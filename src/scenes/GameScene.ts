@@ -12,17 +12,30 @@ import {
   MAX_ZOOM,
   DEFAULT_ZOOM,
   ZOOM_STORAGE_KEY,
-  VISION_RADIUS,
+  PLAYER_MAX_HP,
+  PLAYER_START_SPEED,
+  PLAYER_START_VISION,
+  UNARMED_BASE_DAMAGE,
+  CONTACT_DAMAGE_COOLDOWN_MS,
 } from '../config';
 import { NODES } from '../data/nodes';
 import { BUILDABLES } from '../data/buildables';
-import type { ResourceNodeDef } from '../data/types';
+import { ENEMIES } from '../data/enemies';
+import type { ResourceNodeDef, CombatantStats, EnemyDef } from '../data/types';
 import { Inventory } from '../systems/Inventory';
 import { worldToTile, tileToWorldCenter, snapToTileCenter, tileKey } from '../systems/grid';
 import { findPath, reachableAdjacent, type Cell } from '../systems/pathfind';
 import { TaskQueue, type Action } from '../systems/tasks';
+import { resolveMeleeAttack } from '../systems/combat';
 import type { UIScene } from './UIScene';
-import { ACTIVE_TILESET, dirtKey, playerFrameKey, pickWeighted } from '../data/tileset';
+import {
+  ACTIVE_TILESET,
+  dirtKey,
+  playerFrameKey,
+  kidZombieFrameKey,
+  kidZombieDamagedFrameKey,
+  pickWeighted,
+} from '../data/tileset';
 
 /** A live/stump resource node instance in the world (tree sprite + its data + state). */
 interface TreeNode {
@@ -50,6 +63,22 @@ interface BuildSite {
   done: boolean;
 }
 
+/** A live enemy instance in the world — minimal idle/chasing AI (see plan 003). */
+interface ZombieUnit {
+  id: string;
+  sprite: Phaser.GameObjects.Sprite & { body: Phaser.Physics.Arcade.Body };
+  def: EnemyDef;
+  hp: number;
+  alive: boolean;
+  col: number;
+  row: number;
+  state: 'idle' | 'chasing';
+  lastContactAt: number;
+  lastRepathAt: number;
+  path: Cell[];
+  pathIndex: number;
+}
+
 /**
  * World scene: the worker task system. The player unit pathfinds around obstacles (walls + live
  * trees), works through a queue of orders (tap = act now / clear; long-press = append), and builds
@@ -60,11 +89,18 @@ interface BuildSite {
  */
 export class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite & { body: Phaser.Physics.Arcade.Body };
-  private readonly speed = 90;
+
+  // Combat: stats bag + separate runtime HP (mirrors the def/runtime-hp split used for trees),
+  // facing (for Punch — see Step 5/6), reset in create() so a death-restart starts fresh.
+  private playerStats!: CombatantStats;
+  private playerHp = 0;
+  private lastFacing = { dCol: 0, dRow: 1 };
 
   private inv!: Inventory;
   private trees: TreeNode[] = [];
   private nextTreeId = 0;
+  private zombies: ZombieUnit[] = [];
+  private nextZombieId = 0;
 
   private readonly queue = new TaskQueue();
   private path: Cell[] = [];
@@ -103,6 +139,39 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Reset all mutable world/queue state — create() reruns on a death-restart (see
+    // damagePlayer()), and Phaser reuses this same Scene instance rather than reconstructing it,
+    // so plain-data fields (unlike this.add.*-owned GameObjects, which the scene teardown already
+    // destroys) need an explicit reset here or they'd accumulate across restarts.
+    this.queue.clear();
+    this.trees = [];
+    this.nextTreeId = 0;
+    this.zombies = [];
+    this.nextZombieId = 0;
+    this.sites = [];
+    this.siteTiles.clear();
+    this.occupied.clear();
+    this.nextSiteId = 0;
+    this.path = [];
+    this.pathIndex = 0;
+    this.actionGoal = null;
+    this.chopElapsed = 0;
+    this.buildMode = false;
+    this.queueMarkers = [];
+    this.paintedThisGesture.clear();
+    this.lastFacing = { dCol: 0, dRow: 1 };
+
+    this.playerStats = {
+      maxHp: PLAYER_MAX_HP,
+      armour: 0,
+      speed: PLAYER_START_SPEED,
+      vision: PLAYER_START_VISION,
+      strength: 0,
+      dex: 0,
+      dodge: 0,
+    };
+    this.playerHp = this.playerStats.maxHp;
+
     this.drawGround();
 
     // Shared character inventory — stored in the registry so the UIScene reads the same instance.
@@ -110,12 +179,31 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('inventory', this.inv);
 
     this.spawnTrees();
+    this.spawnZombies();
 
     // The player you order around with taps — the pack's walk-cycle frames, idle on frame 0.
     if (!this.anims.exists('player-walk')) {
       this.anims.create({
         key: 'player-walk',
         frames: ACTIVE_TILESET.actors.player.map((_, i) => ({ key: playerFrameKey(i) })),
+        frameRate: 10,
+        repeat: -1,
+      });
+    }
+    // The kid zombie's walk-cycle + hit-reaction frames — not yet spawned on-screen (that's a
+    // later step), but the anims are built here so they exist as soon as assets are preloaded.
+    if (!this.anims.exists('kid-zombie-walk')) {
+      this.anims.create({
+        key: 'kid-zombie-walk',
+        frames: ACTIVE_TILESET.actors.kidZombie.map((_, i) => ({ key: kidZombieFrameKey(i) })),
+        frameRate: 10,
+        repeat: -1,
+      });
+    }
+    if (!this.anims.exists('kid-zombie-damaged')) {
+      this.anims.create({
+        key: 'kid-zombie-damaged',
+        frames: ACTIVE_TILESET.actors.kidZombieDamaged.map((_, i) => ({ key: kidZombieDamagedFrameKey(i) })),
         frameRate: 10,
         repeat: -1,
       });
@@ -170,6 +258,7 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on('debug:regenTrees', this.regenerateTrees, this); // TEMP: movement testing
     this.game.events.on('zoom:delta', this.adjustZoom, this);
     this.game.events.on('camera:center', this.centerOnPlayer, this);
+    this.game.events.on('combat:punch', this.punch, this);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off('build:toggle', this.toggleBuild, this);
@@ -177,6 +266,7 @@ export class GameScene extends Phaser.Scene {
       this.game.events.off('debug:regenTrees', this.regenerateTrees, this); // TEMP
       this.game.events.off('zoom:delta', this.adjustZoom, this);
       this.game.events.off('camera:center', this.centerOnPlayer, this);
+      this.game.events.off('combat:punch', this.punch, this);
     });
 
     this.emitTasks();
@@ -188,6 +278,7 @@ export class GameScene extends Phaser.Scene {
       this.player.body.setVelocity(0, 0);
       this.updatePlayerAnim();
       this.updateVision();
+      this.updateZombies();
       return;
     }
     switch (action.kind) {
@@ -203,6 +294,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.updatePlayerAnim();
     this.updateVision();
+    this.updateZombies();
   }
 
   // --- Obstacle grid + path following -------------------------------------
@@ -234,12 +326,15 @@ export class GameScene extends Phaser.Scene {
     const wp = this.path[this.pathIndex];
     const wx = tileToWorldCenter(wp.col);
     const wy = tileToWorldCenter(wp.row);
+    const dCol = Math.sign(wp.col - worldToTile(this.player.x));
+    const dRow = Math.sign(wp.row - worldToTile(this.player.y));
+    if (dCol !== 0 || dRow !== 0) this.lastFacing = { dCol, dRow };
     if (Phaser.Math.Distance.Between(this.player.x, this.player.y, wx, wy) <= 2) {
       this.player.body.reset(wx, wy);
       this.pathIndex += 1;
       return this.pathIndex >= this.path.length;
     }
-    this.physics.moveTo(this.player, wx, wy, this.speed);
+    this.physics.moveTo(this.player, wx, wy, this.playerStats.speed);
     return false;
   }
 
@@ -492,6 +587,36 @@ export class GameScene extends Phaser.Scene {
     this.enqueue(this.actionAt(pointer.worldX, pointer.worldY));
   }
 
+  // --- Combat ----------------------------------------------------------------
+
+  /** Apply incoming damage to the player; on death, restart the scene (see Context & decisions'
+   * "Death = restart" — no in-place heal, since that let an adjacent zombie immediately re-hit a
+   * "reset" player). */
+  private damagePlayer(amount: number): void {
+    this.playerHp = Math.max(0, this.playerHp - amount);
+    this.game.events.emit('player:hpChanged', { hp: this.playerHp, maxHp: this.playerStats.maxHp });
+    if (this.playerHp <= 0) {
+      console.log('player down — restarting');
+      this.scene.restart();
+    }
+  }
+
+  /** Punch the facing-adjacent tile: flat damage via the shared combat formula, no range/arc
+   * beyond that one tile. Only affects zombies — trees keep using chop(). */
+  private punch(): void {
+    const pt = this.playerTile();
+    const col = pt.col + this.lastFacing.dCol;
+    const row = pt.row + this.lastFacing.dRow;
+    const zombie = this.zombies.find((z) => z.alive && z.col === col && z.row === row);
+    if (!zombie) return;
+    zombie.hp -= resolveMeleeAttack(this.playerStats, zombie.def, UNARMED_BASE_DAMAGE);
+    if (zombie.hp <= 0) {
+      zombie.alive = false;
+      zombie.sprite.destroy();
+      this.zombies = this.zombies.filter((z) => z !== zombie);
+    }
+  }
+
   // --- Trees / chopping ----------------------------------------------------
 
   private spawnTrees(): void {
@@ -561,6 +686,99 @@ export class GameScene extends Phaser.Scene {
         tree.sprite.clearTint();
         this.repath(); // regrown tree may now block the active route
       });
+    }
+  }
+
+  // --- Zombies (minimal idle/chasing AI — see plan 003) ---------------------
+
+  private spawnZombies(): void {
+    this.addZombie('kidZombie', 11, 30);
+  }
+
+  private addZombie(enemyId: string, col: number, row: number): void {
+    const def = ENEMIES[enemyId];
+    const sprite = this.add.sprite(tileToWorldCenter(col), tileToWorldCenter(row), kidZombieFrameKey(0)).setDepth(9);
+    this.physics.add.existing(sprite);
+    const zsprite = sprite as ZombieUnit['sprite'];
+    zsprite.body.setCollideWorldBounds(true);
+    this.zombies.push({
+      id: `zombie-${this.nextZombieId++}`,
+      sprite: zsprite,
+      def,
+      hp: def.maxHp,
+      alive: true,
+      col,
+      row,
+      state: 'idle',
+      lastContactAt: 0,
+      lastRepathAt: 0,
+      path: [],
+      pathIndex: 0,
+    });
+  }
+
+  /** Step a zombie toward its next waypoint (mirrors advancePath's approach); true once its
+   * current path is exhausted. */
+  private advanceZombie(z: ZombieUnit): boolean {
+    if (z.pathIndex >= z.path.length) {
+      z.sprite.body.setVelocity(0, 0);
+      return true;
+    }
+    const wp = z.path[z.pathIndex];
+    const wx = tileToWorldCenter(wp.col);
+    const wy = tileToWorldCenter(wp.row);
+    if (Phaser.Math.Distance.Between(z.sprite.x, z.sprite.y, wx, wy) <= 2) {
+      z.sprite.body.reset(wx, wy);
+      z.col = wp.col;
+      z.row = wp.row;
+      z.pathIndex += 1;
+      return z.pathIndex >= z.path.length;
+    }
+    this.physics.moveTo(z.sprite, wx, wy, z.def.speed);
+    return false;
+  }
+
+  /** Walk-cycle while moving, idle frame otherwise (mirrors updatePlayerAnim). */
+  private updateZombieAnim(z: ZombieUnit): void {
+    if (z.sprite.body.velocity.lengthSq() > 1) {
+      z.sprite.anims.play('kid-zombie-walk', true);
+    } else {
+      z.sprite.anims.stop();
+      z.sprite.setTexture(kidZombieFrameKey(0));
+    }
+  }
+
+  /** Per-frame idle→chasing aggro check + chase/contact-damage for every live zombie. */
+  private updateZombies(): void {
+    const now = this.time.now;
+    const pt = this.playerTile();
+    for (const z of this.zombies) {
+      if (!z.alive) continue;
+
+      if (z.state === 'idle') {
+        const dist = Phaser.Math.Distance.Between(z.sprite.x, z.sprite.y, this.player.x, this.player.y);
+        if (dist <= (z.def.vision ?? 0)) z.state = 'chasing';
+      }
+
+      if (z.state === 'chasing') {
+        const tileDist = Math.max(Math.abs(pt.col - z.col), Math.abs(pt.row - z.row));
+        if (tileDist <= 1) {
+          z.sprite.body.setVelocity(0, 0);
+          if (now - z.lastContactAt >= CONTACT_DAMAGE_COOLDOWN_MS) {
+            z.lastContactAt = now;
+            this.damagePlayer(resolveMeleeAttack(z.def, this.playerStats, UNARMED_BASE_DAMAGE));
+          }
+        } else {
+          if (now - z.lastRepathAt >= 300) {
+            z.lastRepathAt = now;
+            z.path = findPath({ col: z.col, row: z.row }, pt, this.isBlocked, this.gridDims) ?? [];
+            z.pathIndex = 0;
+          }
+          this.advanceZombie(z);
+        }
+      }
+
+      this.updateZombieAnim(z);
     }
   }
 
@@ -746,13 +964,15 @@ export class GameScene extends Phaser.Scene {
   private updateVision(): void {
     this.fogShape.clear();
     this.fogShape.fillStyle(0xffffff);
-    this.fogShape.fillCircle(this.player.x, this.player.y, VISION_RADIUS);
+    this.fogShape.fillCircle(this.player.x, this.player.y, this.playerStats.vision ?? PLAYER_START_VISION);
     this.player.setVisible(this.inVisionRange(this.player.x, this.player.y));
   }
 
   /** True if a world point is within the character's vision radius (see fog of war above). */
   private inVisionRange(x: number, y: number): boolean {
-    return Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) <= VISION_RADIUS;
+    return (
+      Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) <= (this.playerStats.vision ?? PLAYER_START_VISION)
+    );
   }
 
   /** How many of the tracked pointers (see BootScene's addPointer) are currently held down. */

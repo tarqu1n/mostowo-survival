@@ -181,7 +181,16 @@ target — this slice deliberately implements only a minimal slice of that (see 
 
 ## Steps
 
-- [ ] **Step 1: Shared stats schema + combat resolution + EnemyDef catalog** `[inline]`
+- [x] **Step 1: Shared stats schema + combat resolution + EnemyDef catalog** `[inline]`
+  - Outcome: `src/data/types.ts` gained `BaseStats`/`CombatantStats`/`ObjectStats`/`EnemyDef`/
+    `InspectableStats`; `ResourceNodeDef`/`BuildableDef` now `extends ObjectStats` (their `maxHp`
+    field is inherited, not duplicated). New `src/data/enemies.ts` (`ENEMIES.kidZombie`). New
+    `src/systems/combat.ts` (`meleeDamage`/`rangedDamage`/`hitChance`/`damageTaken`/
+    `resolveMeleeAttack`, `rng` injectable). Added `PLAYER_MAX_HP`/`PLAYER_START_SPEED`/
+    `PLAYER_START_VISION`/`UNARMED_BASE_DAMAGE`/`CONTACT_DAMAGE_COOLDOWN_MS` to `config.ts`.
+    Updated `NODES.tree` (`armour: 0, speed: 0`) and `BUILDABLES.wall` (`maxHp: 10, armour: 0,
+    speed: 0`) — only two literals existed, confirmed via grep. `npm run typecheck` passes;
+    `resolveMeleeAttack(player, kidZombie, 1, () => 0)` returns `1` as intended.
   - In `src/data/types.ts`, add the three-interface schema from Context & decisions verbatim
     (`BaseStats`, `CombatantStats extends BaseStats`, `ObjectStats extends BaseStats`), plus:
     ```ts
@@ -232,7 +241,12 @@ target — this slice deliberately implements only a minimal slice of that (see 
     {...kidZombie defaults}, UNARMED_BASE_DAMAGE)` returns `1` confirms the formula composes as
     intended before any scene code consumes it.
 
-- [ ] **Step 2: Wire the kid zombie tileset entry** `[delegate]`
+- [x] **Step 2: Wire the kid zombie tileset entry** `[delegate]`
+  - Outcome: `tileset.ts` gained `actors.kidZombie`/`kidZombieDamaged` (9+9 filename-sorted paths)
+    + `kidZombieFrameKey`/`kidZombieDamagedFrameKey` helpers. `PreloadScene.ts` loads both frame
+    sets. `GameScene.ts::create()` builds `'kid-zombie-walk'`/`'kid-zombie-damaged'` anims right
+    after `'player-walk'` (guarded, no sprite/spawn yet — that's Step 4). Verified via a real
+    headless-browser run: zero 404s/console errors, both anim keys exist with 9 frames each.
   - In `src/data/tileset.ts`, extend `TilesetManifest`'s `actors` shape to add zombie frame lists
     alongside the existing `player: string[]`, e.g. `kidZombie: string[]` (walk cycle, the 9 files
     in `public/assets/tilesets/zombie-apocalypse/sprites/kid-zombie-animation-frames/`) and
@@ -255,7 +269,19 @@ target — this slice deliberately implements only a minimal slice of that (see 
     that `this.anims.get('kid-zombie-walk')` / `'kid-zombie-damaged'` exist (inspectable via
     `window.game.anims` in devtools). The zombie doesn't need to be on-screen yet — that's Step 4.
 
-- [ ] **Step 3: Player stats, facing, and HP** `[inline]`
+- [x] **Step 3: Player stats, facing, and HP** `[inline]`
+  - Outcome: `GameScene` gained `playerStats: CombatantStats` (from new `PLAYER_MAX_HP`/
+    `PLAYER_START_SPEED`/`PLAYER_START_VISION` config constants), `playerHp`, `lastFacing`, and
+    `damagePlayer()` (emits `player:hpChanged`, restarts the scene at 0 HP). Migrated the old
+    `this.speed`/`VISION_RADIUS` reads to `this.playerStats.speed`/`.vision` (single source of
+    truth, small contained rename). `lastFacing` is updated in `advancePath()` from the sign of
+    the current waypoint delta. **Judgement call beyond the plan's literal text:** since
+    `scene.restart()` reuses the same Scene instance (class field initializers don't rerun),
+    added an explicit reset block at the top of `create()` clearing every plain-data
+    collection/counter (`trees`, `sites`, `occupied`, `queue`, `zombies`, etc.) — otherwise a
+    death-restart would accumulate stale entries instead of giving a clean respawn. `npm run
+    typecheck` passes once Step 4/5 consume `damagePlayer`/`lastFacing` (both were flagged
+    `noUnusedLocals` until wired up, expected given how tightly these steps couple).
   - In `GameScene.ts`, add `playerStats: CombatantStats` initialized to the Context & decisions
     "Player" row (`{ maxHp: 10, armour: 0, speed: 90, vision: 80, strength: 0, dex: 0, dodge: 0 }`
     — pull the `10`/`90`/`80` into named `config.ts` constants `PLAYER_MAX_HP`,
@@ -288,7 +314,18 @@ target — this slice deliberately implements only a minimal slice of that (see 
     in devtools console logs the emitted event (check via a temporary
     `game.events.on('player:hpChanged', console.log)` in devtools) and clamps/resets correctly at 0.
 
-- [ ] **Step 4: Zombie runtime unit + minimal chase/contact-damage AI** `[inline]`
+- [x] **Step 4: Zombie runtime unit + minimal chase/contact-damage AI** `[inline]`
+  - Outcome: `ZombieUnit` interface + `zombies: ZombieUnit[]` array added to `GameScene.ts`,
+    mirroring `TreeNode`. One `kidZombie` spawns at a fixed test tile `(11, 30)` — 10 tiles south
+    of the player's spawn `(11, 20)`, well outside the zombie's `vision: 80px` (5 tiles) so it
+    starts genuinely idle rather than immediately aggroing. `updateZombies()` runs every frame:
+    idle→chasing on a vision-radius check, chase via `findPath` re-planned every ~300ms +
+    `advanceZombie()` (a per-zombie duplicate of `advancePath`'s waypoint-walk, parameterized by
+    sprite/path/speed rather than forcing a shared function per the plan's "don't force a shared
+    function if the existing code isn't already factored for reuse" guidance), contact damage via
+    `resolveMeleeAttack` + `damagePlayer` on `CONTACT_DAMAGE_COOLDOWN_MS`. No new Arcade collider
+    between player and zombie — contact damage is tile-distance-based, per plan. `npm run
+    typecheck` passes.
   - In `GameScene.ts`, add a scene-local `interface ZombieUnit { id: string; sprite:
     Phaser.GameObjects.Sprite; def: EnemyDef; hp: number; alive: boolean; col: number; row: number;
     state: 'idle' | 'chasing'; lastContactAt: number; lastRepathAt: number; path: {col:number;
@@ -325,7 +362,13 @@ target — this slice deliberately implements only a minimal slice of that (see 
     should land (this is a good moment to sanity-check the `hitChance` floor/clamp is doing the
     right thing, even though it's a no-op at these starting numbers).
 
-- [ ] **Step 5: Punch action** `[inline]`
+- [x] **Step 5: Punch action** `[inline]`
+  - Outcome: `GameScene.punch()` computes `playerTile() + lastFacing`, finds a live zombie by
+    tile-equality, resolves damage via `resolveMeleeAttack(playerStats, zombie.def,
+    UNARMED_BASE_DAMAGE)`, destroys + removes the zombie at `hp <= 0` (no stump-equivalent, per
+    plan). Wired to a new `combat:punch` game-event (emitted by Step 6's Punch button), registered/
+    torn down alongside the other `build:*`/`tasks:*` listeners. `npm run build` (typecheck + vite
+    build) passes.
   - In `GameScene.ts`, add a `punch()` method: compute the facing tile
     (`playerTile() + lastFacing`, using `systems/grid.ts` helpers), find a live zombie in
     `zombies` occupying that tile (mirror how `treeAt()` hit-tests, but by tile-equality against

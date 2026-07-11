@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { BASE_WIDTH, BASE_HEIGHT, COLORS } from '../config';
-import { ACTIVE_TILESET, dirtKey, playerFrameKey } from '../data/tileset';
+import { ACTIVE_TILESET, dirtKey, playerFrameKey, kidZombieFrameKey, kidZombieDamagedFrameKey } from '../data/tileset';
 
 /**
  * Loads assets and shows a simple loading bar. Trialling a first real-art pass (see
@@ -40,6 +40,12 @@ export class PreloadScene extends Phaser.Scene {
     this.load.image('wall', `${base}/${ACTIVE_TILESET.tiles.wall}`);
     this.load.image('tree', `${base}/${ACTIVE_TILESET.tiles.tree}`);
     ACTIVE_TILESET.actors.player.forEach((relPath, i) => this.load.image(playerFrameKey(i), `${base}/${relPath}`));
+    ACTIVE_TILESET.actors.kidZombie.forEach((relPath, i) =>
+      this.load.image(kidZombieFrameKey(i), `${base}/${relPath}`)
+    );
+    ACTIVE_TILESET.actors.kidZombieDamaged.forEach((relPath, i) =>
+      this.load.image(kidZombieDamagedFrameKey(i), `${base}/${relPath}`)
+    );
   }
 
   create(): void {

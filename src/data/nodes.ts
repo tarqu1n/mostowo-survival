@@ -9,6 +9,8 @@ export const NODES: Record<string, ResourceNodeDef> = {
     id: 'tree',
     name: 'Tree',
     maxHp: 3,
+    armour: 0, // inert for objects — see plan 003 Context & decisions
+    speed: 0, // inert for objects
     woodItemId: 'wood',
     woodPerHit: 1,
     regrowMs: 15000,

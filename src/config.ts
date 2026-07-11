@@ -39,6 +39,17 @@ export const ZOOM_STORAGE_KEY = 'mostowa:zoom';
 /** Radius (world px) of the character's line of sight — everything beyond it is fogged. */
 export const VISION_RADIUS = TILE_SIZE * 5;
 
+/** Starting player combat stats (see plan 003 Context & decisions' cast table). */
+export const PLAYER_MAX_HP = 10;
+export const PLAYER_START_SPEED = 90;
+export const PLAYER_START_VISION = VISION_RADIUS;
+
+/** Base damage of an unarmed hit — shared by Punch and a zombie's bite via resolveMeleeAttack. */
+export const UNARMED_BASE_DAMAGE = 1;
+
+/** Minimum time (ms) between a zombie's contact-damage attempts on the player. */
+export const CONTACT_DAMAGE_COOLDOWN_MS = 1000;
+
 /** Semantic colour palette (dark & grotty). Expand as the art identity firms up. */
 export const COLORS = {
   background: 0x14100f,

@@ -24,6 +24,10 @@ export interface TilesetManifest {
   actors: {
     /** Walk-cycle frames, relative to `sprites/`. Frame 0 doubles as the idle pose. */
     player: string[];
+    /** Kid zombie walk-cycle frames, relative to `sprites/`. Frame 0 doubles as the idle pose. */
+    kidZombie: string[];
+    /** Kid zombie "damaged" (hit-reaction) frames, relative to `sprites/`. */
+    kidZombieDamaged: string[];
   };
 }
 
@@ -51,6 +55,28 @@ export const ZOMBIE_APOCALYPSE_TILESET: TilesetManifest = {
       'player-character-walking-animation-frames/Zombie-Tileset---_0483_Capa-484.png',
       'player-character-walking-animation-frames/Zombie-Tileset---_0484_Capa-485.png',
     ],
+    kidZombie: [
+      'kid-zombie-animation-frames/Zombie-Tileset---_0430_Capa-431.png',
+      'kid-zombie-animation-frames/Zombie-Tileset---_0431_Capa-432.png',
+      'kid-zombie-animation-frames/Zombie-Tileset---_0432_Capa-433.png',
+      'kid-zombie-animation-frames/Zombie-Tileset---_0433_Capa-434.png',
+      'kid-zombie-animation-frames/Zombie-Tileset---_0434_Capa-435.png',
+      'kid-zombie-animation-frames/Zombie-Tileset---_0435_Capa-436.png',
+      'kid-zombie-animation-frames/Zombie-Tileset---_0436_Capa-437.png',
+      'kid-zombie-animation-frames/Zombie-Tileset---_0437_Capa-438.png',
+      'kid-zombie-animation-frames/Zombie-Tileset---_0438_Capa-439.png',
+    ],
+    kidZombieDamaged: [
+      'damaged-kid-zombie-animation-frames/Zombie-Tileset---_0439_Capa-440.png',
+      'damaged-kid-zombie-animation-frames/Zombie-Tileset---_0440_Capa-441.png',
+      'damaged-kid-zombie-animation-frames/Zombie-Tileset---_0441_Capa-442.png',
+      'damaged-kid-zombie-animation-frames/Zombie-Tileset---_0442_Capa-443.png',
+      'damaged-kid-zombie-animation-frames/Zombie-Tileset---_0443_Capa-444.png',
+      'damaged-kid-zombie-animation-frames/Zombie-Tileset---_0444_Capa-445.png',
+      'damaged-kid-zombie-animation-frames/Zombie-Tileset---_0445_Capa-446.png',
+      'damaged-kid-zombie-animation-frames/Zombie-Tileset---_0446_Capa-447.png',
+      'damaged-kid-zombie-animation-frames/Zombie-Tileset---_0447_Capa-448.png',
+    ],
   },
 };
 
@@ -62,6 +88,12 @@ export const dirtKey = (i: number): string => `dirt${i}`;
 
 /** Texture key for the Nth player walk-cycle frame. */
 export const playerFrameKey = (i: number): string => `player-walk-${i}`;
+
+/** Texture key for the Nth kid zombie walk-cycle frame. */
+export const kidZombieFrameKey = (i: number): string => `kid-zombie-${i}`;
+
+/** Texture key for the Nth kid zombie "damaged" (hit-reaction) frame. */
+export const kidZombieDamagedFrameKey = (i: number): string => `kid-zombie-damaged-${i}`;
 
 /** Weighted-random pick over `items` — used for ground variety (see `tiles.dirt` doc above). */
 export function pickWeighted<T extends { weight: number }>(items: T[]): T {
