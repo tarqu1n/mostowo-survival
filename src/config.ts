@@ -30,10 +30,7 @@ export const DRAG_PX = 12;
 /** Semantic colour palette (dark & grotty). Expand as the art identity firms up. */
 export const COLORS = {
   background: 0x14100f,
-  dirt: 0x3b2f2a,
-  grass: 0x2f3b26,
   water: 0x24384a,
-  player: 0xd9c7a3,
   ui: 0xe8dcc0,
   ghostValid: 0x4caf50, // build ghost when a tile is placeable + affordable
   ghostInvalid: 0xb23b3b, // build ghost when blocked or unaffordable

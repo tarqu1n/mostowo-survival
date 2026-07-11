@@ -1,9 +1,14 @@
 import Phaser from 'phaser';
 import { BASE_WIDTH, BASE_HEIGHT, COLORS } from '../config';
+import { ACTIVE_TILESET, dirtKey, playerFrameKey } from '../data/tileset';
 
 /**
- * Loads assets and shows a simple loading bar. No real assets yet (placeholder-first art), so this
- * mostly exists to lock the pipeline in place — drop `this.load.*` calls here as assets arrive.
+ * Loads assets and shows a simple loading bar. Trialling a first real-art pass (see
+ * `src/data/tileset.ts` for the active pack, still eval-stage per docs/ASSETS.md) over the
+ * placeholder rects, to see how it reads in motion before committing to a base tileset. Texture
+ * keys loaded here are the pack-agnostic roles (`dirt0`, `wall`, `player-walk-0`, ...), not
+ * pack-specific names — swapping `ACTIVE_TILESET` is the only change needed to trial a different
+ * pack.
  */
 export class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -30,8 +35,11 @@ export class PreloadScene extends Phaser.Scene {
       bar.destroy();
     });
 
-    // No assets to load yet — this keeps the loader from stalling on an empty queue.
-    this.load.image('__noop', 'data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA=');
+    const base = `${import.meta.env.BASE_URL}assets/tilesets/${ACTIVE_TILESET.id}/sprites`;
+    ACTIVE_TILESET.tiles.dirt.forEach((variant, i) => this.load.image(dirtKey(i), `${base}/${variant.path}`));
+    this.load.image('wall', `${base}/${ACTIVE_TILESET.tiles.wall}`);
+    this.load.image('tree', `${base}/${ACTIVE_TILESET.tiles.tree}`);
+    ACTIVE_TILESET.actors.player.forEach((relPath, i) => this.load.image(playerFrameKey(i), `${base}/${relPath}`));
   }
 
   create(): void {
