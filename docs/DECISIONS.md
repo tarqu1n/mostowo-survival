@@ -7,6 +7,36 @@ Format: `YYYY-MM-DD — [DECIDED|PROPOSED|OPEN] Title` then a short rationale.
 
 ---
 
+## 2026-07-12 — [DECIDED] Swap active art to Pixel Crawler; zombie pack retired (plan 005)
+
+Committed the swap proposed below: `ACTIVE_TILESET` now points to `PIXEL_CRAWLER_TILESET`
+(`src/data/tileset.ts`). The old `ZOMBIE_APOCALYPSE_TILESET` const is removed (git history +
+[docs/ASSETS.md](ASSETS.md#zombie-apocalypse-tileset--retired-reference-fallback-2026-07-11) retain
+the record); its files stay under `public/assets/` as retired reference/fallback art, not deleted.
+Manifest reshaped to a role-based schema (`TileSource` union — `image`/`sheetFrame` — plus
+`StripAnim`/`ActorRender`), replacing the old approach, since the new schema is strip-only.
+
+**Skeleton (Base)** mob is the sprite stand-in for the kid zombie — enemy data id `kidZombie` /
+`name: 'Kid Zombie'` unchanged, only the sprite changed, consistent with the "reskinnable
+stand-ins" call below.
+
+Added **3-way directional facing for the player** (Down/Side/Up idle+walk strips; Side art faces
+right, `flipX` mirrors left, driven by `lastFacing`). The **enemy stays single-orientation** (Run
+strip only, frame 0 = idle, flips by movement-x) — mob sheets in this pack ship no directional
+variants.
+
+**Escape hatch (deferred, not done):** the zombie pack doesn't need to stay runnable (Matt's call
+mid-plan), but could be made to fit the new strip-only schema by montaging its per-frame PNGs into
+horizontal strips.
+
+**Deferred primitive:** the new `sheetFrame` `TileSource` (a single fixed frame per tile) is also
+the right shape for future adjacency-mask → frame **autotiling** — intentionally left as a
+door-opener; only single fill frames are wired today (grass weighted-random, wall single fill).
+
+Supersedes the [PROPOSED] entry directly below (Pixel Crawler is now committed/wired, not just the
+leading candidate). Full narrative:
+[docs/ASSETS.md](ASSETS.md#active-tileset--pixel-crawler-wired-in-plan-005).
+
 ## 2026-07-11 — [OPEN] Want a map editor; Pixel Crawler autotiler + demo polish gaps
 
 Matt's steer after reviewing the autotiled demos: they're good enough for evaluation, but the real

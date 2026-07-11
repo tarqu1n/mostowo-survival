@@ -31,12 +31,17 @@ import { treeStats, wallStats, zombieStats } from '../systems/stats';
 import type { UIScene } from './UIScene';
 import {
   ACTIVE_TILESET,
-  dirtKey,
-  playerFrameKey,
-  kidZombieFrameKey,
-  kidZombieDamagedFrameKey,
+  resolveTile,
+  playerAnimKey,
+  enemyWalkKey,
   pickWeighted,
+  type Facing,
+  type PlayerState,
+  type ActorRender,
 } from '../data/tileset';
+
+/** Height (in tiles) the tree image is scaled to stand — big pine on a 16px tile, canopy overhangs up. */
+const TREE_TILES_TALL = 2.6;
 
 /** A live/stump resource node instance in the world (tree sprite + its data + state). */
 export interface TreeNode {
@@ -188,38 +193,37 @@ export class GameScene extends Phaser.Scene {
     this.spawnTrees();
     this.spawnZombies();
 
-    // The player you order around with taps — the pack's walk-cycle frames, idle on frame 0.
-    if (!this.anims.exists('player-walk')) {
+    // Player: 3-way directional idle + walk (down/side/up). Each strip is its own texture (key ==
+    // anim key, loaded in PreloadScene); side art faces right, GameScene mirrors it with flipX.
+    const { player: playerActor, enemy: enemyActor } = ACTIVE_TILESET.actors;
+    (['idle', 'walk'] as PlayerState[]).forEach((state) => {
+      (['down', 'side', 'up'] as Facing[]).forEach((facing) => {
+        const key = playerAnimKey(state, facing);
+        if (this.anims.exists(key)) return;
+        this.anims.create({
+          key,
+          frames: this.anims.generateFrameNumbers(key, { start: 0, end: playerActor[state][facing].frames - 1 }),
+          frameRate: 10,
+          repeat: -1,
+        });
+      });
+    });
+    // Enemy (skeleton): a single Run strip; frame 0 doubles as the idle pose, and GameScene flips it
+    // by movement-x (the mob sheets ship no directional variants). Its damaged anim is dropped.
+    if (!this.anims.exists(enemyWalkKey)) {
       this.anims.create({
-        key: 'player-walk',
-        frames: ACTIVE_TILESET.actors.player.map((_, i) => ({ key: playerFrameKey(i) })),
+        key: enemyWalkKey,
+        frames: this.anims.generateFrameNumbers(enemyWalkKey, { start: 0, end: enemyActor.walk.frames - 1 }),
         frameRate: 10,
         repeat: -1,
       });
     }
-    // The kid zombie's walk-cycle + hit-reaction frames — not yet spawned on-screen (that's a
-    // later step), but the anims are built here so they exist as soon as assets are preloaded.
-    if (!this.anims.exists('kid-zombie-walk')) {
-      this.anims.create({
-        key: 'kid-zombie-walk',
-        frames: ACTIVE_TILESET.actors.kidZombie.map((_, i) => ({ key: kidZombieFrameKey(i) })),
-        frameRate: 10,
-        repeat: -1,
-      });
-    }
-    if (!this.anims.exists('kid-zombie-damaged')) {
-      this.anims.create({
-        key: 'kid-zombie-damaged',
-        frames: ACTIVE_TILESET.actors.kidZombieDamaged.map((_, i) => ({ key: kidZombieDamagedFrameKey(i) })),
-        frameRate: 10,
-        repeat: -1,
-      });
-    }
-    const p = this.add.sprite(BASE_WIDTH / 2, BASE_HEIGHT / 2, playerFrameKey(0));
+    const p = this.add.sprite(BASE_WIDTH / 2, BASE_HEIGHT / 2, playerAnimKey('idle', 'down'));
     this.physics.add.existing(p);
     this.player = p as typeof this.player;
-    this.player.setDepth(10);
+    this.player.setDepth(10).setScale(playerActor.render.scale).setOrigin(playerActor.render.originX, playerActor.render.originY);
     this.player.body.setCollideWorldBounds(true);
+    this.fitActorBody(this.player, playerActor.render);
     this.physics.world.setBounds(0, 0, BASE_WIDTH, BASE_HEIGHT);
 
     // Camera follows the player once zoomed in (at MIN_ZOOM the viewport already covers the whole
@@ -358,14 +362,39 @@ export class GameScene extends Phaser.Scene {
     return false;
   }
 
-  /** Walk-cycle while actually translating (moving between tiles); idle frame otherwise (e.g. chopping in place). */
+  /**
+   * Directional walk/idle from `lastFacing`: walk while translating (moving between tiles), idle
+   * otherwise (e.g. chopping in place) — keeping the last facing either way. Side art faces right,
+   * so left is the same strip mirrored with flipX; down/up clear flipX.
+   */
   private updatePlayerAnim(): void {
-    if (this.player.body.velocity.lengthSq() > 1) {
-      this.player.anims.play('player-walk', true);
-    } else {
-      this.player.anims.stop();
-      this.player.setTexture(playerFrameKey(0));
-    }
+    const facing = this.facingDir();
+    const state: PlayerState = this.player.body.velocity.lengthSq() > 1 ? 'walk' : 'idle';
+    this.player.setFlipX(facing === 'side' && this.lastFacing.dCol < 0);
+    this.player.anims.play(playerAnimKey(state, facing), true);
+  }
+
+  /** Map `lastFacing` (dCol/dRow) to a directional strip: side when horizontal dominates, else up/down. */
+  private facingDir(): Facing {
+    const { dCol, dRow } = this.lastFacing;
+    if (dCol !== 0 && Math.abs(dCol) >= Math.abs(dRow)) return 'side';
+    return dRow < 0 ? 'up' : 'down';
+  }
+
+  /**
+   * Give a scaled actor a roughly tile-sized physics body at its feet. Size/offset are in source-
+   * frame px (Arcade scales the body by the sprite's scale), so a padded 64px canvas gets a ~1-tile
+   * world body centred on the character's feet. Low-stakes: player↔wall collision is a pathfinding
+   * backstop and enemy contact damage is tile-based (z.col/row), not physics.
+   */
+  private fitActorBody(
+    sprite: Phaser.GameObjects.Sprite & { body: Phaser.Physics.Arcade.Body },
+    render: ActorRender,
+  ): void {
+    const frame = sprite.frame.width; // square source canvas (px)
+    const bodyPx = Math.min(frame, Math.round(TILE_SIZE / render.scale)); // → ≈ one tile in world
+    sprite.body.setSize(bodyPx, bodyPx);
+    sprite.body.setOffset((frame - bodyPx) / 2, frame - bodyPx); // centred horizontally, at the canvas bottom
   }
 
   /** Recompute the path to the active goal after the world changed (wall built / tree regrew). */
@@ -721,8 +750,18 @@ export class GameScene extends Phaser.Scene {
 
   private addTree(col: number, row: number): void {
     const def = NODES.tree;
-    const sprite = this.add.image(tileToWorldCenter(col), tileToWorldCenter(row), 'tree').setDepth(1);
+    const { key } = resolveTile(ACTIVE_TILESET.tiles.tree);
+    const sprite = this.add.image(tileToWorldCenter(col), tileToWorldCenter(row), key).setDepth(1);
+    // The extracted pine is much taller than a tile: scale it to ~TREE_TILES_TALL tiles high and
+    // anchor near its base (bottom-centre-ish origin) so the trunk sits on the tile and the canopy
+    // overhangs upward. sprite.x/y stay the tile centre, so treeAt()'s distance check is unaffected.
+    sprite.setScale(this.treeScale(sprite)).setOrigin(0.5, 0.92);
     this.trees.push({ id: `tree-${this.nextTreeId++}`, sprite, def, hp: def.maxHp, alive: true, col, row });
+  }
+
+  /** Base display scale for the tree image (derived from its source height, so any pine fits its tile). */
+  private treeScale(sprite: Phaser.GameObjects.Image): number {
+    return (TILE_SIZE * TREE_TILES_TALL) / sprite.frame.height;
   }
 
   /**
@@ -764,12 +803,14 @@ export class GameScene extends Phaser.Scene {
   private chop(tree: TreeNode): void {
     tree.hp -= 1;
     this.inv.add(tree.def.woodItemId, tree.def.woodPerHit);
-    this.tweens.add({ targets: tree.sprite, scale: 1.18, duration: 80, yoyo: true });
+    // Bump relative to the tree's fitted base scale (not an absolute 1 — the pine is scaled down).
+    const base = this.treeScale(tree.sprite);
+    this.tweens.add({ targets: tree.sprite, scale: base * 1.18, duration: 80, yoyo: true });
     if (tree.hp <= 0) {
       tree.alive = false;
       // No dedicated stump sprite in the pack yet (see docs/ASSETS.md) — tint the felled tree
       // brown as a stand-in "stump" state rather than mixing in a mismatched placeholder rect.
-      tree.sprite.setScale(1).setTint(tree.def.stumpColor);
+      tree.sprite.setScale(base).setTint(tree.def.stumpColor);
       this.time.delayedCall(tree.def.regrowMs, () => {
         tree.hp = tree.def.maxHp;
         tree.alive = true;
@@ -787,10 +828,13 @@ export class GameScene extends Phaser.Scene {
 
   private addZombie(enemyId: string, col: number, row: number): void {
     const def = ENEMIES[enemyId];
-    const sprite = this.add.sprite(tileToWorldCenter(col), tileToWorldCenter(row), kidZombieFrameKey(0)).setDepth(9);
+    const { render } = ACTIVE_TILESET.actors.enemy;
+    const sprite = this.add.sprite(tileToWorldCenter(col), tileToWorldCenter(row), enemyWalkKey).setDepth(9);
+    sprite.setScale(render.scale).setOrigin(render.originX, render.originY);
     this.physics.add.existing(sprite);
     const zsprite = sprite as ZombieUnit['sprite'];
     zsprite.body.setCollideWorldBounds(true);
+    this.fitActorBody(zsprite, render);
     this.zombies.push({
       id: `zombie-${this.nextZombieId++}`,
       sprite: zsprite,
@@ -828,13 +872,15 @@ export class GameScene extends Phaser.Scene {
     return false;
   }
 
-  /** Walk-cycle while moving, idle frame otherwise (mirrors updatePlayerAnim). */
+  /** Run-cycle while moving (flipped by movement-x — art faces right), idle pose (frame 0) otherwise. */
   private updateZombieAnim(z: ZombieUnit): void {
     if (z.sprite.body.velocity.lengthSq() > 1) {
-      z.sprite.anims.play('kid-zombie-walk', true);
+      const vx = z.sprite.body.velocity.x;
+      if (vx !== 0) z.sprite.setFlipX(vx < 0);
+      z.sprite.anims.play(enemyWalkKey, true);
     } else {
       z.sprite.anims.stop();
-      z.sprite.setTexture(kidZombieFrameKey(0));
+      z.sprite.setFrame(0);
     }
   }
 
@@ -937,7 +983,8 @@ export class GameScene extends Phaser.Scene {
     site.done = true;
     // Physics body stays on the (now-hidden) rect; the pack's wall sprite renders on top of it.
     site.rect.setAlpha(0);
-    site.visual = this.add.image(site.rect.x, site.rect.y, 'wall').setDepth(1);
+    const wall = resolveTile(ACTIVE_TILESET.tiles.wall);
+    site.visual = this.add.image(site.rect.x, site.rect.y, wall.key, wall.frame).setDepth(1);
     this.walls.add(site.rect);
     const body = site.rect.body as Phaser.Physics.Arcade.StaticBody;
     body.setSize(TILE_SIZE, TILE_SIZE);
@@ -991,10 +1038,11 @@ export class GameScene extends Phaser.Scene {
    * just sprinkle in, instead of either a flat placeholder or an obvious repeating checkerboard.
    */
   private drawGround(): void {
-    const dirtVariants = ACTIVE_TILESET.tiles.dirt.map((variant, i) => ({ ...variant, key: dirtKey(i) }));
+    const groundVariants = ACTIVE_TILESET.tiles.ground.map((g) => ({ ...resolveTile(g.source), weight: g.weight }));
     for (let row = 0; row * TILE_SIZE < BASE_HEIGHT; row++) {
       for (let col = 0; col * TILE_SIZE < BASE_WIDTH; col++) {
-        this.add.image(tileToWorldCenter(col), tileToWorldCenter(row), pickWeighted(dirtVariants).key).setDepth(0);
+        const pick = pickWeighted(groundVariants);
+        this.add.image(tileToWorldCenter(col), tileToWorldCenter(row), pick.key, pick.frame).setDepth(0);
       }
     }
   }

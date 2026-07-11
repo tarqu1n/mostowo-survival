@@ -44,11 +44,19 @@ Verified via headless smoke (`npm run smoke`).
 Punch and enemy attacks. Three mutually-exclusive HUD-toggled input modes — **Command** (today's
 tap-to-pathfind, unchanged), **Combat** (virtual movepad + Punch button, direct real-time control,
 bypasses the pathfinder), **Inspect** (tap any tree/wall/zombie for a stats panel). The first enemy,
-a **kid zombie**, is wired in from the staged Zombie Apocalypse tileset with minimal idle→chasing
-AI and contact damage; player HP reaching 0 restarts the scene (no save system yet, so "restart" =
-back to spawn with the world reset). The worker/task/pathfinding core is the seam both the zombie's
-AI and the eventual NPC companions plug into. Next: survival systems (day/night, hunger) — see
-[docs/GAME-DESIGN.md](docs/GAME-DESIGN.md) MVP slice; [docs/DECISIONS.md](docs/DECISIONS.md) for settled vs open.
+a **kid zombie** (data id `kidZombie`), has minimal idle→chasing AI and contact damage; player HP
+reaching 0 restarts the scene (no save system yet, so "restart" = back to spawn with the world
+reset). The worker/task/pathfinding core is the seam both the zombie's AI and the eventual NPC
+companions plug into.
+
+**Active art swapped to Pixel Crawler (plan 005):** `ACTIVE_TILESET` in `src/data/tileset.ts` is
+now the **Pixel Crawler** pack — the Zombie Apocalypse pack is retired to reference-only under
+`public/assets/`. A Skeleton (Base) mob sprite stands in for the kid zombie (data id/name
+unchanged); the player has full 3-way directional facing (enemy flips by movement-x only). See
+[docs/ASSETS.md](docs/ASSETS.md) and [docs/DECISIONS.md](docs/DECISIONS.md) for the full picture.
+
+Next: survival systems (day/night, hunger) — see [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md) MVP
+slice; [docs/DECISIONS.md](docs/DECISIONS.md) for settled vs open.
 
 ## The game in one line
 

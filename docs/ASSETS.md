@@ -16,37 +16,40 @@ visual gags. Readable at small pixel sizes. Consistent base resolution + nearest
 3. **Gemini-generated bespoke assets** for characterful, on-theme items/enemies where stock art
    doesn't fit the dark-comic identity.
 
-## Base tileset — chosen (2026-07-11)
+## Zombie Apocalypse tileset — retired, reference fallback (2026-07-11)
 
 **[Zombie Apocalypse Tileset](https://ittaimanero.itch.io/zombie-apocalypse-tileset)** by Ittai
 Manero, staged at
 [`public/assets/tilesets/zombie-apocalypse/`](../public/assets/tilesets/zombie-apocalypse/) (see
-that folder's own `README.md` for the category index + Phaser loading notes). 16×16, matches
-`TILE_SIZE`, on-theme (post-apoc scenery, zombies, weapons, UI). Beat the CC-BY-SA OpenGameArt
-alternative on content breadth (environment + characters + items in one coherent pack vs.
-terrain-only).
+that folder's own `README.md` for the category index + Phaser loading notes). Was the original
+chosen base tileset — 16×16, matches `TILE_SIZE`, on-theme (post-apoc scenery, zombies, weapons,
+UI) — and wired in through plan 003: ground/wall/tree tiles, the player's walk cycle, the kid
+zombie's walk + damaged-reaction frames.
 
-**Licence is not CC0** — free for personal + commercial use, credit appreciated, no redistributing
-the assets themselves standalone. Full terms in that folder's `LICENSE.md`; keep it alongside the
+**Retired by plan 005**: `ACTIVE_TILESET` now points at Pixel Crawler (below); the
+`ZOMBIE_APOCALYPSE_TILESET` const was removed from `src/data/tileset.ts` (git history + this doc
+retain the record). Files **stay under `public/assets/tilesets/zombie-apocalypse/`** as
+reference/fallback art — not deleted, just unwired. Escape hatch to make it runnable again under
+the new strip-only actor-anim schema (montage its per-frame PNGs into horizontal strips) is noted
+in DECISIONS.md — not done.
+
+Licence is not CC0 — free for personal + commercial use, credit appreciated, no redistributing the
+assets themselves standalone. Full terms in that folder's `LICENSE.md`; keep it alongside the
 assets if this repo or a build ever goes public.
 
-**Wired into the Phaser loader:** ground/wall/tree tiles + the player's walk cycle landed first;
-the kid zombie's walk + damaged-reaction frames followed (plan 003, the first enemy). Still
-placeholder-tinted rather than fully styled (no hit-flash/VFX yet, per plan 003's out-of-scope
-list) — the swappable-manifest approach in `src/data/tileset.ts` means trialling a different pack
-is still just pointing `ACTIVE_TILESET` elsewhere.
+## Active tileset — Pixel Crawler (wired in, plan 005)
 
-## Leading replacement — Pixel Crawler (2026-07-11)
-
-Found a **better-quality** pack we prefer the *art style* of: **[Pixel Crawler — Free Pack
+**[Pixel Crawler — Free Pack
 v2.11](https://anokolisa.itch.io/free-pixel-art-asset-pack-topdown-tileset-rpg-16x16-sprites)** by
-Anokolisa. Staged at [`public/assets/tilesets/pixel-crawler/`](../public/assets/tilesets/pixel-crawler/)
-— **that folder's `README.md` is the full index** (grid sizes, category counts, blob-autotile fill
-tiles, object-extraction indices, Phaser loading). Downloaded, unzipped (PNGs only; `.aseprite` source
+Anokolisa is the **active** pack: `src/data/tileset.ts` exports `PIXEL_CRAWLER_TILESET` and
+`ACTIVE_TILESET = PIXEL_CRAWLER_TILESET`. Staged at
+[`public/assets/tilesets/pixel-crawler/`](../public/assets/tilesets/pixel-crawler/) — **that
+folder's `README.md` is the full index** (grid sizes, category counts, blob-autotile fill tiles,
+object-extraction indices, Phaser loading). Downloaded, unzipped (PNGs only; `.aseprite` source
 left out per convention), visually catalogued, and **stitched into 3 demo maps** to prove coherent
 use: [`docs/assets/pixel-crawler/demos/`](assets/pixel-crawler/demos/).
 
-Decision context (why it's the leading candidate, not yet committed):
+Decision context (why it replaced the zombie pack):
 
 - **Style fits better** than the zombie pack and is higher quality — *accepted trade-off:* it's
   **medieval-fantasy** themed (knights/orcs/skeletons/anvils/bonfires), not zombie/modern.
@@ -58,9 +61,83 @@ Decision context (why it's the leading candidate, not yet committed):
   **stations** (bonfire/cooking/anvil/sawmill/workbench) that suit the base-building pillar.
 - **If it works out, buy more of Anokolisa's paid packs** in the same style (same grid/conventions).
 - Licence (`Terms.txt`): free commercial use, alter freely, credit optional, **no reselling the assets
-  standalone**. Not wired into `src/data/tileset.ts` yet — evaluation only.
+  standalone**.
 
 Reproducible tooling for the catalogue/demos: [`scripts/pixel-crawler/`](../scripts/pixel-crawler/).
+
+### Sprite extraction pipeline
+
+Every Pixel Crawler PNG loads one of 3 ways — mechanical rule, no per-file judgement calls:
+
+| Class | Rule | Load |
+|---|---|---|
+| **Grid tilesheet** | under `Environment/Tilesets/` | `load.spritesheet` @ 16px, address by frame index |
+| **Animation strip** | filename ends `-Sheet.png` | `load.spritesheet` @ frameSize = sheet height |
+| **Multi-object sheet** | everything else (`Props/Static/*`, static `Structures/{Stations,Buildings}` props, `Weapons/*`) | can't grid-slice — extract the one object you want by connected-component bbox → a derived PNG |
+
+**Detection** (run this whenever the pack updates or you add a new sheet): a file that is *not*
+`*-Sheet.png` and *not* under `Environment/Tilesets/` is a multi-object candidate. Run `--scan`;
+**>1 varying-size connected component ⇒ multi-object, needs extraction** before it can be used
+in-game (a single component ⇒ already a clean static prop, `load.image` in-place, no extraction
+needed).
+
+**Tooling:** [`scripts/pixel-crawler/extract.py`](../scripts/pixel-crawler/extract.py) wraps
+`objects.py`'s `components()`/`crop()`/`preview_components()`.
+
+```sh
+# Preview a sheet's components (index · bbox · pixel size) before picking one.
+python3 scripts/pixel-crawler/extract.py --list "Environment/Props/Static/Trees/Model_02/Size_03.png"
+
+# Crop component <index> and save under public/assets/tilesets/pixel-crawler/<out-rel>.
+python3 scripts/pixel-crawler/extract.py "Environment/Props/Static/Trees/Model_02/Size_03.png" 3 _derived/tree_pine.png
+
+# Walk the whole pack (or a subdir) and flag every multi-object sheet — report-only, extracts nothing.
+python3 scripts/pixel-crawler/extract.py --scan
+```
+
+All three accept `--alpha-thresh` / `--gap` / `--min-area` if a component comes out merged or split
+(same tunables as `objects.components()`).
+
+**Rescan-when-assets-change procedure:** after dropping in an updated/re-downloaded pack (files stay
+in place, same names — see the load-in-place rule below), re-run `--scan`, diff against the manifest
+below, and extract any *newly*-flagged multi-object sheet you actually need for a feature. Don't
+extract speculatively — only what's wired into the game.
+
+**Load-in-place rule:** the pack's own folder/file names are never changed, so a re-downloaded pack
+drops straight back in. The only new files this pipeline adds live under `_derived/` (a `_`-prefixed
+dir a pack re-extract won't clobber) — reproducible any time via the commands above, so nothing there
+needs to be treated as precious.
+
+**Derived-file manifest** (`output ← source sheet · component index`):
+
+| Output | Source sheet | Index |
+|---|---|---|
+| `_derived/tree_pine.png` | `Environment/Props/Static/Trees/Model_02/Size_03.png` | 3 |
+
+Other multi-object sheets (`Vegetation`, `Rocks`, `Resources`, `Furniture`, `Tools`, …) are future
+candidates per `--scan` — not extracted this pass.
+
+### The art swap — concrete frames wired (plan 005)
+
+The game-facing narrative (this section is the *what got wired*; extraction mechanics are above,
+not repeated here):
+
+- **Ground:** `Floors_Tiles.png` frames 252/251/253 (weighted, grass).
+- **Wall:** `Wall_Tiles.png` frame **83** (grey stone fill, grid (8,3)) — corrects the plan's
+  original guess of frame 502/(2,20), which turned out to be a dark dungeon fill, not grey stone.
+- **Tree:** `_derived/tree_pine.png` (extracted per the pipeline above).
+- **Player:** Body_A Idle/Walk strips × Down/Side/Up (64px frames) — full 3-way directional
+  facing; Side art faces right, mirrored `flipX` for left, driven by `lastFacing`.
+- **Enemy** (kid zombie data id, unchanged): Skeleton (Base) `Run/Run-Sheet.png` (64px, 6 frames)
+  stands in for the sprite; single-orientation, frame 0 = idle, flips by movement-x only — mob
+  sheets in this pack ship no directional variants.
+
+Manifest schema reshaped to roles: a `TileSource` union (`{kind:'image'}` standalone PNGs,
+`{kind:'sheetFrame'}` indexed frames of a 16px-sliced sheet) plus `StripAnim`/`ActorRender` for
+actors — see `src/data/tileset.ts`.
+
+Verified: `npm run build` clean, `npm run smoke` (33/33, no console errors), manual screenshot
+check of grass/tree/wall/directional-player/skeleton.
 
 <details>
 <summary>Other candidates considered</summary>

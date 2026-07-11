@@ -1,14 +1,22 @@
 import Phaser from 'phaser';
-import { BASE_WIDTH, BASE_HEIGHT, COLORS } from '../config';
-import { ACTIVE_TILESET, dirtKey, playerFrameKey, kidZombieFrameKey, kidZombieDamagedFrameKey } from '../data/tileset';
+import { BASE_WIDTH, BASE_HEIGHT, COLORS, TILE_SIZE } from '../config';
+import {
+  ACTIVE_TILESET,
+  sheetKey,
+  tileImageKey,
+  playerAnimKey,
+  enemyWalkKey,
+  type TileSource,
+  type StripAnim,
+  type Facing,
+} from '../data/tileset';
 
 /**
- * Loads assets and shows a simple loading bar. Trialling a first real-art pass (see
- * `src/data/tileset.ts` for the active pack, still eval-stage per docs/ASSETS.md) over the
- * placeholder rects, to see how it reads in motion before committing to a base tileset. Texture
- * keys loaded here are the pack-agnostic roles (`dirt0`, `wall`, `player-walk-0`, ...), not
- * pack-specific names — swapping `ACTIVE_TILESET` is the only change needed to trial a different
- * pack.
+ * Loads the active tileset (see `src/data/tileset.ts`) and shows a simple loading bar. All keys are
+ * pack-agnostic roles derived by the shared helpers (`sheetKey`/`tileImageKey` for terrain,
+ * `playerAnimKey`/`enemyWalkKey` for actors), never pack-specific names — swapping `ACTIVE_TILESET`
+ * is the only change needed to trial a different pack. Files load in-place from the pack root (no
+ * `sprites/` subdir); every URL is `encodeURI`'d because some pack paths contain spaces.
  */
 export class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -35,17 +43,47 @@ export class PreloadScene extends Phaser.Scene {
       bar.destroy();
     });
 
-    const base = `${import.meta.env.BASE_URL}assets/tilesets/${ACTIVE_TILESET.id}/sprites`;
-    ACTIVE_TILESET.tiles.dirt.forEach((variant, i) => this.load.image(dirtKey(i), `${base}/${variant.path}`));
-    this.load.image('wall', `${base}/${ACTIVE_TILESET.tiles.wall}`);
-    this.load.image('tree', `${base}/${ACTIVE_TILESET.tiles.tree}`);
-    ACTIVE_TILESET.actors.player.forEach((relPath, i) => this.load.image(playerFrameKey(i), `${base}/${relPath}`));
-    ACTIVE_TILESET.actors.kidZombie.forEach((relPath, i) =>
-      this.load.image(kidZombieFrameKey(i), `${base}/${relPath}`)
-    );
-    ACTIVE_TILESET.actors.kidZombieDamaged.forEach((relPath, i) =>
-      this.load.image(kidZombieDamagedFrameKey(i), `${base}/${relPath}`)
-    );
+    const manifest = ACTIVE_TILESET;
+    const base = `${import.meta.env.BASE_URL}assets/tilesets/${manifest.id}${
+      manifest.spriteRoot ? `/${manifest.spriteRoot}` : ''
+    }`;
+    // Every pack path goes through here: spaces/other chars in mob paths would 404 unescaped.
+    const url = (relPath: string): string => encodeURI(`${base}/${relPath}`);
+
+    // Terrain: load each distinct sheet once (deduped by path) as a TILE_SIZE spritesheet; load
+    // each standalone image tile (e.g. the extracted tree) once. GameScene reads them via resolveTile.
+    const tileSources: TileSource[] = [
+      ...manifest.tiles.ground.map((g) => g.source),
+      manifest.tiles.wall,
+      manifest.tiles.tree,
+    ];
+    const loadedSheets = new Set<string>();
+    const loadedImages = new Set<string>();
+    for (const source of tileSources) {
+      if (source.kind === 'sheetFrame') {
+        if (loadedSheets.has(source.sheet)) continue;
+        loadedSheets.add(source.sheet);
+        this.load.spritesheet(sheetKey(source.sheet), url(source.sheet), {
+          frameWidth: TILE_SIZE,
+          frameHeight: TILE_SIZE,
+        });
+      } else {
+        if (loadedImages.has(source.path)) continue;
+        loadedImages.add(source.path);
+        this.load.image(tileImageKey(source.path), url(source.path));
+      }
+    }
+
+    // Actors: each strip is its own square-framed spritesheet, keyed by role (texture key == anim key).
+    const loadStrip = (key: string, strip: StripAnim): void => {
+      this.load.spritesheet(key, url(strip.path), { frameWidth: strip.frameSize, frameHeight: strip.frameSize });
+    };
+    const { player, enemy } = manifest.actors;
+    (['down', 'side', 'up'] as Facing[]).forEach((facing) => {
+      loadStrip(playerAnimKey('idle', facing), player.idle[facing]);
+      loadStrip(playerAnimKey('walk', facing), player.walk[facing]);
+    });
+    loadStrip(enemyWalkKey, enemy.walk);
   }
 
   create(): void {
