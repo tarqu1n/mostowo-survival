@@ -61,7 +61,8 @@ next from `queue`. Plain tap → `queue=[]; current=<action>` (recompute path). 
 
 ## Steps
 
-- [ ] **Step 1: A* pathfinding module** `[delegate]` (parallel: A)
+- [x] **Step 1: A* pathfinding module** `[delegate]` (parallel: A)
+  - Outcome: created `src/systems/pathfind.ts` — `findPath` (8-conn, octile, corner-cut guard, `[]`/`null`/list contract, OOB=blocked) + `reachableAdjacent`. Verified 6/6 hand-traced cases (open path, wall detour, `[]`, walled `null`, adjacent lookup). Typecheck green.
   - Create `src/systems/pathfind.ts` — pure, no Phaser. Export
     `findPath(start: {col:number;row:number}, goal: {col:number;row:number},
     isBlocked: (col:number, row:number) => boolean,
@@ -88,7 +89,8 @@ next from `queue`. Plain tap → `queue=[]; current=<action>` (recompute path). 
     returns `null`; `reachableAdjacent` returns a neighbour for an open target and `null` when the
     target is ringed by blocked tiles.
 
-- [ ] **Step 2: Task types + queue helper** `[delegate haiku]` (parallel: A)
+- [x] **Step 2: Task types + queue helper** `[delegate haiku]` (parallel: A)
+  - Outcome: created `src/systems/tasks.ts` — `Action` union (`move`/`harvest`/`build`) + `TaskQueue` (`replace`/`append`/`next`/`clear`/`pending`/`current`). Typecheck green; queue semantics confirmed.
   - Create `src/systems/tasks.ts` — pure types + a tiny queue. Export the `Action` discriminated union
     (exactly the three kinds in **Task model** above) and a `TaskQueue` class holding
     `current: Action | null` and a private `Action[]`. Methods: `replace(a: Action)` (clear queue +
