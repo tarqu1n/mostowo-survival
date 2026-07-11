@@ -36,6 +36,9 @@ export const ZOOM_STEP = 0.5;
 /** localStorage key the current zoom is persisted under (best-effort — see GameScene.setZoom). */
 export const ZOOM_STORAGE_KEY = 'mostowa:zoom';
 
+/** Radius (world px) of the character's line of sight — everything beyond it is fogged. */
+export const VISION_RADIUS = TILE_SIZE * 5;
+
 /** Semantic colour palette (dark & grotty). Expand as the art identity firms up. */
 export const COLORS = {
   background: 0x14100f,

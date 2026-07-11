@@ -25,6 +25,7 @@ export class UIScene extends Phaser.Scene {
   private zoomText!: Phaser.GameObjects.Text;
   private zoomOutButton!: Phaser.GameObjects.Rectangle;
   private zoomInButton!: Phaser.GameObjects.Rectangle;
+  private followButton!: Phaser.GameObjects.Rectangle;
   /** Interactive HUD elements GameScene must treat as UI, not world — tested live so a hidden
    * button (Cancel when idle, the indicator outside build mode) never swallows a world tap. */
   private hudElements: Array<Phaser.GameObjects.Rectangle | Phaser.GameObjects.Text> = [];
@@ -114,6 +115,22 @@ export class UIScene extends Phaser.Scene {
     this.hudElements.push(this.zoomOutButton, this.zoomInButton);
     this.updateZoomButtons(initialZoom);
 
+    // Follow button — grouped with zoom (top-center, just below it): snaps the camera back to the
+    // player and re-engages the follow-lock a manual drag (GameScene.onPointerMove) breaks. Teal
+    // fill while locked on.
+    const fbw = 64;
+    const fbh = 22;
+    const fbx = BASE_WIDTH / 2;
+    const fby = zY + zbSize / 2 + 6 + fbh / 2;
+    const initialFollowing = (this.registry.get('following') as boolean | undefined) ?? true;
+    this.followButton = this.add
+      .rectangle(fbx, fby, fbw, fbh, initialFollowing ? 0x2f4a45 : 0x3a3730)
+      .setStrokeStyle(1, COLORS.ui, 0.6)
+      .setInteractive({ useHandCursor: true });
+    this.add.text(fbx, fby, 'FOLLOW', { fontFamily: 'monospace', fontSize: '10px', color: '#e8dcc0' }).setOrigin(0.5);
+    this.followButton.on('pointerdown', () => this.game.events.emit('camera:center'));
+    this.hudElements.push(this.followButton);
+
     // Control hint — moved here from GameScene: a genuinely fixed HUD label belongs on the
     // never-zoomed UI camera, not on the world camera (which now pans/zooms with the player).
     this.add.text(6, BASE_HEIGHT - 30, 'tap: order · hold: queue · Build: walls', {
@@ -143,6 +160,7 @@ export class UIScene extends Phaser.Scene {
     this.game.events.on('build:modeChanged', this.onBuildMode, this);
     this.game.events.on('tasks:changed', this.onTasks, this);
     this.game.events.on('zoom:changed', this.onZoomChanged, this);
+    this.game.events.on('camera:followChanged', this.onFollowChanged, this);
 
     // Teardown so a future scene restart doesn't double-register on stale listeners.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -150,6 +168,7 @@ export class UIScene extends Phaser.Scene {
       this.game.events.off('build:modeChanged', this.onBuildMode, this);
       this.game.events.off('tasks:changed', this.onTasks, this);
       this.game.events.off('zoom:changed', this.onZoomChanged, this);
+      this.game.events.off('camera:followChanged', this.onFollowChanged, this);
     });
   }
 
@@ -187,5 +206,9 @@ export class UIScene extends Phaser.Scene {
   private updateZoomButtons(zoom: number): void {
     this.zoomOutButton.setAlpha(zoom <= MIN_ZOOM ? 0.4 : 1);
     this.zoomInButton.setAlpha(zoom >= MAX_ZOOM ? 0.4 : 1);
+  }
+
+  private onFollowChanged(following: boolean): void {
+    this.followButton.setFillStyle(following ? 0x2f4a45 : 0x3a3730);
   }
 }

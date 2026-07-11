@@ -12,6 +12,7 @@ import {
   MAX_ZOOM,
   DEFAULT_ZOOM,
   ZOOM_STORAGE_KEY,
+  VISION_RADIUS,
 } from '../config';
 import { NODES } from '../data/nodes';
 import { BUILDABLES } from '../data/buildables';
@@ -81,7 +82,7 @@ export class GameScene extends Phaser.Scene {
 
   private ui!: UIScene;
   private gridDims = { cols: Math.floor(BASE_WIDTH / TILE_SIZE), rows: Math.floor(BASE_HEIGHT / TILE_SIZE) };
-  private downWorld = new Phaser.Math.Vector2();
+  private downScreen = new Phaser.Math.Vector2(); // pointerdown position in screen/base-canvas px
   private downOnUI = false;
   private pressStart = 0; // scene-clock time of the current pointer press (for hold detection)
   private queuePainting = false; // once a hold crosses LONGPRESS_MS, dragging paints queue orders
@@ -89,6 +90,12 @@ export class GameScene extends Phaser.Scene {
   private queueMarkers: Phaser.GameObjects.Rectangle[] = []; // yellow pips over queued move tiles
   private pinching = false; // a second pointer went down — the gesture is a pinch-zoom, not a tap
   private pinchDist = 0; // previous frame's inter-pointer distance, for the zoom delta ratio
+  private isPanning = false; // this gesture dragged the camera rather than issuing an order
+  private lastPanX = 0; // previous frame's screen-space pointer position, for the pan delta
+  private lastPanY = 0;
+  private following = true; // camera auto-follows the player until a manual pan breaks the lock
+  private fog!: Phaser.GameObjects.Rectangle;
+  private fogShape!: Phaser.GameObjects.Graphics; // invisible — its shape is only a mask source
 
   constructor() {
     super('Game');
@@ -123,10 +130,21 @@ export class GameScene extends Phaser.Scene {
     // map, so bounds leave no scroll room and this is a no-op — see config.ts). Instant (no lerp
     // smoothing): this is a precision tap-to-target game, so the camera should never lag behind
     // where the player actually is. centerOn avoids a visible pan-in from (0,0) on the first frame.
+    // A manual drag breaks this lock (free look); the HUD's FOLLOW button re-engages it.
     this.cameras.main.setBounds(0, 0, BASE_WIDTH, BASE_HEIGHT);
     this.cameras.main.centerOn(this.player.x, this.player.y);
+    this.registry.set('following', true);
     this.cameras.main.startFollow(this.player, true);
     this.setZoom(this.loadStoredZoom());
+
+    // Fog of war: a full-map dark overlay with a hole (inverted geometry mask) tracking the
+    // character's vision radius, redrawn each frame in update() as the character moves.
+    this.fogShape = this.add.graphics().setVisible(false);
+    this.fog = this.add.rectangle(BASE_WIDTH / 2, BASE_HEIGHT / 2, BASE_WIDTH, BASE_HEIGHT, 0x000000, 1).setDepth(50);
+    const fogMask = this.fogShape.createGeometryMask();
+    fogMask.setInvertAlpha(true);
+    this.fog.setMask(fogMask);
+    this.updateFog();
 
     // Walls: static bodies the player collides with (a backstop; pathing already avoids them).
     this.walls = this.physics.add.staticGroup();
@@ -148,12 +166,14 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on('tasks:cancel', this.cancelAll, this);
     this.game.events.on('debug:regenTrees', this.regenerateTrees, this); // TEMP: movement testing
     this.game.events.on('zoom:delta', this.adjustZoom, this);
+    this.game.events.on('camera:center', this.centerOnPlayer, this);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off('build:toggle', this.toggleBuild, this);
       this.game.events.off('tasks:cancel', this.cancelAll, this);
       this.game.events.off('debug:regenTrees', this.regenerateTrees, this); // TEMP
       this.game.events.off('zoom:delta', this.adjustZoom, this);
+      this.game.events.off('camera:center', this.centerOnPlayer, this);
     });
 
     this.emitTasks();
@@ -164,6 +184,7 @@ export class GameScene extends Phaser.Scene {
     if (!action) {
       this.player.body.setVelocity(0, 0);
       this.updatePlayerAnim();
+      this.updateFog();
       return;
     }
     switch (action.kind) {
@@ -178,6 +199,7 @@ export class GameScene extends Phaser.Scene {
         break;
     }
     this.updatePlayerAnim();
+    this.updateFog();
   }
 
   // --- Obstacle grid + path following -------------------------------------
@@ -372,15 +394,19 @@ export class GameScene extends Phaser.Scene {
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
     if (this.activePointerCount() >= 2) {
       // A second finger just landed — this gesture is a pinch, not a tap. Abandon anything the
-      // first finger started (build ghost / queue-paint) so the two don't fight over the input.
+      // first finger started (build ghost / queue-paint / pan) so they don't fight over the input.
       this.pinching = true;
       this.pinchDist = this.pointerDistance();
       this.queuePainting = false;
+      this.isPanning = false;
       return;
     }
     this.downOnUI = this.ui.hudHitTest(pointer.x, pointer.y);
     if (this.downOnUI) return; // HUD owns this tap
-    this.downWorld.set(pointer.worldX, pointer.worldY);
+    this.downScreen.set(pointer.x, pointer.y);
+    this.lastPanX = pointer.x;
+    this.lastPanY = pointer.y;
+    this.isPanning = false;
     this.pressStart = this.time.now;
     this.queuePainting = false;
     this.paintedThisGesture.clear();
@@ -403,10 +429,30 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (!pointer.isDown || this.downOnUI || this.ui.hudHitTest(pointer.x, pointer.y)) return;
-    // Once the press has been held past the long-press threshold, dragging paints queue orders —
-    // hold and drag across trees / tiles to add several things to the queue in one gesture.
-    if (!this.queuePainting && this.time.now - this.pressStart >= LONGPRESS_MS) this.queuePainting = true;
-    if (this.queuePainting) this.paintQueueAt(pointer);
+
+    if (this.queuePainting) {
+      this.paintQueueAt(pointer);
+      return;
+    }
+    // A press held roughly still past the long-press threshold enters queue-paint mode (unchanged
+    // behaviour); a press that starts dragging *first* pans the camera instead — see onPointerUp.
+    if (!this.isPanning && this.time.now - this.pressStart >= LONGPRESS_MS) {
+      this.queuePainting = true;
+      this.paintQueueAt(pointer);
+      return;
+    }
+
+    if (!this.isPanning && Phaser.Math.Distance.Between(this.downScreen.x, this.downScreen.y, pointer.x, pointer.y) > DRAG_PX) {
+      this.isPanning = true;
+      this.setFollowing(false); // manual pan always breaks the follow-lock
+    }
+    if (this.isPanning) {
+      const cam = this.cameras.main;
+      cam.scrollX -= (pointer.x - this.lastPanX) / cam.zoom;
+      cam.scrollY -= (pointer.y - this.lastPanY) / cam.zoom;
+    }
+    this.lastPanX = pointer.x;
+    this.lastPanY = pointer.y;
   }
 
   private onPointerUp(pointer: Phaser.Input.Pointer): void {
@@ -419,8 +465,10 @@ export class GameScene extends Phaser.Scene {
       this.queuePainting = false; // the drag already queued its targets
       return;
     }
-    // Reject drags/swipes — only deliberate taps become orders.
-    if (Phaser.Math.Distance.Between(this.downWorld.x, this.downWorld.y, pointer.worldX, pointer.worldY) > DRAG_PX) return;
+    if (this.isPanning) {
+      this.isPanning = false; // the drag panned the camera — never resolves as a tap
+      return;
+    }
 
     const action = this.actionAt(pointer.worldX, pointer.worldY);
     if (pointer.getDuration() >= LONGPRESS_MS) this.enqueue(action); // held-still long-press = append one
@@ -663,6 +711,35 @@ export class GameScene extends Phaser.Scene {
 
   private adjustZoom(delta: number): void {
     this.setZoom(this.cameras.main.zoom + delta);
+  }
+
+  // --- Camera pan / follow-lock -----------------------------------------------
+
+  /** Engage/disengage camera auto-follow. Mirrored onto the registry (UIScene's initial button
+   * colour) and broadcast for live updates, matching the zoom-state pattern above. */
+  private setFollowing(on: boolean): void {
+    if (this.following === on) return;
+    this.following = on;
+    this.registry.set('following', on);
+    if (on) {
+      this.cameras.main.startFollow(this.player, true);
+      this.cameras.main.centerOn(this.player.x, this.player.y);
+    } else {
+      this.cameras.main.stopFollow();
+    }
+    this.game.events.emit('camera:followChanged', on);
+  }
+
+  /** HUD "FOLLOW" button: snap back to the player and re-engage the follow-lock. */
+  private centerOnPlayer(): void {
+    this.setFollowing(true);
+  }
+
+  /** Redraw the vision-radius mask shape at the character's current position. */
+  private updateFog(): void {
+    this.fogShape.clear();
+    this.fogShape.fillStyle(0xffffff);
+    this.fogShape.fillCircle(this.player.x, this.player.y, VISION_RADIUS);
   }
 
   /** How many of the tracked pointers (see BootScene's addPointer) are currently held down. */

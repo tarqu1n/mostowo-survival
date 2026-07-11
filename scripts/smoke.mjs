@@ -125,6 +125,46 @@ const zMin = await zoomNow();
 if (zMin === 1 && (await zoomReadout()) === '100%') ok(`zoom-out clamps at MIN_ZOOM (${zMin * 100}%, readout 100%)`);
 else fail(`zoom-out did not clamp correctly (zoom ${zMin * 100}%, readout ${await zoomReadout()})`);
 
+// 0c. Manual pan: a quick drag (before the long-press threshold) scrolls the camera and breaks
+// the follow-lock; the FOLLOW button (top-center, under the zoom row: 180,49) snaps back +
+// re-locks. Zoom in one step first — at MIN_ZOOM the viewport already covers the whole map, so
+// there's no scroll room to actually demonstrate a pan.
+const following = () => page.evaluate(() => window.game.registry.get('following'));
+const scrollNow = () => page.evaluate(() => {
+  const cam = window.game.scene.getScene('Game').cameras.main;
+  return { x: cam.scrollX, y: cam.scrollY };
+});
+
+await tapBase(214, 20); // zoom in one step: 100% → 150%
+await page.waitForTimeout(100);
+
+if ((await following()) === true) ok('camera starts in follow mode');
+else fail(`camera did not start in follow mode (got ${await following()})`);
+
+const scrollBefore = await scrollNow();
+const dragStart = await toClient([200, 300]);
+const dragEnd = await toClient([260, 380]);
+await page.mouse.move(dragStart.x, dragStart.y);
+await page.mouse.down();
+await page.mouse.move(dragEnd.x, dragEnd.y, { steps: 8 });
+await page.waitForTimeout(50);
+await page.mouse.up();
+const scrollAfter = await scrollNow();
+
+if ((await following()) === false) ok('manual pan breaks the follow-lock');
+else fail('follow-lock was still on after a manual pan');
+if (scrollAfter.x !== scrollBefore.x || scrollAfter.y !== scrollBefore.y) ok('manual pan scrolled the camera');
+else fail(`pan did not move the camera (scroll stayed at ${JSON.stringify(scrollAfter)})`);
+
+await tapBase(180, 49); // FOLLOW button
+await page.waitForTimeout(100);
+if ((await following()) === true) ok('FOLLOW button re-engages the follow-lock');
+else fail('FOLLOW button did not re-engage the follow-lock');
+
+for (let i = 0; i < 3; i++) await tapBase(146, 20); // back to MIN_ZOOM for the gameplay steps below
+await page.waitForTimeout(100);
+await page.screenshot({ path: `${OUT}-0-fog.png` }); // visual check: vision-radius fog around the player
+
 // 1. Chop the tree at tile (5,8): worker paths adjacent (trees block) + 3 hits → wood 3.
 await tapWorld(...center(5, 8));
 await page.waitForTimeout(6500);
