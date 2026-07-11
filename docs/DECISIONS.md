@@ -28,6 +28,13 @@ resumable across devices. See docs/WORKFLOW.md.
 All reusable decisions/preferences/workflows are committed to the repo, never left only in chat,
 because sessions hop between devices. This log is part of that.
 
+## 2026-07-11 — [DECIDED] Trunk-based solo workflow: commit each stage, push to `master`, auto-deploy
+
+Solo project — no feature branches, no PRs. Work on `master`; commit each completed stage and push
+straight to `master`. Every push to `master` triggers the GitHub Pages Action to build + deploy, so
+"ship" = `git push`. Rationale: minimises ceremony for a one-person project and gives a live URL that
+always reflects trunk. (Set `master` as the GitHub default branch in Settings — one-time.)
+
 ## 2026-07-11 — [DECIDED] Language: TypeScript; Build tool: Vite
 
 A survival/crafting game grows complex fast; types pay off in inventory/recipe/save code and make

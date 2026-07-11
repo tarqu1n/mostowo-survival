@@ -2,11 +2,15 @@
 
 How to work on Mostowa Survival from any device. Update this whenever the "how" changes.
 
-## Git
+## Git — trunk-based, solo
 
-- **Feature branch for agent work:** `claude/mostowa-survival-setup-qdqfgj` (current). Develop
-  and push here; open a PR to `main` when a slice is ready.
-- Commit in small, described steps. Push often (work may resume on another device).
+It's just Matt working on this, so **no feature branches, no PRs**:
+
+- **Work directly on `master`.** Commit each stage as it's completed, and **push straight to
+  `master`** (`git push`). Don't open PRs or stack review branches.
+- Commit in small, described steps with clear messages. **Push often** — work may resume on another
+  device mid-task, and unpushed work is invisible there.
+- A "completed stage" = a coherent, working increment (builds + boots). Finish it → commit → push.
 
 ## Hermes dev skills (how we build)
 
@@ -40,14 +44,17 @@ npm run typecheck # types only, no build
 Verified working on Node 22 (Phaser 3.90, Vite 6, TypeScript 5.9). `npm run build` typechecks then
 bundles; the ~1.4 MB JS chunk is Phaser itself (~341 KB gzipped) — expected, not worth splitting.
 
-**Deploy: GitHub Pages via GitHub Actions** (`.github/workflows/deploy.yml`). On push to `main` (or
-manual "Run workflow"), it runs `npm ci` → `npm run build` → publishes `dist/`. Assets resolve under
-`/Mostowa-survival/` in production (Vite `base`, see `vite.config.ts`; override with `BASE_PATH` if
-the repo is renamed or served elsewhere).
+**Deploy: GitHub Pages via GitHub Actions** (`.github/workflows/deploy.yml`). **Every push to
+`master`** (or a manual "Run workflow") runs `npm ci` → `npm run build` → publishes `dist/` to Pages
+— so shipping is just `git push`. Assets resolve under `/Mostowa-survival/` in production (Vite
+`base`, see `vite.config.ts`; override with `BASE_PATH` if the repo is renamed or served elsewhere).
 
-> **One-time setup (only Matt can do this):** repo **Settings → Pages → Source: "GitHub Actions"**.
-> The Action won't publish until this is set and the branch reaches `main`. Live URL will be
-> `https://tarqu1n.github.io/Mostowa-survival/`.
+> **One-time setup (only Matt can do this, in repo Settings):**
+> 1. **Settings → Pages → Source: "GitHub Actions".**
+> 2. **Settings → Branches (or the branch dropdown) → set default branch to `master`** so fresh
+>    clones and the Pages environment use it.
+>
+> After that, every `git push` to `master` auto-deploys to `https://tarqu1n.github.io/Mostowa-survival/`.
 
 ### Smoke-testing a build
 
