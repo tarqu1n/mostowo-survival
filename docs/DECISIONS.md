@@ -7,6 +7,15 @@ Format: `YYYY-MM-DD — [DECIDED|PROPOSED|OPEN] Title` then a short rationale.
 
 ---
 
+## 2026-07-11 — [DECIDED] Direct tweaks auto-push on green; review gates stay on the plan loop only
+
+For small changes Matt requests directly (tweaks/fixes/debug helpers, not plan steps): implement →
+verify green (`npm run build` + `npm run smoke` where relevant) → commit → push to `master` without
+stopping to ask. The stop-for-review checkpoints below apply to `plan-feature`/`critique-plan`/
+`execute-plan` work, **not** to these one-off tweaks. Pause only if it's not green, ambiguous/
+hard-to-reverse, or actually plan-scale. Rationale: ends the commit-then-ask friction on small live-test
+iterations while keeping human review where it matters (the plan loop). Detail in WORKFLOW.md.
+
 ## 2026-07-11 — [DECIDED] Stop for Matt's review at plan / critique / each step (no unattended sweep)
 
 The plan→critique→execute loop must **pause for Matt's input** at three gates: after a plan is written

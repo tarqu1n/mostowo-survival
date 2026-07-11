@@ -35,6 +35,14 @@ autonomous sweep.** Stop and hand back for input at each of these points:
 This holds even when a task says "build it" / "do it": that authorises the *work*, not skipping the
 review gates. When in doubt, stop and ask rather than press on.
 
+**Direct tweaks (outside the plan loop) = auto-push on green.** For a small change Matt asks for
+directly (a tweak, a fix, a debug helper — not a `plan-feature` step), don't stop to ask before
+pushing: implement it, verify it's **green** (`npm run build` typechecks + builds, and `npm run smoke`
+passes when there's runtime surface), then commit and push to `master` (auto-deploys). Only pause if
+it's *not* green, if it's ambiguous/hard-to-reverse, or if it's actually plan-scale work (then it goes
+through plan → critique → execute with the gates above). Commits are authored as
+`Claude <noreply@anthropic.com>` (repo git config) so GitHub marks them verified.
+
 > Cross-device note: to make these skills load automatically in a fresh session on another
 > machine, install the `hermes-skills` marketplace / `hermes-dev` plugin per that repo's README,
 > or vendor them into `.claude/skills/`. TODO: decide and wire this up (tracked in DECISIONS.md).
