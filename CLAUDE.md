@@ -33,8 +33,16 @@ See [docs/WORKFLOW.md](docs/WORKFLOW.md) for how these are wired in and the day-
 Project bootstrapping. Stack and hosting under discussion — see
 [docs/DECISIONS.md](docs/DECISIONS.md) for what's settled vs open.
 
+## The game in one line
+
+Camping at **Mostowa** when a **zombie apocalypse** hits: by day scavenge the camp/forest, by night
+fortify and defend your base. Pillars: **base building · survival · crafting · base defense**, on a
+**day/night cycle**. Dark-and-grotty but funny. Full vision in [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md).
+
 ## Docs
 
+- [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md) — what the game *is* (premise, day/night loop, enemies, pillars, MVP)
+- [docs/LORE.md](docs/LORE.md) — intro story + real-Mostowa people/places/stories that theme the game
+- [docs/ASSETS.md](docs/ASSETS.md) — art direction + pipeline (CC0 tilesets, Gemini "Nano Banana" via guppi)
 - [docs/DECISIONS.md](docs/DECISIONS.md) — decision log (what we chose and why)
 - [docs/WORKFLOW.md](docs/WORKFLOW.md) — run / build / deploy / code conventions
-- [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md) — what the game *is* (mechanics, scope, theme)

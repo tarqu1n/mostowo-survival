@@ -46,6 +46,34 @@ Start with generated/coloured-rect placeholder art so we can build and feel the 
 (ideal for on-the-go sessions), then swap in real pixel art (free CC0 tileset and/or hand-drawn)
 once the slice is fun. Keeps art off the critical path.
 
+## 2026-07-11 — [DECIDED] Premise & core loop: zombie apocalypse at Mostowa, day/night cycle
+
+Camping at Mostowa when a zombie apocalypse hits (intro short story). Four pillars: base building,
+survival, crafting, base defense. **Day** = scavenge camp/forest/surroundings for resources;
+**base phase** = fortify (walls/traps), craft, unlock crafting stations; **night** = zombie animals,
+humans, creatures come through the map. **Enemies are roaming (don't attack unless aggro'd) or
+attacking** — this deliberately punishes staying out at night and makes "get home and defend" the
+correct play. Full detail in GAME-DESIGN.md. Rationale: gives the day/night cycle real risk/reward
+teeth and a clear emotional arc each cycle.
+
+## 2026-07-11 — [DECIDED] Map is based on the real Mostowa site
+
+The playable map traces a Google Maps screenshot of the actual camping spot; people, stories, and
+landmarks of the place theme the content (LORE.md). Rationale: site-specific identity is what makes
+this ours, not a generic zombie game.
+
+## 2026-07-11 — [DECIDED] Art identity: dark & grotty, but humorous
+
+Grimy survival-horror palette with comic items/enemies/visual gags. Rationale: distinctive tone,
+and humour keeps a grim premise fun.
+
+## 2026-07-11 — [DECIDED] Asset pipeline: free CC0 tilesets + Gemini "Nano Banana" (via guppi)
+
+Start with CC0 tilesets (Kenney first) for a coherent base; generate bespoke on-theme items/enemies
+with `gemini-2.5-flash-image` mirroring `guppi/house-helper/catalog_icons.py`. Key lives on the home
+server (`GEMINI_API_KEY`, gitignored, LAN-only) so generation runs from a guppi-reachable machine and
+processed sprites get committed. Detail in ASSETS.md.
+
 ---
 
 ## Open questions
