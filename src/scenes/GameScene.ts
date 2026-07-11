@@ -64,6 +64,10 @@ export class GameScene extends Phaser.Scene {
   private gridDims = { cols: Math.floor(BASE_WIDTH / TILE_SIZE), rows: Math.floor(BASE_HEIGHT / TILE_SIZE) };
   private downWorld = new Phaser.Math.Vector2();
   private downOnUI = false;
+  private pressStart = 0; // scene-clock time of the current pointer press (for hold detection)
+  private queuePainting = false; // once a hold crosses LONGPRESS_MS, dragging paints queue orders
+  private paintedThisGesture = new Set<string>(); // tile keys already queued in the current gesture
+  private queueMarkers: Phaser.GameObjects.Rectangle[] = []; // yellow pips over queued move tiles
 
   constructor() {
     super('Game');
@@ -249,7 +253,30 @@ export class GameScene extends Phaser.Scene {
   }
 
   private emitTasks(): void {
+    this.refreshQueueHighlights();
     this.game.events.emit('tasks:changed', { current: this.queue.current?.kind ?? null, pending: this.queue.pending });
+  }
+
+  /** Outline every queued target in yellow (trees to harvest, sites to build) + pip queued move tiles. */
+  private refreshQueueHighlights(): void {
+    for (const t of this.trees) t.rect.isStroked = false;
+    for (const s of this.sites) s.rect.isStroked = false;
+    for (const m of this.queueMarkers) m.destroy();
+    this.queueMarkers = [];
+
+    for (const a of this.queue.all()) {
+      if (a.kind === 'harvest') {
+        const tree = this.treeById(a.treeId);
+        if (tree?.alive) tree.rect.setStrokeStyle(2, COLORS.queued, 1);
+      } else if (a.kind === 'build') {
+        const site = this.siteById(a.siteId);
+        if (site && !site.done) site.rect.setStrokeStyle(2, COLORS.queued, 1);
+      } else {
+        this.queueMarkers.push(
+          this.add.rectangle(tileToWorldCenter(a.col), tileToWorldCenter(a.row), 6, 6, COLORS.queued, 0.85).setDepth(4),
+        );
+      }
+    }
   }
 
   // --- Harvest / build executors ------------------------------------------
@@ -287,6 +314,9 @@ export class GameScene extends Phaser.Scene {
     this.downOnUI = this.ui.hudHitTest(pointer.x, pointer.y);
     if (this.downOnUI) return; // HUD owns this tap
     this.downWorld.set(pointer.worldX, pointer.worldY);
+    this.pressStart = this.time.now;
+    this.queuePainting = false;
+    this.paintedThisGesture.clear();
     if (this.buildMode) {
       this.updateGhost(pointer);
       this.placeOrEnqueueBuild(pointer);
@@ -294,20 +324,43 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onPointerMove(pointer: Phaser.Input.Pointer): void {
-    if (this.buildMode && !this.ui.hudHitTest(pointer.x, pointer.y)) this.updateGhost(pointer);
+    if (this.buildMode) {
+      if (!this.ui.hudHitTest(pointer.x, pointer.y)) this.updateGhost(pointer);
+      return;
+    }
+    if (!pointer.isDown || this.downOnUI || this.ui.hudHitTest(pointer.x, pointer.y)) return;
+    // Once the press has been held past the long-press threshold, dragging paints queue orders —
+    // hold and drag across trees / tiles to add several things to the queue in one gesture.
+    if (!this.queuePainting && this.time.now - this.pressStart >= LONGPRESS_MS) this.queuePainting = true;
+    if (this.queuePainting) this.paintQueueAt(pointer);
   }
 
   private onPointerUp(pointer: Phaser.Input.Pointer): void {
     if (this.buildMode || this.downOnUI || this.ui.hudHitTest(pointer.x, pointer.y)) return;
+    if (this.queuePainting) {
+      this.queuePainting = false; // the drag already queued its targets
+      return;
+    }
     // Reject drags/swipes — only deliberate taps become orders.
     if (Phaser.Math.Distance.Between(this.downWorld.x, this.downWorld.y, pointer.worldX, pointer.worldY) > DRAG_PX) return;
 
-    const tree = this.treeAt(pointer.worldX, pointer.worldY);
-    const action: Action = tree
-      ? { kind: 'harvest', treeId: tree.id }
-      : { kind: 'move', col: worldToTile(pointer.worldX), row: worldToTile(pointer.worldY) };
-    if (pointer.getDuration() >= LONGPRESS_MS) this.enqueue(action);
-    else this.order(action);
+    const action = this.actionAt(pointer.worldX, pointer.worldY);
+    if (pointer.getDuration() >= LONGPRESS_MS) this.enqueue(action); // held-still long-press = append one
+    else this.order(action); // quick tap = act now
+  }
+
+  /** The order implied by a world point: harvest a live tree there, else move to that tile. */
+  private actionAt(x: number, y: number): Action {
+    const tree = this.treeAt(x, y);
+    return tree ? { kind: 'harvest', treeId: tree.id } : { kind: 'move', col: worldToTile(x), row: worldToTile(y) };
+  }
+
+  /** Append the target under the pointer to the queue, once per tile per paint gesture. */
+  private paintQueueAt(pointer: Phaser.Input.Pointer): void {
+    const key = tileKey(worldToTile(pointer.worldX), worldToTile(pointer.worldY));
+    if (this.paintedThisGesture.has(key)) return;
+    this.paintedThisGesture.add(key);
+    this.enqueue(this.actionAt(pointer.worldX, pointer.worldY));
   }
 
   // --- Trees / chopping ----------------------------------------------------

@@ -62,4 +62,12 @@ export class TaskQueue {
   get current(): Action | null {
     return this._current;
   }
+
+  /**
+   * All active actions in order: the current one (if any) followed by the pending queue.
+   * Used to render queue highlights.
+   */
+  all(): Action[] {
+    return this._current ? [this._current, ...this.queue] : [...this.queue];
+  }
 }

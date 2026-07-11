@@ -38,4 +38,5 @@ export const COLORS = {
   ghostValid: 0x4caf50, // build ghost when a tile is placeable + affordable
   ghostInvalid: 0xb23b3b, // build ghost when blocked or unaffordable
   blueprint: 0x5a7a9a, // placed-but-unbuilt construction site (drawn translucent)
+  queued: 0xffd500, // outline / marker for targets currently in the worker's task queue
 } as const;

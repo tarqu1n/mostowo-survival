@@ -53,6 +53,19 @@ async function longPressBase(bx, by) {
   await page.waitForTimeout(480); // > LONGPRESS_MS (350) → append
   await page.mouse.up();
 }
+// Hold past the long-press threshold, then drag across tiles — paints several queue orders at once.
+async function paintDrag(cells) {
+  const first = await toClient(center(...cells[0]));
+  await page.mouse.move(first.x, first.y);
+  await page.mouse.down();
+  await page.waitForTimeout(430); // cross LONGPRESS_MS → enter paint mode
+  for (let i = 1; i < cells.length; i++) {
+    const c = await toClient(center(...cells[i]));
+    await page.mouse.move(c.x, c.y);
+    await page.waitForTimeout(60);
+  }
+  await page.mouse.up();
+}
 const wood = () => page.evaluate(() => window.game.registry.get('inventory')?.get('wood') ?? 0);
 const dbg = () => page.evaluate(() => window.game.scene.getScene('Game').debugState());
 const blocked = (c, r) => page.evaluate(([c, r]) => window.game.scene.getScene('Game').isTileBlocked(c, r), [c, r]);
@@ -79,6 +92,22 @@ await longPressBase(...center(4, 34));
 const q = await dbg();
 if (q.pending >= 2) ok(`long-press queued orders (pending ${q.pending})`);
 else fail(`queue did not fill via long-press (pending ${q.pending}, current ${q.currentKind})`);
+
+// 2b. A queued harvest outlines its tree yellow; hold-drag paints several orders in one gesture.
+await tapBase(...center(2, 2)); // act-now move busies the worker so queued items don't drain
+await longPressBase(...center(8, 20)); // append a harvest of a still-live tree (5,8 was felled above)
+await page.waitForTimeout(120);
+const outlined = await page.evaluate(() =>
+  window.game.scene.getScene('Game').trees.some((t) => t.rect.isStroked && t.rect.strokeColor === 0xffd500),
+);
+if (outlined) ok('queued harvest target is outlined yellow');
+else fail('queued harvest target was not outlined yellow');
+
+const pBefore = (await dbg()).pending;
+await paintDrag([[2, 32], [3, 32], [4, 32], [5, 32], [6, 32]]);
+const pAfter = (await dbg()).pending;
+if (pAfter - pBefore >= 3) ok(`hold-drag queued multiple orders (+${pAfter - pBefore})`);
+else fail(`hold-drag did not queue multiple orders (pending ${pBefore} → ${pAfter})`);
 
 // 3. Cancel clears the queue. (part of d)
 await tapBase(314, 51); // Cancel button
