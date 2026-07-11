@@ -1,6 +1,6 @@
 # Swap Active Art to Pixel Crawler Pack
 
-> Status: in review
+> Status: deployed
 
 ## Summary
 
