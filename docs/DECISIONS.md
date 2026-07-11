@@ -7,6 +7,36 @@ Format: `YYYY-MM-DD — [DECIDED|PROPOSED|OPEN] Title` then a short rationale.
 
 ---
 
+## 2026-07-11 — [OPEN] Want a map editor; Pixel Crawler autotiler + demo polish gaps
+
+Matt's steer after reviewing the autotiled demos: they're good enough for evaluation, but the real
+need going forward is a **map editor so he can build/edit maps himself** rather than tuning a Python
+compositor — that's the next tooling to plan (in-browser tile painter over the same
+`Floors`/`Wall`/blob data the offline autotiler already understands;
+[`scripts/pixel-crawler/autotile.py`](../scripts/pixel-crawler/autotile.py)'s 8-neighbour key logic is
+the thing to port into the engine).
+
+Known demo/autotiler polish gaps (deferred, not blocking the art decision):
+
+- **`demo3_ruins` dirt corners** — the walled-enclosure floor still shows missing/!clean corner tiles.
+- **Dirt has no surface texture** — the dirt fill reads flat; wants variation like the grass has.
+- **Grass variation is too uniformly random** — the 6-fill random scatter looks noisy/even rather than
+  naturally clustered; needs weighting/patchiness, not a flat random pick.
+
+## 2026-07-11 — [PROPOSED] Adopt Pixel Crawler as the base art (re-theme to fantasy), darken later
+
+Evaluated **Pixel Crawler — Free Pack v2.11** (Anokolisa) and made it the **leading replacement** for
+the Zombie Apocalypse pack: better art quality and a style we prefer. Accepted trade-off — it's
+**medieval-fantasy** (knights/orcs/skeletons/anvils/bonfires), not zombie/modern. Matt's call: keep
+this art despite it **not being grim-dark enough yet**, and darken it *later* via grimmer
+tiles/props/recolours + a lighting pass (proven viable by `demo2_camp_night.png`). So this swaps the
+*art* and treats fantasy mobs as reskinnable stand-ins — **not** a story change, and **not yet wired
+into `src/data/tileset.ts`** (evaluation only; still PROPOSED). If it pans out, buy more of Anokolisa's
+paid packs (same grid/conventions). Full index + demos: pack
+[`README.md`](../public/assets/tilesets/pixel-crawler/README.md) and
+[`docs/ASSETS.md`](ASSETS.md#leading-replacement--pixel-crawler-2026-07-11). Zombie pack stays the
+wired-in default until this is committed.
+
 ## 2026-07-11 — [DECIDED] Shared stats via typed adapters, not a class hierarchy
 
 `InspectableStats` (the Inspect-mode panel's shape) is produced by small pure adapter functions

@@ -36,6 +36,32 @@ placeholder-tinted rather than fully styled (no hit-flash/VFX yet, per plan 003'
 list) — the swappable-manifest approach in `src/data/tileset.ts` means trialling a different pack
 is still just pointing `ACTIVE_TILESET` elsewhere.
 
+## Leading replacement — Pixel Crawler (2026-07-11)
+
+Found a **better-quality** pack we prefer the *art style* of: **[Pixel Crawler — Free Pack
+v2.11](https://anokolisa.itch.io/free-pixel-art-asset-pack-topdown-tileset-rpg-16x16-sprites)** by
+Anokolisa. Staged at [`public/assets/tilesets/pixel-crawler/`](../public/assets/tilesets/pixel-crawler/)
+— **that folder's `README.md` is the full index** (grid sizes, category counts, blob-autotile fill
+tiles, object-extraction indices, Phaser loading). Downloaded, unzipped (PNGs only; `.aseprite` source
+left out per convention), visually catalogued, and **stitched into 3 demo maps** to prove coherent
+use: [`docs/assets/pixel-crawler/demos/`](assets/pixel-crawler/demos/).
+
+Decision context (why it's the leading candidate, not yet committed):
+
+- **Style fits better** than the zombie pack and is higher quality — *accepted trade-off:* it's
+  **medieval-fantasy** themed (knights/orcs/skeletons/anvils/bonfires), not zombie/modern.
+- Matt's call (2026-07-11): keep this art even though it's **not grim-dark enough yet**; darken it
+  *later* by adding grimmer tiles/props/recolours + lighting. `demo2_camp_night.png` is a proof that a
+  fire-lit night pass gets most of the way there in-engine. So: swap the *art*, treat the fantasy mobs
+  as reskinnable stand-ins — not (yet) a story change.
+- 16×16 terrain grid (matches `TILE_SIZE`), 32×32 mobs/NPCs, 64×64 layerable player base + crafting
+  **stations** (bonfire/cooking/anvil/sawmill/workbench) that suit the base-building pillar.
+- **If it works out, buy more of Anokolisa's paid packs** in the same style (same grid/conventions).
+- Licence (`Terms.txt`): free commercial use, alter freely, credit optional, **no reselling the assets
+  standalone**. Not wired into `src/data/tileset.ts` yet — evaluation only.
+
+Reproducible tooling for the catalogue/demos: [`scripts/pixel-crawler/`](../scripts/pixel-crawler/).
+
 <details>
 <summary>Other candidates considered</summary>
 
