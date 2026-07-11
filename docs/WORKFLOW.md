@@ -71,6 +71,22 @@ _To be firmed up as we go. Starting position:_
 - **Systems over god-objects.** Keep inventory / crafting / time-of-day / resources as separate,
   testable modules.
 - **Scenes:** Boot → Preload → Menu → Game (world) → UI overlay. Keep UI decoupled from world logic.
+  The core-loop slice set the pattern: content is data in **`src/data/`** (`ITEMS`/`NODES`/`BUILDABLES`
+  + `types.ts`), logic is small modules in **`src/systems/`** (`Inventory`, `grid`), and the HUD is a
+  parallel **`UIScene`** launched over `GameScene` — not baked in. Cross-scene comms via
+  `this.game.events` (`build:*`) + a shared instance in `this.registry` (the `Inventory`).
+- **World-scene input gates on the HUD hit-region.** A scene-level `input.on('pointerdown')` fires for
+  *every* tap, including ones over the overlay — so `GameScene` ignores pointers inside `UIScene`'s
+  hit-region (`hudHitTest`) before routing move/chop/build. Route all pointer handlers (`down` + `move`)
+  through one intent gate.
+- **Tear down cross-scene listeners** in `this.events.once(SHUTDOWN, …)` — `game.events`/`registry`
+  outlive a scene, so listeners double-register on restart otherwise.
 - **Pixel art:** integer scaling, `pixelArt: true`, nearest-neighbour; design at a fixed low base
   resolution and scale up.
 - Keep functions small; name for the domain (resource, node, recipe, stockpile), not the framework.
+
+### Smoke-testing the core loop
+
+`npm run smoke` (needs `npm run preview` running) drives the real game headless in Chromium: it
+chops a tree (asserts wood rises), enters build mode, places a wall (asserts wood drops by 2), and
+checks the Build button doesn't leak taps into the world. See `scripts/smoke.mjs`.

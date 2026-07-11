@@ -30,9 +30,13 @@ See [docs/WORKFLOW.md](docs/WORKFLOW.md) for how these are wired in and the day-
 
 ## Status
 
-Scaffold in place: **Phaser 3 + TypeScript + Vite**, mobile-first (portrait, touch), Boot→Preload→
-MainMenu→Game scenes, placeholder world, GitHub Pages deploy Action. Build verified. Next: MVP
-gameplay slice via `plan-feature`. See [docs/DECISIONS.md](docs/DECISIONS.md) for settled vs open.
+Core-loop slice landed (plan 001): **tap a tree → walk over → multi-hit chop → wood into a character
+`Inventory`**; **Build mode → tap a tile → place a wall** (spends wood, blocks movement); trees turn to
+stumps and regrow. Data-driven items/nodes/buildables (`src/data/`), separate systems (`src/systems/`),
+and a decoupled `UIScene` HUD over the world scene. On the **Phaser 3 + TypeScript + Vite** mobile-first
+scaffold (Boot→Preload→MainMenu→Game + UI overlay), GitHub Pages auto-deploy. Verified via headless
+smoke (`npm run smoke`). Next: survival systems (day/night, hunger) — see
+[docs/GAME-DESIGN.md](docs/GAME-DESIGN.md) MVP slice; [docs/DECISIONS.md](docs/DECISIONS.md) for settled vs open.
 
 ## The game in one line
 

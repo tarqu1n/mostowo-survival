@@ -12,6 +12,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Smoke-test artifacts (screenshots)
+scripts/.smoke*
+
 # Editor / OS
 .DS_Store
 .idea/

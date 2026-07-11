@@ -4,6 +4,7 @@ import { BootScene } from './scenes/BootScene';
 import { PreloadScene } from './scenes/PreloadScene';
 import { MainMenuScene } from './scenes/MainMenuScene';
 import { GameScene } from './scenes/GameScene';
+import { UIScene } from './scenes/UIScene';
 
 /**
  * Phaser game bootstrap. Mobile-first, portrait, pixel-art, touch-native.
@@ -27,8 +28,8 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  scene: [BootScene, PreloadScene, MainMenuScene, GameScene],
+  scene: [BootScene, PreloadScene, MainMenuScene, GameScene, UIScene],
 };
 
-// eslint-disable-next-line no-new
-new Phaser.Game(config);
+// Expose the game instance for debugging + headless smoke tests (harmless in a solo browser game).
+(window as unknown as { game: Phaser.Game }).game = new Phaser.Game(config);

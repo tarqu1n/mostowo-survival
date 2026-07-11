@@ -165,11 +165,12 @@ Ideas captured as they land; to be firmed into real systems later.
 
 Smallest thing that captures the day→fortify→night→defend *feel*:
 
-1. Tile-grid slice of the Mostowa map, player movement.
-2. **Day:** one or two resource nodes to harvest → items into an inventory.
-3. **Fortify:** place a wall segment and one trap from gathered resources.
+1. ~~Tile-grid slice of the Mostowa map, player movement.~~ ✅ (scaffold + core-loop slice, plan 001)
+2. ~~**Day:** one or two resource nodes to harvest → items into an inventory.~~ ✅ tap-to-chop trees →
+   wood into a character `Inventory` (plan 001).
+3. **Fortify:** ~~place a wall segment~~ ✅ (walls, plan 001) · and one trap from gathered resources (todo).
 4. **Night:** a short timed wave of a couple of roaming/attacking zombies; base + trap + player can
-   repel them; day/night tint + a survival meter ticking through it.
+   repel them; day/night tint + a survival meter ticking through it. (todo)
 
 Weather, deep crafting trees, full map, save system, richer AI layer on *after* the slice is fun.
 

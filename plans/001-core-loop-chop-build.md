@@ -1,6 +1,6 @@
 # Core Loop: Chop a Tree, Build a Wall
 
-> Status: planned — run /execute-plan to begin.
+> Status: deployed
 
 ## Summary
 
@@ -92,7 +92,13 @@ save persistence, camera/scrolling world, multiple maps.
   - Docs: none.
   - Done when: `npm run typecheck` passes; snapping `x=20` with `TILE_SIZE=16` yields centre `24`.
 
-- [ ] **Step 4: Trees + tap-to-chop in GameScene** `[inline]`
+- [x] **Step 4: Trees + tap-to-chop in GameScene** `[inline]`
+  - Outcome: rewrote `src/scenes/GameScene.ts`. Character `Inventory` in `registry`; 3 trees on tile
+    centres (`TreeNode` state array w/ col,row). Single `onPointerDown`/`onPointerMove` intent gate:
+    UI-guard (`ui.hudHitTest`) → build seam → tree-hit → move; drag folded in. Chop loop in `update`
+    (approach → hit every `CHOP_INTERVAL_MS`, scale-pop tick, stump at hp≤0, `delayedCall` regrow).
+    Added `INTERACT_RANGE`/`CHOP_INTERVAL_MS` to `config.ts`. Bugfix during verify: after felling,
+    pin `target` to player pos so it doesn't drift back to the spawn target. Shutdown teardown added.
   - Extend `src/scenes/GameScene.ts`. Create the character `Inventory` (Step 2), store it via
     `this.registry.set('inventory', inv)`, and re-emit its `'change'` as
     `this.game.events.emit('inventory:changed', snapshot)` so the HUD can subscribe.
@@ -131,7 +137,12 @@ save persistence, camera/scrolling world, multiple maps.
     (observe via a temporary log or the Step-5 HUD), tree becomes a stump and regrows after the delay;
     tapping open ground still moves the player.
 
-- [ ] **Step 5: HUD overlay (UIScene) — wood count + Build button** `[inline]`
+- [x] **Step 5: HUD overlay (UIScene) — wood count + Build button** `[inline]`
+  - Outcome: created `src/scenes/UIScene.ts` (registered in `main.ts`, `launch('UI')` from GameScene).
+    Wood swatch+counter, touch-sized Build button, build-mode indicator. Subscribes to the shared
+    `Inventory`'s native `'change'` directly (no bus hop, per Finding 4); `build:modeChanged` toggles
+    indicator + button state. Exposes `hudHitTest()` (Build button + indicator rects) for Finding-1
+    guard. Button dims when a wall is unaffordable. Shutdown teardown of both listeners.
   - Create `src/scenes/UIScene.ts` (mirror the other scene classes). Runs **in parallel** over
     `GameScene`. It renders: a **wood counter** (icon swatch in `ITEMS.wood.color` + count, top area),
     a **Build** toggle button (tap target sized for touch), and a small **mode indicator**
@@ -154,7 +165,12 @@ save persistence, camera/scrolling world, multiple maps.
   - Done when: HUD shows live wood count that increments while chopping; tapping **Build** flips the
     indicator on/off (the mode is consumed in Step 6).
 
-- [ ] **Step 6: Build mode + wall placement** `[inline]`
+- [x] **Step 6: Build mode + wall placement** `[inline]`
+  - Outcome: `buildMode` in GameScene toggled via `build:toggle` → re-emits `build:modeChanged`.
+    Occupancy `Set<tileKey>`; ghost rect snapped to tile, green/red by `tilePlaceable` (bounds +
+    occupied + live-tree) && `canAfford`. Valid tap → `inv.spend(wall.cost)` → wall rect in a
+    `staticGroup` (body `setSize`+`updateFromGameObject`); `collider(player, walls)` blocks movement.
+    Build taps intercepted after the UI guard so tapping Build to exit never places under the button.
   - In `GameScene`, add a `buildMode: boolean`. Listen for `this.game.events.on('build:toggle', …)`
     to flip it and emit `'build:modeChanged'` back. Maintain an **occupancy set** of placed-wall tile
     keys (`grid.tileKey`).
@@ -176,7 +192,12 @@ save persistence, camera/scrolling world, multiple maps.
     are rejected (invalid ghost, no spend); the player collides with placed walls; exiting build mode
     returns to normal chopping/moving.
 
-- [ ] **Step 7: Verify end-to-end + docs** `[inline]`
+- [x] **Step 7: Verify end-to-end + docs** `[inline]`
+  - Outcome: added `scripts/smoke.mjs` (+ `npm run smoke`, gitignored screenshots) — headless
+    Chromium drives menu→chop (wood 0→3)→Build (arbitration: no leak)→place wall (wood 3→1)→exit
+    (no wall under button), asserts no console errors: **SMOKE PASSED**. Exposed `window.game` for
+    test/debug. Docs updated: `CLAUDE.md` Status, `docs/GAME-DESIGN.md` MVP slice ticks,
+    `docs/WORKFLOW.md` conventions (data/systems/UIScene, input-guard, listener teardown, smoke).
   - **Verify** via the headless smoke pattern in `docs/WORKFLOW.md` (`npm run build && npm run preview`
     + Chromium at `/opt/pw-browsers/`): drive tap→chop (assert wood count rises), toggle Build, place a
     wall (assert wood drops by 2), and confirm no console/runtime errors. **Explicitly assert the
