@@ -1,6 +1,6 @@
 # Workflow & Conventions
 
-How to work on Mostowa Survival from any device. Update this whenever the "how" changes.
+How to work on Mostowo Survival from any device. Update this whenever the "how" changes.
 
 ## Git — trunk-based, solo
 
@@ -58,7 +58,7 @@ through plan → critique → execute with the gates above). Commits are authore
 npm install       # install deps
 npm run dev       # local dev server with hot reload (Vite)
 npm run build     # typecheck (tsc --noEmit) + static production build -> dist/
-npm run preview   # serve the production build locally (http://localhost:4173/Mostowa-survival/)
+npm run preview   # serve the production build locally (http://localhost:4173/mostowo-survival/)
 npm run typecheck # types only, no build
 ```
 
@@ -67,7 +67,7 @@ bundles; the ~1.4 MB JS chunk is Phaser itself (~341 KB gzipped) — expected, n
 
 **Deploy: GitHub Pages via GitHub Actions** (`.github/workflows/deploy.yml`). **Every push to
 `master`** (or a manual "Run workflow") runs `npm ci` → `npm run build` → publishes `dist/` to Pages
-— so shipping is just `git push`. Assets resolve under `/Mostowa-survival/` in production (Vite
+— so shipping is just `git push`. Assets resolve under `/mostowo-survival/` in production (Vite
 `base`, see `vite.config.ts`; override with `BASE_PATH` if the repo is renamed or served elsewhere).
 
 > **One-time setup (only Matt can do this, in repo Settings):**
@@ -75,7 +75,7 @@ bundles; the ~1.4 MB JS chunk is Phaser itself (~341 KB gzipped) — expected, n
 > 2. **Settings → Branches (or the branch dropdown) → set default branch to `master`** so fresh
 >    clones and the Pages environment use it.
 >
-> After that, every `git push` to `master` auto-deploys to `https://tarqu1n.github.io/Mostowa-survival/`.
+> After that, every `git push` to `master` auto-deploys to `https://tarqu1n.github.io/mostowo-survival/`.
 
 ### Smoke-testing a build
 

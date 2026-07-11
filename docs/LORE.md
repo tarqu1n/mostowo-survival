@@ -1,11 +1,11 @@
-# Lore — Mostowa
+# Lore — Mostowo
 
 The story, and the real-place details that theme the game. Fill this in as Matt shares them so any
-session themes content consistently. Keep it grounded in the real Mostowa.
+session themes content consistently. Keep it grounded in the real Mostowo.
 
 ## Intro story (outbreak)
 
-_Draft the short opening story here — an ordinary camping trip at Mostowa, then the zombie outbreak.
+_Draft the short opening story here — an ordinary camping trip at Mostowo, then the zombie outbreak.
 This is shown as the intro sequence before day one._
 
 - Setup / normal camping day: _TBD_
@@ -14,7 +14,7 @@ This is shown as the intro sequence before day one._
 
 ## Real-place details to draw on
 
-Capture the actual people, stories, landmarks, and local colour of Mostowa so they can become map
+Capture the actual people, stories, landmarks, and local colour of Mostowo so they can become map
 areas, NPCs, enemies, items, and in-jokes.
 
 - **Landmarks / areas** (become map zones): _TBD — pending Google Maps screenshot + notes_
@@ -26,7 +26,7 @@ areas, NPCs, enemies, items, and in-jokes.
 
 As details land, note the mapping so it's reusable:
 
-| Real Mostowa thing | In-game form | Notes |
+| Real Mostowo thing | In-game form | Notes |
 | --- | --- | --- |
 | _e.g. a specific area_ | _map zone / resource area_ | _TBD_ |
 | _e.g. a local person_ | _NPC / named enemy_ | _TBD_ |

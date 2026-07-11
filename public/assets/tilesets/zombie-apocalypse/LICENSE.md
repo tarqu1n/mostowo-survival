@@ -14,7 +14,7 @@
 
 **This is a custom permissive licence, not CC0.** Practical read for this project:
 
-- ✅ Use as-is or edited in Mostowa Survival, including once it's public/shipped (personal +
+- ✅ Use as-is or edited in Mostowo Survival, including once it's public/shipped (personal +
   commercial both explicitly allowed).
 - ✅ Credit Ittai Manero somewhere reachable from the game (about screen / credits / README) —
   not strictly required but asked for.
@@ -22,5 +22,5 @@
   downloadable itch.io/asset-store listing. Shipping it *inside* the game is fine; redistributing
   it *as assets* is not.
 
-If Mostowa Survival's repo or a build ever goes fully public, keep this file (and this note)
+If Mostowo Survival's repo or a build ever goes fully public, keep this file (and this note)
 alongside the assets so the terms travel with them.

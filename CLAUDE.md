@@ -1,6 +1,6 @@
-# Mostowa Survival
+# Mostowo Survival
 
-A browser-based **pixel-art survival / base-building game**, themed around Mostowa (the
+A browser-based **pixel-art survival / base-building game**, themed around Mostowo (the
 camping destination this project is named after). Built with **Phaser 3**. Single-player,
 runs entirely in the browser, no backend.
 
@@ -52,14 +52,14 @@ AI and the eventual NPC companions plug into. Next: survival systems (day/night,
 
 ## The game in one line
 
-Camping at **Mostowa** when a **zombie apocalypse** hits: by day scavenge the camp/forest, by night
+Camping at **Mostowo** when a **zombie apocalypse** hits: by day scavenge the camp/forest, by night
 fortify and defend your base. Pillars: **base building · survival · crafting · base defense**, on a
 **day/night cycle**. Dark-and-grotty but funny. Full vision in [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md).
 
 ## Docs
 
 - [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md) — what the game *is* (premise, day/night loop, enemies, pillars, MVP)
-- [docs/LORE.md](docs/LORE.md) — intro story + real-Mostowa people/places/stories that theme the game
+- [docs/LORE.md](docs/LORE.md) — intro story + real-Mostowo people/places/stories that theme the game
 - [docs/ASSETS.md](docs/ASSETS.md) — art direction + pipeline (CC0 tilesets, Gemini "Nano Banana" via guppi)
 - [docs/DECISIONS.md](docs/DECISIONS.md) — decision log (what we chose and why)
 - [docs/WORKFLOW.md](docs/WORKFLOW.md) — run / build / deploy / code conventions

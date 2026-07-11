@@ -13,7 +13,7 @@ export class MainMenuScene extends Phaser.Scene {
     const cx = BASE_WIDTH / 2;
 
     this.add
-      .text(cx, BASE_HEIGHT * 0.32, 'MOSTOWA', {
+      .text(cx, BASE_HEIGHT * 0.32, 'MOSTOWO', {
         fontFamily: 'monospace',
         fontSize: '40px',
         color: '#e8dcc0',
@@ -29,7 +29,7 @@ export class MainMenuScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(cx, BASE_HEIGHT * 0.5, 'the dead are up at Mostowa.', {
+      .text(cx, BASE_HEIGHT * 0.5, 'the dead are up at Mostowo.', {
         fontFamily: 'monospace',
         fontSize: '11px',
         color: '#6f6552',

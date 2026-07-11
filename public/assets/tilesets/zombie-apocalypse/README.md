@@ -1,6 +1,6 @@
 # Zombie Apocalypse Tileset
 
-Base evaluation pack for Mostowa Survival's environment art — see
+Base evaluation pack for Mostowo Survival's environment art — see
 [`docs/ASSETS.md`](../../../../docs/ASSETS.md) for the overall art pipeline this fits into.
 **Licence:** [`LICENSE.md`](./LICENSE.md) (not CC0 — free for personal + commercial use, credit
 appreciated, no redistribution of the assets themselves). Source:

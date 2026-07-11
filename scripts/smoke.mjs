@@ -14,7 +14,7 @@ async function loadPlaywright() {
 const pw = await loadPlaywright();
 const chromium = pw.chromium ?? pw.default?.chromium;
 
-const URL = process.env.SMOKE_URL ?? 'http://localhost:4173/Mostowa-survival/';
+const URL = process.env.SMOKE_URL ?? 'http://localhost:4173/mostowo-survival/';
 const OUT = 'scripts/.smoke';
 let failed = false;
 const fail = (m) => {

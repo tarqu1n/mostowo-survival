@@ -58,7 +58,7 @@ lands; a fully autonomous sweep robbed him of that. Detail in WORKFLOW.md → Re
 
 ## 2026-07-11 — [DECIDED] Genre & platform: browser pixel-art survival base-builder
 
-Single-player, runs in the browser, no server. Themed around Mostowa (camping destination).
+Single-player, runs in the browser, no server. Themed around Mostowo (camping destination).
 Rationale: fun personal project; browser = zero-install, shareable by link; no backend keeps
 it cheap and simple to host and reason about.
 
@@ -102,9 +102,9 @@ Start with generated/coloured-rect placeholder art so we can build and feel the 
 (ideal for on-the-go sessions), then swap in real pixel art (free CC0 tileset and/or hand-drawn)
 once the slice is fun. Keeps art off the critical path.
 
-## 2026-07-11 — [DECIDED] Premise & core loop: zombie apocalypse at Mostowa, day/night cycle
+## 2026-07-11 — [DECIDED] Premise & core loop: zombie apocalypse at Mostowo, day/night cycle
 
-Camping at Mostowa when a zombie apocalypse hits (intro short story). Four pillars: base building,
+Camping at Mostowo when a zombie apocalypse hits (intro short story). Four pillars: base building,
 survival, crafting, base defense. **Day** = scavenge camp/forest/surroundings for resources;
 **base phase** = fortify (walls/traps), craft, unlock crafting stations; **night** = zombie animals,
 humans, creatures come through the map. **Enemies are roaming (don't attack unless aggro'd) or
@@ -127,7 +127,7 @@ unlock as new bolt-on maps; special maps reached via fast travel once **car (rep
 in the save — don't hard-wire one world. Rationale: cheap content expansion and a clear progression/
 exploration hook; decided early because it shapes the scene/loading architecture.
 
-## 2026-07-11 — [DECIDED] Map is based on the real Mostowa site
+## 2026-07-11 — [DECIDED] Map is based on the real Mostowo site
 
 The playable map traces a Google Maps screenshot of the actual camping spot; people, stories, and
 landmarks of the place theme the content (LORE.md). Rationale: site-specific identity is what makes

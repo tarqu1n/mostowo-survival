@@ -1,6 +1,6 @@
 # Game Design
 
-Living document for what Mostowa Survival *is*. Rough now; sharpens as we play. Everything here
+Living document for what Mostowo Survival *is*. Rough now; sharpens as we play. Everything here
 is design intent — keep it aligned with the objectives below whenever we plan a feature.
 
 > **Ideas land here as they come.** Matt jots gameplay ideas into this doc (and lore into
@@ -14,7 +14,7 @@ is design intent — keep it aligned with the objectives below whenever we plan 
 
 ## Pitch
 
-You're camping at **Mostowa** when a **zombie apocalypse** breaks out. By day you range across the
+You're camping at **Mostowo** when a **zombie apocalypse** breaks out. By day you range across the
 campsite, forest, and surrounding areas scavenging resources; by night you hole up in your patch of
 the camp and defend it as zombie animals, humans, and worse come through the map. Build, fortify,
 craft, and survive night after night. Pixel-art, browser, single-player.
@@ -26,7 +26,7 @@ and visual gags.
 
 - Four intertwined pillars: **base building · survival · crafting · base defense**.
 - A **day/night cycle** that creates a real risk/reward rhythm (explore vs fortify vs defend).
-- A world **grounded in the real Mostowa** — its geography, people, stories, and local colour.
+- A world **grounded in the real Mostowo** — its geography, people, stories, and local colour.
 - Readable, characterful pixel art with a dark-but-comic identity.
 - **Mobile-first**: primarily played on a phone (portrait, touch), scaling up to larger screens later.
 
@@ -45,12 +45,12 @@ from Google Maps to be added, see "Map" below). Locations, landmarks, and flavou
 survivors/NPCs/zombies, in-jokes and site-specific detail. This is what makes it *ours* rather than
 a generic zombie game.
 
-> TODO: capture the specific Mostowa people/stories/landmarks to draw on — add them to
+> TODO: capture the specific Mostowo people/stories/landmarks to draw on — add them to
 > [LORE.md](LORE.md) as they're shared so any session can theme content consistently.
 
 ## Story intro
 
-A **short story** sets it up: an ordinary camping trip at Mostowa, then the outbreak. Delivered as
+A **short story** sets it up: an ordinary camping trip at Mostowo, then the outbreak. Delivered as
 an intro sequence (text + simple stills) before the first day begins. Draft to live in
 [LORE.md](LORE.md).
 
@@ -92,7 +92,7 @@ creatures — grotty but funny.
 The world is **multiple discrete maps**, not one giant continuous map:
 
 - **Starting map** — the camp and its immediate surroundings, where the base is. Built from a
-  **Google Maps screenshot of the real Mostowa site** (to be provided): trace the real pitches,
+  **Google Maps screenshot of the real Mostowo site** (to be provided): trace the real pitches,
   tracks, treeline, water, and buildings into a tile map, base in a plausible camping spot.
 - **Unlockable adjacent areas** — surrounding areas open up as the game progresses. Think of each as
   a **new map "bolted on"** to the existing world (reached from an edge/exit of an unlocked map).
@@ -152,7 +152,7 @@ Ideas captured as they land; to be firmed into real systems later.
   options**. Choices carry consequences: **some good, some bad** (resources, risks, NPC encounters,
   map/story developments, buffs/debuffs for the day).
 - Sets the tone and stakes for the day before the player heads out, and injects variety + story so
-  no two days feel identical. Themed with Mostowa lore (see [LORE.md](LORE.md)).
+  no two days feel identical. Themed with Mostowo lore (see [LORE.md](LORE.md)).
 - To design later: are outcomes deterministic or partly chance? Do prior choices/state gate which
   events appear? How authored vs. randomised is the pool?
 
@@ -168,7 +168,7 @@ Ideas captured as they land; to be firmed into real systems later.
 - **They must be fed** — companions consume food, tying directly into the **hunger/food economy**:
   more helpers = more mouths, so there's a real trade-off between labour and food pressure.
 - **At night they fight alongside you defending the base** — bolstering base defense against the wave.
-- Themed as Mostowa people/survivors (see [LORE.md](LORE.md)); a natural home for named characters.
+- Themed as Mostowo people/survivors (see [LORE.md](LORE.md)); a natural home for named characters.
 - To design later: recruitment, individual needs/traits/skills, task assignment UI, morale/loyalty,
   what happens if they starve, and how they behave in the night defense (positioning, orders).
 
@@ -176,7 +176,7 @@ Ideas captured as they land; to be firmed into real systems later.
 
 Smallest thing that captures the day→fortify→night→defend *feel*:
 
-1. ~~Tile-grid slice of the Mostowa map, player movement.~~ ✅ (scaffold + core-loop slice, plan 001)
+1. ~~Tile-grid slice of the Mostowo map, player movement.~~ ✅ (scaffold + core-loop slice, plan 001)
 2. ~~**Day:** one or two resource nodes to harvest → items into an inventory.~~ ✅ tap-to-chop trees →
    wood into a character `Inventory` (plan 001).
 3. **Fortify:** ~~place a wall segment~~ ✅ (walls, plan 001) · and one trap from gathered resources (todo).

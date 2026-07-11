@@ -34,7 +34,7 @@ export const DEFAULT_ZOOM = 2;
 /** Zoom change per UI button press. */
 export const ZOOM_STEP = 0.5;
 /** localStorage key the current zoom is persisted under (best-effort — see GameScene.setZoom). */
-export const ZOOM_STORAGE_KEY = 'mostowa:zoom';
+export const ZOOM_STORAGE_KEY = 'mostowo:zoom';
 
 /** Radius (world px) of the character's line of sight — everything beyond it is fogged. */
 export const VISION_RADIUS = TILE_SIZE * 5;

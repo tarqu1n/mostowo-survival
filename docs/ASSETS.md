@@ -140,5 +140,5 @@ Practical workflow (proposed, to firm up when we start generating):
 
 - `public/assets/` (or `src/assets/`) — sprites/tilesets/atlases the game loads (path finalised with
   the Vite scaffold).
-- `docs/assets/reference/` — reference material (e.g. the Google Maps screenshot of Mostowa).
+- `docs/assets/reference/` — reference material (e.g. the Google Maps screenshot of Mostowo).
 - Licence notes travel with any third-party pack.

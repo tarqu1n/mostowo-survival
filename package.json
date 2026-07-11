@@ -1,9 +1,9 @@
 {
-  "name": "mostowa-survival",
+  "name": "mostowo-survival",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Browser pixel-art survival base-builder themed around Mostowa (Phaser 3).",
+  "description": "Browser pixel-art survival base-builder themed around Mostowo (Phaser 3).",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

@@ -1,6 +1,6 @@
-# Mostowa Survival
+# Mostowo Survival
 
-A browser-based pixel-art survival / base-building game, themed around Mostowa. Built with Phaser 3.
+A browser-based pixel-art survival / base-building game, themed around Mostowo. Built with Phaser 3.
 
 > Bootstrapping. Stack and hosting are being decided — see [docs/DECISIONS.md](docs/DECISIONS.md).
 

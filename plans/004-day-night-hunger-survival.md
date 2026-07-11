@@ -129,7 +129,7 @@ line number; reconfirm before editing but these are current as of the rebase):**
   `window.game.registry.get('inventory')`, `GameScene.debugState()` (`GameScene.ts:952`, the
   primary state seam — **add fields here for assertions**), `GameScene.isTileBlocked(col,row)` (`:983`).
   Taps via `tapBase`/`tapWorld`/`longPressWorld`; assertions are manual `ok()`/`fail()`; page errors
-  collected and asserted empty. **Only zoom persists** (`localStorage`, key `mostowa:zoom`) — confirm
+  collected and asserted empty. **Only zoom persists** (`localStorage`, key `mostowo:zoom`) — confirm
   no game-state save exists.
 
 **Direction (README / GAME-DESIGN / DECISIONS):** mobile-first portrait touch, data-driven catalogs,
