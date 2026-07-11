@@ -148,20 +148,24 @@ function reconstruct(cameFrom: Map<number, number>, goalKey: number, dims: Dims)
 }
 
 /**
- * Of `tile`'s 8 neighbours, return the walkable one reachable from `from` by the shortest
- * successful {@link findPath}, else `null`. Used by harvest/build to stand next to a
- * target — so "no reachable adjacent tile" is detectable rather than a silent stall.
+ * Of `tile`'s candidate neighbours (all 8 by default), return the walkable one reachable from
+ * `from` by the shortest successful {@link findPath}, else `null`. Used by harvest/build to stand
+ * next to a target — so "no reachable adjacent tile" is detectable rather than a silent stall.
  * (`[]` counts as reachable: `from` already *is* that neighbour.)
+ *
+ * Pass a restricted `offsets` set to constrain *which* sides count — e.g. a tall tree that overhangs
+ * upward wants the worker at its base, not on a canopy tile above it (see GameScene BASE_STAND_OFFSETS).
  */
 export function reachableAdjacent(
   from: Cell,
   tile: Cell,
   isBlocked: Blocked,
   dims: Dims,
+  offsets: ReadonlyArray<readonly [number, number]> = OFFSETS,
 ): Cell | null {
   let best: Cell | null = null;
   let bestLen = Infinity;
-  for (const [dc, dr] of OFFSETS) {
+  for (const [dc, dr] of offsets) {
     const nc = tile.col + dc;
     const nr = tile.row + dr;
     if (isWall(nc, nr, isBlocked, dims)) continue;

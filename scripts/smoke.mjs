@@ -357,21 +357,38 @@ else fail(`restart did not fully reset state: ${JSON.stringify(postRestart)}`);
 // 8c. Punch: post-restart, walk to the fresh zombie and destroy it in 3 hits (maxHp 3, flat 1 dmg).
 await tapBase(40, 48); // COMBAT toggle (restart reset mode to command)
 await page.waitForTimeout(150);
+// Punch strikes exactly one tile — the tile at (playerTile + facing). Don't walk all the way onto
+// the zombie: player↔zombie have no collision, so marching in co-locates them on one tile, leaving
+// the facing-adjacent punch tile empty (and just draining HP). Instead walk down only until the
+// zombie aggros (starts chasing), then hold still facing down — it climbs to the tile directly below
+// and halts there (its AI stops at tileDist 1), giving Punch a stable, aligned target.
 adjacent = false;
-for (let i = 0; i < 30; i++) {
-  await movepadStep(0, 35);
-  const dist = await page.evaluate(() => {
+for (let i = 0; i < 20 && !adjacent; i++) {
+  await movepadStep(0, 30);
+  adjacent = await page.evaluate(() => window.game.scene.getScene('Game').zombies.some((z) => z.alive && z.state === 'chasing'));
+}
+if (adjacent) ok('movepad walked the player close enough to aggro the fresh zombie');
+else fail('movepad did not get the player within the zombie’s aggro range');
+
+// Facing was set to 'down' by the last downward step; wait for the climbing zombie to settle onto
+// the punch-target tile (playerTile + facing), then punch. Punch as soon as aligned to minimise
+// contact damage taken while adjacent.
+const punchAligned = () =>
+  page.evaluate(() => {
     const gs = window.game.scene.getScene('Game');
     const z = gs.zombies.find((z) => z.alive);
-    return z ? Math.abs(gs.player.y - z.sprite.y) + Math.abs(gs.player.x - z.sprite.x) : Infinity;
+    if (!z) return false;
+    const pc = Math.floor(gs.player.x / 16);
+    const pr = Math.floor(gs.player.y / 16);
+    return z.col === pc + gs.lastFacing.dCol && z.row === pr + gs.lastFacing.dRow;
   });
-  if (dist < 20) {
-    adjacent = true;
-    break;
-  }
+let punchReady = false;
+for (let j = 0; j < 60 && !punchReady; j++) {
+  punchReady = await punchAligned();
+  if (!punchReady) await page.waitForTimeout(100);
 }
-if (adjacent) ok('movepad walked the player to the fresh post-restart zombie');
-else fail('movepad did not close the distance to the fresh zombie');
+if (punchReady) ok('zombie settled onto the punch-target tile');
+else fail('zombie never aligned with the punch-target tile');
 
 const zBefore = (await dbg()).zombies;
 for (let i = 0; i < 3; i++) {

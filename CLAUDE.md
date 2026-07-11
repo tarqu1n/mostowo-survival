@@ -56,8 +56,10 @@ unchanged); the player has full 3-way directional facing (enemy flips by movemen
 [docs/ASSETS.md](docs/ASSETS.md) and [docs/DECISIONS.md](docs/DECISIONS.md) for the full picture.
 
 **Post-005 polish:** player **chop** (Slice) + **punch** (Crush) directional action swings; ground
-baked into one `RenderTexture` to kill the fractional-zoom (150%) tile-seam bleed. See
-[docs/DECISIONS.md](docs/DECISIONS.md) (2026-07-12).
+baked into one `RenderTexture` to kill the fractional-zoom (150%) tile-seam bleed; workers chop/build
+from a resource's **base** tile and **face** the target (`faceTile`, `TREE_BASE_STAND_OFFSETS`). See
+[docs/DECISIONS.md](docs/DECISIONS.md) (2026-07-12). **Testing direction:** move to isolated,
+deterministic scenario setups rather than one live-game end-to-end smoke (decision logged).
 
 Next: survival systems (day/night, hunger) — see [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md) MVP
 slice; [docs/DECISIONS.md](docs/DECISIONS.md) for settled vs open.

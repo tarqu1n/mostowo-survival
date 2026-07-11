@@ -44,6 +44,21 @@ import {
 /** Height (in tiles) the tree image is scaled to stand — big pine on a 16px tile, canopy overhangs up. */
 const TREE_TILES_TALL = 2.6;
 
+/**
+ * Neighbour offsets the worker may stand on to chop a tree: the trunk row (sides) and the row below,
+ * but NOT the three tiles directly above (dr === -1). A pine overhangs ~2 tiles upward yet only
+ * blocks its trunk tile, so an "above" stand tile sits inside the canopy and — with the player drawn
+ * on top — reads as chopping halfway up the tree. Restricting to the base keeps the worker rooted at
+ * the trunk. Falls back to any adjacent tile if the base is walled off (see beginCurrent).
+ */
+const TREE_BASE_STAND_OFFSETS: ReadonlyArray<readonly [number, number]> = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [1, 1],
+  [-1, 1],
+];
+
 /** A live/stump resource node instance in the world (tree sprite + its data + state). */
 export interface TreeNode {
   id: string;
@@ -406,6 +421,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
+   * Turn the worker to face a target tile. Called while working in place (chop/build) so the swing
+   * points at the thing being worked — independent of the approach direction or a stale `lastFacing`
+   * (fixes chopping while facing away when already stood next to the target).
+   */
+  private faceTile(col: number, row: number): void {
+    const pt = this.playerTile();
+    const dCol = Math.sign(col - pt.col);
+    const dRow = Math.sign(row - pt.row);
+    if (dCol !== 0 || dRow !== 0) this.lastFacing = { dCol, dRow };
+  }
+
+  /**
    * Give a scaled actor a roughly tile-sized physics body at its feet. Size/offset are in source-
    * frame px (Arcade scales the body by the sprite's scale), so a padded 64px canvas gets a ~1-tile
    * world body centred on the character's feet. Low-stakes: player↔wall collision is a pathfinding
@@ -453,7 +480,11 @@ export class GameScene extends Phaser.Scene {
     if (a.kind === 'harvest') {
       const tree = this.treeById(a.treeId);
       if (!tree || !tree.alive) return this.completeCurrent();
-      const stand = reachableAdjacent(this.playerTile(), { col: tree.col, row: tree.row }, this.isBlocked, this.gridDims);
+      const target = { col: tree.col, row: tree.row };
+      // Prefer a base stand tile (never up in the canopy); fall back to any adjacent if walled off.
+      const stand =
+        reachableAdjacent(this.playerTile(), target, this.isBlocked, this.gridDims, TREE_BASE_STAND_OFFSETS) ??
+        reachableAdjacent(this.playerTile(), target, this.isBlocked, this.gridDims);
       if (!stand || !this.pathTo(stand)) this.completeCurrent();
       return;
     }
@@ -538,6 +569,7 @@ export class GameScene extends Phaser.Scene {
     if (!tree || !tree.alive) return this.completeCurrent();
     if (this.advancePath()) {
       this.player.body.setVelocity(0, 0);
+      this.faceTile(tree.col, tree.row); // swing toward the trunk, whatever side we stood on
       this.chopping = true; // standing at the tree → updatePlayerAnim plays the chop swing
       this.chopElapsed += delta;
       if (this.chopElapsed >= CHOP_INTERVAL_MS) {
@@ -552,6 +584,7 @@ export class GameScene extends Phaser.Scene {
     if (!site || site.done) return this.completeCurrent();
     if (this.advancePath()) {
       this.player.body.setVelocity(0, 0);
+      this.faceTile(site.col, site.row); // face the blueprint while building it
       site.progress += delta;
       site.rect.setAlpha(0.35 + 0.55 * Math.min(1, site.progress / BUILD_MS));
       if (site.progress >= BUILD_MS) {

@@ -7,6 +7,57 @@ Format: `YYYY-MM-DD — [DECIDED|PROPOSED|OPEN] Title` then a short rationale.
 
 ---
 
+## 2026-07-12 — [DECIDED] Toward isolated test setups, not one live-game end-to-end smoke
+
+The headless smoke drives the whole running game start-to-finish. That's already fragile and won't
+scale as content grows — one linear playthrough can't cover every action/animation/interaction. Case
+in point: the Punch step relied on a real-time movepad walk landing the player exactly one tile from a
+chasing zombie; it flaked ~50% (the player walked *through* the collisionless zombie and co-located,
+so Punch's single facing-adjacent tile was empty). Reworked to *aggro-then-settle* (walk only until
+the zombie aggros, hold still, let it stop one tile below, then punch) — stable, but still indirect.
+Direction: prefer **isolated, deterministic scenarios** — place the player + entities on known tiles,
+set facing, trigger the one action under test, assert the result — over navigating there through live
+play. The end-to-end smoke stays as a broad boot/core-loop sanity check; specific behaviours get their
+own focused setups. **[OPEN]** harness shape: a debug scenario API on GameScene vs a dedicated test
+scene vs a query-param scenario loader — to be specced.
+
+## 2026-07-12 — [DECIDED] Workers chop/build from a resource's base tile, facing the target
+
+Harvest prefers a *base* stand tile (the trunk row + the row below — `TREE_BASE_STAND_OFFSETS`; never
+the canopy tiles directly above), falling back to any reachable adjacent tile if the base is walled
+off. While working in place the worker turns to face the target (`faceTile`), so the chop/build swing
+points at the tree/blueprint regardless of approach direction or a stale facing. Fixes: (a) chopping
+from a canopy tile ~2 squares above the trunk, and (b) chopping while facing away when already stood
+next to the tree. `reachableAdjacent` gained an optional candidate-offsets arg for (a). Rationale: a
+tall sprite (2.6-tile pine) overhangs upward but only blocks its trunk tile, so "any adjacent" read
+wrong — the base is where you'd actually chop. (Answers "do interactables need a target coordinate?":
+yes, in effect — encode where the worker stands + which way it faces, per resource.)
+
+## 2026-07-12 — [DECIDED] Player action swings: chop = Slice, punch = Crush (reskinnable stand-ins)
+
+The player now plays directional action animations: **chop** = Pixel Crawler `Slice_Base` (loops
+while felling in place), **punch** = `Crush_Base` (one-shot per Punch press). Wired as two extra
+`PlayerState`s (`chop`/`punch`) alongside `idle`/`walk`, sharing the same `playerAnimKey`/render
+footprint; action swings run at `ACTION_ANIM_FRAMERATE` (20 fps ⇒ ≈ one chop per `CHOP_INTERVAL_MS`).
+A one-shot punch owns the sprite via a `punchLockUntil` time-gate in `updatePlayerAnim`; the swing
+fires on every press (even a whiff) so input always feels heard. Rationale: the Body_A rig ships no
+literal chop/punch strip, so Slice (axe-like side swing) and Crush (overhead smash) are the closest
+melee motions — consistent with the plan-005 "fantasy mobs/actions as reskinnable stand-ins" stance.
+The Skeleton mob has no attack strip (Idle/Run/Death only), so the enemy side of "fighting" is still
+just contact damage with no dedicated attack pose — a future add.
+
+## 2026-07-12 — [DECIDED] Ground baked into one RenderTexture (fixes fractional-zoom tile seams)
+
+`drawGround()` bakes all ground tiles into a single `RenderTexture` instead of ~900 separate
+`add.image` tiles. Symptom it fixes: at fractional camera zoom (notably 150%) thin dark vertical
+seams crawled across the grass while scrolling horizontally. Cause: individually-placed frames of a
+shared spritesheet **bleed** at non-integer scale — a 16px source tile drawn at 24px samples just
+past its atlas cell and picks up a neighbouring (dark) frame. At 100%/200% (integer scale) the
+sampling lands cleanly, so it only showed at 150%. Baked side-by-side at integer 1:1, each tile's
+neighbour is the real adjacent grass (no cross-frame bleed) and it's one object (no inter-tile gaps);
+the camera then nearest-samples one opaque texture. Rationale: robust at any zoom, and collapses ~900
+draw objects to one. (Alternative — extruding tile edges — is more work for the same result here.)
+
 ## 2026-07-12 — [DECIDED] Swap active art to Pixel Crawler; zombie pack retired (plan 005)
 
 Committed the swap proposed below: `ACTIVE_TILESET` now points to `PIXEL_CRAWLER_TILESET`
@@ -205,31 +256,6 @@ with `gemini-2.5-flash-image` mirroring `guppi/house-helper/catalog_icons.py`. K
 server (`GEMINI_API_KEY`, gitignored, LAN-only) so generation runs from a guppi-reachable machine and
 processed sprites get committed. Detail in ASSETS.md.
 
-## 2026-07-12 — [DECIDED] Player action swings: chop = Slice, punch = Crush (reskinnable stand-ins)
-
-The player now plays directional action animations: **chop** = Pixel Crawler `Slice_Base` (loops
-while felling in place), **punch** = `Crush_Base` (one-shot per Punch press). Wired as two extra
-`PlayerState`s (`chop`/`punch`) alongside `idle`/`walk`, sharing the same `playerAnimKey`/render
-footprint; action swings run at `ACTION_ANIM_FRAMERATE` (20 fps ⇒ ≈ one chop per `CHOP_INTERVAL_MS`).
-A one-shot punch owns the sprite via a `punchLockUntil` time-gate in `updatePlayerAnim`; the swing
-fires on every press (even a whiff) so input always feels heard. Rationale: the Body_A rig ships no
-literal chop/punch strip, so Slice (axe-like side swing) and Crush (overhead smash) are the closest
-melee motions — consistent with the plan-005 "fantasy mobs/actions as reskinnable stand-ins" stance.
-The Skeleton mob has no attack strip (Idle/Run/Death only), so the enemy side of "fighting" is still
-just contact damage with no dedicated attack pose — a future add.
-
-## 2026-07-12 — [DECIDED] Ground baked into one RenderTexture (fixes fractional-zoom tile seams)
-
-`drawGround()` bakes all ground tiles into a single `RenderTexture` instead of ~900 separate
-`add.image` tiles. Symptom it fixes: at fractional camera zoom (notably 150%) thin dark vertical
-seams crawled across the grass while scrolling horizontally. Cause: individually-placed frames of a
-shared spritesheet **bleed** at non-integer scale — a 16px source tile drawn at 24px samples just
-past its atlas cell and picks up a neighbouring (dark) frame. At 100%/200% (integer scale) the
-sampling lands cleanly, so it only showed at 150%. Baked side-by-side at integer 1:1, each tile's
-neighbour is the real adjacent grass (no cross-frame bleed) and it's one object (no inter-tile gaps);
-the camera then nearest-samples one opaque texture. Rationale: robust at any zoom, and collapses ~900
-draw objects to one. (Alternative — extruding tile edges — is more work for the same result here.)
-
 ---
 
 ## Open questions
@@ -238,3 +264,8 @@ draw objects to one. (Alternative — extruding tile edges — is more work for 
   marketplace vs vendoring skills into `.claude/skills/`. (Tracked in WORKFLOW.md.)
 - **[OPEN] MVP vertical slice details:** exact mechanics/scope for the first playable — to be nailed
   down by a `plan-feature` plan. Draft slice is in GAME-DESIGN.md.
+- **[OPEN] Plan the testing rework — TODO:** run `plan-feature` for isolated, deterministic test
+  scenarios (place player + entities on known tiles, set facing, trigger one action, assert) to
+  replace the fragile live-game end-to-end smoke. See the 2026-07-12 "isolated test setups" decision
+  above; pick the harness shape (debug scenario API vs test scene vs query-param loader). The current
+  smoke stays as a boot/core-loop sanity check until then.
