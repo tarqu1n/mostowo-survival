@@ -19,6 +19,14 @@ and visual gags.
 - A **day/night cycle** that creates a real risk/reward rhythm (explore vs fortify vs defend).
 - A world **grounded in the real Mostowa** — its geography, people, stories, and local colour.
 - Readable, characterful pixel art with a dark-but-comic identity.
+- **Mobile-first**: primarily played on a phone (portrait, touch), scaling up to larger screens later.
+
+## Platform & controls
+
+**Phone-first, portrait orientation, touch controls** are the primary target; the game must **scale
+to any screen size** (letterbox/fit on desktop now; showing more of the world on big screens is a
+later enhancement). Design UI, tap targets, and framing for a phone first. Input abstraction should
+not assume mouse/keyboard — touch is the baseline, pointer/keys are conveniences.
 
 ## Setting & theme
 
@@ -64,14 +72,26 @@ player is heavily incentivised to be back at base defending, not caught out in t
 Enemy variety leans into the humour: zombie campsite animals, zombified local characters, absurd
 creatures — grotty but funny.
 
-## Map
+## Maps & world structure
 
-Built from a **Google Maps screenshot of the real Mostowa site** (to be provided). Plan: trace the
-real layout into a tile map — the actual pitches, tracks, treeline, water, and buildings become the
-playable space, with the player's base in a plausible camping spot.
+The world is **multiple discrete maps**, not one giant continuous map:
+
+- **Starting map** — the camp and its immediate surroundings, where the base is. Built from a
+  **Google Maps screenshot of the real Mostowa site** (to be provided): trace the real pitches,
+  tracks, treeline, water, and buildings into a tile map, base in a plausible camping spot.
+- **Unlockable adjacent areas** — surrounding areas open up as the game progresses. Think of each as
+  a **new map "bolted on"** to the existing world (reached from an edge/exit of an unlocked map).
+- **Special maps via fast travel** — reachable once the player unlocks transport:
+  - **Car** — unlocked by **repairing** it → fast-travel to certain maps.
+  - **Boat** — unlocked by **building** it → fast-travel to water-reachable maps.
+
+**Architecture implication:** treat maps as **data-driven, independently-loaded scenes/definitions**
+registered in a **map registry**, with defined **connections** (edge transitions + fast-travel
+nodes) and **unlock gates**. Persist which maps/connections/transport are unlocked in the save.
+Don't hard-wire a single world; build the map-loading + travel system to add maps cheaply.
 
 > When the screenshot arrives, save it under `docs/assets/reference/` and record what each real
-> area maps to in-game here.
+> area maps to in-game here, plus how areas connect and what gates each unlock.
 
 ## Pillars in more detail
 

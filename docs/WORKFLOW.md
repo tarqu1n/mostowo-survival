@@ -32,13 +32,28 @@ Loop: *plan → critique → (revise) → execute → commit → push*.
 ```bash
 npm install       # install deps
 npm run dev       # local dev server with hot reload (Vite)
-npm run build     # static production build -> dist/
-npm run preview   # serve the production build locally
+npm run build     # typecheck (tsc --noEmit) + static production build -> dist/
+npm run preview   # serve the production build locally (http://localhost:4173/Mostowa-survival/)
+npm run typecheck # types only, no build
 ```
 
-**Deploy: GitHub Pages via GitHub Actions.** A workflow builds with `vite build` and publishes
-`dist/` to Pages on push. (Vite `base` must be set to the repo path for Pages to resolve assets —
-wired up when the scaffold lands.) itch.io is a possible later second target for sharing with players.
+Verified working on Node 22 (Phaser 3.90, Vite 6, TypeScript 5.9). `npm run build` typechecks then
+bundles; the ~1.4 MB JS chunk is Phaser itself (~341 KB gzipped) — expected, not worth splitting.
+
+**Deploy: GitHub Pages via GitHub Actions** (`.github/workflows/deploy.yml`). On push to `main` (or
+manual "Run workflow"), it runs `npm ci` → `npm run build` → publishes `dist/`. Assets resolve under
+`/Mostowa-survival/` in production (Vite `base`, see `vite.config.ts`; override with `BASE_PATH` if
+the repo is renamed or served elsewhere).
+
+> **One-time setup (only Matt can do this):** repo **Settings → Pages → Source: "GitHub Actions"**.
+> The Action won't publish until this is set and the branch reaches `main`. Live URL will be
+> `https://tarqu1n.github.io/Mostowa-survival/`.
+
+### Smoke-testing a build
+
+Headless check that the game actually boots (canvas present, no runtime errors) without a device:
+`npm run build && npm run preview`, then load the preview URL in a headless Chromium and assert a
+non-zero `<canvas>`. Chromium is pre-installed at `/opt/pw-browsers/` in web sessions.
 
 ## Code conventions
 

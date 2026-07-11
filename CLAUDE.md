@@ -30,8 +30,9 @@ See [docs/WORKFLOW.md](docs/WORKFLOW.md) for how these are wired in and the day-
 
 ## Status
 
-Project bootstrapping. Stack and hosting under discussion — see
-[docs/DECISIONS.md](docs/DECISIONS.md) for what's settled vs open.
+Scaffold in place: **Phaser 3 + TypeScript + Vite**, mobile-first (portrait, touch), Boot→Preload→
+MainMenu→Game scenes, placeholder world, GitHub Pages deploy Action. Build verified. Next: MVP
+gameplay slice via `plan-feature`. See [docs/DECISIONS.md](docs/DECISIONS.md) for settled vs open.
 
 ## The game in one line
 

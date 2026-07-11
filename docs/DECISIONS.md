@@ -56,6 +56,21 @@ attacking** — this deliberately punishes staying out at night and makes "get h
 correct play. Full detail in GAME-DESIGN.md. Rationale: gives the day/night cycle real risk/reward
 teeth and a clear emotional arc each cycle.
 
+## 2026-07-11 — [DECIDED] Mobile-first, portrait, touch — scales to larger screens
+
+Primary target is playing on a phone (portrait, touch). Must scale to any screen size (fit/letterbox
+on desktop now; richer big-screen framing later). Scaffold: Phaser `Scale.FIT` from a fixed portrait
+base resolution, `pixelArt: true`, touch as the baseline input. Rationale: Matt plays on his phone;
+designing mobile-first avoids a painful retrofit.
+
+## 2026-07-11 — [DECIDED] Multi-map world: bolt-on areas + fast-travel special maps
+
+World is many discrete maps, not one continuous map. Start map = camp + surroundings; adjacent areas
+unlock as new bolt-on maps; special maps reached via fast travel once **car (repaired)** or **boat
+(built)** is unlocked. Build a **data-driven map registry** with connections + unlock gates, persisted
+in the save — don't hard-wire one world. Rationale: cheap content expansion and a clear progression/
+exploration hook; decided early because it shapes the scene/loading architecture.
+
 ## 2026-07-11 — [DECIDED] Map is based on the real Mostowa site
 
 The playable map traces a Google Maps screenshot of the actual camping spot; people, stories, and
