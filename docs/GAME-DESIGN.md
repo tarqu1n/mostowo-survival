@@ -140,6 +140,27 @@ Ideas captured as they land; to be firmed into real systems later.
 - To design out later: food types & spoilage, cooking/crafting food at stations, hunger→health
   cascade, and how night danger trades off against the need to forage.
 
+## Daily narrative events (draft)
+
+- **Each day opens with a narrative event** — a short bit of story presented with **multiple-choice
+  options**. Choices carry consequences: **some good, some bad** (resources, risks, NPC encounters,
+  map/story developments, buffs/debuffs for the day).
+- Sets the tone and stakes for the day before the player heads out, and injects variety + story so
+  no two days feel identical. Themed with Mostowa lore (see [LORE.md](LORE.md)).
+- To design later: are outcomes deterministic or partly chance? Do prior choices/state gate which
+  events appear? How authored vs. randomised is the pool?
+
+## NPC companions (draft)
+
+- **Recruitable NPC characters** the player can **send out to do tasks during the day** (e.g.
+  scavenging/gathering, and later other jobs) — extending what you can accomplish beyond the player alone.
+- **They must be fed** — companions consume food, tying directly into the **hunger/food economy**:
+  more helpers = more mouths, so there's a real trade-off between labour and food pressure.
+- **At night they fight alongside you defending the base** — bolstering base defense against the wave.
+- Themed as Mostowa people/survivors (see [LORE.md](LORE.md)); a natural home for named characters.
+- To design later: recruitment, individual needs/traits/skills, task assignment UI, morale/loyalty,
+  what happens if they starve, and how they behave in the night defense (positioning, orders).
+
 ## MVP vertical slice (first playable) — proposed
 
 Smallest thing that captures the day→fortify→night→defend *feel*:
