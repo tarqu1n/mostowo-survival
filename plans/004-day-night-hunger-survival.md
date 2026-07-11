@@ -26,13 +26,19 @@ un-saved world today).
   production-speed cycle is untestable via `waitForTimeout`, add debug fast-forward hooks (Step 8)
   mirroring the existing `debug:regenTrees` event so the smoke test can drive the clock/hunger.
 - **Night scope:** darkening tint + queryable phase state only. **No enemy waves this slice.**
-- **Health:** builds on **plan 003 (combat), assumed executed first.** Plan 003 introduces on
-  `GameScene`: a mutable `playerHp` (starts at `playerStats.maxHp`), `damagePlayer(amount: number)`
-  (`playerHp = Math.max(0, playerHp - amount)`, emits `player:hpChanged { hp, maxHp }`), and
-  **death = `this.scene.restart()`** when `playerHp` hits 0 (no game-over screen, no save). Starvation
-  routes damage through `damagePlayer(...)` so it reuses that exact death path. If 003's final field
-  names differ at execution time, adapt the references — the contract used here is
-  `damagePlayer(n)` + `player:hpChanged` + death-on-zero.
+- **Health:** builds on **plan 003 (combat), now EXECUTED and deployed to `master`** (this plan branch
+  is rebased on top of it). The real, in-code contract (verified, current anchors):
+  `private playerStats!: CombatantStats` (`GameScene.ts:96`, populated `:171`),
+  `private playerHp` (`:97`, initialised to `playerStats.maxHp` at `:180`),
+  `private damagePlayer(amount: number)` (`:626` — `playerHp = Math.max(0, playerHp - amount)`, emits
+  `player:hpChanged { hp, maxHp }` at `:628`, and on `playerHp <= 0` calls `this.scene.restart()` at
+  `:629-631`; no game-over screen, no save). **Starvation routes damage through `damagePlayer(...)`**,
+  reusing that exact death path. Two facts that resolve critique findings: `debugState()` (`:952`)
+  **already returns `playerHp`** (`:962/:976`) plus `mode`/`zombies`, so the smoke reads HP directly —
+  no need to add it. But `playerStats` is a **private field, not on the registry**, so the Wellbeing
+  screen's stats rows require GameScene to `registry.set('playerStats', this.playerStats)` (added in
+  Step 6). Combat also shipped an `InspectableStats` type + an Inspect-mode stats panel in `UIScene` —
+  the Wellbeing stats rows should reuse that rendering shape for consistency.
 - **Food source:** both — a new edible item **and** a forageable berry-bush node.
 - **Persistence:** **runtime-only, none this slice.** Saving only the clock/hunger while the world,
   inventory, walls and position all reset on reload would be incoherent; real persistence lands with a
@@ -48,54 +54,80 @@ un-saved world today).
   action this slice.** Both overlays share one reusable in-`UIScene` panel helper (built in Step 6,
   reused in Step 7).
 
-**Codebase seams (file:line anchors current at planning time — reconfirm before editing):**
-- **Tick seam:** `src/scenes/GameScene.ts` `override update(_time, delta)` (`:185-206`). Both the idle
-  branch (`if (!this.queue.current)` early-return, `:187`) and the busy `switch` return without a
+**Codebase seams (anchors REFRESHED against post-combat `master` — plan 003 landed and shifted every
+line number; reconfirm before editing but these are current as of the rebase):**
+- **Tick seam:** `src/scenes/GameScene.ts` `override update(_time, delta)` (**now `:293`**). The idle
+  branch (`if (!this.queue.current)` early-return) and the busy `switch` (`:309/:312`) return without a
   shared tail, so **anything that must run every frame regardless of worker state (clock advance,
-  hunger drain) goes at the TOP of `update()`, above the `:187` early-return.** `delta` (ms) is the
-  per-frame unit; the **accumulator pattern** to mirror is `runHarvest`/`runBuild` (`chopElapsed +=
-  delta` / `site.progress += delta`, fire on crossing an interval — `:368-393`).
-- **Full-screen overlay precedent (the tint):** `GameScene.ts:149` —
-  `this.add.rectangle(BASE_WIDTH/2, BASE_HEIGHT/2, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.2).setDepth(5)`
-  (the fog dim). A night overlay is exactly this: a full-screen coloured rect whose alpha you animate.
-  Depth map: world content 0–4, fog overlay 5, ghost 6, player 10. A **global** darken must sit
-  **above the player** (e.g. `setDepth(15)`) so everything dims uniformly; it is still under the HUD
-  because `UIScene` is a separate scene rendered on top. Alpha-ramp model:
-  `site.rect.setAlpha(0.35 + 0.55 * progress/BUILD_MS)` (`:387`).
-- **Cross-scene comms:** two channels. `this.registry` for initial-state reads (`inventory` `:110`,
-  `zoom` `:706`, `following` `:137,726`); `this.game.events` for live updates. GameScene setters write
+  hunger drain) goes at the TOP of `update()`, above the early-return.** `delta` (ms) is the per-frame
+  unit; the **accumulator pattern** to mirror is `runHarvest` (`:483`, `chopElapsed += delta`, fire on
+  crossing `CHOP_INTERVAL_MS`) / `runBuild` (`:496`, `site.progress += delta`). **Large-delta guard:**
+  on tab-refocus Phaser can hand a big `delta`; `drainHunger` clamps to `[0,max]` and the starvation
+  `while`-loop is bounded (decrements each iteration), so no NaN/runaway — but keep the drain math
+  clamp-first.
+- **Full-screen overlay precedent (the tint):** `GameScene.ts:244` —
+  `this.add.rectangle(BASE_WIDTH/2, BASE_HEIGHT/2, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0.2).setDepth(5)
+  .setMask(fogMask)` (the fog dim). **The world is base-sized** (the map ≈ `BASE_WIDTH×BASE_HEIGHT`
+  world px and the camera clamps to it), which is why this **world-space** rect (centred on the map,
+  **no `setScrollFactor`**) always covers the viewport. The night overlay must **mirror this exactly**:
+  world-space, same centre/size, **no `setScrollFactor(0)`** (Finding 5 — earlier draft contradicted
+  itself; drop it). Only difference: a higher depth so it dims globally. Depth map: world content 0–4,
+  fog overlay 5, ghost 6 (`:252`), player 10 (`:221`). A **global** darken sits **above the player**
+  (`setDepth(15)`) so everything dims uniformly; still under the HUD (`UIScene` is a separate scene on
+  top). Alpha-ramp model: `site.rect.setAlpha(...)` in `runBuild`.
+- **Post-combat HUD occupancy (plan 003 filled zones the earlier draft treated as free — new buttons
+  must avoid these):** top-left = wood counter (`10,12`) + queue text (`10,26`); **left, below
+  wood/queue = COMBAT + INSPECT mode toggles** (`UIScene.ts:160-179`); top-center = zoom row + FOLLOW;
+  top-right = BUILD + CANCEL; **bottom-right = virtual movepad** (centre `300,540`, radius 40) and
+  **bottom-left = Punch** — but these two are **hidden unless mode==='combat'** (`:181`), so they're
+  free in Command mode yet a *persistent* button placed there would collide when Combat is toggled.
+  Inspect mode shows a **centered stats panel**. Safe slots for the new STATUS/BAG buttons: the
+  right edge below CANCEL, or stacked near the mode toggles — **not** the two bottom corners. The
+  day/night readout (passive) fits top-center under FOLLOW or top-left under the queue text.
+- **Cross-scene comms:** two channels. `this.registry` for initial-state reads (`inventory` `:186`,
+  `zoom` `:1020`, `following` `:232,1040`); `this.game.events` for live updates. GameScene setters write
   **both** (`registry.set` + `emit('*:changed', …)`) so a scene restart re-seeds correctly — mirror
-  this for new state. Events emitted: `tasks:changed` (`:333`), `build:modeChanged` (`:572`),
-  `zoom:changed` (`:712`), `camera:followChanged` (`:733`). **Teardown:** every `.on` needs a matching
-  `.off` in the `SHUTDOWN` block (GameScene `:174-180`, UIScene `:166-172`) or restart double-registers.
+  this for new state. Events emitted: `tasks:changed` (`:448`), `build:modeChanged` (`:880`),
+  `zoom:changed` (`:1026`), `camera:followChanged` (`:1047`). **Teardown:** every `.on` needs a matching
+  `.off` in the `SHUTDOWN` block (GameScene `:277-287`, UIScene `:286-294`) or restart double-registers.
 - **HUD template:** `UIScene.ts` `BASE_WIDTH=360 × BASE_HEIGHT=640` portrait. Interactive button =
   `Rectangle(...).setStrokeStyle(1, COLORS.ui, 0.6).setInteractive({ useHandCursor: true })` + centred
   `Text` (`fontFamily:'monospace', fontSize:'12px', color:'#e8dcc0'`), **pushed to `this.hudElements`**
-  so `hudHitTest` excludes it from world taps (`:53-61`). A **passive readout/meter** (wood counter
-  `:41-46`) is a plain rect+text and is **not** pushed to `hudElements`. Live-update pattern:
+  so `hudHitTest` excludes it from world taps (`:79-87`). A **passive readout/meter** (wood counter
+  `:66-68`) is a plain rect+text and is **not** pushed to `hudElements`. Live-update pattern:
   seed from `registry` in `create()`, then subscribe to the `*:changed` event. Free HUD space: left
   edge below the queue text (y≳40) and the bottom band between the two bottom corners.
 - **Inventory** (`src/systems/Inventory.ts`, extends `Phaser.Events.EventEmitter`, emits `'change'`
-  after every mutation; UIScene subscribes to the instance directly, `UIScene.ts:159`): has
-  `get/add/has/canAfford/spend/snapshot` but **no `remove`** — eating needs a new
-  `remove(id, n=1): boolean` (returns false if `< n` present, else decrement + emit `'change'`).
-- **Data pattern** (static def + scene-local runtime wrapper): `src/data/types.ts` —
-  `ItemDef {id,name,color}`, `ResourceNodeDef {id,name,maxHp,woodItemId,woodPerHit,regrowMs,color,
-  stumpColor}`, `BuildableDef`. `src/data/items.ts` has only `wood`; `src/data/nodes.ts` only `tree`.
-  Runtime `TreeNode {id,sprite,def,hp,alive,col,row}` (`GameScene.ts:28-36`) embeds the def by
-  reference; `chop()` mutates the instance, never the def; `maxHp` is catalog-only, current `hp` is
-  per-instance.
-- **Harvest lifecycle (the forage template):** `spawnTrees→addTree` (`:497-511`), `treeAt` hit-test
-  (`:542-547`), `actionAt` returns `{kind:'harvest'}` (`:482-485`), live trees block pathing via
-  `isBlocked` (`:211-212`), `runHarvest` accumulates `chopElapsed` then `chop()` (`:368-379`); `chop()`
-  (`:549-565`) does `hp-=1`, **`this.inv.add(tree.def.woodItemId, tree.def.woodPerHit)`** (the
-  item-into-inventory line to mirror), stump tint on depletion, `this.time.delayedCall(regrowMs, …)` to
-  regrow.
-- **Config** (`src/config.ts`): all tunables live here; `COLORS` `as const` (`:43-51`, comment invites
+  after every mutation; UIScene subscribes to the instance directly): has `get/add/has/canAfford/
+  spend/snapshot` but **no `remove`** — eating needs a new `remove(id, n=1): boolean`. **Finding 7:**
+  the existing `spend` decrements but **leaves 0-count keys in the map** (it does `set(id, get(id)-n)`,
+  never deletes), and `snapshot()` returns them. So `remove` must **match `spend`** (decrement, leave
+  the 0-key, emit `'change'`, return false if `< n`) — do **not** delete the key — and any consumer
+  that iterates `snapshot()` (the Step 7 inventory list, the Step 6 edible list) must **skip
+  0-count entries** so emptied items don't render as ghost rows.
+- **Data pattern** (static def + scene-local runtime wrapper): `src/data/types.ts` — `ItemDef
+  {id,name,color}`; **`ResourceNodeDef` now `extends ObjectStats`** (plan 003 added `maxHp,armour,
+  speed,vision?`) plus `{id,name,woodItemId,woodPerHit,regrowMs,color,stumpColor}`; `BuildableDef
+  extends ObjectStats`. Player stats use `CombatantStats` (extends `BaseStats` with strength/dex/
+  dodge); `InspectableStats {name,maxHp,currentHp?,extra?}` is the panel-render shape. `src/data/
+  items.ts` has only `wood`; `src/data/nodes.ts` only `tree` (note its inert `armour:0,speed:0`). New
+  node/item entries must include the inherited `ObjectStats` fields (`armour:0,speed:0`). Runtime
+  `TreeNode {id,sprite,def,hp,alive,col,row}` embeds the def by reference; `chop()` mutates the
+  instance, never the def; `maxHp` is catalog-only, current `hp` is per-instance.
+- **Harvest lifecycle (the forage template):** `spawnTrees` (`:712`) → `addTree` (`:722`), harvest
+  order resolves via a tree hit-test → `{kind:'harvest'}`; **live trees block pathing via `isBlocked`
+  (`:323-324`, `this.trees.some(t => t.alive && …)`)**; `runHarvest` (`:483`) accumulates `chopElapsed`
+  then `chop()` (`:764`) does `hp-=1`, **`this.inv.add(tree.def.woodItemId, tree.def.woodPerHit)`** (the
+  item-into-inventory line to mirror), stump tint on depletion, `this.time.delayedCall(tree.def.
+  regrowMs, …)` (`:773`) to regrow. **Second node-array site (Finding 2):** `tilePlaceable` (`:892`)
+  independently does `this.trees.some(t => t.alive && …)` at `:896` to forbid building on a live node —
+  so `blocksPath` must be honoured in **both** `isBlocked` and `tilePlaceable`, not just pathing.
+  Worker stands **adjacent** to harvest via `reachableAdjacent` (`:403`), never on the target tile.
+- **Config** (`src/config.ts`): all tunables live here; `COLORS` `as const` (`:54`, comment invites
   expansion). `TILE_SIZE=16`, `BASE_WIDTH/HEIGHT` `:9-10`.
 - **Smoke** (`scripts/smoke.mjs`): Playwright vs `npm run preview`; reads
-  `window.game.registry.get('inventory')`, `GameScene.debugState()` (`GameScene.ts:643-665`, the
-  primary state seam — **add fields here for assertions**), `GameScene.isTileBlocked(col,row)`.
+  `window.game.registry.get('inventory')`, `GameScene.debugState()` (`GameScene.ts:952`, the
+  primary state seam — **add fields here for assertions**), `GameScene.isTileBlocked(col,row)` (`:983`).
   Taps via `tapBase`/`tapWorld`/`longPressWorld`; assertions are manual `ok()`/`fail()`; page errors
   collected and asserted empty. **Only zoom persists** (`localStorage`, key `mostowa:zoom`) — confirm
   no game-state save exists.
@@ -123,12 +155,13 @@ Don't-Starve-style pressure (constant, punishes hoarding), and the Health & Well
   - `GameScene.ts`:
     - Fields: `private clockMs = 0` (total elapsed), `private dayPhase: DayPhase = 'day'`,
       `private dayCount = 1`, `private nightOverlay!: Phaser.GameObjects.Rectangle`.
-    - In `create()`, build the overlay right after the fog overlay (`:149`):
-      `this.nightOverlay = this.add.rectangle(BASE_WIDTH/2, BASE_HEIGHT/2, BASE_WIDTH, BASE_HEIGHT,
-      COLORS.night, 0).setDepth(15).setScrollFactor(0)` (screen-fixed, above the player so the dim is
-      global; `setScrollFactor(0)` keeps it pinned as the camera scrolls — verify against how the fog
-      rect handles camera scroll and match that approach).
-    - At the **TOP of `update(_time, delta)`, above the `:187` early-return**: `this.clockMs += delta`;
+    - In `create()`, build the overlay right after the fog overlay (`:244`), **mirroring the fog rect
+      exactly** (world-space, **no `setScrollFactor`** — the map is base-sized so a world-space rect
+      covers the viewport; Finding 5): `this.nightOverlay = this.add.rectangle(BASE_WIDTH/2,
+      BASE_HEIGHT/2, BASE_WIDTH, BASE_HEIGHT, COLORS.night, 0).setDepth(15)` (depth 15 = above the
+      player at 10, so the dim is global). Do **not** call `setInteractive` (rects aren't interactive
+      by default — confirm it stays non-interactive so it never eats pointers).
+    - At the **TOP of `update(_time, delta)`, above the early-return (`:293`)**: `this.clockMs += delta`;
       `const cycleMs = this.clockMs % cycleLengthMs()`; set `this.nightOverlay.setAlpha(tintAlphaAt(
       cycleMs))`; compute `phaseAt`/`dayCountForTotal`; when either changes from the stored value,
       update the field, `this.registry.set('dayPhase'/'dayCount', …)` and emit
@@ -149,11 +182,11 @@ Don't-Starve-style pressure (constant, punishes hoarding), and the Health & Well
     glyph renders poorly at 12px). Place it top-center-ish in free space (below the zoom row / above
     the build indicator — pick a slot that doesn't overlap existing elements; the bottom-center build
     indicator is hidden unless building, top band is partly free). Follow the wood-counter template
-    (`:41-46`).
+    (`:66-68`).
     - Seed initial text from `this.registry.get('dayPhase') ?? 'day'` and `get('dayCount') ?? 1` in
       `create()`.
-    - Subscribe to `time:changed` in the listener-registration block (`:160-163`); update the text in
-      the handler; **add the matching `.off` in the SHUTDOWN block** (`:166-172`).
+    - Subscribe to `time:changed` in the listener-registration block (`:277-283`); update the text in
+      the handler; **add the matching `.off` in the SHUTDOWN block** (`:286-294`).
   - Side effects: none beyond one more HUD element; verify it doesn't overlap the zoom/follow/build
     widgets at 360px wide.
   - Docs: none (Step 8).
@@ -166,8 +199,10 @@ Don't-Starve-style pressure (constant, punishes hoarding), and the Health & Well
   - `src/data/items.ts`: add `berries: { id: 'berries', name: 'Berries', color: 0x7a2f4a, nutrition:
     25 }`.
   - `src/systems/Inventory.ts`: add `remove(id: string, n = 1): boolean` — if `this.get(id) < n` return
-    `false`; else decrement (delete the key if it reaches 0, matching how `spend` leaves the map),
-    `this.emit('change')`, return `true`. Mirror `spend`'s structure.
+    `false`; else `this.items.set(id, this.get(id) - n)` (**leave the 0-count key in the map, exactly
+    like `spend` does — do NOT delete it**; Finding 7), `this.emit('change', this.snapshot())`, return
+    `true`. Mirror `spend`'s structure. Consumers that iterate `snapshot()` skip 0-count entries
+    (Steps 6/7).
   - Side effects: `ItemDef.nutrition` is optional so `wood` and all existing usage stay valid. No
     caller uses `remove` yet (wired in Steps 5/6). Smoke reads `inventory.get('wood')` — unaffected.
   - Docs: none (Step 8).
@@ -181,32 +216,36 @@ Don't-Starve-style pressure (constant, punishes hoarding), and the Health & Well
     yieldPerHit` (generic yield), and add `blocksPath: boolean` (trees block pathing, bushes don't).
     Keep `stumpColor` (bushes can reuse it as a picked/depleted tint).
   - `src/data/nodes.ts`: update `tree` to the new field names + `blocksPath: true`; add
-    `berryBush: { id:'berryBush', name:'Berry Bush', maxHp: 1, yieldItemId:'berries', yieldPerHit: 2,
-    regrowMs: 20_000, blocksPath: false, color: <berry-green>, stumpColor: <depleted> }` (single-pick:
-    `maxHp:1`).
-  - `GameScene.ts`: propagate the rename (`tree.def.woodItemId → yieldItemId`, `woodPerHit →
-    yieldPerHit` in `chop()` `:549-565`). Make pathing honour `def.blocksPath`: in `isBlocked`
-    (`:211-212`) only count a live node as an obstacle when `node.def.blocksPath` (trees yes, bushes
-    no — a bush is walkable). Spawn a few berry bushes: either extend the existing `trees`/`addTree`
-    machinery to a shared node list or add a parallel `bushes` spawn that reuses the same
-    `TreeNode`-shaped runtime wrapper + the same `treeAt`/`runHarvest`/`chop` path. **Prefer
-    generalising to one runtime array** (`nodes: ResourceNode[]`) if the churn is contained; if it
-    balloons, add bushes as a second array reusing the identical harvest functions and note the
-    duplication for a later cleanup. `actionAt`/`treeAt` must hit-test bushes too so tapping a bush
-    yields a `harvest` order.
-  - Provide a placeholder bush sprite the same way trees get theirs (a coloured `add.image`/rect at the
-    node's tile — check how `addTree` obtains the `'tree'` texture and mirror it, e.g. a generated
-    placeholder or a solid-colour rectangle if no bush art is staged; do **not** block on real art).
-  - Side effects: pathfinding change means bushes no longer route-block — verify the worker walks
-    onto/over a bush tile and still harvests it (it stands adjacent or on it; reuse `reachableAdjacent`
-    which already handles reachable stand-tiles). Regrow uses the same `delayedCall(regrowMs)` path.
-    The build system's placeability check (can't build on a blocked tile) should still forbid building
-    on a bush only if that matches intent — a bush is walkable, so building over it is acceptable;
-    confirm the buildable-placement occupancy test doesn't crash on a non-blocking node.
+    `berryBush: { id:'berryBush', name:'Berry Bush', maxHp: 1, armour: 0, speed: 0, yieldItemId:
+    'berries', yieldPerHit: 2, regrowMs: 20_000, blocksPath: false, color: <berry-green>, stumpColor:
+    <depleted> }` (single-pick `maxHp:1`; `armour:0,speed:0` are the inert `ObjectStats` fields
+    `ResourceNodeDef` inherits — see the tree entry).
+  - `GameScene.ts`:
+    - Propagate the rename (`tree.def.woodItemId → yieldItemId`, `woodPerHit → yieldPerHit` in `chop()`
+      `:764`).
+    - **Honour `def.blocksPath` at BOTH node-array sites (Finding 2), not just pathing:** `isBlocked`
+      (`:323-324`) and `tilePlaceable` (`:892`, the `this.trees.some(...)` at `:896`) both currently
+      treat every live node as an obstacle — gate each on `t.def.blocksPath` so a bush blocks neither
+      routing nor build-placement (a bush is walkable and buildable-over). Audit for any other
+      `this.trees.some/find/filter/forEach` site while there.
+    - Spawn berry bushes at **fixed, deterministic coordinates** (mirror `spawnTrees` `:712`, which
+      places trees at known tiles) — the smoke test taps a **known bush tile**, so the coords must be
+      stable, not random. **Prefer generalising to one runtime array** (`nodes: ResourceNode[]`) driven
+      by `def` if the churn is contained; if it balloons, add a second `bushes` array reusing the
+      identical `addTree`/harvest/`chop` functions and note the duplication for later cleanup. The
+      harvest hit-test must include bushes so tapping one yields a `{kind:'harvest'}` order.
+  - Provide a placeholder bush sprite the way trees get theirs (check how `addTree` `:722` obtains the
+    `'tree'` texture and mirror it — a solid-colour rect/image if no bush art is staged; do **not**
+    block on real art).
+  - Side effects: making bushes non-blocking touches routing **and** build-placement — verify (a) the
+    worker routes **through** bush tiles (a bush no longer forces a detour), (b) it still harvests by
+    standing on a **reachable adjacent** tile via `reachableAdjacent` `:403` (never on the target), and
+    (c) building on/over a bush tile is now allowed and doesn't crash the placement check. Regrow reuses
+    the same `delayedCall(regrowMs)` path.
   - Docs: none (Step 8).
-  - Done when: build green; tapping a berry bush walks the worker over and harvests `berries` into the
-    inventory (visible via inventory), the bush depletes then regrows, and the worker paths **through**
-    bush tiles (unlike trees).
+  - Done when: build green; tapping a berry bush routes the worker **through** other bush tiles (unlike
+    trees), it stands **adjacent** and harvests `berries` into the inventory, and the bush depletes
+    then regrows; building over a bush tile is permitted.
 
 - [ ] **Step 5: Hunger need — model, per-frame drain, and starvation → health cascade** `[inline]`
   - New pure module `src/systems/needs.ts` (Phaser-free): `drainHunger(current, deltaMs, drainPerSec,
@@ -232,13 +271,13 @@ Don't-Starve-style pressure (constant, punishes hoarding), and the Health & Well
       (`ITEMS[itemId]?.nutrition == null`) or `!this.inv.remove(itemId, 1)`, return false; else
       `this.hunger = feed(this.hunger, ITEMS[itemId].nutrition!, HUNGER_MAX)`, emit
       `hunger:changed`/`registry.set`, return true. Expose it for the Step 6 UI to call (via a
-      `game.events` listener, e.g. `needs:eat { itemId }`, registered/torn-down in the
-      `:168-180` block — matching the existing event-in pattern like `build:toggle`).
-  - Side effects: depends on plan 003 (`damagePlayer`, `playerHp`, death path) being executed. If run
-    before 003, `damagePlayer` won't exist — the executor must land 003 first (user's stated
-    assumption). The hunger tick runs every frame regardless of worker state (it's above the
-    early-return). Confirm no divide-by-zero / NaN when `delta` is large (tab refocus) — `drainHunger`
-    clamps, and the `while` starvation loop is bounded because it decrements each iteration.
+      `game.events` listener, e.g. `needs:eat { itemId }`, registered/torn-down in the debug-event
+      block (`:268/:280`) — matching the existing event-in pattern like `build:toggle`).
+  - Side effects: **plan 003 is already deployed**, so `damagePlayer` (`:626`), `playerHp`, and the
+    death path exist — no ordering risk. `ItemDef.nutrition` is added in Step 3, so `eat` can read it.
+    The hunger tick runs every frame regardless of worker state (above the early-return). NaN/large-
+    delta safety: `drainHunger` clamps to `[0,max]` and the `while` starvation loop is bounded (it
+    decrements each iteration), so a big tab-refocus `delta` at most deals a burst of capped damage.
   - Docs: none (Step 8).
   - Done when: build green; hunger visibly falls over time (via the Step 6 meter or `debugState`);
     forcing hunger to 0 (Step 8 debug hook) starts ticking `playerHp` down every 2 s and eventually
@@ -255,7 +294,7 @@ Don't-Starve-style pressure (constant, punishes hoarding), and the Health & Well
     `UIScene`, not a new Phaser scene (simpler; the world keeps running underneath — real-time
     survival). Panels populate their body via a per-overlay render callback.
   - `UIScene.ts`: add a **STATUS** button (interactive, pushed to `hudElements`, button template
-    `:53-61`) in a free HUD slot (e.g. top-left under the wood counter, or bottom-left) that toggles
+    `:79-87`) in a free HUD slot (e.g. top-left under the wood counter, or bottom-left) that toggles
     the Health & Wellbeing overlay via the helper. Panel contents:
     - **Hunger meter:** label + a bar = background rect + foreground rect whose width =
       `barWidth * hunger / HUNGER_MAX` (there's no existing bar widget — the closest analog is
@@ -277,13 +316,13 @@ Don't-Starve-style pressure (constant, punishes hoarding), and the Health & Well
       each with its live count from `this.inv.get(id)` and its nutrition; make each row interactive
       (button template) — tapping it emits `needs:eat { itemId: id }` (Step 5 handles it) **only when
       count > 0**; rows with 0 render disabled/greyed. Refresh the list counts on the Inventory
-      `'change'` event (subscribe to the instance like `refreshWood` does, `:159`) and on
+      `'change'` event (subscribe to the instance like `refreshWood` does, `:276`) and on
       `hunger:changed`.
     - While the panel is open, its interactive rows/close/backdrop must be in `hudElements` so world
       taps don't leak through; when closed, remove/hide them (respect `hudHitTest`'s visibility-aware
       check — hidden elements already don't swallow taps).
   - **Teardown:** every new `.on` (`hunger:changed`, `player:hpChanged`, Inventory `'change'`) gets a
-    matching `.off` in the UIScene SHUTDOWN block (`:166-172`).
+    matching `.off` in the UIScene SHUTDOWN block (`:286-294`).
   - Side effects: this is the first modal overlay in the HUD (via the reusable helper) — make sure
     opening it doesn't break the existing `hudHitTest` world-tap gating for the buttons underneath
     (they're covered by the backdrop which should itself be in `hudElements`). Verify the panel lays
@@ -295,22 +334,23 @@ Don't-Starve-style pressure (constant, punishes hoarding), and the Health & Well
 
 - [ ] **Step 7: Inventory + Equipped overlay (display shell)** `[inline]`
   - `UIScene.ts`: add a second HUD button (e.g. **BAG** / **INV**, interactive, pushed to
-    `hudElements`, button template `:53-61`) in a free slot distinct from STATUS, that opens a second
+    `hudElements`, button template `:79`) in a free slot distinct from STATUS, that opens a second
     overlay **reusing the Step 6 panel helper** (opening it closes the Wellbeing overlay — one at a
     time). Panel contents:
-    - **Inventory section:** iterate `this.inv.snapshot()` and render one row per present item —
+    - **Inventory section:** iterate `this.inv.snapshot()` and render one row per item **with
+      `count > 0`** (skip 0-count keys — `spend`/`remove` leave emptied keys in the map, Finding 7):
       item name (from `ITEMS[id].name`), a colour swatch (from `ITEMS[id].color`, like the wood
       counter), and the count. Read-only (no drop/use here; eating stays on the Wellbeing screen).
-      Refresh the rows on the Inventory `'change'` event (subscribe to the instance like `refreshWood`,
-      `:159`), so foraging/eating updates the list live while it's open. Handle the empty case (no
-      items) with a subtle "Empty" line.
+      Refresh the rows on the Inventory `'change'` event (subscribe to the instance like `refreshWood`),
+      so foraging/eating updates the list live while it's open. When every count is 0, show a subtle
+      "Empty" line.
     - **Equipped section:** a **display shell only** — render a small fixed set of empty slot boxes
       (e.g. 2–3 rects with a `—`/"empty" label) under an "Equipped" heading, plus a caption like
       "Nothing equipped". Drive it from `registry.get('equipped') ?? {}` (slot→itemId map) so that when
       a future equipment model populates that registry key the same render fills the slots — but this
       slice sets nothing there, so every slot renders empty. **No equip/unequip interaction.**
   - **Teardown:** the Inventory `'change'` subscription (and any panel-specific listeners) get matching
-    `.off` in the UIScene SHUTDOWN block (`:166-172`).
+    `.off` in the UIScene SHUTDOWN block (`:286-294`).
   - Side effects: second overlay through the shared helper — verify the "only one open at a time"
     logic and `hudElements` add/remove works when toggling between STATUS and BAG. No new game-state or
     events; purely a read view over `Inventory` + a placeholder. Confirm layout within 360×640.
@@ -321,22 +361,24 @@ Don't-Starve-style pressure (constant, punishes hoarding), and the Health & Well
 
 - [ ] **Step 8: Debug hooks, smoke coverage, and docs** `[inline]`
   - **Debug hooks (so the smoke test can drive a real-time system):** in `GameScene.ts`, add
-    `game.events` handlers mirroring `debug:regenTrees` (registered/torn-down `:168-180`):
+    `game.events` handlers mirroring `debug:regenTrees` (registered/torn-down in the `:268/:280` block):
     `debug:setHunger { value }` (set `this.hunger`, emit `hunger:changed`) and `debug:advanceTime
     { ms }` (add to `this.clockMs`, recompute phase/overlay/day and emit `time:changed`). These are
     dev-only, matching the existing TEMP `⟳ TREES` convention — no HUD button required; the smoke
     driver emits them via `window.game.scene.getScene('Game').game.events.emit(...)` or a small exposed
     helper. Prefer exposing thin methods (`debugSetHunger`, `debugAdvanceTime`) on GameScene for the
     driver to call, consistent with `debugState()`.
-  - **`debugState()`** (`GameScene.ts:643-665`): add `hunger`, `dayPhase`, `dayCount`, `clockMs` to the
-    returned snapshot so the smoke can assert on them.
+  - **`debugState()`** (`GameScene.ts:952`): it **already returns `playerHp`** (`:962/:976`), `mode`,
+    and `zombies` — only add `hunger`, `dayPhase`, `dayCount`, `clockMs` to the returned snapshot for
+    the new assertions (don't re-add `playerHp`).
   - **`scripts/smoke.mjs`:** extend the existing run (don't add a second harness). Add assertions:
     (a) advance time into night via `debugAdvanceTime`, assert `debugState().dayPhase === 'night'` and
     that the night overlay alpha rose (assert via `debugState()`/a queried alpha, or that a later
-    `advanceTime` rolls `dayCount` up); (b) forage a berry bush (tap it via `tapWorld` at a known bush
-    tile, `waitForTimeout` for the walk+pick) and assert `inventory.get('berries')` rose; (c) set
-    hunger to 0 via `debugSetHunger`, wait > `STARVE_DAMAGE_INTERVAL_MS`, assert `playerHp` (however
-    003 exposes it) fell; (d) open STATUS, eat a berry, assert `hunger` rose and `berries` count fell;
+    `advanceTime` rolls `dayCount` up); (b) forage a berry bush (tap it via `tapWorld` at the **fixed
+    bush tile from Step 4's deterministic spawn**, `waitForTimeout` for the walk+pick) and assert
+    `inventory.get('berries')` rose; (c) set hunger to 0 via `debugSetHunger`, wait >
+    `STARVE_DAMAGE_INTERVAL_MS`, assert `debugState().playerHp` (already exposed by combat) fell;
+    (d) open STATUS, eat a berry, assert `hunger` rose and `berries` count fell;
     (e) open BAG and assert the inventory overlay is present / shows the held items (a light check —
     e.g. the overlay's item rows reflect `inventory.snapshot()`). Keep the manual `ok()`/`fail()` style
     and the final page-errors-empty assertion.
@@ -378,3 +420,26 @@ Don't-Starve-style pressure (constant, punishes hoarding), and the Health & Well
 - **Real day/night or bush/food pixel art** — placeholder art only (per the art-pipeline decision).
 - **NPC companion feeding** (companions consuming food) — depends on the companion system, not built.
 - **Daily narrative events** (the day-opens-with-a-choice feature) — separate design, not this slice.
+
+## Critique
+
+Fresh-eyes adversarial review (independent sub-agent, ran against plan 003 + code). **All findings
+resolved in this revision** — recorded here so the executor sees what was addressed.
+
+**Verdict:** Solid, well-researched plan; its headline mechanic + half its UI hard-depended on the
+then-unexecuted combat plan 003 — since resolved (003 is now deployed and this branch is rebased on
+it), with the remaining ripples tightened.
+
+| # | Finding | Severity | Resolution |
+| - | ------- | -------- | ---------- |
+| 1 | Starvation→health cascade + health/stats UI all require plan 003's `playerHp`/`damagePlayer`/`playerStats`, yet 003 was only planned; CLAUDE.md said survival was "Next" | High | **003 executed & deployed** (user confirmed); branch rebased onto it; Context now cites the real in-code contract + anchors. Combat-first ordering accepted. |
+| 2 | `blocksPath` ripple under-enumerated — `tilePlaceable` (`:896`) also does `this.trees.some(...)`, not just `isBlocked` (`:324`) | Medium | Step 4 now gates **both** sites (and audits other `this.trees.some` sites) on `def.blocksPath`. |
+| 3 | Equipped section is empty UI for an out-of-scope equipment model | Medium | **Kept as a display shell** (user call); scoped explicitly as a shell in Step 7 + Out of scope, no equip logic. |
+| 4 | Smoke coupling: `playerHp` exposure + "known bush tile" determinism | Medium | `debugState()` **already exposes `playerHp`** (verified `:962`); Step 4 pins **fixed bush spawn coords**; Step 8 reads `debugState().playerHp`. |
+| 5 | Night-overlay self-contradiction: "match fog rect" vs. `setScrollFactor(0)` | Low | Step 1 now mirrors the fog rect exactly — world-space, **no `setScrollFactor`**. |
+| 6 | Step 4 acceptance implied worker stands *on* the bush | Low | Reworded: bushes are non-blocking for **routing**; worker still stands **adjacent** (`reachableAdjacent`) to harvest. |
+| 7 | `Inventory.remove` "delete key at 0" mismatched `spend` (which leaves 0-keys) | Low | Step 3 `remove` **leaves the 0-key like `spend`**; Steps 6/7 consumers **skip 0-count** rows. |
+
+Also folded in (the critique predated combat landing on-branch): all file:line anchors refreshed to
+post-combat `master`, and a post-combat **HUD occupancy map** added so the new STATUS/BAG buttons and
+day/night readout avoid combat's mode-toggle / movepad / Punch zones.
