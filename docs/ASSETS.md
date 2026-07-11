@@ -73,6 +73,39 @@ post-processing to look right). CLI wrappers + full API details:
 Compare a few equivalent prompts across both (+ Gemini) before settling on a default; see the
 gen-art README's "What to compare" section.
 
+### PixelLab trial #1 — tree / stump / forest floor (2026-07-11)
+
+Tested whether PixelLab (`pixflux` model) can produce assets in the Zombie Apocalypse pack's style,
+using the game's actual `tree`/stump resource-node concept as the subject. 3 fast generations spent
+(37 of 40 free fast credits left; after that it's 5 slow/day). Outputs + a side-by-side comparison
+sheet against the existing pack's tree/terrain tiles: `docs/assets/ai-tests/pixellab/`
+(`tree.png`, `stump.png`, `forest-floor.png`, `comparison-sheet.png`).
+
+One correction to the script's docstring: the free tier's canvas *minimum* is 32×32 (`pixflux`
+rejects 16×16 with a 422 "Canvas must be size 32x32 area or larger") — generated at 32×32 and would
+need downscaling to this repo's 16×16 `TILE_SIZE`, not just upscale-safe as assumed.
+
+**Verdict: style mismatch, not a drop-in match for the pack.**
+
+- **Tree / stump** — well-rendered individually (clean linework, readable silhouette, correct
+  subject), but stylistically they read as soft, rounded, Stardew-Valley-ish farming-game icons:
+  saturated colour, gentle shading, a single polished 32×32 illustration. The pack's tree is a
+  spiky, high-contrast, near-monochrome silhouette built from several plain 16×16 modular pieces.
+  Different composition philosophy (one painted icon vs. modular flat tiles) as well as different
+  palette/rendering — dropping the PixelLab tree next to the pack's would visibly clash.
+- **Forest floor — clear failure for this use case.** Asked for a seamless tileable ground texture;
+  `pixflux` instead generated a single self-contained vignette (a circular leaf-pile motif with a
+  hard edge), which tiles as an obvious repeating blob grid, not a continuous floor — visible in the
+  3×3 tiled comparison. Confirms the README's note above: PixelLab has no dedicated tile endpoint,
+  and prompting pixflux/bitforge for "tileable" doesn't reliably produce one. Retro Diffusion's
+  `rd_tile__*` styles are the more promising path for ground/floor tiles specifically — worth
+  trying there next before writing off AI-gen for environment tiles.
+
+Bitforge's `style_image` reference (not exercised in this trial — `pixellab.mjs` doesn't wire it up
+yet) is the more likely route to close the style gap for props like the tree/stump, by conditioning
+on an actual pack sprite; plain pixflux + text prompting isn't enough to match a specific existing
+pack's look.
+
 ## Gemini asset generation (via guppi)
 
 Matt's home server (**guppi** repo / Beelink) has a working Gemini image-gen setup we can mirror.

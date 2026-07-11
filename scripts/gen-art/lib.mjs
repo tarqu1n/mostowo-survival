@@ -34,3 +34,7 @@ export function writeBase64Png(base64, outPath) {
   fs.writeFileSync(outPath, Buffer.from(base64, 'base64'));
   console.log('wrote', outPath);
 }
+
+export function readPngAsBase64(inPath) {
+  return fs.readFileSync(inPath).toString('base64');
+}

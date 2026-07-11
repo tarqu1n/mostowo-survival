@@ -8,23 +8,32 @@
 //
 // Usage:
 //   PIXELLAB_API_KEY=... node scripts/gen-art/pixellab.mjs \
-//     --description "mossy stone brick wall, top down" --width 16 --height 16 \
+//     --description "mossy stone brick wall, top down" --width 32 --height 32 \
 //     --out docs/assets/ai-tests/pixellab/wall.png
 //
 // Useful flags:
 //   --description         required. What to generate.
 //   --negative             optional negative_description.
 //   --model                pixflux (default, general-purpose text-to-pixel-art) or bitforge
-//                          (supports a --style-image reference for matching an existing pack's look —
-//                          useful for keeping AI-generated pieces visually consistent with the
-//                          Zombie Apocalypse base tileset once we've picked one).
-//   --width/--height       default 16x16 (this repo's TILE_SIZE). Free tier caps at 200x200 total.
-//   --view                 e.g. "top-down", "side", "low top-down" (enum — see PixelLab docs for
-//                          the exact accepted values, unverified here).
+//                          (supports --style-image below, for matching an existing pack's look).
+//   --width/--height       default 16x16 (this repo's TILE_SIZE) — but the API's free-tier minimum
+//                          canvas is verified at 32x32 (pixflux 422s below that); downscale to 16x16
+//                          in post if you need the exact tile size. Free tier caps at 200x200 total.
+//   --view                 CameraView enum, verified against the live OpenAPI schema: "side",
+//                          "low top-down", "high top-down".
+//   --shading               Shading enum: "flat shading", "basic shading", "medium shading",
+//                          "detailed shading", "highly detailed shading".
+//   --detail               Detail enum: "low detail", "medium detail", "highly detailed".
+//   --outline               Outline enum: "single color black outline", "single color outline",
+//                          "selective outline", "lineless".
 //   --no-background        transparent background.
+//   --style-image           bitforge only. Path to a local reference PNG for style transfer — sets
+//                          model to bitforge automatically. Pairs with --style-strength.
+//   --style-strength       bitforge only, 0-100, default 50 when --style-image is set (the API
+//                          itself defaults to 0 = no style transfer, so this must be set explicitly).
 //   --seed                 optional int, for reproducible re-runs.
 //   --out                  output PNG path (default: scripts/.gen-art/pixellab-<timestamp>.png)
-import { parseArgs, requireEnv, writeBase64Png } from './lib.mjs';
+import { parseArgs, requireEnv, writeBase64Png, readPngAsBase64 } from './lib.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 
@@ -35,16 +44,30 @@ if (!args.description) {
 
 const apiKey = requireEnv('PIXELLAB_API_KEY');
 
-const model = args.model === 'bitforge' ? 'bitforge' : 'pixflux';
+const model = args.model === 'bitforge' || args['style-image'] ? 'bitforge' : 'pixflux';
 const endpoint = `https://api.pixellab.ai/v1/generate-image-${model}`;
+
+if (args['style-image'] && model !== 'bitforge') {
+  console.error('--style-image requires bitforge (pass --model bitforge, or omit --model — it is inferred).');
+  process.exit(1);
+}
 
 const payload = {
   description: args.description,
   image_size: { width: Number(args.width ?? 16), height: Number(args.height ?? 16) },
   ...(args.negative ? { negative_description: args.negative } : {}),
   ...(args.view ? { view: args.view } : {}),
+  ...(args.shading ? { shading: args.shading } : {}),
+  ...(args.detail ? { detail: args.detail } : {}),
+  ...(args.outline ? { outline: args.outline } : {}),
   ...(args['no-background'] ? { no_background: true } : {}),
   ...(args.seed ? { seed: Number(args.seed) } : {}),
+  ...(args['style-image']
+    ? {
+        style_image: { type: 'base64', base64: readPngAsBase64(args['style-image']) },
+        style_strength: Number(args['style-strength'] ?? 50),
+      }
+    : {}),
 };
 
 const res = await fetch(endpoint, {
