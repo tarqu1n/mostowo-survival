@@ -18,6 +18,13 @@ export const INTERACT_RANGE = TILE_SIZE * 1.4;
 /** Milliseconds between chop hits while felling a node. */
 export const CHOP_INTERVAL_MS = 400;
 
+/**
+ * Frame rate for the player's action swings (chop/punch). The strips are 8 frames, so this ≈ one
+ * swing per CHOP_INTERVAL_MS (8 / 20 fps = 400 ms) — a chop reads as a continuous swing per hit,
+ * and a punch is a single snappy swing. Locomotion (idle/walk) stays at the slower default (10).
+ */
+export const ACTION_ANIM_FRAMERATE = 20;
+
 /** Hold time (ms) that turns a tap into a queued order rather than an act-now order. */
 export const LONGPRESS_MS = 350;
 

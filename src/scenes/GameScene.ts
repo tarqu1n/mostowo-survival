@@ -4,6 +4,7 @@ import {
   BASE_HEIGHT,
   TILE_SIZE,
   CHOP_INTERVAL_MS,
+  ACTION_ANIM_FRAMERATE,
   LONGPRESS_MS,
   BUILD_MS,
   DRAG_PX,
@@ -118,6 +119,11 @@ export class GameScene extends Phaser.Scene {
   private pathIndex = 0;
   private actionGoal: Cell | null = null; // the tile we're currently pathing to (for re-pathing)
   private chopElapsed = 0;
+  // Action-swing anim state: `chopping` is set true each frame the worker is felling in place
+  // (drives the looping chop swing); `punchLockUntil` is the scene-clock time until which the
+  // one-shot punch swing owns the sprite (updatePlayerAnim yields to it — see punch()).
+  private chopping = false;
+  private punchLockUntil = 0;
 
   private buildMode = false;
   private walls!: Phaser.Physics.Arcade.StaticGroup;
@@ -167,6 +173,8 @@ export class GameScene extends Phaser.Scene {
     this.pathIndex = 0;
     this.actionGoal = null;
     this.chopElapsed = 0;
+    this.chopping = false;
+    this.punchLockUntil = 0;
     this.buildMode = false;
     this.queueMarkers = [];
     this.paintedThisGesture.clear();
@@ -196,15 +204,18 @@ export class GameScene extends Phaser.Scene {
     // Player: 3-way directional idle + walk (down/side/up). Each strip is its own texture (key ==
     // anim key, loaded in PreloadScene); side art faces right, GameScene mirrors it with flipX.
     const { player: playerActor, enemy: enemyActor } = ACTIVE_TILESET.actors;
-    (['idle', 'walk'] as PlayerState[]).forEach((state) => {
+    // idle/walk loop (velocity-driven locomotion); chop loops while felling in place; punch is a
+    // one-shot swing. Action swings run faster (ACTION_ANIM_FRAMERATE) so a chop lands per hit.
+    (['idle', 'walk', 'chop', 'punch'] as PlayerState[]).forEach((state) => {
+      const isAction = state === 'chop' || state === 'punch';
       (['down', 'side', 'up'] as Facing[]).forEach((facing) => {
         const key = playerAnimKey(state, facing);
         if (this.anims.exists(key)) return;
         this.anims.create({
           key,
           frames: this.anims.generateFrameNumbers(key, { start: 0, end: playerActor[state][facing].frames - 1 }),
-          frameRate: 10,
-          repeat: -1,
+          frameRate: isAction ? ACTION_ANIM_FRAMERATE : 10,
+          repeat: state === 'punch' ? 0 : -1,
         });
       });
     });
@@ -295,6 +306,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   override update(_time: number, delta: number): void {
+    this.chopping = false; // re-set true by runHarvest only while actually felling in place
     const action = this.queue.current;
     if (!action) {
       // Combat mode drives velocity directly via onCombatMove/onCombatMoveEnd — don't stomp it
@@ -363,15 +375,27 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Directional walk/idle from `lastFacing`: walk while translating (moving between tiles), idle
-   * otherwise (e.g. chopping in place) — keeping the last facing either way. Side art faces right,
-   * so left is the same strip mirrored with flipX; down/up clear flipX.
+   * Directional player animation from `lastFacing`. Priority: a one-shot punch swing owns the
+   * sprite until it finishes (we yield, leaving its frames to play); else the looping chop swing
+   * while felling in place; else walk while translating / idle when still. Side art faces right, so
+   * left is the same strip mirrored with flipX; down/up clear flipX.
    */
   private updatePlayerAnim(): void {
+    if (this.time.now < this.punchLockUntil) return; // punch swing in progress — don't stomp it
     const facing = this.facingDir();
-    const state: PlayerState = this.player.body.velocity.lengthSq() > 1 ? 'walk' : 'idle';
+    const state: PlayerState = this.chopping ? 'chop' : this.player.body.velocity.lengthSq() > 1 ? 'walk' : 'idle';
     this.player.setFlipX(facing === 'side' && this.lastFacing.dCol < 0);
     this.player.anims.play(playerAnimKey(state, facing), true);
+  }
+
+  /** Play the one-shot punch swing in the current facing and lock updatePlayerAnim out for its
+   * duration (so a punch reads fully even while moving). Re-pressing restarts it. */
+  private playPunchSwing(): void {
+    const facing = this.facingDir();
+    this.player.setFlipX(facing === 'side' && this.lastFacing.dCol < 0);
+    const key = playerAnimKey('punch', facing);
+    this.player.anims.play(key); // no ignoreIfPlaying → a rapid re-press restarts the swing
+    this.punchLockUntil = this.time.now + (this.anims.get(key)?.duration ?? 300);
   }
 
   /** Map `lastFacing` (dCol/dRow) to a directional strip: side when horizontal dominates, else up/down. */
@@ -514,6 +538,7 @@ export class GameScene extends Phaser.Scene {
     if (!tree || !tree.alive) return this.completeCurrent();
     if (this.advancePath()) {
       this.player.body.setVelocity(0, 0);
+      this.chopping = true; // standing at the tree → updatePlayerAnim plays the chop swing
       this.chopElapsed += delta;
       if (this.chopElapsed >= CHOP_INTERVAL_MS) {
         this.chopElapsed = 0;
@@ -664,6 +689,7 @@ export class GameScene extends Phaser.Scene {
   /** Punch the facing-adjacent tile: flat damage via the shared combat formula, no range/arc
    * beyond that one tile. Only affects zombies — trees keep using chop(). */
   private punch(): void {
+    this.playPunchSwing(); // swing on every press, even a whiff, so the input always feels heard
     const pt = this.playerTile();
     const col = pt.col + this.lastFacing.dCol;
     const row = pt.row + this.lastFacing.dRow;
@@ -1033,18 +1059,28 @@ export class GameScene extends Phaser.Scene {
   // --- Rendering -----------------------------------------------------------
 
   /**
-   * Ground pass using the active pack's dirt variants (still eval-stage, see docs/ASSETS.md) —
-   * weighted-random per tile so the common plain variants dominate and the rarer debris variants
-   * just sprinkle in, instead of either a flat placeholder or an obvious repeating checkerboard.
+   * Ground pass: weighted-random grass variants per tile so the common variants dominate and rarer
+   * ones just sprinkle in (vs a flat fill or an obvious checkerboard).
+   *
+   * Baked into ONE RenderTexture rather than ~900 separate tile images. Individually-placed frames
+   * of a shared spritesheet bleed at fractional zoom (e.g. 150%): a 16px source tile scaled to 24px
+   * samples just past its atlas cell and picks up a neighbouring (dark) frame, showing as thin
+   * vertical seams that crawl as the camera scrolls. Baked side-by-side at integer 1:1, every tile's
+   * neighbour is the actual adjacent grass — no cross-frame bleed, and one object means no inter-tile
+   * gaps either. The camera then scales this single opaque texture, which nearest-samples cleanly.
    */
   private drawGround(): void {
     const groundVariants = ACTIVE_TILESET.tiles.ground.map((g) => ({ ...resolveTile(g.source), weight: g.weight }));
-    for (let row = 0; row * TILE_SIZE < BASE_HEIGHT; row++) {
-      for (let col = 0; col * TILE_SIZE < BASE_WIDTH; col++) {
+    const cols = Math.ceil(BASE_WIDTH / TILE_SIZE);
+    const rows = Math.ceil(BASE_HEIGHT / TILE_SIZE);
+    const rt = this.add.renderTexture(0, 0, cols * TILE_SIZE, rows * TILE_SIZE).setOrigin(0, 0).setDepth(0);
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
         const pick = pickWeighted(groundVariants);
-        this.add.image(tileToWorldCenter(col), tileToWorldCenter(row), pick.key, pick.frame).setDepth(0);
+        rt.drawFrame(pick.key, pick.frame, col * TILE_SIZE, row * TILE_SIZE);
       }
     }
+    rt.texture.setFilter(Phaser.Textures.FilterMode.NEAREST); // crisp pixels when the camera scales it
   }
 
   // --- Camera zoom -----------------------------------------------------------

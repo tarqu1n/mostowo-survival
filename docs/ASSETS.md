@@ -128,6 +128,12 @@ not repeated here):
 - **Tree:** `_derived/tree_pine.png` (extracted per the pipeline above).
 - **Player:** Body_A Idle/Walk strips × Down/Side/Up (64px frames) — full 3-way directional
   facing; Side art faces right, mirrored `flipX` for left, driven by `lastFacing`.
+- **Player action swings** (added post-005): **chop** = `Slice_Base` (reads as an axe swing, loops
+  while felling in place), **punch** = `Crush_Base` (overhead smash, one-shot per Punch press) —
+  each ×Down/Side/Up, 8×64px. The Body_A rig ships no literal chop/punch strip, so these are the
+  closest melee motions, treated as reskinnable stand-ins. Wired as extra `PlayerState`s
+  (`idle`|`walk`|`chop`|`punch`) sharing the one `playerAnimKey`/render footprint; action swings
+  run at `ACTION_ANIM_FRAMERATE` (config) so a chop lands ≈ once per `CHOP_INTERVAL_MS`.
 - **Enemy** (kid zombie data id, unchanged): Skeleton (Base) `Run/Run-Sheet.png` (64px, 6 frames)
   stands in for the sprite; single-orientation, frame 0 = idle, flips by movement-x only — mob
   sheets in this pack ship no directional variants.

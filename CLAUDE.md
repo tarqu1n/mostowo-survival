@@ -55,6 +55,10 @@ now the **Pixel Crawler** pack — the Zombie Apocalypse pack is retired to refe
 unchanged); the player has full 3-way directional facing (enemy flips by movement-x only). See
 [docs/ASSETS.md](docs/ASSETS.md) and [docs/DECISIONS.md](docs/DECISIONS.md) for the full picture.
 
+**Post-005 polish:** player **chop** (Slice) + **punch** (Crush) directional action swings; ground
+baked into one `RenderTexture` to kill the fractional-zoom (150%) tile-seam bleed. See
+[docs/DECISIONS.md](docs/DECISIONS.md) (2026-07-12).
+
 Next: survival systems (day/night, hunger) — see [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md) MVP
 slice; [docs/DECISIONS.md](docs/DECISIONS.md) for settled vs open.
 

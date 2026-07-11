@@ -205,6 +205,31 @@ with `gemini-2.5-flash-image` mirroring `guppi/house-helper/catalog_icons.py`. K
 server (`GEMINI_API_KEY`, gitignored, LAN-only) so generation runs from a guppi-reachable machine and
 processed sprites get committed. Detail in ASSETS.md.
 
+## 2026-07-12 — [DECIDED] Player action swings: chop = Slice, punch = Crush (reskinnable stand-ins)
+
+The player now plays directional action animations: **chop** = Pixel Crawler `Slice_Base` (loops
+while felling in place), **punch** = `Crush_Base` (one-shot per Punch press). Wired as two extra
+`PlayerState`s (`chop`/`punch`) alongside `idle`/`walk`, sharing the same `playerAnimKey`/render
+footprint; action swings run at `ACTION_ANIM_FRAMERATE` (20 fps ⇒ ≈ one chop per `CHOP_INTERVAL_MS`).
+A one-shot punch owns the sprite via a `punchLockUntil` time-gate in `updatePlayerAnim`; the swing
+fires on every press (even a whiff) so input always feels heard. Rationale: the Body_A rig ships no
+literal chop/punch strip, so Slice (axe-like side swing) and Crush (overhead smash) are the closest
+melee motions — consistent with the plan-005 "fantasy mobs/actions as reskinnable stand-ins" stance.
+The Skeleton mob has no attack strip (Idle/Run/Death only), so the enemy side of "fighting" is still
+just contact damage with no dedicated attack pose — a future add.
+
+## 2026-07-12 — [DECIDED] Ground baked into one RenderTexture (fixes fractional-zoom tile seams)
+
+`drawGround()` bakes all ground tiles into a single `RenderTexture` instead of ~900 separate
+`add.image` tiles. Symptom it fixes: at fractional camera zoom (notably 150%) thin dark vertical
+seams crawled across the grass while scrolling horizontally. Cause: individually-placed frames of a
+shared spritesheet **bleed** at non-integer scale — a 16px source tile drawn at 24px samples just
+past its atlas cell and picks up a neighbouring (dark) frame. At 100%/200% (integer scale) the
+sampling lands cleanly, so it only showed at 150%. Baked side-by-side at integer 1:1, each tile's
+neighbour is the real adjacent grass (no cross-frame bleed) and it's one object (no inter-tile gaps);
+the camera then nearest-samples one opaque texture. Rationale: robust at any zoom, and collapses ~900
+draw objects to one. (Alternative — extruding tile edges — is more work for the same result here.)
+
 ---
 
 ## Open questions

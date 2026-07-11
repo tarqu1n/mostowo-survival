@@ -13,7 +13,12 @@
  */
 
 export type Facing = 'down' | 'side' | 'up';
-export type PlayerState = 'idle' | 'walk';
+/**
+ * Player animation states: `idle`/`walk` are looping locomotion (velocity-driven); `chop`/`punch`
+ * are action swings triggered by the harvest/Punch events (chop loops while working in place, punch
+ * is a one-shot). All four are 3-way directional and share one `playerAnimKey`/render footprint.
+ */
+export type PlayerState = 'idle' | 'walk' | 'chop' | 'punch';
 
 /** A terrain tile: a standalone PNG (load.image) OR frame N of a sheet sliced at TILE_SIZE. */
 export type TileSource =
@@ -49,8 +54,17 @@ export interface TilesetManifest {
     tree: TileSource;
   };
   actors: {
-    /** Player: one render footprint for all strips; 3-way directional idle + walk. */
-    player: { render: ActorRender; idle: Record<Facing, StripAnim>; walk: Record<Facing, StripAnim> };
+    /**
+     * Player: one render footprint for all strips; 3-way directional idle + walk (looping
+     * locomotion) plus chop + punch action swings (see `PlayerState` doc).
+     */
+    player: {
+      render: ActorRender;
+      idle: Record<Facing, StripAnim>;
+      walk: Record<Facing, StripAnim>;
+      chop: Record<Facing, StripAnim>;
+      punch: Record<Facing, StripAnim>;
+    };
     /** Enemy: single-orientation Run strip (frame 0 doubles as idle); GameScene flips by move-x. */
     enemy: { render: ActorRender; walk: StripAnim };
   };
@@ -89,6 +103,19 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
         down: { path: 'Entities/Characters/Body_A/Animations/Walk_Base/Walk_Down-Sheet.png', frameSize: 64, frames: 6 },
         side: { path: 'Entities/Characters/Body_A/Animations/Walk_Base/Walk_Side-Sheet.png', frameSize: 64, frames: 6 },
         up: { path: 'Entities/Characters/Body_A/Animations/Walk_Base/Walk_Up-Sheet.png', frameSize: 64, frames: 6 },
+      },
+      // Chop = Slice_Base (side-swing, reads as an axe chop); punch = Crush_Base (overhead smash).
+      // The Body_A base rig has no literal "chop"/"punch" strip — these are the closest melee
+      // motions, treated as reskinnable stand-ins (see docs/ASSETS.md). Both are 8×64px, 3-way.
+      chop: {
+        down: { path: 'Entities/Characters/Body_A/Animations/Slice_Base/Slice_Down-Sheet.png', frameSize: 64, frames: 8 },
+        side: { path: 'Entities/Characters/Body_A/Animations/Slice_Base/Slice_Side-Sheet.png', frameSize: 64, frames: 8 },
+        up: { path: 'Entities/Characters/Body_A/Animations/Slice_Base/Slice_Up-Sheet.png', frameSize: 64, frames: 8 },
+      },
+      punch: {
+        down: { path: 'Entities/Characters/Body_A/Animations/Crush_Base/Crush_Down-Sheet.png', frameSize: 64, frames: 8 },
+        side: { path: 'Entities/Characters/Body_A/Animations/Crush_Base/Crush_Side-Sheet.png', frameSize: 64, frames: 8 },
+        up: { path: 'Entities/Characters/Body_A/Animations/Crush_Base/Crush_Up-Sheet.png', frameSize: 64, frames: 8 },
       },
     },
     enemy: {

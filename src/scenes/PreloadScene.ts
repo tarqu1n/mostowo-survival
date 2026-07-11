@@ -9,6 +9,7 @@ import {
   type TileSource,
   type StripAnim,
   type Facing,
+  type PlayerState,
 } from '../data/tileset';
 
 /**
@@ -79,9 +80,9 @@ export class PreloadScene extends Phaser.Scene {
       this.load.spritesheet(key, url(strip.path), { frameWidth: strip.frameSize, frameHeight: strip.frameSize });
     };
     const { player, enemy } = manifest.actors;
+    const playerStates: PlayerState[] = ['idle', 'walk', 'chop', 'punch'];
     (['down', 'side', 'up'] as Facing[]).forEach((facing) => {
-      loadStrip(playerAnimKey('idle', facing), player.idle[facing]);
-      loadStrip(playerAnimKey('walk', facing), player.walk[facing]);
+      for (const state of playerStates) loadStrip(playerAnimKey(state, facing), player[state][facing]);
     });
     loadStrip(enemyWalkKey, enemy.walk);
   }
