@@ -976,10 +976,12 @@ export class GameScene extends Phaser.Scene {
     ] as Array<[number, number]>) {
       this.addNode(NODES.tree, col, row);
     }
-    // A couple of rocks so the camp has a stone source to mine (see plan 008).
+    // A few rocks around the same camp cluster (near the player spawn ~22,40) so there's a stone
+    // source in view and within reach from the start (see plan 008).
     for (const [col, row] of [
-      [10, 6],
-      [4, 16],
+      [26, 43],
+      [18, 45],
+      [28, 36],
     ] as Array<[number, number]>) {
       this.addNode(NODES.rock, col, row);
     }
