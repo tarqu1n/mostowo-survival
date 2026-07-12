@@ -1,6 +1,6 @@
 # Layered Equipment System + Anchor-Stamp Tooling
 
-> Status: draft (awaiting review — gate 1)
+> Status: planned — run /execute-plan to begin. (Code anchors re-verified against current tree on the plan-feature rerun.)
 
 ## Summary
 
@@ -172,11 +172,13 @@ committed **anchor file** and every icon for that slot reuses it. Shape:
   loop `:84-86` iterates state×facing. **Add** an inner loop over `manifest.actors.player.equipment`
   entries calling `loadStrip(equipAnimKey(slot,state,facing), layer[state][facing])`.
 - `src/scenes/GameScene.ts` — anim-create loop `:291-303` (build equip anims alongside player anims,
-  same `generateFrameNumbers`/frameRate/repeat rules keyed by `equipAnimKey`); player create
-  `:314-319` (spawn `playerLayers[]` after, same scale/origin, depth `+z`, no physics); the player
-  anim driver at `:488-490` (`updatePlayerAnim`) and the punch handler `:497-499` — **both** must also
-  drive the layers (copy transform + flipX, play matching key, sync progress). `fitActorBody` `:319`
-  stays body-only.
+  same `generateFrameNumbers`/frameRate/repeat rules keyed by `equipAnimKey`; `ACTION_ANIM_FRAMERATE`
+  is imported from `src/config.ts:26` and `=20`, locomotion default `10`); player create `:314-320`
+  (spawn `playerLayers[]` after, same scale/origin, depth `+z`, no physics); the player anim driver
+  `updatePlayerAnim` at `:485-491` (core `anims.play` at `:490`) and the swing player `playPunchSwing()`
+  at `:495-501` (plays `playerAnimKey('punch',…)` at `:498`; note the separate `punch()` event handler
+  lives at `:877-890`) — **both** the driver and the swing must also drive the layers (copy transform +
+  flipX, play matching key, sync progress). `fitActorBody` `:319` stays body-only.
 - **Blast radius = these 3 files + 2 new Python scripts + 1 anchor JSON + derived strips.** No system,
   test, or data-id change. `enemies.ts`/`buildables.ts`/`nodes.ts` untouched.
 
@@ -214,12 +216,13 @@ The Python **previewer** is the cheaper first-line alignment check before ever b
 - [ ] **Step 3: Render + sync layers (GameScene)** `[inline]`
   - **Anim create** (`:291-303`): after the player loop, for each equipped slot build
     `equipAnimKey(slot,state,facing)` anims with the **same** `generateFrameNumbers`/frameRate
-    (`ACTION_ANIM_FRAMERATE` for chop/punch, 10 otherwise)/repeat rules as the body, so timelines match.
-  - **Create layers** (after `:319`): `this.playerLayers = equippedSlots.map(...)` — each an
+    (`ACTION_ANIM_FRAMERATE`=20 from `src/config.ts` for chop/punch, 10 otherwise)/repeat rules as the
+    body, so timelines match.
+  - **Create layers** (after `:320`): `this.playerLayers = equippedSlots.map(...)` — each an
     `add.sprite` at the player's spawn, `setScale(render.scale)`, `setOrigin(render.originX, originY)`,
     `setDepth(player.depth + z)`, **no physics body**. Store `{ slot, sprite, z }`.
-  - **Drive layers**: in `updatePlayerAnim` (`:488-490`) and the punch handler (`:497-499`), after the
-    body picks `(state, facing)` and plays/flips, loop the layers: `sprite.setPosition(player.x,
+  - **Drive layers**: in `updatePlayerAnim` (`:485-491`) and the swing player `playPunchSwing()`
+    (`:495-501`), after the body picks `(state, facing)` and plays/flips, loop the layers: `sprite.setPosition(player.x,
     player.y)`, `sprite.setFlipX(player.flipX)`, `anims.play(equipAnimKey(slot,state,facing), true)`,
     then `anims.setProgress(this.player.anims.getProgress())` to lock frame-sync (punch: play without
     ignoreIfPlaying, same as body, so it restarts together).
