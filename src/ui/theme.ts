@@ -25,7 +25,7 @@ export const UI_THEME = {
     text: '#e8dcc0',
     fontSize: 12,
   },
-  /** Destructive / attack actions (Cancel, Punch). */
+  /** Destructive / attack actions (Cancel, Attack). */
   danger: {
     fill: 0x3a2a2a,
     stroke: 0xb23b3b,

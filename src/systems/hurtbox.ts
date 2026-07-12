@@ -3,7 +3,7 @@
  * *targeting* — distinct from its footprint (movement/occupancy), which is always the single feet
  * tile. Anchored at the feet tile, centred horizontally on the feet column and rising upward (lower
  * rows) to match how actors are drawn (feet at the bottom, body above). See `Hurtbox` in
- * `src/data/types.ts` for the size semantics; consumed by GameScene's Punch/Inspect/contact paths.
+ * `src/data/types.ts` for the size semantics; consumed by GameScene's Attack/Inspect/contact paths.
  */
 
 import type { Hurtbox } from '../data/types';

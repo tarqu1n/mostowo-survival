@@ -68,14 +68,14 @@ describe('resolveMeleeAttack', () => {
     expect(resolveMeleeAttack(attacker, defender, 1, rng)).toBe(4);
   });
 
-  it('kills a maxHp-3 zombie in 3 hits of flat-1 damage', () => {
+  it('kills a maxHp-3 enemy in 3 hits of flat-1 damage', () => {
     const attacker = makeStats({ strength: 0 });
-    const zombie = makeStats({ maxHp: 3, dodge: 0, armour: 0 });
+    const enemy = makeStats({ maxHp: 3, dodge: 0, armour: 0 });
     const alwaysHit = () => 0; // rng() * 100 = 0 < hitChance(100) -> always hits.
-    let hp = zombie.maxHp;
+    let hp = enemy.maxHp;
 
     for (let i = 0; i < 3; i++) {
-      const dmg = resolveMeleeAttack(attacker, zombie, 1, alwaysHit);
+      const dmg = resolveMeleeAttack(attacker, enemy, 1, alwaysHit);
       expect(dmg).toBe(1);
       hp -= dmg;
     }

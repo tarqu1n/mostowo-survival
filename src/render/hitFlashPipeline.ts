@@ -10,7 +10,7 @@ import Phaser from 'phaser';
  * detached on completion, so it never costs a per-frame pass at rest.
  *
  * Per-attachment state: each sprite that attaches the pipeline gets its own instance (Phaser creates
- * one per `setPostPipeline`), so `flash` differs between the player and a zombie flashing at once.
+ * one per `setPostPipeline`), so `flash` differs between the player and an enemy flashing at once.
  *
  * Graceful degradation: WebGL-only. `registerHitFlashPipeline` no-ops on Canvas, and `flashHit`
  * falls back to a solid `setTintFill` there — so the effect degrades to a plain red fill, never errors.

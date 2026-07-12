@@ -1,12 +1,12 @@
 /**
  * Adapters mapping runtime instances to the Inspect-mode panel's common InspectableStats shape.
  * Objects (trees/walls) omit armour/speed — inert per plan 003 (see Context & decisions), they'd
- * always read a meaningless 0. Combatants (zombies/player) surface the full stat block.
+ * always read a meaningless 0. Combatants (enemies/player) surface the full stat block.
  */
 
 import { BUILDABLES } from '../data/buildables';
 import type { CombatantStats, InspectableStats } from '../data/types';
-import type { TreeNode, BuildSite, ZombieUnit } from '../scenes/GameScene';
+import type { TreeNode, BuildSite, EnemyUnit } from '../scenes/GameScene';
 
 export function treeStats(node: TreeNode): InspectableStats {
   return { name: 'Tree', maxHp: node.def.maxHp, currentHp: node.hp };
@@ -30,7 +30,7 @@ function combatantExtra(stats: CombatantStats): { label: string; value: string }
   ];
 }
 
-export function zombieStats(unit: ZombieUnit): InspectableStats {
+export function enemyStats(unit: EnemyUnit): InspectableStats {
   return { name: unit.def.name, maxHp: unit.def.maxHp, currentHp: unit.hp, extra: combatantExtra(unit.def) };
 }
 

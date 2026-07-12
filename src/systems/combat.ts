@@ -1,5 +1,5 @@
 /**
- * Combat resolution: pure functions, no Phaser imports. Both Punch and a zombie's contact
+ * Combat resolution: pure functions, no Phaser imports. Both the player's attack and an enemy's contact
  * attack go through `resolveMeleeAttack` rather than each hand-rolling damage math.
  */
 

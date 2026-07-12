@@ -7,7 +7,7 @@ import { playerAnimKey } from '../data/tileset';
  * Title screen. Tap anywhere to start — touch-native, no buttons to mis-hit on a phone.
  *
  * Theme is medieval-fantasy adventure (the active Pixel Crawler art — see docs/ASSETS.md), so the
- * copy stays evocative rather than zombie-specific. A lone idle adventurer + an edge vignette give
+ * copy stays evocative rather than enemy-specific. A lone idle adventurer + an edge vignette give
  * the bare text a bit of mood.
  */
 export class MainMenuScene extends Phaser.Scene {

@@ -1,9 +1,22 @@
 # Generic Monster System (AI states + swappable weapons)
 
-> Status: **in review — all steps done (Phase A A1–A4 + Phase B B1–B7). B7 docs uncommitted; deploy
-> (commit B7 + push `master`) + Matt's eyeball pending.**
+> Status: **deployed** — all steps done (Phase A A1–A4 + Phase B B1–B7), committed + pushed to
+> `master` (`9a5e159`), GitHub Pages deploy green (run 29206939618). Matt's live eyeball + likely
+> anchor/pivot/idle-origin tuning pass still pending.
 > Sequenced AI-first (Matt's call after the critique). Code anchors are from a source sweep on
 > 2026-07-12 — **reconfirm each `file:line` before editing** (they drift).
+
+## Follow-up (2026-07-12) — eyeball tuning pass + hand layer
+
+The anticipated tuning pass landed, plus a visible **hand layer** (Matt: skeleton looked handless and
+held the weapon in its face). Changes:
+
+- **Weapon held out, not in the face.** `enemy.idle`/`walk` `mainHand` anchors moved forward (idle
+  x20→24, walk x40→43) with a resting `rot: 14` leaning the shaft off the skull.
+- **Two visible fists.** Added `StripAnim.anchors.offHand` + `actors.enemy.hand` (shared mitt,
+  `_derived/hand.png`, tan fist from `Weapons/Hands`). `syncZombieWeapon` → **`syncZombieAttachments`**
+  pins the weapon + both fists each tick (fists position/flip only, no rotate). Rendered for every mob
+  armed or not; destroyed with the weapon on death. See ASSETS.md "Hand layer".
 
 ## Session handoff (2026-07-12) — resume here
 
@@ -388,7 +401,8 @@ scale-swap (critique #3).
     HP removed per hit.
   - Outcome: `ZombieUnit.weapon?` (`{id, sprite: Image, def: MonsterWeapon, swingRot}`); `addZombie`
     rolls from `weaponPool` (or `opts.weaponId`), creates the pinned image (grip-pivot origin, `depth+z`,
-    no body). New `syncZombieWeapon` runs EVERY tick (via `updateZombieAnim`): reads the active strip's
+    no body). New `syncZombieWeapon` (later `syncZombieAttachments` — see Follow-up above) runs EVERY
+    tick (via `updateZombieAnim`): reads the active strip's
     frame anchor (`Number(frame.name)`), runs `weaponTransform`, writes pos/flip/angle. `zombieLungeAt`
     extended with a `weaponSwingTweens`-tracked swing (`swingRot` 0→arc→0 + scale pop; always +arc,
     weaponTransform mirrors on flipX). Bite (`updateZombies`) now uses the weapon's `damage` as base +

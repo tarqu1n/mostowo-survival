@@ -15,6 +15,10 @@ const chromiumPath = process.env.SMOKE_CHROMIUM_PATH;
 
 export default defineConfig({
   testDir: './tests/e2e',
+  // Warm the dev server once before workers fan out — a cold `.vite/deps` cache under parallel cold
+  // boots triggers a full page reload that was a source of the "boot-timeout" flake. See the setup
+  // file and docs/WORKFLOW.md.
+  globalSetup: './tests/e2e/global-setup.ts',
   fullyParallel: true,
   retries: 0,
   reporter: [['list']],

@@ -53,7 +53,7 @@ export class UIScene extends Phaser.Scene {
   private timeText!: Phaser.GameObjects.Text;
 
   // Dev menu (dev-only): a bottom-right DEV toggle that opens a small olive Panel of build-testing
-  // helpers — Randomise (scatter nodes + zombies) and a day/night flip. Only the toggle button and
+  // helpers — Randomise (scatter nodes + enemies) and a day/night flip. Only the toggle button and
   // the Panel go in hudElements; the buttons nested in the Panel ride its bounds/visibility.
   private devButton!: Button;
   private devPanel!: Panel;
@@ -103,8 +103,8 @@ export class UIScene extends Phaser.Scene {
   // below the damage vignette so a hit still flashes red over it. Also non-interactive.
   private hungerVignette!: Phaser.GameObjects.Image;
 
-  // Combat mode: virtual movepad (bottom-right) + Punch button (bottom-left). The movepad is a
-  // bespoke joystick (drag tracking below), not a kit widget; the Punch button is a kit Button.
+  // Combat mode: virtual movepad (bottom-right) + Attack button (bottom-left). The movepad is a
+  // bespoke joystick (drag tracking below), not a kit widget; the Attack button is a kit Button.
   // Drag is tracked here (not GameScene) via a scene-level pointermove/up, gated by which pointer id
   // pressed the base — keeps the input arithmetic out of GameScene, which only needs the resulting
   // normalized {dx, dy}.
@@ -113,7 +113,7 @@ export class UIScene extends Phaser.Scene {
   private readonly movepadCenter = { x: 300, y: 540 };
   private readonly movepadRadius = 40;
   private movepadPointerId: number | null = null;
-  private combatPunchButton!: Button;
+  private combatAttackButton!: Button;
 
   // Inspect mode: a simple stats panel, centered, shown on 'inspect:show' / hidden on
   // 'inspect:hide' or leaving Inspect mode. `inspectPanelBg` is the Panel container itself, so its
@@ -294,7 +294,7 @@ export class UIScene extends Phaser.Scene {
     this.hudElements.push(this.modeCombatButton, this.modeInspectButton);
 
     // STATUS — opens the Health & Wellbeing screen. Left column, below the mode row (clear of the
-    // combat movepad/Punch corners and the centre day/night stack).
+    // combat movepad/Attack corners and the centre day/night stack).
     this.statusButton = new Button(this, 8 + mbw / 2, 72, {
       width: mbw,
       height: mbh,
@@ -305,7 +305,7 @@ export class UIScene extends Phaser.Scene {
     this.hudElements.push(this.statusButton);
 
     // Combat mode controls — hidden until mode === 'combat' (see onModeChanged). The movepad stays
-    // a bespoke joystick; only the Punch button comes from the kit.
+    // a bespoke joystick; only the Attack button comes from the kit.
     this.movepadBase = this.add
       .circle(this.movepadCenter.x, this.movepadCenter.y, this.movepadRadius, 0x3a3730, 0.4)
       .setStrokeStyle(1, COLORS.ui, 0.6)
@@ -320,14 +320,14 @@ export class UIScene extends Phaser.Scene {
 
     const pbw = 70;
     const pbh = 40;
-    this.combatPunchButton = new Button(this, 8 + pbw / 2, BASE_HEIGHT - 8 - pbh / 2, {
+    this.combatAttackButton = new Button(this, 8 + pbw / 2, BASE_HEIGHT - 8 - pbh / 2, {
       width: pbw,
       height: pbh,
       label: 'ATTACK',
       variant: 'danger',
-      onDown: () => this.game.events.emit('combat:punch'),
+      onDown: () => this.game.events.emit('combat:attack'),
     }).setVisible(false);
-    this.hudElements.push(this.combatPunchButton);
+    this.hudElements.push(this.combatAttackButton);
 
     // Inspect-mode stats panel — centered, clear of the always-on HUD zones. Hidden until
     // 'inspect:show'; tapping the panel itself dismisses it (dismissible Panel → 'inspect:hide').
@@ -413,7 +413,7 @@ export class UIScene extends Phaser.Scene {
     this.hudElements.push(this.devPanel);
 
     // Hotbar — always-visible row of the first HOTBAR_SLOTS slots, bottom-centre. Hidden in combat
-    // mode (see onModeChanged) so it never clashes with the movepad/Punch controls.
+    // mode (see onModeChanged) so it never clashes with the movepad/Attack controls.
     this.hotbar = new SlotGrid(this, BASE_WIDTH / 2, BASE_HEIGHT - 70, {
       slotCount: HOTBAR_SLOTS,
       cols: HOTBAR_SLOTS,
@@ -755,8 +755,8 @@ export class UIScene extends Phaser.Scene {
     const inCombat = mode === 'combat';
     this.movepadBase.setVisible(inCombat);
     this.movepadKnob.setVisible(inCombat);
-    this.combatPunchButton.setVisible(inCombat);
-    // Hide the hotbar in combat so it doesn't clash with the movepad/Punch controls; and drop the
+    this.combatAttackButton.setVisible(inCombat);
+    // Hide the hotbar in combat so it doesn't clash with the movepad/Attack controls; and drop the
     // full inventory panel open across a mode switch.
     this.hotbar.setVisible(!inCombat);
     if (inCombat) this.setInventoryOpen(false);

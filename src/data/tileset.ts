@@ -15,13 +15,13 @@
 export type Facing = 'down' | 'side' | 'up';
 /**
  * Player animation states: `idle`/`walk` are looping locomotion (velocity-driven); `chop`/`mine`/
- * `gather`/`punch` are in-place harvest/action states. `chop` (axe) loops while felling a tree;
+ * `gather`/`attack` are in-place harvest/action states. `chop` (axe) loops while felling a tree;
  * `mine` (overhead pickaxe swing) loops while mining a rock; `gather` (Collect crouch-pick) loops
- * while foraging a bush; `punch` (sword thrust) is a one-shot combat swing; `death` is a one-shot
+ * while foraging a bush; `attack` (sword thrust) is a one-shot combat swing; `death` is a one-shot
  * collapse played once on death then held on its last frame (see GameScene.killPlayer). All are 3-way
  * directional and share one `playerAnimKey`/render footprint.
  */
-export type PlayerState = 'idle' | 'walk' | 'chop' | 'mine' | 'gather' | 'punch' | 'death';
+export type PlayerState = 'idle' | 'walk' | 'chop' | 'mine' | 'gather' | 'attack' | 'death';
 
 /** A terrain tile: a standalone PNG (load.image) OR frame N of a sheet sliced at TILE_SIZE. */
 export type TileSource =
@@ -57,10 +57,11 @@ export interface StripAnim {
   frameWidth?: number;
   /**
    * Per-frame attach points for held props, keyed by slot. Each array's length MUST equal `frames`
-   * (one anchor per animation frame — asserted in data.test.ts). Only `mainHand` (the monster weapon)
-   * exists today. Optional: a strip carrying no held prop omits it.
+   * (one anchor per animation frame — asserted in data.test.ts). `mainHand` = the weapon-gripping
+   * hand (the held weapon AND the fist that grips it pin here); `offHand` = the free hand. A strip
+   * carrying neither omits `anchors`; one carrying hands but no weapon still pins both fists.
    */
-  anchors?: { mainHand?: AttachPoint[] };
+  anchors?: { mainHand?: AttachPoint[]; offHand?: AttachPoint[] };
   /**
    * Per-strip render footprint override. A strip whose source canvas differs from the actor's default
    * footprint (the 32px skeleton Idle vs the 64px Run) carries its own scale/origin so it still grounds
@@ -91,6 +92,23 @@ export interface WeaponArt {
   scale?: number;
 }
 
+/**
+ * The shared hand mitt layered onto the monster. The Base skeleton's own hands are vestigial nubs
+ * (crossed-forearm pixels that read as nothing at game scale), so a visible fist from `Weapons/Hands`
+ * is pinned to each hand anchor every frame — the SAME image for both, mirrored with the body. The
+ * `mainZ`/`offZ` depth offsets (added to the wielder's depth) put the gripping hand OVER the weapon
+ * (weapon `z` 1) and the free hand beside the body. A fist doesn't rotate, so there's no `rot` here.
+ */
+export interface HandArt {
+  source: TileSource;
+  /** setOrigin as [x,y] fractions — the point pinned to the hand anchor (fist centre). */
+  pivot: [number, number];
+  /** Depth offset for the weapon-gripping (main) hand — drawn in front of the weapon. */
+  mainZ: number;
+  /** Depth offset for the free (off) hand. */
+  offZ: number;
+}
+
 export interface TilesetManifest {
   /** Pack id — must match its folder under public/assets/tilesets/<id>/. */
   id: string;
@@ -110,7 +128,7 @@ export interface TilesetManifest {
   actors: {
     /**
      * Player: one render footprint for all strips; 3-way directional idle + walk (looping
-     * locomotion) plus chop + mine + gather + punch action swings (see `PlayerState` doc).
+     * locomotion) plus chop + mine + gather + attack action swings (see `PlayerState` doc).
      */
     player: {
       render: ActorRender;
@@ -119,11 +137,11 @@ export interface TilesetManifest {
       chop: Record<Facing, StripAnim>;
       mine: Record<Facing, StripAnim>;
       gather: Record<Facing, StripAnim>;
-      punch: Record<Facing, StripAnim>;
+      attack: Record<Facing, StripAnim>;
       death: Record<Facing, StripAnim>;
     };
     /**
-     * Enemy: single-orientation Run (`walk`) strip + a one-shot Death collapse (see GameScene.killZombie),
+     * Enemy: single-orientation Run (`walk`) strip + a one-shot Death collapse (see GameScene.killEnemy),
      * plus (Phase B) a slow Idle bob on its own 32px footprint and a catalogue of equippable `weapons`
      * (art only — stats in data/weapons.ts) the mob rolls from per spawn. `walk`/`idle` carry per-frame
      * `mainHand` anchors so the held weapon pins to the hand each tick.
@@ -134,6 +152,9 @@ export interface TilesetManifest {
       walk: StripAnim;
       death: StripAnim;
       weapons: Record<string, WeaponArt>;
+      /** Shared hand mitt pinned to the `mainHand` (grips the weapon) and `offHand` anchors — see
+       *  {@link HandArt}. The skeleton always has both hands, armed or not. */
+      hand: HandArt;
     };
   };
 }
@@ -179,7 +200,7 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
       },
       // Each action maps to the Body_A motion that reads right for it: chop = Slice_Base
       // (side-swing axe, fells trees); mine = Crush_Base (overhead smash, reads as a pickaxe on
-      // rock); gather = Collect_Base (crouch-and-pick, reads as foraging a bush); punch = Pierce_Base
+      // rock); gather = Collect_Base (crouch-and-pick, reads as foraging a bush); attack = Pierce_Base
       // (weapon thrust — the character holds a sword, so this is the combat swing). All 8×64px, 3-way.
       // NB Pierce ships its up strip as `Pierce_Top-Sheet.png` (not `_Up`) — the manifest lists
       // explicit paths, so the odd name is captured here.
@@ -198,7 +219,7 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
         side: { path: 'Entities/Characters/Body_A/Animations/Collect_Base/Collect_Side-Sheet.png', frameSize: 64, frames: 8 },
         up: { path: 'Entities/Characters/Body_A/Animations/Collect_Base/Collect_Up-Sheet.png', frameSize: 64, frames: 8 },
       },
-      punch: {
+      attack: {
         down: { path: 'Entities/Characters/Body_A/Animations/Pierce_Base/Pierce_Down-Sheet.png', frameSize: 64, frames: 8 },
         side: { path: 'Entities/Characters/Body_A/Animations/Pierce_Base/Pierce_Side-Sheet.png', frameSize: 64, frames: 8 },
         up: { path: 'Entities/Characters/Body_A/Animations/Pierce_Base/Pierce_Top-Sheet.png', frameSize: 64, frames: 8 },
@@ -226,16 +247,22 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
         frameSize: 32,
         frames: 4,
         render: { scale: 1, originX: 0.5, originY: 0.92 },
-        anchors: { mainHand: [{ x: 20, y: 18 }, { x: 20, y: 19 }, { x: 20, y: 18 }, { x: 20, y: 17 }] },
+        // mainHand holds the weapon OUT to the front (was ~x20 = straight up the face); `rot` leans the
+        // shaft forward off the skull. offHand = the free fist at the far side. y follows the bob.
+        anchors: {
+          mainHand: [{ x: 24, y: 20, rot: 14 }, { x: 24, y: 21, rot: 14 }, { x: 24, y: 20, rot: 14 }, { x: 24, y: 19, rot: 14 }],
+          offHand: [{ x: 10, y: 20 }, { x: 10, y: 21 }, { x: 10, y: 20 }, { x: 10, y: 19 }],
+        },
       },
-      // Run strip (frame 0 doubles as the Phase-A frozen idle). Per-frame mainHand grip points (frame-px
-      // space, one per frame) so the held weapon tracks the hand through the run cycle — rough, tuned in B5.
+      // Run strip (frame 0 doubles as the Phase-A frozen idle). Per-frame mainHand grip + offHand points
+      // (frame-px space, one per frame) so the held weapon and both fists track the run cycle.
       walk: {
         path: 'Entities/Mobs/Skeleton Crew/Skeleton - Base/Run/Run-Sheet.png',
         frameSize: 64,
         frames: 6,
         anchors: {
-          mainHand: [{ x: 40, y: 36 }, { x: 41, y: 35 }, { x: 40, y: 34 }, { x: 40, y: 36 }, { x: 41, y: 35 }, { x: 40, y: 34 }],
+          mainHand: [{ x: 43, y: 41, rot: 14 }, { x: 44, y: 40, rot: 14 }, { x: 43, y: 39, rot: 14 }, { x: 43, y: 41, rot: 14 }, { x: 44, y: 40, rot: 14 }, { x: 43, y: 39, rot: 14 }],
+          offHand: [{ x: 28, y: 47 }, { x: 29, y: 46 }, { x: 28, y: 45 }, { x: 28, y: 47 }, { x: 29, y: 46 }, { x: 28, y: 45 }],
         },
       },
       // Death cells are 96×64 (wider than the 64² Run cells) — the collapse needs horizontal room.
@@ -248,6 +275,10 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
         club: { source: { kind: 'image', path: '_derived/weapons/club.png' }, pivot: [0.5, 0.9], z: 1 },
         knife: { source: { kind: 'image', path: '_derived/weapons/knife.png' }, pivot: [0.5, 0.9], z: 1 },
       },
+      // Visible fist layered on both hands (the Base skeleton's own hands are unreadable nubs). One tan
+      // fist extracted from Weapons/Hands into _derived/hand.png; centred on the anchor, mirrored with
+      // the body. mainZ 2 draws it over the weapon (z 1); offZ 1 sits the free fist beside the body.
+      hand: { source: { kind: 'image', path: '_derived/hand.png' }, pivot: [0.5, 0.5], mainZ: 2, offZ: 1 },
     },
   },
 };

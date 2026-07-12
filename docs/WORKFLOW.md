@@ -134,6 +134,25 @@ fixed 1/60s slices with **zero wall-clock** (stops the RAF loop, drives `game.st
 serves `vite dev`, never `vite preview`. Chromium is pre-installed at `/opt/pw-browsers/` in web
 sessions; both the e2e config and the boot canary honour `SMOKE_CHROMIUM_PATH`.
 
+### Boot determinism (the ex-"boot-timeout" flake) — [RESOLVED 2026-07-12]
+
+`startGame` used to wait for `game.isBooted` then immediately tap the title screen. But Phaser flips
+`isBooted` almost instantly — long before PreloadScene finishes loading assets and MainMenuScene's
+`create()` registers its "tap to start" `pointerdown` listener. Under parallel-worker load that gap
+widened, the tap landed *before* MainMenu was listening, got dropped, and `startGame` then hung the
+full 15s waiting for a `__test` that never installed (fail at `harness.ts`, the `__test` wait). Two
+fixes, both root-cause, not papered over (`retries: 0` stays):
+
+- **`harness.ts` — `bootIntoGame`:** wait for the **MainMenu scene to be ACTIVE** (not just booted),
+  then tap, and **retry the tap while MainMenu is still active** so a dropped tap self-heals; stop
+  once the Game scene takes over (no stray move orders). Shared by `startGame` and global-setup.
+- **Server warm-up — `tests/e2e/global-setup.ts` + `optimizeDeps.include` (vite.config):** a cold
+  `.vite/deps` cache let Vite re-optimize *after* workers connected and fire a full page reload
+  ("[vite] page reload …") that wiped mid-boot pages. `globalSetup` boots the game once before the
+  workers fan out so dep-optimization + the module-graph transform settle serially → every worker
+  hits a fully warm server, no reload. Validated: 37/37 green across repeated **cold** runs at 5 and
+  8 workers (previously failed reliably when cold).
+
 ### Adding a test
 
 - **A unit test:** drop `src/systems/__tests__/<name>.test.ts` (or `*.test.ts` beside the module).

@@ -25,7 +25,7 @@ export interface BaseStats {
 }
 
 /**
- * A combatant's body extent **in tiles**, for combat targeting (Punch/Inspect hit-tests, contact
+ * A combatant's body extent **in tiles**, for combat targeting (Attack/Inspect hit-tests, contact
  * reach) — NOT collision/occupancy, which stays a single tile (the feet). Anchored at the feet tile,
  * centred horizontally on the feet column and rising **upward** (lower rows), matching how actors are
  * drawn: feet at the bottom, body/head above. So a ~2-tile-tall sprite uses `{ width: 1, height: 2 }`

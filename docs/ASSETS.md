@@ -116,6 +116,7 @@ needs to be treated as precious.
 | `_derived/rock.png` | `Environment/Props/Static/Rocks.png` | 5 |
 | `_derived/weapons/club.png` | `Weapons/Bone/Bone.png` | 1 (bone mace, grip at bottom; `sips -Z 40` → 7×40) |
 | `_derived/weapons/knife.png` | `Weapons/Bone/Bone.png` | 7 (bone dagger, grip at bottom; `sips -Z 18` → 4×18) |
+| `_derived/hand.png` | `Weapons/Hands/Hands.png` | 0 (tan fist, 7×7 — the shared hand mitt, see "Weapon attachment" below) |
 
 > The two bone weapons are extracted big (80/27px) then downscaled to sit proportionately on the
 > ~30px skeleton (club distinctly larger than the knife). They draw at integer scale 1 from these
@@ -181,17 +182,28 @@ check of grass/tree/wall/directional-player/skeleton.
 ### Weapon attachment (runtime pinning, plan 011)
 
 Monster weapons (club/knife) are held via **runtime anchor-pinning**, not baked per-frame art.
-`StripAnim.anchors.mainHand` (`src/data/tileset.ts`) carries one `AttachPoint {x,y,rot?}` per
-animation frame, in that frame's own pixel space — the enemy's `idle` (4 frames, 32px canvas) and
-`walk`/Run (6 frames, 64px canvas) strips each carry their own set, since an anchor array is only
-meaningful relative to a specific strip's frames. Every tick the pure `weaponTransform`
-(`src/systems/attachment.ts`) resolves the active frame's anchor through the strip's render
-footprint into a world-px offset/angle, and GameScene repositions the one pinned weapon sprite —
-every update tick, not on `animationupdate`, because lunge/veer tweens slide the sprite between
-frame changes. Swapping/randomising a weapon is then just re-pointing which sprite is pinned — zero
-baked art per weapon. The attack "swing" is a coded tween (rotate the pinned sprite about its grip)
-rather than a sprite animation, since the pack ships no mob attack strip — see `WEAPON_SWING_*` in
-`config.ts`.
+`StripAnim.anchors` (`src/data/tileset.ts`) carries per-frame `AttachPoint {x,y,rot?}` arrays in the
+frame's own pixel space, keyed by slot — `mainHand` (the weapon-gripping hand) and `offHand` (the
+free hand). The enemy's `idle` (4 frames, 32px canvas) and `walk`/Run (6 frames, 64px canvas) strips
+each carry their own set, since an anchor array is only meaningful relative to a specific strip's
+frames. Every tick the pure `weaponTransform` (`src/systems/attachment.ts`) resolves the active
+frame's anchor through the strip's render footprint into a world-px offset/angle, and
+`GameScene.syncZombieAttachments` repositions the pinned sprites — every update tick, not on
+`animationupdate`, because lunge/veer tweens slide the sprite between frame changes.
+Swapping/randomising a weapon is then just re-pointing which sprite is pinned — zero baked art per
+weapon. The attack "swing" is a coded tween (rotate the pinned weapon about its grip = the mainHand
+anchor, so the gripping fist stays put) rather than a sprite animation, since the pack ships no mob
+attack strip — see `WEAPON_SWING_*` in `config.ts`.
+
+**Hand layer.** The Base skeleton's own hands are unreadable nubs (crossed-forearm pixels that
+vanish at game scale — the pack's promo art composites visible mitts + weapons on top). So a shared
+fist (`_derived/hand.png`, `actors.enemy.hand`) is pinned to BOTH anchors every tick — the same
+image for both hands, mirrored with the body: `mainHand` grips the weapon (drawn over it via
+`mainZ`), `offHand` is the free fist beside the body (`offZ`). Fists don't rotate (position + flip
+only), so the grip stays steady while the weapon arcs. Both fists render whether or not the mob is
+armed; they're destroyed with the weapon on death (the 96px Death strip carries no anchors). The
+`mainHand` `rot` also leans the resting weapon forward off the skull, so it reads as held-out, not
+held-to-the-face.
 
 Weapon **ART** (source image — extracted per the pipeline above, see the `club`/`knife` derived-file
 rows in the manifest table above — plus grip `pivot` and draw `z`) lives in the manifest

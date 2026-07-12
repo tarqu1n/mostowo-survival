@@ -73,9 +73,9 @@ export const INTERACT_RANGE = TILE_SIZE * 1.4;
 export const CHOP_INTERVAL_MS = 400;
 
 /**
- * Frame rate for the player's action swings (chop/punch). The strips are 8 frames, so this ≈ one
+ * Frame rate for the player's action swings (chop/attack). The strips are 8 frames, so this ≈ one
  * swing per CHOP_INTERVAL_MS (8 / 20 fps = 400 ms) — a chop reads as a continuous swing per hit,
- * and a punch is a single snappy swing. Locomotion (idle/walk) stays at the slower default (10).
+ * and an attack is a single snappy swing. Locomotion (idle/walk) stays at the slower default (10).
  */
 export const ACTION_ANIM_FRAMERATE = 20;
 
@@ -113,23 +113,23 @@ export const PLAYER_START_VISION = VISION_RADIUS;
 
 /**
  * Player body extent for combat targeting (see `Hurtbox` in data/types). The character sprite is
- * ~1 tile wide and ~2 tall, so its torso occupies the tile above its feet — a zombie touching that
+ * ~1 tile wide and ~2 tall, so its torso occupies the tile above its feet — an enemy touching that
  * tile still connects. Footprint/occupancy stays the single feet tile.
  */
 export const PLAYER_HURTBOX: Hurtbox = { width: 1, height: 2 };
 
-/** Base damage of an unarmed hit — shared by Punch and a zombie's bite via resolveMeleeAttack. */
+/** Base damage of an unarmed hit — shared by an unarmed attack and an enemy's bite via resolveMeleeAttack. */
 export const UNARMED_BASE_DAMAGE = 1;
 
 /**
- * Attack commitment: while a swing is in progress (the punch-lock window, see GameScene.playPunchSwing)
+ * Attack commitment: while a swing is in progress (the attack-lock window, see GameScene.playAttackSwing)
  * the player's move speed drops to this fraction of normal, so attacking has weight — you plant and
  * commit rather than gliding through the swing at full pace. Applied to both movepad and pathfinder
  * movement via GameScene.effectiveMoveSpeed.
  */
 export const ATTACK_MOVE_SLOW = 0.2;
 
-/** Minimum time (ms) between a zombie's contact-damage attempts on the player. */
+/** Minimum time (ms) between an enemy's contact-damage attempts on the player. */
 export const CONTACT_DAMAGE_COOLDOWN_MS = 1000;
 
 /**
@@ -142,11 +142,11 @@ export const CONTACT_DAMAGE_COOLDOWN_MS = 1000;
  *
  * On top of the per-sprite flash, a **camera kick** sells the impact: getting bitten gives a firm
  * shake (`PLAYER_HIT_SHAKE_*`) plus a red **damage vignette** pulse round the screen edges
- * (`DAMAGE_VIGNETTE_*`, drawn by UIScene on a `player:hit` event); landing a punch gives a lighter
+ * (`DAMAGE_VIGNETTE_*`, drawn by UIScene on a `player:hit` event); landing an attack gives a lighter
  * shake (`ENEMY_HIT_SHAKE_*`). Shake intensity is a fraction of the viewport, durations are ms.
  *
- * The skeletons ship no attack strip, so a zombie's attack is a coded lunge toward its target:
- * `ZOMBIE_LUNGE_PX` is the reach (world px) and `ZOMBIE_LUNGE_MS` the time for each leg of the
+ * The enemies ship no attack strip, so an enemy's attack is a coded lunge toward its target:
+ * `ENEMY_LUNGE_PX` is the reach (world px) and `ENEMY_LUNGE_MS` the time for each leg of the
  * out-and-back — kept well under the contact cooldown so a lunge always settles before the next bite.
  */
 export const HIT_FLASH_MS = 260;
@@ -160,12 +160,12 @@ export const ENEMY_HIT_SHAKE_INTENSITY = 0.003;
 export const DAMAGE_VIGNETTE_MS = 460;
 export const DAMAGE_VIGNETTE_ALPHA = 0.72;
 export const DAMAGE_VIGNETTE_COLOR = 0xe01818;
-export const ZOMBIE_LUNGE_PX = 7;
-export const ZOMBIE_LUNGE_MS = 120;
+export const ENEMY_LUNGE_PX = 7;
+export const ENEMY_LUNGE_MS = 120;
 
 /**
- * Monster weapon swing feel (Phase B — see GameScene.zombieLungeAt / systems/attachment.ts). The
- * skeleton pack ships no mob attack strip, so the bite's weapon "swing" is coded: rotate the held
+ * Monster weapon swing feel (Phase B — see GameScene.enemyLungeAt / systems/attachment.ts). The
+ * enemy pack ships no mob attack strip, so the bite's weapon "swing" is coded: rotate the held
  * weapon about its grip through `WEAPON_SWING_ARC_DEG`, with a brief `WEAPON_SWING_SCALE_POP` pop,
  * over `WEAPON_SWING_MS` (yoyo). Swing *feel* only — weapon damage/cadence live in data/weapons.ts.
  */
@@ -198,10 +198,10 @@ export const MONSTER_WANDER_RADIUS_TILES = 4;
 export const MONSTER_PATROL_PAUSE_MS = 1000;
 
 /**
- * Death animation timing (see GameScene.killPlayer / killZombie). Both actors play a one-shot
+ * Death animation timing (see GameScene.killPlayer / killEnemy). Both actors play a one-shot
  * collapse strip on death: `DEATH_ANIM_FRAMERATE` is slower than an action swing so the collapse
- * reads as a fall, not a twitch (player 8f ≈ 0.67s, skeleton 12f ≈ 1.0s). `DEATH_HOLD_MS` is the
- * beat the downed last frame is held before the payoff — the player's scene restart, the zombie's
+ * reads as a fall, not a twitch (player 8f ≈ 0.67s, enemy 12f ≈ 1.0s). `DEATH_HOLD_MS` is the
+ * beat the downed last frame is held before the payoff — the player's scene restart, the enemy's
  * corpse removal.
  */
 export const DEATH_ANIM_FRAMERATE = 12;

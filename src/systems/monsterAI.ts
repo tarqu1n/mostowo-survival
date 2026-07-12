@@ -1,6 +1,6 @@
 /**
  * Pure monster-AI state machine — no Phaser, no scene deps, no module-level mutable state. The scene
- * owns the *effects* (A* `findPath`, `advanceZombie`, tween movement, contact damage); this module
+ * owns the *effects* (A* `findPath`, `advanceEnemy`, tween movement, contact damage); this module
  * owns the *decision*: given the monster's prior AI state plus a snapshot of the world, it returns the
  * next state, the tile to move toward this tick, and whether the path needs recomputing.
  *

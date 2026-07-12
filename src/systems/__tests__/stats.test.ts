@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { treeStats, wallStats, zombieStats, playerCombatStats } from '../stats';
+import { treeStats, wallStats, enemyStats, playerCombatStats } from '../stats';
 import { BUILDABLES } from '../../data/buildables';
 import { ENEMIES } from '../../data/enemies';
 import { NODES } from '../../data/nodes';
-import type { TreeNode, BuildSite, ZombieUnit } from '../../scenes/GameScene';
+import type { TreeNode, BuildSite, EnemyUnit } from '../../scenes/GameScene';
 import type { CombatantStats } from '../../data/types';
 
 describe('treeStats', () => {
@@ -55,10 +55,10 @@ describe('wallStats', () => {
   });
 });
 
-describe('zombieStats', () => {
+describe('enemyStats', () => {
   it('returns the enemy def name/maxHp/currentHp plus combatant extras', () => {
     const unit = {
-      id: 'zombie-1',
+      id: 'enemy-1',
       def: ENEMIES.kidZombie,
       hp: 1,
       alive: true,
@@ -67,9 +67,9 @@ describe('zombieStats', () => {
       state: 'chasing' as const,
       lastContactAt: 0,
       lastRepathAt: 0,
-    } as unknown as ZombieUnit;
+    } as unknown as EnemyUnit;
 
-    const result = zombieStats(unit);
+    const result = enemyStats(unit);
     expect(result.name).toBe(ENEMIES.kidZombie.name);
     expect(result.maxHp).toBe(ENEMIES.kidZombie.maxHp);
     expect(result.currentHp).toBe(1);

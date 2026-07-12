@@ -29,9 +29,9 @@ export function justARock(): ScenarioSpec {
   return { player: [3, 3], rocks: [[5, 3]], inventory: {} };
 }
 
-/** Player at [10,10], one kid zombie two tiles east — closes distance fast, then contact-damages. */
-export function oneZombie(): ScenarioSpec {
-  return { player: [10, 10], zombies: [[12, 10]] };
+/** Player at [10,10], one enemy two tiles east — closes distance fast, then contact-damages. */
+export function oneEnemy(): ScenarioSpec {
+  return { player: [10, 10], enemies: [[12, 10]] };
 }
 
 /** Player at [3,3] with a built wall at [5,5] — a solid tile the pathfinder must route around. */

@@ -91,7 +91,7 @@ export class PreloadScene extends Phaser.Scene {
       });
     };
     const { player, enemy } = manifest.actors;
-    const playerStates: PlayerState[] = ['idle', 'walk', 'chop', 'mine', 'gather', 'punch', 'death'];
+    const playerStates: PlayerState[] = ['idle', 'walk', 'chop', 'mine', 'gather', 'attack', 'death'];
     (['down', 'side', 'up'] as Facing[]).forEach((facing) => {
       for (const state of playerStates) loadStrip(playerAnimKey(state, facing), player[state][facing]);
     });
@@ -99,11 +99,12 @@ export class PreloadScene extends Phaser.Scene {
     loadStrip(enemyIdleKey, enemy.idle); // 32px Idle bob — its own footprint (Phase B)
     loadStrip(enemyDeathKey, enemy.death);
 
-    // Monster weapon art: one static image per catalogue entry (no anim), keyed like the derived tiles.
-    for (const art of Object.values(enemy.weapons)) {
-      if (art.source.kind === 'image' && !loadedImages.has(art.source.path)) {
-        loadedImages.add(art.source.path);
-        this.load.image(tileImageKey(art.source.path), url(art.source.path));
+    // Monster weapon art + the shared hand mitt: one static image each (no anim), keyed like the
+    // derived tiles. GameScene resolves them via resolveTile(source).
+    for (const src of [...Object.values(enemy.weapons).map((w) => w.source), enemy.hand.source]) {
+      if (src.kind === 'image' && !loadedImages.has(src.path)) {
+        loadedImages.add(src.path);
+        this.load.image(tileImageKey(src.path), url(src.path));
       }
     }
 

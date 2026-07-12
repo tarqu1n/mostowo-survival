@@ -18,17 +18,17 @@ export interface DebugState {
   prow: number;
   px: number;
   py: number;
-  zombies: number;
-  zombieModes: Array<'idle' | 'wander' | 'patrol' | 'chase'>;
-  zombieTiles: Array<{ col: number; row: number }>;
-  zombieWeapons: Array<string | null>;
+  enemies: number;
+  enemyModes: Array<'idle' | 'wander' | 'patrol' | 'chase'>;
+  enemyTiles: Array<{ col: number; row: number }>;
+  enemyWeapons: Array<string | null>;
   corpses: number;
   playerHp: number;
   playerDying: boolean;
   playerFlash: number;
   playerHitFlashes: number;
-  zombieHitFlashes: number;
-  zombieAttacks: number;
+  enemyHitFlashes: number;
+  enemyAttacks: number;
   mode: 'command' | 'combat' | 'inspect';
   hunger: number;
   dayPhase: 'day' | 'night';
@@ -40,16 +40,45 @@ export interface DebugState {
   queuedTreeIds: string[];
 }
 
+/**
+ * Tap the title screen to start the Game scene and wait for the DEV `__test` surface to install.
+ * Assumes the page is already navigated to the app (see `startGame`, and `tests/e2e/global-setup.ts`
+ * which reuses this to warm the dev server).
+ *
+ * Waits for MainMenu to be ACTIVE, not just for `game.isBooted`. Phaser flips isBooted almost
+ * immediately — long before PreloadScene finishes loading assets and MainMenuScene's create()
+ * registers its "tap to start" pointerdown listener. Tapping straight after isBooted races that gap:
+ * under parallel-worker load the tap lands before MainMenu is listening, is dropped, and we then hang
+ * the full 15s for a `__test` that never installs. This was the documented e2e "boot-timeout" flake
+ * (see docs/WORKFLOW.md). The tap is retried while MainMenu is still active so a dropped tap (or a
+ * cold Vite reload) self-heals; once the Game scene has taken over we stop tapping — no stray move
+ * orders — and just wait out the install.
+ */
+export async function bootIntoGame(page: Page): Promise<void> {
+  await page.waitForFunction(() => (window as any).game?.scene?.isActive('MainMenu'), null, {
+    timeout: 15_000,
+  });
+  // Tap the canvas centre via its bounding box — the FIT-scaled canvas is letterboxed within the
+  // viewport, so viewport-centre may miss it.
+  const box = await page.locator('canvas').boundingBox();
+  if (!box) throw new Error('game canvas not found');
+  const [cx, cy] = [box.x + box.width / 2, box.y + box.height / 2];
+  let installed = false;
+  for (let attempt = 0; attempt < 10 && !installed; attempt++) {
+    const menuActive = await page.evaluate(() => (window as any).game?.scene?.isActive('MainMenu'));
+    if (menuActive) await page.mouse.click(cx, cy);
+    installed = await page
+      .waitForFunction(() => (window as any).game?.__test != null, null, { timeout: 1_500 })
+      .then(() => true)
+      .catch(() => false);
+  }
+  if (!installed) throw new Error('game.__test never installed — MainMenu tap did not start the Game scene');
+}
+
 /** Boot the game, start the world (menu → Game), and wait for the DEV test surface to install. */
 export async function startGame(page: Page): Promise<void> {
   await page.goto('/', { waitUntil: 'load' });
-  await page.waitForFunction(() => (window as any).game?.isBooted, null, { timeout: 15_000 });
-  // MainMenu starts the Game scene on any pointerdown; click the canvas centre (via its bounding
-  // box — the FIT-scaled canvas is letterboxed within the viewport, so viewport-centre may miss it).
-  const box = await page.locator('canvas').boundingBox();
-  if (!box) throw new Error('game canvas not found');
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await page.waitForFunction(() => (window as any).game?.__test != null, null, { timeout: 15_000 });
+  await bootIntoGame(page);
   // Install a per-page event capture so specs can assert on GameScene→UIScene events.
   await page.evaluate(() => {
     const g = (window as any).game;
@@ -97,7 +126,7 @@ export function blocked(page: Page, col: number, row: number): Promise<boolean> 
   return page.evaluate(([c, r]) => (window as any).game.__test.blocked(c, r), [col, row] as const);
 }
 
-/** Emit a game event (drives the HUD-wired paths: mode toggles, zoom, punch, follow). */
+/** Emit a game event (drives the HUD-wired paths: mode toggles, zoom, attack, follow). */
 export function emit(page: Page, event: string, ...args: unknown[]): Promise<void> {
   return page.evaluate(({ event, args }) => (window as any).game.events.emit(event, ...args), { event, args });
 }

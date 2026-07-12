@@ -142,12 +142,23 @@ describe('monster weapons + attach anchors', () => {
   const enemy = ACTIVE_TILESET.actors.enemy;
   const enemyStrips = [enemy.idle, enemy.walk, enemy.death];
 
-  it('every enemy strip with mainHand anchors has exactly one anchor per frame', () => {
-    // Anchors are meaningless except per-frame; a length mismatch would pin the weapon to a stale
-    // frame. Co-located on the strip so this invariant is cheap to assert.
+  it('every enemy strip hand anchor set has exactly one anchor per frame', () => {
+    // Anchors are meaningless except per-frame; a length mismatch would pin a weapon/fist to a stale
+    // frame. Both slots (mainHand grip + offHand free) are asserted. Cheap, co-located on the strip.
     for (const strip of enemyStrips) {
-      const anchors = strip.anchors?.mainHand;
-      if (anchors) expect(anchors.length).toBe(strip.frames);
+      for (const anchors of [strip.anchors?.mainHand, strip.anchors?.offHand]) {
+        if (anchors) expect(anchors.length).toBe(strip.frames);
+      }
+    }
+  });
+
+  it('the hand mitt art resolves and the strips that grip it carry both hand slots', () => {
+    // The fists are layered every tick — missing art would render nothing; a strip with a mainHand
+    // (weapon-gripping) anchor but no offHand would show a one-handed skeleton.
+    expect(enemy.hand.source.kind).toBe('image');
+    for (const strip of [enemy.idle, enemy.walk]) {
+      expect(strip.anchors?.mainHand, 'gripping strip missing mainHand').toBeDefined();
+      expect(strip.anchors?.offHand, 'gripping strip missing offHand').toBeDefined();
     }
   });
 

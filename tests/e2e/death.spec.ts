@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { startGame, applyScenario, step, state } from './harness';
 
-// Tier-2: player death → scene restart. A zombie stood adjacent chips the player's HP down over
+// Tier-2: player death → scene restart. An enemy stood adjacent chips the player's HP down over
 // repeated contact hits (1s cooldown each); at 0 HP GameScene.scene.restart() re-runs create(),
 // resetting the world to its boot fixtures (player back at spawn centre, full HP, default spawns).
 test('the player dying restarts the scene and resets the world', async ({ page }) => {
@@ -14,7 +14,7 @@ test('the player dying restarts the scene and resets the world', async ({ page }
   page.on('console', (m) => logs.push(m.text()));
 
   await startGame(page);
-  await applyScenario(page, { player: [11, 20], zombies: [[11, 21]] }); // zombie adjacent, aggroed instantly
+  await applyScenario(page, { player: [11, 20], enemies: [[11, 21]] }); // enemy adjacent, aggroed instantly
 
   // 10 HP × 1 dmg on a 1s contact cooldown → ~10s to die, then the restart. Drive well past that.
   await step(page, 14000);

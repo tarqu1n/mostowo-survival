@@ -10,11 +10,11 @@ test('inspecting each entity kind shows its stats, empty ground hides the panel'
     player: [3, 3],
     mode: 'inspect',
     trees: [[5, 3]],
-    zombies: [[7, 3]],
+    enemies: [[7, 3]],
     walls: [[9, 3]],
   });
 
-  await inspect(page, 7, 3); // zombie (highest priority)
+  await inspect(page, 7, 3); // enemy (highest priority)
   expect(await captured(page, 'inspect:show')).toMatchObject({ name: 'Kid Zombie', maxHp: 3, currentHp: 3 });
 
   await inspect(page, 5, 3); // tree
