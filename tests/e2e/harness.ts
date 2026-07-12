@@ -17,7 +17,13 @@ export interface DebugState {
   pcol: number;
   prow: number;
   zombies: number;
+  corpses: number;
   playerHp: number;
+  playerDying: boolean;
+  playerFlash: number;
+  playerHitFlashes: number;
+  zombieHitFlashes: number;
+  zombieAttacks: number;
   mode: 'command' | 'combat' | 'inspect';
   hunger: number;
   dayPhase: 'day' | 'night';

@@ -17,10 +17,11 @@ export type Facing = 'down' | 'side' | 'up';
  * Player animation states: `idle`/`walk` are looping locomotion (velocity-driven); `chop`/`mine`/
  * `gather`/`punch` are in-place harvest/action states. `chop` (axe) loops while felling a tree;
  * `mine` (overhead pickaxe swing) loops while mining a rock; `gather` (Collect crouch-pick) loops
- * while foraging a bush; `punch` (sword thrust) is a one-shot combat swing. All are 3-way directional
- * and share one `playerAnimKey`/render footprint.
+ * while foraging a bush; `punch` (sword thrust) is a one-shot combat swing; `death` is a one-shot
+ * collapse played once on death then held on its last frame (see GameScene.killPlayer). All are 3-way
+ * directional and share one `playerAnimKey`/render footprint.
  */
-export type PlayerState = 'idle' | 'walk' | 'chop' | 'mine' | 'gather' | 'punch';
+export type PlayerState = 'idle' | 'walk' | 'chop' | 'mine' | 'gather' | 'punch' | 'death';
 
 /** A terrain tile: a standalone PNG (load.image) OR frame N of a sheet sliced at TILE_SIZE. */
 export type TileSource =
@@ -70,9 +71,13 @@ export interface TilesetManifest {
       mine: Record<Facing, StripAnim>;
       gather: Record<Facing, StripAnim>;
       punch: Record<Facing, StripAnim>;
+      death: Record<Facing, StripAnim>;
     };
-    /** Enemy: single-orientation Run strip (frame 0 doubles as idle); GameScene flips by move-x. */
-    enemy: { render: ActorRender; walk: StripAnim };
+    /**
+     * Enemy: single-orientation Run strip (frame 0 doubles as idle; GameScene flips by move-x) plus a
+     * single-orientation Death strip (one-shot collapse, played on kill — see GameScene.killZombie).
+     */
+    enemy: { render: ActorRender; walk: StripAnim; death: StripAnim };
   };
 }
 
@@ -141,12 +146,20 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
         side: { path: 'Entities/Characters/Body_A/Animations/Pierce_Base/Pierce_Side-Sheet.png', frameSize: 64, frames: 8 },
         up: { path: 'Entities/Characters/Body_A/Animations/Pierce_Base/Pierce_Top-Sheet.png', frameSize: 64, frames: 8 },
       },
+      // death = Death_Base: an 8-frame collapse. Directional like the other player strips (up ships as
+      // `Death_Up`, not the `_Top` oddity Pierce has), played once and held on the last (downed) frame.
+      death: {
+        down: { path: 'Entities/Characters/Body_A/Animations/Death_Base/Death_Down-Sheet.png', frameSize: 64, frames: 8 },
+        side: { path: 'Entities/Characters/Body_A/Animations/Death_Base/Death_Side-Sheet.png', frameSize: 64, frames: 8 },
+        up: { path: 'Entities/Characters/Body_A/Animations/Death_Base/Death_Up-Sheet.png', frameSize: 64, frames: 8 },
+      },
     },
     enemy: {
       // Native 1:1 like the player (crisp at integer zoom). The skeleton's feet reach the frame
       // bottom (content bbox ≈ y34–64), so originY 0.96 grounds it on the tile.
       render: { scale: 1, originX: 0.5, originY: 0.96 },
       walk: { path: 'Entities/Mobs/Skeleton Crew/Skeleton - Base/Run/Run-Sheet.png', frameSize: 64, frames: 6 },
+      death: { path: 'Entities/Mobs/Skeleton Crew/Skeleton - Base/Death/Death-Sheet.png', frameSize: 64, frames: 12 },
     },
   },
 };
@@ -177,6 +190,9 @@ export const playerAnimKey = (state: PlayerState, facing: Facing): string => `pl
 
 /** Texture/anim key for the enemy Run strip (frame 0 doubles as idle). */
 export const enemyWalkKey = 'enemy-walk';
+
+/** Texture/anim key for the enemy Death strip (one-shot collapse on kill). */
+export const enemyDeathKey = 'enemy-death';
 
 /** Texture key for an item's icon image (loaded from `public/assets/icons/<icon>`). */
 export const iconKey = (id: string): string => `icon:${id}`;

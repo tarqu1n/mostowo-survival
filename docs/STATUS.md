@@ -116,3 +116,32 @@ Wellbeing** screen (STATUS button → Panel) shows hunger/health meters, read-on
 008's existing panel (no throwaway "Equipped" shell — deferred to plan 010). Survival state is **not
 persisted**. New Tier-1 `daynight`/`needs` unit tests + three Tier-2 scenarios
 (`survival-{daynight,hunger,forage}`).
+
+## Combat hit feedback + enemy attack tell
+
+Combat now *reads*. On a landed hit, both the player and a zombie **flash red and squash-"flinch"**:
+one tween over a plain `{ t }` object (1→0) drives a live **`HitFlashPipeline`** PostFX (WebGL; a
+`setTintFill` fallback on Canvas — see [render/hitFlashPipeline.ts](../src/render/hitFlashPipeline.ts)
++ docs/RENDERING.md) *and* a scale-only squash, so flash and flinch decay in lockstep and the squash
+never fights the actor's Arcade body. The skeleton ships **no attack strip**, so a zombie's bite is a
+coded **lunge** toward its target (`GameScene.zombieLungeAt`) — it moves the Arcade **body** via
+`body.reset` (a `sprite.x` tween would be stomped by physics each frame) out-and-back, only during the
+stationary contact phase, settling well inside the contact cooldown. All feedback is purely visual:
+logic stays keyed to `col`/`row`. Tuning lives in `config.ts` (`HIT_FLASH_*`, `ZOMBIE_LUNGE_*`);
+`debugState` surfaces `playerFlash` + `{player,zombie}HitFlashes`/`zombieAttacks` counters, asserted by
+two new Tier-2 `combat` scenarios (the boot canary's real-WebGL run compiles the shader as a free check).
+
+## Death animations (both actors)
+
+Death now *plays* instead of blinking out. The player's `death` `PlayerState` (`Death_Base`, 3-way)
+and the skeleton's `Death-Sheet` (single-orientation) are wired as one-shot collapses at a slower
+`DEATH_ANIM_FRAMERATE`. A **killed zombie** leaves the AI set at once (so nothing chases/counts it) but
+its sprite lingers as a **corpse** playing the collapse, removed only after the anim + `DEATH_HOLD_MS`
+(`GameScene.killZombie`; the old path `destroy()`-ed on the same frame). **Player death** routes
+through `killPlayer`: a `playerDying` flag freezes the world (update() early-returns, further
+bites/starve ticks are swallowed) while the collapse plays, then the existing "Death = restart"
+`scene.restart()` fires on a `delayedCall`. Combat-FX/dying resets live in `resetCombatFx()` (shared by
+create() + the scenario reset). `debugState` adds `corpses` + `playerDying`; a new Tier-2 `combat`
+scenario proves the corpse is gated on the animation, and the existing `death` spec still covers the
+freeze→restart (its `'restarting'` log now lives inside `killPlayer`, so it exercises the new path).
+Tuning: `DEATH_ANIM_FRAMERATE` / `DEATH_HOLD_MS` in `config.ts`.

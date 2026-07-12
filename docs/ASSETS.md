@@ -142,10 +142,18 @@ not repeated here):
   GameScene picks chop vs mine from the harvested node's `tile` role (rock → mine, else chop).
 - **Enemy** (kid zombie data id, unchanged): Skeleton (Base) `Run/Run-Sheet.png` (64px, 6 frames)
   stands in for the sprite; single-orientation, frame 0 = idle, flips by movement-x only — mob
-  sheets in this pack ship no directional variants.
+  sheets in this pack ship no directional variants. Its `Death/Death-Sheet.png` (64px, 12 frames) is
+  now wired too — a one-shot collapse played on kill (`enemyDeathKey`), single-orientation like Run.
+  The pack ships **no skeleton attack strip**, so a zombie's bite is a coded lunge, not a sprite anim
+  (see docs/RENDERING.md / the combat-feedback STATUS entry).
 - **Player gather swing (added in plan 004):** a new `gather` `PlayerState` maps to the pack's
   `Collect_Base` strips (`Collect_{Down,Side,Up}-Sheet.png`, 8×64px) — foraging a berry bush plays
   this, distinct from the chop/mine swings above.
+- **Death collapse (both actors):** the player's `death` `PlayerState` maps to `Death_Base`
+  (`Death_{Down,Side,Up}-Sheet.png`, 8×64px, 3-way — `up` ships as `Death_Up`, not the `_Top` oddity
+  `Pierce` has), a one-shot collapse held on its last downed frame while the scene restarts; the
+  skeleton uses its single-orientation `Death-Sheet.png` (above). Both are one-shot (`repeat: 0`) at a
+  slower `DEATH_ANIM_FRAMERATE` so they read as a fall, not a twitch.
 
 **Berry bush + berries are placeholder art (plan 004), not Pixel Crawler frames:**
 `icons/berries.png` + `_derived/bush.png` are baked by `scripts/placeholder-art.mjs` (same

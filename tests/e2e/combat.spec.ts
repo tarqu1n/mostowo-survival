@@ -43,6 +43,48 @@ test('Punch connects with a tall enemy body, not only its feet tile', async ({ p
   expect((await state(page)).zombies).toBe(0);
 });
 
+test('a biting zombie plays an attack lunge and the player flashes on the hit', async ({ page }) => {
+  await startGame(page);
+  await applyScenario(page, oneZombie()); // player [10,10], zombie two tiles east
+
+  await step(page, 4000); // aggro → chase → adjacent → at least one bite lands
+  const s = await state(page);
+  // The skeleton has no attack strip, so the bite is a coded lunge — assert it fired, and that the
+  // landed bite triggered the player's red-flash hit reaction (dodge 0, so the bite always connects).
+  expect(s.zombieAttacks).toBeGreaterThan(0);
+  expect(s.playerHitFlashes).toBeGreaterThan(0);
+});
+
+test('punching a surviving zombie triggers its hit flash', async ({ page }) => {
+  await startGame(page);
+  // Adjacent zombie the player faces, Combat mode so Punch is live. kidZombie maxHp 3, flat-1 damage →
+  // one punch leaves it alive, so the hit flash (not a death/destroy) is what we should see.
+  await applyScenario(page, { player: [10, 10], zombies: [[11, 10]], facing: 'right', mode: 'combat' });
+
+  await emit(page, 'combat:punch');
+  await step(page, 50); // let the flash bookkeeping run a frame
+  const s = await state(page);
+  expect(s.zombies).toBe(1); // survived the single hit
+  expect(s.zombieHitFlashes).toBeGreaterThan(0);
+});
+
+test('a punched-dead zombie plays its death collapse before the corpse is removed', async ({ page }) => {
+  await startGame(page);
+  await applyScenario(page, { player: [10, 10], zombies: [[11, 10]], facing: 'right', mode: 'combat' });
+
+  for (let i = 0; i < 3; i++) await emit(page, 'combat:punch'); // kidZombie maxHp 3, flat-1 → dead on the 3rd
+
+  // Killed = out of the AI set immediately, but the sprite lingers as a corpse playing the one-shot
+  // Death strip — it isn't destroyed on the same frame it dies (that was the old instant `destroy()`).
+  const dead = await state(page);
+  expect(dead.zombies).toBe(0);
+  expect(dead.corpses).toBe(1);
+
+  // Past the collapse + hold beat (12f @ 12fps = 1s, +300ms hold), the corpse is removed.
+  await step(page, 1600);
+  expect((await state(page)).corpses).toBe(0);
+});
+
 test('the movepad drives the player directly, bypassing the pathfinder', async ({ page }) => {
   await startGame(page);
   await applyScenario(page, { player: [10, 10], mode: 'combat' });

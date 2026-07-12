@@ -77,9 +77,15 @@ A PostFX pipeline runs a fragment shader over a sprite *after* it's drawn, into 
 render-target. Attach it per-object; each attachment is its own instance, so per-object state (a
 flag, a phase) can differ between sprites sharing the pipeline.
 
-No live PostFX pipeline ships today — the queued-tree glow that first introduced one was rebaked (see
-above). If you add one for a genuinely per-frame effect, this is the pattern (and the retired
-`OutlinePipeline` in git history is a worked example):
+The live PostFX that ships today is the **hit flash** ([src/render/hitFlashPipeline.ts](../src/render/hitFlashPipeline.ts)):
+`HitFlashPipeline` mixes a sprite's colour toward red by a `flash` uniform an actor tweens 1→0 over
+~200ms when it takes damage. It's a genuine per-frame effect (the tint ramps down every frame) and a
+true per-pixel tint that a GameObject can't fake — Phaser's Canvas `setTint` is a *multiply*, so it
+can only darken, never brighten a mid-tone toward red. It's attached only while flashing and detached
+on completion (`GameScene.flashHit`), so it costs nothing at rest. The queued-tree glow that first
+introduced a pipeline was instead *rebaked* (it's a static silhouette — see above). To add another
+per-frame effect, this is the pattern (`hitFlashPipeline.ts` is the live worked example; the retired
+`OutlinePipeline` in git history is another):
 
 1. **Subclass** `Phaser.Renderer.WebGL.Pipelines.PostFXPipeline` with an inline GLSL `fragShader`.
    Add public instance fields for per-attachment state (e.g. `pulse`).

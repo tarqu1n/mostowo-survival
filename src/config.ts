@@ -112,6 +112,31 @@ export const UNARMED_BASE_DAMAGE = 1;
 export const CONTACT_DAMAGE_COOLDOWN_MS = 1000;
 
 /**
+ * Hit feedback (see render/hitFlashPipeline.ts + GameScene.flashHit). When an actor takes damage it
+ * flashes red and does a quick squash "flinch". `HIT_FLASH_MS` is how long the whole reaction lasts;
+ * `HIT_FLASH_PEAK` is the max red mix (0..1) at the moment of impact — kept below 1 so it reads as a
+ * flash *tint*, not a solid red silhouette. `HIT_FLASH_TINT` is the Canvas-fallback fill colour (no
+ * shader). The skeletons ship no attack strip, so a zombie's attack is a coded lunge toward its
+ * target: `ZOMBIE_LUNGE_PX` is the reach (world px) and `ZOMBIE_LUNGE_MS` the time for each leg of the
+ * out-and-back — kept well under the contact cooldown so a lunge always settles before the next bite.
+ */
+export const HIT_FLASH_MS = 200;
+export const HIT_FLASH_PEAK = 0.7;
+export const HIT_FLASH_TINT = 0xd21f1f;
+export const ZOMBIE_LUNGE_PX = 7;
+export const ZOMBIE_LUNGE_MS = 120;
+
+/**
+ * Death animation timing (see GameScene.killPlayer / killZombie). Both actors play a one-shot
+ * collapse strip on death: `DEATH_ANIM_FRAMERATE` is slower than an action swing so the collapse
+ * reads as a fall, not a twitch (player 8f ≈ 0.67s, skeleton 12f ≈ 1.0s). `DEATH_HOLD_MS` is the
+ * beat the downed last frame is held before the payoff — the player's scene restart, the zombie's
+ * corpse removal.
+ */
+export const DEATH_ANIM_FRAMERATE = 12;
+export const DEATH_HOLD_MS = 300;
+
+/**
  * Day/night cycle timing (see systems/daynight.ts). A full cycle is DAY_MS + NIGHT_MS of real time,
  * looping continuously. TWILIGHT_MS is the length of the dusk/dawn cross-fade at each boundary —
  * kept short relative to DAY_MS/NIGHT_MS so full day and full night both read as distinct plateaus.
