@@ -130,3 +130,18 @@ stationary contact phase, settling well inside the contact cooldown. All feedbac
 logic stays keyed to `col`/`row`. Tuning lives in `config.ts` (`HIT_FLASH_*`, `ZOMBIE_LUNGE_*`);
 `debugState` surfaces `playerFlash` + `{player,zombie}HitFlashes`/`zombieAttacks` counters, asserted by
 two new Tier-2 `combat` scenarios (the boot canary's real-WebGL run compiles the shader as a free check).
+
+## Death animations (both actors)
+
+Death now *plays* instead of blinking out. The player's `death` `PlayerState` (`Death_Base`, 3-way)
+and the skeleton's `Death-Sheet` (single-orientation) are wired as one-shot collapses at a slower
+`DEATH_ANIM_FRAMERATE`. A **killed zombie** leaves the AI set at once (so nothing chases/counts it) but
+its sprite lingers as a **corpse** playing the collapse, removed only after the anim + `DEATH_HOLD_MS`
+(`GameScene.killZombie`; the old path `destroy()`-ed on the same frame). **Player death** routes
+through `killPlayer`: a `playerDying` flag freezes the world (update() early-returns, further
+bites/starve ticks are swallowed) while the collapse plays, then the existing "Death = restart"
+`scene.restart()` fires on a `delayedCall`. Combat-FX/dying resets live in `resetCombatFx()` (shared by
+create() + the scenario reset). `debugState` adds `corpses` + `playerDying`; a new Tier-2 `combat`
+scenario proves the corpse is gated on the animation, and the existing `death` spec still covers the
+freeze→restart (its `'restarting'` log now lives inside `killPlayer`, so it exercises the new path).
+Tuning: `DEATH_ANIM_FRAMERATE` / `DEATH_HOLD_MS` in `config.ts`.

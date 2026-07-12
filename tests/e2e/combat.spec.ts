@@ -68,6 +68,23 @@ test('punching a surviving zombie triggers its hit flash', async ({ page }) => {
   expect(s.zombieHitFlashes).toBeGreaterThan(0);
 });
 
+test('a punched-dead zombie plays its death collapse before the corpse is removed', async ({ page }) => {
+  await startGame(page);
+  await applyScenario(page, { player: [10, 10], zombies: [[11, 10]], facing: 'right', mode: 'combat' });
+
+  for (let i = 0; i < 3; i++) await emit(page, 'combat:punch'); // kidZombie maxHp 3, flat-1 → dead on the 3rd
+
+  // Killed = out of the AI set immediately, but the sprite lingers as a corpse playing the one-shot
+  // Death strip — it isn't destroyed on the same frame it dies (that was the old instant `destroy()`).
+  const dead = await state(page);
+  expect(dead.zombies).toBe(0);
+  expect(dead.corpses).toBe(1);
+
+  // Past the collapse + hold beat (12f @ 12fps = 1s, +300ms hold), the corpse is removed.
+  await step(page, 1600);
+  expect((await state(page)).corpses).toBe(0);
+});
+
 test('the movepad drives the player directly, bypassing the pathfinder', async ({ page }) => {
   await startGame(page);
   await applyScenario(page, { player: [10, 10], mode: 'combat' });

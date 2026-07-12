@@ -24,6 +24,8 @@ import {
   HIT_FLASH_TINT,
   ZOMBIE_LUNGE_PX,
   ZOMBIE_LUNGE_MS,
+  DEATH_ANIM_FRAMERATE,
+  DEATH_HOLD_MS,
   INVENTORY_SLOTS,
   DEFAULT_MAX_STACK,
   PLAYER_HURTBOX,
@@ -55,6 +57,7 @@ import {
   resolveTile,
   playerAnimKey,
   enemyWalkKey,
+  enemyDeathKey,
   pickWeighted,
   type Facing,
   type PlayerState,
@@ -233,12 +236,18 @@ export class GameScene extends Phaser.Scene {
   private readonly hitFlashTweens = new Map<Phaser.GameObjects.Sprite, Phaser.Tweens.Tween>();
   private readonly lungeTweens = new Map<Phaser.GameObjects.Sprite, Phaser.Tweens.Tween>();
   private readonly hitFlashOn = new Set<Phaser.GameObjects.Sprite>();
+  // Zombie sprites out of the AI set but lingering to play their one-shot death collapse before the
+  // corpse is removed. Tracked so debugState can report them (proves removal waits for the animation).
+  private readonly corpses = new Set<Phaser.GameObjects.Sprite>();
   // Live player flash intensity (0..1) + cumulative FX counters, surfaced via debugState so Tier-2
   // scenarios can assert hit/attack feedback fired without inspecting the (shader-driven) sprite.
   private playerFlash = 0;
   private playerHitFlashes = 0;
   private zombieHitFlashes = 0;
   private zombieAttacks = 0;
+  // True from the moment the player's HP hits 0 until the death-anim beat ends and the scene restarts.
+  // Freezes the world (see update()) and swallows further damage so a crowd can't re-trigger death.
+  private playerDying = false;
 
   // Day/night clock: `clockMs` auto-advances every frame (see update()); `dayPhase`/`dayCount` are the
   // derived, queryable state (also mirrored to the registry + emitted as 'time:changed'). The
@@ -307,6 +316,10 @@ export class GameScene extends Phaser.Scene {
     this.chopElapsed = 0;
     this.harvestSwing = null;
     this.punchLockUntil = 0;
+    // Combat-FX state — clear so a death-restart starts clean: the maps/set held tweens+sprites from
+    // the dead run (Phaser destroyed them on teardown, so drop the stale references), and `playerDying`
+    // must reset or the fresh player would stay frozen from the previous death (see killPlayer/update).
+    this.resetCombatFx();
     this.buildMode = false;
     this.queueMarkers = [];
     this.outlinedTreeIds.clear();
@@ -357,27 +370,36 @@ export class GameScene extends Phaser.Scene {
     // idle/walk loop (velocity-driven locomotion); chop/mine/gather loop while harvesting in place;
     // punch is a one-shot swing. Chop/mine/punch run faster (ACTION_ANIM_FRAMERATE) so a hit lands per
     // swing; gather is a calmer forage loop at the locomotion rate.
-    (['idle', 'walk', 'chop', 'mine', 'gather', 'punch'] as PlayerState[]).forEach((state) => {
+    (['idle', 'walk', 'chop', 'mine', 'gather', 'punch', 'death'] as PlayerState[]).forEach((state) => {
       const isAction = state === 'chop' || state === 'mine' || state === 'punch';
+      const oneShot = state === 'punch' || state === 'death'; // play once and hold the last frame
       (['down', 'side', 'up'] as Facing[]).forEach((facing) => {
         const key = playerAnimKey(state, facing);
         if (this.anims.exists(key)) return;
         this.anims.create({
           key,
           frames: this.anims.generateFrameNumbers(key, { start: 0, end: playerActor[state][facing].frames - 1 }),
-          frameRate: isAction ? ACTION_ANIM_FRAMERATE : 10,
-          repeat: state === 'punch' ? 0 : -1,
+          frameRate: state === 'death' ? DEATH_ANIM_FRAMERATE : isAction ? ACTION_ANIM_FRAMERATE : 10,
+          repeat: oneShot ? 0 : -1,
         });
       });
     });
-    // Enemy (skeleton): a single Run strip; frame 0 doubles as the idle pose, and GameScene flips it
-    // by movement-x (the mob sheets ship no directional variants). Its damaged anim is dropped.
+    // Enemy (skeleton): a single Run strip (frame 0 doubles as the idle pose, flipped by movement-x —
+    // the mob sheets ship no directional variants) plus a one-shot Death collapse played on kill.
     if (!this.anims.exists(enemyWalkKey)) {
       this.anims.create({
         key: enemyWalkKey,
         frames: this.anims.generateFrameNumbers(enemyWalkKey, { start: 0, end: enemyActor.walk.frames - 1 }),
         frameRate: 10,
         repeat: -1,
+      });
+    }
+    if (!this.anims.exists(enemyDeathKey)) {
+      this.anims.create({
+        key: enemyDeathKey,
+        frames: this.anims.generateFrameNumbers(enemyDeathKey, { start: 0, end: enemyActor.death.frames - 1 }),
+        frameRate: DEATH_ANIM_FRAMERATE,
+        repeat: 0,
       });
     }
     const p = this.add.sprite(MAP_WIDTH / 2, MAP_HEIGHT / 2, playerAnimKey('idle', 'down'));
@@ -491,6 +513,14 @@ export class GameScene extends Phaser.Scene {
   override update(_time: number, delta: number): void {
     this.harvestSwing = null; // re-set by runHarvest only while actually harvesting in place
     this.syncGlowTransforms(); // keep queued-tree halos locked to their (possibly animating) trees
+
+    // Player is collapsing: freeze the world on the death anim (which advances on its own via Phaser's
+    // anim system) until the scheduled scene.restart() fires. No clock/hunger tick, no input, no AI —
+    // a clean death beat. The sprite's velocity is pinned to 0 so nothing drifts under the animation.
+    if (this.playerDying) {
+      this.player.body.setVelocity(0, 0);
+      return;
+    }
 
     // Survival tick — advance the day/night clock EVERY frame, above the no-action early-return below,
     // so time passes whether or not a worker task is active. Drives the night-tint alpha; on a
@@ -608,6 +638,7 @@ export class GameScene extends Phaser.Scene {
    * mirrored with flipX; down/up clear flipX.
    */
   private updatePlayerAnim(): void {
+    if (this.playerDying) return; // death collapse owns the sprite until the restart
     if (this.time.now < this.punchLockUntil) return; // punch swing in progress — don't stomp it
     const facing = this.facingDir();
     const state: PlayerState = this.harvestSwing ?? (this.player.body.velocity.lengthSq() > 1 ? 'walk' : 'idle');
@@ -1044,12 +1075,10 @@ export class GameScene extends Phaser.Scene {
    * "Death = restart" — no in-place heal, since that let an adjacent zombie immediately re-hit a
    * "reset" player). */
   private damagePlayer(amount: number): void {
+    if (this.playerDying) return; // already collapsing — ignore further bites/starve ticks until restart
     this.playerHp = Math.max(0, this.playerHp - amount);
     this.game.events.emit('player:hpChanged', { hp: this.playerHp, maxHp: this.playerStats.maxHp });
-    if (this.playerHp <= 0) {
-      console.log('player down — restarting');
-      this.scene.restart();
-    }
+    if (this.playerHp <= 0) this.killPlayer();
   }
 
   /**
@@ -1094,10 +1123,7 @@ export class GameScene extends Phaser.Scene {
     const dmg = resolveMeleeAttack(this.playerStats, zombie.def, UNARMED_BASE_DAMAGE, this.rng);
     zombie.hp -= dmg;
     if (zombie.hp <= 0) {
-      zombie.alive = false;
-      this.cleanupActorFx(zombie.sprite); // stop any in-flight flash/lunge before the sprite goes away
-      zombie.sprite.destroy();
-      this.zombies = this.zombies.filter((z) => z !== zombie);
+      this.killZombie(zombie); // play the death collapse, then remove the corpse
     } else if (dmg > 0) {
       this.flashHit(zombie.sprite); // red flash + flinch on a hit it survived
     }
@@ -1211,6 +1237,66 @@ export class GameScene extends Phaser.Scene {
     this.lungeTweens.get(sprite)?.stop();
     this.lungeTweens.delete(sprite);
     this.hitFlashOn.delete(sprite);
+  }
+
+  /** Reset all combat-FX bookkeeping to its boot state — called from create() (death-restart) and the
+   * scenario reset. The maps/set may hold tweens+sprites from a torn-down run, so drop them wholesale. */
+  private resetCombatFx(): void {
+    this.hitFlashTweens.clear();
+    this.lungeTweens.clear();
+    this.hitFlashOn.clear();
+    this.corpses.clear(); // scene teardown destroys the sprites; drop stale references
+    this.playerFlash = 0;
+    this.playerHitFlashes = 0;
+    this.zombieHitFlashes = 0;
+    this.zombieAttacks = 0;
+    this.playerDying = false;
+  }
+
+  /**
+   * Kill a zombie: pull it out of the AI/debugState set immediately (so nothing chases or counts it),
+   * then let its sprite linger just long enough to play the one-shot Death collapse before removing
+   * the corpse. The body is disabled so a corpse isn't a physics obstacle mid-animation, and any
+   * in-flight flash/lunge is stopped first (those tweens poke the sprite, which is about to go away).
+   */
+  private killZombie(z: ZombieUnit): void {
+    z.alive = false;
+    this.zombies = this.zombies.filter((x) => x !== z);
+    this.cleanupActorFx(z.sprite);
+    const sprite = z.sprite;
+    sprite.body.setVelocity(0, 0);
+    sprite.body.enable = false;
+    sprite.setScale((sprite.getData('baseScale') as number | undefined) ?? 1); // undo any squash mid-flash
+    sprite.anims.play(enemyDeathKey); // keeps its current flipX — collapses facing the way it ran
+    this.corpses.add(sprite);
+    const dur = this.anims.get(enemyDeathKey)?.duration ?? 600;
+    this.time.delayedCall(dur + DEATH_HOLD_MS, () => {
+      this.corpses.delete(sprite);
+      sprite.destroy();
+    });
+  }
+
+  /**
+   * Player death: freeze the world on a one-shot Death collapse, then restart the scene (the existing
+   * "Death = restart" reset — see damagePlayer). Guarded by `playerDying` so a crowd of zombies can't
+   * re-enter this each frame. We cancel any active order, stop movement, and clear an in-flight
+   * hit-flash so the corpse isn't left mid-squash; update() then holds everything still until the
+   * scheduled restart fires (the delayedCall runs on the scene clock, which the test harness drives).
+   */
+  private killPlayer(): void {
+    this.playerDying = true;
+    console.log('player down — restarting'); // the death→restart signal the death spec asserts
+    this.cancelAll();
+    this.player.body.setVelocity(0, 0);
+    this.punchLockUntil = 0;
+    this.cleanupActorFx(this.player);
+    const facing = this.facingDir();
+    this.player.setScale((this.player.getData('baseScale') as number | undefined) ?? 1);
+    this.player.setFlipX(facing === 'side' && this.lastFacing.dCol < 0);
+    const key = playerAnimKey('death', facing);
+    this.player.anims.play(key);
+    const dur = this.anims.get(key)?.duration ?? 600;
+    this.time.delayedCall(dur + DEATH_HOLD_MS, () => this.scene.restart());
   }
 
   /** Switch input mode (mutually exclusive) and notify UIScene to update its HUD accordingly. */
@@ -1658,6 +1744,7 @@ export class GameScene extends Phaser.Scene {
     this.chopElapsed = 0;
     this.harvestSwing = null;
     this.punchLockUntil = 0;
+    this.resetCombatFx(); // start each scenario with clean FX counters/flags (see create())
     this.buildMode = false;
     this.queueMarkers = [];
     this.outlinedTreeIds.clear();
@@ -1786,7 +1873,9 @@ export class GameScene extends Phaser.Scene {
     pcol: number;
     prow: number;
     zombies: number;
+    corpses: number;
     playerHp: number;
+    playerDying: boolean;
     playerFlash: number;
     playerHitFlashes: number;
     zombieHitFlashes: number;
@@ -1812,7 +1901,9 @@ export class GameScene extends Phaser.Scene {
       pcol: t.col,
       prow: t.row,
       zombies: this.zombies.filter((z) => z.alive).length,
+      corpses: this.corpses.size,
       playerHp: this.playerHp,
+      playerDying: this.playerDying,
       playerFlash: this.playerFlash,
       playerHitFlashes: this.playerHitFlashes,
       zombieHitFlashes: this.zombieHitFlashes,

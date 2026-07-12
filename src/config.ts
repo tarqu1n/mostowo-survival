@@ -127,6 +127,16 @@ export const ZOMBIE_LUNGE_PX = 7;
 export const ZOMBIE_LUNGE_MS = 120;
 
 /**
+ * Death animation timing (see GameScene.killPlayer / killZombie). Both actors play a one-shot
+ * collapse strip on death: `DEATH_ANIM_FRAMERATE` is slower than an action swing so the collapse
+ * reads as a fall, not a twitch (player 8f ≈ 0.67s, skeleton 12f ≈ 1.0s). `DEATH_HOLD_MS` is the
+ * beat the downed last frame is held before the payoff — the player's scene restart, the zombie's
+ * corpse removal.
+ */
+export const DEATH_ANIM_FRAMERATE = 12;
+export const DEATH_HOLD_MS = 300;
+
+/**
  * Day/night cycle timing (see systems/daynight.ts). A full cycle is DAY_MS + NIGHT_MS of real time,
  * looping continuously. TWILIGHT_MS is the length of the dusk/dawn cross-fade at each boundary —
  * kept short relative to DAY_MS/NIGHT_MS so full day and full night both read as distinct plateaus.

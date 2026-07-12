@@ -6,6 +6,7 @@ import {
   tileImageKey,
   playerAnimKey,
   enemyWalkKey,
+  enemyDeathKey,
   iconKey,
   type TileSource,
   type StripAnim,
@@ -84,11 +85,12 @@ export class PreloadScene extends Phaser.Scene {
       this.load.spritesheet(key, url(strip.path), { frameWidth: strip.frameSize, frameHeight: strip.frameSize });
     };
     const { player, enemy } = manifest.actors;
-    const playerStates: PlayerState[] = ['idle', 'walk', 'chop', 'mine', 'gather', 'punch'];
+    const playerStates: PlayerState[] = ['idle', 'walk', 'chop', 'mine', 'gather', 'punch', 'death'];
     (['down', 'side', 'up'] as Facing[]).forEach((facing) => {
       for (const state of playerStates) loadStrip(playerAnimKey(state, facing), player[state][facing]);
     });
     loadStrip(enemyWalkKey, enemy.walk);
+    loadStrip(enemyDeathKey, enemy.death);
 
     // Item icons: one standalone 32×32 image per ITEMS entry, keyed `icon:<id>`. Placeholder art this
     // slice (plan 008) — the repeatable generated set lands in plan 009. The UI falls back to the
