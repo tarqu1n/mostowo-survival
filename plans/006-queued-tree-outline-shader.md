@@ -1,6 +1,7 @@
 # Queued-Tree Outline Shader (Custom PostFX Pipeline)
 
-> Status: planned — run /execute-plan to begin.
+> Status: done — executed 2026-07-12. All steps landed; `npm run typecheck` + `npm run smoke` pass,
+> outline verified by eye at 200% zoom (crisp silhouette, head-of-queue pulses).
 
 ## Summary
 Replace the tile-sized stroked-rectangle marker used to flag queued harvest targets with a
@@ -64,7 +65,7 @@ and the decision is recorded plus a standing "when to reach for a shader" heuris
 
 ## Steps
 
-- [ ] **Step 1: Create the reusable outline PostFX pipeline** `[delegate sonnet]`
+- [x] **Step 1: Create the reusable outline PostFX pipeline** `[delegate sonnet]`
   - New file `src/render/OutlinePipeline.ts` (create `src/render/`). Export:
     - `OUTLINE_PIPELINE_KEY = 'OutlineFX'` (string const).
     - `class OutlinePipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPipeline` with an inline
@@ -114,7 +115,7 @@ and the decision is recorded plus a standing "when to reach for a shader" heuris
   - Done when: `npm run typecheck` passes; `OutlinePipeline` + `registerOutlinePipeline` +
     `OUTLINE_PIPELINE_KEY` are exported and compile under `strict`.
 
-- [ ] **Step 2: Register the pipeline once at boot (WebGL-guarded)** `[delegate sonnet]`
+- [x] **Step 2: Register the pipeline once at boot (WebGL-guarded)** `[delegate sonnet]`
   - In `BootScene.create()` ([BootScene.ts:12-16](src/scenes/BootScene.ts#L12-L16)), call
     `registerOutlinePipeline(this.game)` **before** `this.scene.start('Preload')`. Add the import.
   - The helper already no-ops on Canvas and guards double-registration, so this is safe across the
@@ -124,7 +125,7 @@ and the decision is recorded plus a standing "when to reach for a shader" heuris
   - Done when: `npm run typecheck` passes; app boots (`npm run dev`) with no console error; in the
     browser console `window.game.renderer.pipelines.has('OutlineFX')` is `true` on WebGL.
 
-- [ ] **Step 3: Rewire `refreshQueueHighlights()` to attach/detach the outline** `[inline]`
+- [x] **Step 3: Rewire `refreshQueueHighlights()` to attach/detach the outline** `[inline]`
   - In [GameScene.ts:536-563](src/scenes/GameScene.ts#L536-L563), replace the **harvest** branch so
     that instead of pushing a stroked rect it attaches the pipeline to the tree sprite:
     - Add a field `private outlinedTreeIds = new Set<string>()` (near `queueMarkers`,
@@ -155,7 +156,7 @@ and the decision is recorded plus a standing "when to reach for a shader" heuris
     box), the head-of-queue tree pulses, others are static, and dequeuing/cancelling removes it cleanly;
     switching modes / felling a queued tree leaves no orphaned outline.
 
-- [ ] **Step 4: Update the headless smoke test for the new highlight** `[delegate sonnet]` (parallel: A)
+- [x] **Step 4: Update the headless smoke test for the new highlight** `[delegate sonnet]` (parallel: A)
   - `scripts/smoke.mjs` asserts the old marker at `:190-194` and gates on zero console errors at
     `:409`. Update the highlight assertion to verify the **pipeline path** instead of the stroked rect.
   - Preferred (least brittle): add a tiny debug accessor to `GameScene` — extend the existing
@@ -171,7 +172,7 @@ and the decision is recorded plus a standing "when to reach for a shader" heuris
   - Done when: `npm run smoke` passes end-to-end (implies the shader compiled with no console errors and
     the outline is applied to a queued tree).
 
-- [ ] **Step 5: Document the decision + reusable shader heuristic** `[delegate sonnet]` (parallel: A)
+- [x] **Step 5: Document the decision + reusable shader heuristic** `[delegate sonnet]` (parallel: A)
   - `docs/DECISIONS.md`: add a dated entry (2026-07-12) — "Queued-tree highlight via custom PostFX
     outline pipeline". Record: what changed (rect marker → silhouette outline), why (crisp, hugs the
     sprite, reusable), the **AUTO/Canvas graceful-degradation** guard, the **pulse = head-of-queue**
@@ -190,7 +191,7 @@ and the decision is recorded plus a standing "when to reach for a shader" heuris
   - Docs: this *is* the docs step.
   - Done when: `docs/RENDERING.md` exists and is linked from `CLAUDE.md`; `DECISIONS.md` has the entry.
 
-- [ ] **Step 6: Tune crispness + verify across zoom, then final smoke** `[inline]`
+- [x] **Step 6: Tune crispness + verify across zoom, then final smoke** `[inline]`
   - Run `npm run dev`, queue several trees. Tune `uThickness` (and, if needed, switch the shader
     between 4-way and 8-way sampling) so the outline reads as a **crisp ~1–2 source-px border** with no
     sub-pixel shimmer at **100 % / 150 % / 200 %** zoom (`DEFAULT_ZOOM=2`; step through with the zoom

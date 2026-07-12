@@ -28,6 +28,7 @@ import { worldToTile, tileToWorldCenter, snapToTileCenter, tileKey } from '../sy
 import { findPath, reachableAdjacent, type Cell } from '../systems/pathfind';
 import { TaskQueue, type Action } from '../systems/tasks';
 import { resolveMeleeAttack } from '../systems/combat';
+import { OUTLINE_PIPELINE_KEY, type OutlinePipeline } from '../render/OutlinePipeline';
 import { treeStats, wallStats, zombieStats } from '../systems/stats';
 import type { UIScene } from './UIScene';
 import {
@@ -156,6 +157,7 @@ export class GameScene extends Phaser.Scene {
   private queuePainting = false; // once a hold crosses LONGPRESS_MS, dragging paints queue orders
   private paintedThisGesture = new Set<string>(); // tile keys already queued in the current gesture
   private queueMarkers: Phaser.GameObjects.Rectangle[] = []; // yellow pips over queued move tiles
+  private outlinedTreeIds = new Set<string>(); // trees currently wearing the OutlineFX PostFX (WebGL)
   private pinching = false; // a second pointer went down — the gesture is a pinch-zoom, not a tap
   private pinchDist = 0; // previous frame's inter-pointer distance, for the zoom delta ratio
   private isPanning = false; // this gesture dragged the camera rather than issuing an order
@@ -192,6 +194,7 @@ export class GameScene extends Phaser.Scene {
     this.punchLockUntil = 0;
     this.buildMode = false;
     this.queueMarkers = [];
+    this.outlinedTreeIds.clear();
     this.paintedThisGesture.clear();
     this.lastFacing = { dCol: 0, dRow: 1 };
     this.mode = 'command';
@@ -534,22 +537,37 @@ export class GameScene extends Phaser.Scene {
 
   /** Outline every queued target in yellow (trees to harvest, sites to build) + pip queued move tiles. */
   private refreshQueueHighlights(): void {
+    const webgl = this.game.renderer.type === Phaser.WEBGL;
     for (const s of this.sites) s.rect.isStroked = false;
     for (const m of this.queueMarkers) m.destroy();
     this.queueMarkers = [];
+    // Detach the outline PostFX from every tree that had it; we re-attach below for the live queue.
+    for (const id of this.outlinedTreeIds) this.treeById(id)?.sprite.removePostPipeline(OUTLINE_PIPELINE_KEY);
+    this.outlinedTreeIds.clear();
+
+    // The head-of-queue harvest (first alive tree in queue order) pulses; the rest are static.
+    const headId = this.headHarvestTreeId();
 
     for (const a of this.queue.all()) {
       if (a.kind === 'harvest') {
         const tree = this.treeById(a.treeId);
-        // Trees are sprites now (not Rectangles, see docs/ASSETS.md) — can't be stroked directly,
-        // so outline with a stroke-only marker rect over the tile instead.
         if (tree?.alive) {
-          this.queueMarkers.push(
-            this.add
-              .rectangle(tree.sprite.x, tree.sprite.y, TILE_SIZE, TILE_SIZE, 0, 0)
-              .setStrokeStyle(2, COLORS.queued, 1)
-              .setDepth(4),
-          );
+          if (webgl) {
+            // Crisp silhouette outline that hugs the sprite (see src/render/OutlinePipeline.ts).
+            tree.sprite.setPostPipeline(OUTLINE_PIPELINE_KEY);
+            const fx = tree.sprite.getPostPipeline(OUTLINE_PIPELINE_KEY) as OutlinePipeline | OutlinePipeline[];
+            const pipeline = Array.isArray(fx) ? fx[0] : fx;
+            if (pipeline) pipeline.pulse = tree.id === headId;
+            this.outlinedTreeIds.add(tree.id);
+          } else {
+            // Canvas fallback (no WebGL pipelines): keep the stroke-only marker rect over the tile.
+            this.queueMarkers.push(
+              this.add
+                .rectangle(tree.sprite.x, tree.sprite.y, TILE_SIZE, TILE_SIZE, 0, 0)
+                .setStrokeStyle(2, COLORS.queued, 1)
+                .setDepth(4),
+            );
+          }
         }
       } else if (a.kind === 'build') {
         const site = this.siteById(a.siteId);
@@ -560,6 +578,14 @@ export class GameScene extends Phaser.Scene {
         );
       }
     }
+  }
+
+  /** The tree the worker will chop next: first `harvest` in queue order whose tree is still alive. */
+  private headHarvestTreeId(): string | null {
+    for (const a of this.queue.all()) {
+      if (a.kind === 'harvest' && this.treeById(a.treeId)?.alive) return a.treeId;
+    }
+    return null;
   }
 
   // --- Harvest / build executors ------------------------------------------
@@ -1067,6 +1093,8 @@ export class GameScene extends Phaser.Scene {
     zombies: number;
     playerHp: number;
     mode: 'command' | 'combat' | 'inspect';
+    outlinedTreeIds: string[];
+    pulsingTreeId: string | null;
   } {
     const t = this.playerTile();
     return {
@@ -1081,6 +1109,8 @@ export class GameScene extends Phaser.Scene {
       zombies: this.zombies.filter((z) => z.alive).length,
       playerHp: this.playerHp,
       mode: this.mode,
+      outlinedTreeIds: [...this.outlinedTreeIds],
+      pulsingTreeId: this.headHarvestTreeId(),
     };
   }
 

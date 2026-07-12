@@ -7,6 +7,22 @@ Format: `YYYY-MM-DD — [DECIDED|PROPOSED|OPEN] Title` then a short rationale.
 
 ---
 
+## 2026-07-12 — [DECIDED] Queued-tree highlight via a custom WebGL PostFX outline pipeline (plan 006)
+
+Replaced the tile-sized stroked-rectangle marker on queued harvest targets with a **crisp silhouette
+outline** drawn by a custom WebGL PostFX pipeline (`src/render/OutlinePipeline.ts`, key `OutlineFX`).
+Why a shader, not a GameObject: an alpha-edge outline *hugs the sprite's actual shape* (a box can't),
+stays crisp under the fractional zoom (authored in render-target texels, `uThickness = 1.5`, verified
+by eye at 200%), and the pipeline is **reusable by any Image/Sprite** — enemies/companions can opt in
+later without new marker plumbing. The **head-of-queue** tree (first alive `harvest` in queue order)
+**pulses**; the rest hold a static outline — the pulse *is* the "this one's next" signal. Registered
+once in `BootScene` (registry outlives GameScene death-restarts). **Graceful degradation:** it's
+WebGL-only, so `registerOutlinePipeline` no-ops on Canvas and `refreshQueueHighlights` keeps the old
+stroke-rect marker for that path. **Smoke coupling:** trees are outlined via the pipeline now, so the
+smoke asserts through `debugState().outlinedTreeIds`/`pulsingTreeId` instead of the marker rect, and
+its zero-console-error gate doubles as the shader-compile check. Pattern + a "when to reach for a
+shader" heuristic live in `docs/RENDERING.md`.
+
 ## 2026-07-12 — [DECIDED] Toward isolated test setups, not one live-game end-to-end smoke
 
 The headless smoke drives the whole running game start-to-finish. That's already fragile and won't

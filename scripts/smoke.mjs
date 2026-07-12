@@ -23,7 +23,11 @@ const fail = (m) => {
 };
 const ok = (m) => console.log('ok:', m);
 
-const browser = await chromium.launch();
+// Honour a pre-installed browser (e.g. CI / cloud dev boxes that pin a different Playwright build):
+// set SMOKE_CHROMIUM_PATH to a chromium executable. Unset → Playwright's own managed download.
+const browser = await chromium.launch(
+  process.env.SMOKE_CHROMIUM_PATH ? { executablePath: process.env.SMOKE_CHROMIUM_PATH } : undefined,
+);
 const page = await browser.newPage({ viewport: { width: 480, height: 800 } });
 const errors = [];
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
@@ -185,13 +189,12 @@ else fail(`queue did not fill via long-press (pending ${q.pending}, current ${q.
 await tapWorld(...center(2, 6)); // act-now move busies the worker so queued items don't drain (row 2 would land under the plan-003 mode-toggle HUD buttons)
 await longPressWorld(...center(8, 20)); // append a harvest of a still-live tree (5,8 was felled above)
 await page.waitForTimeout(120);
-// Trees are sprites (not Rectangles, see docs/ASSETS.md) — queued harvest is outlined via a
-// stroke-only marker rect over the tile rather than a stroke on the tree itself.
-const outlined = await page.evaluate(() =>
-  window.game.scene.getScene('Game').queueMarkers.some((m) => m.isStroked && m.strokeColor === 0xffd500),
-);
-if (outlined) ok('queued harvest target is outlined yellow');
-else fail('queued harvest target was not outlined yellow');
+// Queued harvest targets wear a WebGL PostFX silhouette outline (src/render/OutlinePipeline.ts);
+// the head-of-queue tree pulses. Under headless WebGL, assert via the debug accessor rather than
+// the old marker rect. (The zero-console-error gate below doubles as the shader-compile check.)
+const q2 = await dbg();
+if (q2.outlinedTreeIds.length >= 1 && q2.pulsingTreeId) ok('queued harvest target is outlined (pulsing head)');
+else fail(`queued harvest target not outlined (outlined ${q2.outlinedTreeIds.length}, head ${q2.pulsingTreeId})`);
 
 const pBefore = (await dbg()).pending;
 await paintDrag([[2, 32], [3, 32], [4, 32], [5, 32], [6, 32]]);
