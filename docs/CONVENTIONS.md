@@ -22,8 +22,11 @@ _To be firmed up as we go. Starting position:_
   outlive a scene, so listeners double-register on restart otherwise.
 - **Worker task system** (plan 002): units move via A* (`src/systems/pathfind.ts` — `findPath` returns
   `[]`=already-there / `null`=unreachable / a tile list; `reachableAdjacent` finds a stand-tile next to
-  a target). Orders are a `TaskQueue` of `Action`s (`src/systems/tasks.ts`); **tap = act-now (replace),
-  long-press ≥`LONGPRESS_MS` = append**, resolved on `pointerup` with a drag reject. Building is a timed
+  a target). Orders are a `TaskQueue` of `Action`s (`src/systems/tasks.ts`); **tap a tree = queue a chop
+  (append; starts at once if idle, so tapping tree after tree batches a chop list), tap the ground =
+  move-now (replace), long-press ≥`LONGPRESS_MS` = append either**, resolved on `pointerup` with a drag
+  reject. Tapping an already-queued tree **toggles** it: first tap un-queues it (if it's the live chop,
+  the worker advances to the next order); tap again to re-queue it at the **end** of the list. Building is a timed
   on-site job: place a passable *blueprint* (wood reserved on placement), worker paths to a reachable
   adjacent tile and works `BUILD_MS`, then it becomes a blocking wall. `hudHitTest` is visibility-aware
   so hidden buttons don't swallow world taps. Pathing obstacles = completed walls + live trees.
