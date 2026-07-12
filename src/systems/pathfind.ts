@@ -154,7 +154,7 @@ function reconstruct(cameFrom: Map<number, number>, goalKey: number, dims: Dims)
  * (`[]` counts as reachable: `from` already *is* that neighbour.)
  *
  * Pass a restricted `offsets` set to constrain *which* sides count — e.g. a tall tree that overhangs
- * upward wants the worker at its base, not on a canopy tile above it (see GameScene BASE_STAND_OFFSETS).
+ * upward wants the worker at its base, not on a canopy tile above it (see NODES.tree.standOffsets).
  */
 export function reachableAdjacent(
   from: Cell,

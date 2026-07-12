@@ -37,9 +37,9 @@ describe('NODES', () => {
     }
   });
 
-  it('every woodItemId references a real item', () => {
+  it('every yieldItemId references a real item', () => {
     for (const node of Object.values(NODES)) {
-      expect(ITEMS[node.woodItemId]).toBeDefined();
+      expect(ITEMS[node.yieldItemId]).toBeDefined();
     }
   });
 
@@ -50,15 +50,19 @@ describe('NODES', () => {
     }
   });
 
-  it('woodPerHit and regrowMs are positive', () => {
+  it('yieldPerHit, regrowMs and tilesTall are positive', () => {
     for (const node of Object.values(NODES)) {
-      expect(node.woodPerHit).toBeGreaterThan(0);
+      expect(node.yieldPerHit).toBeGreaterThan(0);
       expect(node.regrowMs).toBeGreaterThan(0);
+      expect(node.tilesTall).toBeGreaterThan(0);
     }
   });
 
-  it("tree.id === 'tree'", () => {
+  it("tree.id === 'tree' and yields wood; rock.id === 'rock' and yields stone", () => {
     expect(NODES.tree.id).toBe('tree');
+    expect(NODES.tree.yieldItemId).toBe('wood');
+    expect(NODES.rock.id).toBe('rock');
+    expect(NODES.rock.yieldItemId).toBe('stone');
   });
 });
 

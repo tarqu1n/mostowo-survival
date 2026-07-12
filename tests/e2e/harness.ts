@@ -106,6 +106,11 @@ export function wood(page: Page): Promise<number> {
   return page.evaluate(() => (window as any).game.scene.getScene('Game').registry.get('inventory').get('wood'));
 }
 
+/** Current amount of item `id` held (reads the shared Inventory in the registry). */
+export function held(page: Page, id: string): Promise<number> {
+  return page.evaluate((i) => (window as any).game.scene.getScene('Game').registry.get('inventory').get(i), id);
+}
+
 /** Map a world tile (col,row) to a client (screen) pixel through the live camera zoom/scroll, for
  * real-pointer gesture specs. Mirrors scripts/smoke.mjs's worldToClient (camera worldView + the
  * Scale.FIT canvas scale from BASE_WIDTH 360). */

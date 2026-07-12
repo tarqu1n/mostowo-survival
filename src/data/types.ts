@@ -34,15 +34,35 @@ export interface ObjectStats extends BaseStats {
   activationRange?: number; // proximity trigger (traps etc.), unused this slice
 }
 
-/** A harvestable world node (e.g. a tree). Yields an item per hit until depleted, then regrows. */
+/**
+ * A harvestable world node (e.g. a tree, a rock). Yields an item per hit until depleted, then
+ * regrows. The yield/render fields are generic over species so a rock is just another node def, not
+ * a parallel system: `tile` selects the sprite role, and `tilesTall`/`originX`/`originY` size and
+ * anchor it (a pine overhangs upward at ~2.6 tiles; a rock is ~1 tile, base-anchored) so no species
+ * inherits another's footprint. See docs/CONVENTIONS.md (data-driven content).
+ */
 export interface ResourceNodeDef extends ObjectStats {
   id: string;
   name: string;
-  woodItemId: string;
-  woodPerHit: number;
+  /** Item id produced per hit. */
+  yieldItemId: string;
+  /** Units of `yieldItemId` produced per hit. */
+  yieldPerHit: number;
   regrowMs: number;
   color: number;
   stumpColor: number;
+  /** Tileset sprite role this node renders as (`ACTIVE_TILESET.tiles[tile]`). */
+  tile: 'tree' | 'rock';
+  /** Height (in tiles) the sprite is scaled to stand. */
+  tilesTall: number;
+  /** Sprite anchor — trees anchor near their base so the canopy overhangs up; a rock sits centred. */
+  originX: number;
+  originY: number;
+  /**
+   * Neighbour offsets the worker may stand on to harvest this node. Omit for all-adjacent (a ~1-tile
+   * rock); a tall tree restricts to its base so the worker never stands inside the overhanging canopy.
+   */
+  standOffsets?: ReadonlyArray<readonly [number, number]>;
 }
 
 /** A placeable structure. `cost` maps item id → quantity consumed on build. */

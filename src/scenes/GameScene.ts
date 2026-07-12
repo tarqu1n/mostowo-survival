@@ -42,27 +42,9 @@ import {
   type ActorRender,
 } from '../data/tileset';
 
-/** Height (in tiles) the tree image is scaled to stand — big pine on a 16px tile, canopy overhangs up. */
-const TREE_TILES_TALL = 2.6;
-
-/** Queued-tree glow reach on screen (px). Converted to source texels per species so the baked halo
+/** Queued-node glow reach on screen (px). Converted to source texels per species so the baked halo
  *  reads the same regardless of a sprite's source resolution — see refreshQueueHighlights. */
 const GLOW_SCREEN_PX = 5;
-
-/**
- * Neighbour offsets the worker may stand on to chop a tree: the trunk row (sides) and the row below,
- * but NOT the three tiles directly above (dr === -1). A pine overhangs ~2 tiles upward yet only
- * blocks its trunk tile, so an "above" stand tile sits inside the canopy and — with the player drawn
- * on top — reads as chopping halfway up the tree. Restricting to the base keeps the worker rooted at
- * the trunk. Falls back to any adjacent tile if the base is walled off (see beginCurrent).
- */
-const TREE_BASE_STAND_OFFSETS: ReadonlyArray<readonly [number, number]> = [
-  [1, 0],
-  [-1, 0],
-  [0, 1],
-  [1, 1],
-  [-1, 1],
-];
 
 /** A live/stump resource node instance in the world (tree sprite + its data + state). */
 export interface TreeNode {
@@ -129,6 +111,7 @@ export interface ScenarioSpec {
   wood?: number;
   inventory?: Record<string, number>;
   trees?: Array<[number, number]>;
+  rocks?: Array<[number, number]>;
   zombies?: Array<[number, number] | { at: [number, number]; id?: string }>;
   walls?: Array<[number, number]>;
   blueprints?: Array<[number, number]>;
@@ -138,6 +121,7 @@ export interface ScenarioSpec {
 /** Ids of the entities {@link ScenarioSpec} placed, in spec order, so a test can reference them. */
 export interface ScenarioResult {
   treeIds: string[];
+  rockIds: string[];
   zombieIds: string[];
   siteIds: string[];
 }
@@ -568,9 +552,10 @@ export class GameScene extends Phaser.Scene {
       const tree = this.treeById(a.treeId);
       if (!tree || !tree.alive) return this.completeCurrent();
       const target = { col: tree.col, row: tree.row };
-      // Prefer a base stand tile (never up in the canopy); fall back to any adjacent if walled off.
+      // Prefer this species' stand tiles (a tall tree restricts to its base, never up in the canopy);
+      // fall back to any adjacent tile if those are walled off. A rock omits standOffsets → all-adjacent.
       const stand =
-        reachableAdjacent(this.playerTile(), target, this.isBlocked, this.gridDims, TREE_BASE_STAND_OFFSETS) ??
+        reachableAdjacent(this.playerTile(), target, this.isBlocked, this.gridDims, tree.def.standOffsets) ??
         reachableAdjacent(this.playerTile(), target, this.isBlocked, this.gridDims);
       if (!stand || !this.pathTo(stand)) this.completeCurrent();
       return;
@@ -664,7 +649,7 @@ export class GameScene extends Phaser.Scene {
    * per-frame OutlineFX PostFX — no shader runs in the frame loop.
    */
   private addTreeGlow(tree: TreeNode, pulse: boolean): void {
-    const radius = Phaser.Math.Clamp(Math.round(GLOW_SCREEN_PX / this.treeScale(tree.sprite)), 2, 16);
+    const radius = Phaser.Math.Clamp(Math.round(GLOW_SCREEN_PX / this.nodeScale(tree.sprite, tree.def)), 2, 16);
     const glow = bakeGlowTexture(this, tree.sprite.texture.key, COLORS.queued, radius);
     // Align the padded halo canvas onto the tree: its content sits `pad` texels in from every edge,
     // so the tree's display origin shifts by `pad` and the scale matches.
@@ -948,7 +933,7 @@ export class GameScene extends Phaser.Scene {
     this.game.events.emit('inspect:hide');
   }
 
-  // --- Trees / chopping ----------------------------------------------------
+  // --- Resource nodes / harvesting -----------------------------------------
 
   private spawnTrees(): void {
     for (const [col, row] of [
@@ -956,32 +941,40 @@ export class GameScene extends Phaser.Scene {
       [14, 12],
       [8, 20],
     ] as Array<[number, number]>) {
-      this.addTree(col, row);
+      this.addNode(NODES.tree, col, row);
+    }
+    // A couple of rocks so the camp has a stone source to mine (see plan 008).
+    for (const [col, row] of [
+      [10, 6],
+      [4, 16],
+    ] as Array<[number, number]>) {
+      this.addNode(NODES.rock, col, row);
     }
   }
 
-  private addTree(col: number, row: number): void {
-    const def = NODES.tree;
-    const { key } = resolveTile(ACTIVE_TILESET.tiles.tree);
-    const sprite = this.add.image(tileToWorldCenter(col), tileToWorldCenter(row), key).setDepth(1);
-    // The extracted pine is much taller than a tile: scale it to ~TREE_TILES_TALL tiles high and
-    // anchor near its base (bottom-centre-ish origin) so the trunk sits on the tile and the canopy
-    // overhangs upward. sprite.x/y stay the tile centre, so treeAt()'s distance check is unaffected.
-    sprite.setScale(this.treeScale(sprite)).setOrigin(0.5, 0.92);
-    this.trees.push({ id: `tree-${this.nextTreeId++}`, sprite, def, hp: def.maxHp, alive: true, col, row });
+  /** Spawn one resource node of `def` (tree, rock, …) at a tile; sized/anchored from its own data. */
+  private addNode(def: ResourceNodeDef, col: number, row: number): void {
+    const { key, frame } = resolveTile(ACTIVE_TILESET.tiles[def.tile]);
+    const sprite = this.add.image(tileToWorldCenter(col), tileToWorldCenter(row), key, frame).setDepth(1);
+    // Each species sizes/anchors itself from its def (critique #2): a pine scales to ~2.6 tiles and
+    // anchors near its base so the canopy overhangs up; a rock is ~1 tile, centred. sprite.x/y stay
+    // the tile centre, so treeAt()'s distance check is unaffected regardless of scale/origin.
+    sprite.setScale(this.nodeScale(sprite, def)).setOrigin(def.originX, def.originY);
+    this.trees.push({ id: `${def.id}-${this.nextTreeId++}`, sprite, def, hp: def.maxHp, alive: true, col, row });
   }
 
-  /** Base display scale for the tree image (derived from its source height, so any pine fits its tile). */
-  private treeScale(sprite: Phaser.GameObjects.Image): number {
-    return (TILE_SIZE * TREE_TILES_TALL) / sprite.frame.height;
+  /** Base display scale for a node image (derived from its source height + the def's `tilesTall`). */
+  private nodeScale(sprite: Phaser.GameObjects.Image, def: ResourceNodeDef): number {
+    return (TILE_SIZE * def.tilesTall) / sprite.frame.height;
   }
 
   /**
-   * TEMP (movement testing): clear all trees and scatter a fresh random batch on empty tiles,
-   * avoiding walls, blueprints, and the player's own tile. Wired to a debug HUD button.
+   * TEMP (movement testing): clear all nodes and scatter a fresh random batch on empty tiles,
+   * avoiding walls, blueprints, and the player's own tile. Mostly trees with the odd rock so both
+   * resources are reachable from manual play. Wired to a debug HUD button.
    */
   private regenerateTrees(): void {
-    this.cancelAll(); // drop harvest orders that reference the trees we're about to destroy
+    this.cancelAll(); // drop harvest orders that reference the nodes we're about to destroy
     for (const t of this.trees) t.sprite.destroy();
     this.trees = [];
 
@@ -995,7 +988,7 @@ export class GameScene extends Phaser.Scene {
       const key = tileKey(col, row);
       if (used.has(key) || this.occupied.has(key) || this.siteTiles.has(key)) continue;
       used.add(key);
-      this.addTree(col, row);
+      this.addNode(Math.random() < 0.25 ? NODES.rock : NODES.tree, col, row);
       placed += 1;
     }
   }
@@ -1014,16 +1007,16 @@ export class GameScene extends Phaser.Scene {
 
   private chop(tree: TreeNode): void {
     tree.hp -= 1;
-    this.inv.add(tree.def.woodItemId, tree.def.woodPerHit);
-    // Bump relative to the tree's fitted base scale (not an absolute 1 — the pine is scaled down).
-    // Animate only the tree — its queued glow halo mirrors this (and any future sway/fall) each frame
+    this.inv.add(tree.def.yieldItemId, tree.def.yieldPerHit);
+    // Bump relative to the node's fitted base scale (not an absolute 1 — the pine is scaled down).
+    // Animate only the node — its queued glow halo mirrors this (and any future sway/fall) each frame
     // via syncGlowTransforms(), so animations never have to drive the glow themselves.
-    const base = this.treeScale(tree.sprite);
+    const base = this.nodeScale(tree.sprite, tree.def);
     this.tweens.add({ targets: tree.sprite, scale: base * 1.18, duration: 80, yoyo: true });
     if (tree.hp <= 0) {
       tree.alive = false;
-      // No dedicated stump sprite in the pack yet (see docs/ASSETS.md) — tint the felled tree
-      // brown as a stand-in "stump" state rather than mixing in a mismatched placeholder rect.
+      // No dedicated depleted sprite in the pack yet (see docs/ASSETS.md) — tint the felled node to
+      // its stumpColor as a stand-in "stump"/rubble state rather than a mismatched placeholder rect.
       tree.sprite.setScale(base).setTint(tree.def.stumpColor);
       this.time.delayedCall(tree.def.regrowMs, () => {
         tree.hp = tree.def.maxHp;
@@ -1283,8 +1276,14 @@ export class GameScene extends Phaser.Scene {
 
     const treeIds: string[] = [];
     for (const [c, r] of spec.trees ?? []) {
-      this.addTree(c, r);
+      this.addNode(NODES.tree, c, r);
       treeIds.push(this.trees[this.trees.length - 1].id);
+    }
+
+    const rockIds: string[] = [];
+    for (const [c, r] of spec.rocks ?? []) {
+      this.addNode(NODES.rock, c, r);
+      rockIds.push(this.trees[this.trees.length - 1].id);
     }
 
     for (const [c, r] of spec.walls ?? []) this.finishSite(this.createBlueprint(c, r));
@@ -1304,7 +1303,7 @@ export class GameScene extends Phaser.Scene {
 
     this.updateVision();
     this.emitTasks();
-    return { treeIds, zombieIds, siteIds };
+    return { treeIds, rockIds, zombieIds, siteIds };
   }
 
   /**

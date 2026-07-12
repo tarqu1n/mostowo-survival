@@ -57,6 +57,7 @@ export class PreloadScene extends Phaser.Scene {
       ...manifest.tiles.ground.map((g) => g.source),
       manifest.tiles.wall,
       manifest.tiles.tree,
+      manifest.tiles.rock,
     ];
     const loadedSheets = new Set<string>();
     const loadedImages = new Set<string>();

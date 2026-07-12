@@ -113,9 +113,11 @@ needs to be treated as precious.
 | Output | Source sheet | Index |
 |---|---|---|
 | `_derived/tree_pine.png` | `Environment/Props/Static/Trees/Model_02/Size_03.png` | 3 |
+| `_derived/rock.png` | `Environment/Props/Static/Rocks.png` | 5 |
 
-Other multi-object sheets (`Vegetation`, `Rocks`, `Resources`, `Furniture`, `Tools`, …) are future
-candidates per `--scan` — not extracted this pass.
+The rock is wired as the `rock` tile role (`ACTIVE_TILESET.tiles.rock`), rendering the `rock`
+resource node that yields stone (plan 008). Other multi-object sheets (`Vegetation`, `Resources`,
+`Furniture`, `Tools`, …) are future candidates per `--scan` — not extracted this pass.
 
 ### The art swap — concrete frames wired (plan 005)
 

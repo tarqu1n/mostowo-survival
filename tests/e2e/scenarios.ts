@@ -14,6 +14,11 @@ export function justATree(): ScenarioSpec {
   return { player: [3, 3], trees: [[5, 3]], wood: 0 };
 }
 
+/** Player at [3,3], one rock one tile to the right — the minimal mining world. */
+export function justARock(): ScenarioSpec {
+  return { player: [3, 3], rocks: [[5, 3]], inventory: {} };
+}
+
 /** Player at [10,10], one kid zombie two tiles east — closes distance fast, then contact-damages. */
 export function oneZombie(): ScenarioSpec {
   return { player: [10, 10], zombies: [[12, 10]] };

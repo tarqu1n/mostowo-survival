@@ -52,6 +52,7 @@ export interface TilesetManifest {
     ground: Array<{ source: TileSource; weight: number }>;
     wall: TileSource;
     tree: TileSource;
+    rock: TileSource;
   };
   actors: {
     /**
@@ -90,6 +91,7 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
     ],
     wall: { kind: 'sheetFrame', sheet: 'Environment/Tilesets/Wall_Tiles.png', frame: 83 }, // grey stone fill (8,3)
     tree: { kind: 'image', path: '_derived/tree_pine.png' }, // extracted green pine (Model_02/Size_03 idx 3)
+    rock: { kind: 'image', path: '_derived/rock.png' }, // extracted grey boulder (Rocks.png idx 5)
   },
   actors: {
     player: {
