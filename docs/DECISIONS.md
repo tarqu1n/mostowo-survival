@@ -7,6 +7,26 @@ Format: `YYYY-MM-DD — [DECIDED|PROPOSED|OPEN] Title` then a short rationale.
 
 ---
 
+## 2026-07-12 — [DECIDED] Actors render at native 1:1; camera zoom is integer-only
+
+Reported: the player sprite looked "slightly stretched / pixels clipping" at 300% zoom. Cause: actors
+rendered at `render.scale = 0.5` on a ~30px-tall character, so on-screen texel size was `0.5 × zoom`
+— integer (crisp) only at the even default 200%, fractional everywhere else (`0.5 × 3 = 1.5` at 300%
+→ some texels 1px, others 2px). The baked ground didn't show it because a single continuous texture
+has no frame boundary to expose the unevenness (see the `drawGround` comment), but a small framed
+actor does.
+
+**Decided:** author actors at native `render.scale = 1` (draw the source 1:1, size by the art) and
+restrict camera zoom to integer steps (`ZOOM_STEP = 1`; `setZoom` rounds *every* path incl. pinch and
+the restored preference). Together these keep `render.scale × zoom` a whole number at every zoom stop,
+so nearest-neighbour stays crisp. `originY` was retuned per actor (player 0.78, skeleton 0.96) because
+doubling the scale would otherwise double the empty-padding gap under the feet.
+
+**Trade-offs accepted:** the character is ~2× larger on screen (native detail, ~2 tiles tall) — chosen
+over keeping it small-but-crisp (which would have needed a half-res pre-bake and stayed low-detail);
+and zoom is now 3 stops (100/200/300%) instead of 5 — pinch snaps between them. Rule captured in
+[RENDERING.md](RENDERING.md) ("Pixel-art scale must be integer").
+
 ## 2026-07-12 — [DECIDED] Menus stay in Phaser (canvas), built on a Container-based UI kit — no DOM overlay
 
 Considered a DOM/HTML overlay for the heavier menus (inventory, build palette) vs building them in

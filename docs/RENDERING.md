@@ -7,6 +7,26 @@ The renderer is `Phaser.AUTO` + `pixelArt: true` (see [src/main.ts](../src/main.
 available, Canvas fallback otherwise. **Custom pipelines are WebGL-only** — always feature-detect and
 keep a non-shader path for Canvas.
 
+## Pixel-art scale must be integer (sprites)
+
+Nearest-neighbour sampling only looks clean when a source texel maps to a **whole number** of screen
+pixels. A sprite's on-screen texel size is `render.scale × cameraZoom`; when that product is
+fractional (e.g. `0.5 × 3 = 1.5`), some source texels land on 1 screen-pixel and others on 2, which
+reads as "stretched" / pixels clipping — worst on a small actor. So two rules:
+
+- **Author actors at native `render.scale = 1`** (`src/data/tileset.ts`). Draw the source art 1:1;
+  never a fractional sub-scale like `0.5`, which both drops half the character's own pixels *and*
+  can never be integer at odd zooms. Size the actor by the source art, not by a runtime shrink.
+- **Zoom in integer steps only** (`ZOOM_STEP = 1`, and `GameScene.setZoom` rounds every path —
+  buttons, pinch, restored preference). A fractional camera zoom re-introduces the same unevenness
+  even with `scale = 1`.
+
+Big *continuous* textures (the baked ground `RenderTexture`, a single tree image) survive fractional
+zoom far better — they have no per-object frame boundary to expose the uneven texels — which is why
+only the small framed actors were visibly affected. History: the player rendered at `scale 0.5`, so it
+was crisp only at the even default zoom (200%) and broke at 300% (`0.5 × 3 = 1.5`). See the 2026-07-12
+"Actors render at native 1:1; zoom is integer-only" entry in [DECISIONS.md](DECISIONS.md).
+
 ## Generate once, or shade every frame? (read this first)
 
 A shader is the right way to *generate* a per-pixel effect that a GameObject can't express (a

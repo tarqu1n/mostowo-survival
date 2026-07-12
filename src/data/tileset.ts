@@ -93,7 +93,10 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
   },
   actors: {
     player: {
-      render: { scale: 0.5, originX: 0.5, originY: 0.9 }, // Step 4/5 tune by eye (~1.5-tile-tall, feet on tile)
+      // scale:1 = draw the ~30px character at native 1:1 (no fractional down-scale), so it stays
+      // crisp at every integer camera zoom — see docs/RENDERING.md "Pixel-art scale must be integer".
+      // originY 0.78 ≈ the feet row (content bottom ≈ y48 of the 64px frame) so they rest on the tile.
+      render: { scale: 1, originX: 0.5, originY: 0.78 },
       idle: {
         down: { path: 'Entities/Characters/Body_A/Animations/Idle_Base/Idle_Down-Sheet.png', frameSize: 64, frames: 4 },
         side: { path: 'Entities/Characters/Body_A/Animations/Idle_Base/Idle_Side-Sheet.png', frameSize: 64, frames: 4 },
@@ -119,7 +122,9 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
       },
     },
     enemy: {
-      render: { scale: 0.5, originX: 0.5, originY: 0.9 },
+      // Native 1:1 like the player (crisp at integer zoom). The skeleton's feet reach the frame
+      // bottom (content bbox ≈ y34–64), so originY 0.96 grounds it on the tile.
+      render: { scale: 1, originX: 0.5, originY: 0.96 },
       walk: { path: 'Entities/Mobs/Skeleton Crew/Skeleton - Base/Run/Run-Sheet.png', frameSize: 64, frames: 6 },
     },
   },

@@ -38,8 +38,13 @@ export const DRAG_PX = 12;
 export const MIN_ZOOM = 1;
 export const MAX_ZOOM = 3;
 export const DEFAULT_ZOOM = 2;
-/** Zoom change per UI button press. */
-export const ZOOM_STEP = 0.5;
+/**
+ * Zoom change per UI button press. Kept at whole integers so every zoom stop (100/200/300%) is an
+ * integer camera scale: pixel-art sprites nearest-sample cleanly only at integer zoom — a fractional
+ * zoom (e.g. 150%) gives some source texels 1px and others 2px, reading as "stretched"/clipping.
+ * setZoom() rounds every path (buttons, pinch, restored preference) to enforce this.
+ */
+export const ZOOM_STEP = 1;
 /** localStorage key the current zoom is persisted under (best-effort — see GameScene.setZoom). */
 export const ZOOM_STORAGE_KEY = 'mostowo:zoom';
 

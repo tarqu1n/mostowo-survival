@@ -1413,7 +1413,9 @@ export class GameScene extends Phaser.Scene {
   /** Apply + persist a zoom level, clamped to [MIN_ZOOM, MAX_ZOOM]. Also mirrored onto the
    * registry (for UIScene's initial readout — see UIScene.create) and broadcast for live updates. */
   private setZoom(z: number): void {
-    const clamped = Phaser.Math.Clamp(z, MIN_ZOOM, MAX_ZOOM);
+    // Snap to an integer level: pixel-art sprites only stay crisp at integer camera scale (see
+    // config.ts ZOOM_STEP). This gates *every* zoom source — buttons, pinch, restored preference.
+    const clamped = Phaser.Math.Clamp(Math.round(z), MIN_ZOOM, MAX_ZOOM);
     this.cameras.main.setZoom(clamped);
     this.registry.set('zoom', clamped);
     try {
