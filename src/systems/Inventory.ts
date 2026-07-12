@@ -1,11 +1,15 @@
-import Phaser from 'phaser';
+import { EventEmitter } from 'eventemitter3';
 
 /**
  * Character inventory: a bag of item counts keyed by item id. Pure world logic, no scene deps.
  * Emits `'change'` (payload: {@link snapshot}) after any mutation so UI can react without polling.
  * Shared across scenes via `this.registry`; the UIScene subscribes to `'change'` directly.
+ *
+ * Extends `eventemitter3` directly (rather than `Phaser.Events.EventEmitter`, which is that same
+ * package re-exported) so this file imports no Phaser — keeps it plain-Node testable. See
+ * vitest.config.ts.
  */
-export class Inventory extends Phaser.Events.EventEmitter {
+export class Inventory extends EventEmitter {
   private readonly items = new Map<string, number>();
 
   /** Count held of `id` (0 if never added). */

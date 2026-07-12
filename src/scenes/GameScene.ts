@@ -106,6 +106,54 @@ export interface ZombieUnit {
   pathIndex: number;
 }
 
+/** Cardinal facing shorthand for {@link ScenarioSpec}, mapped to `lastFacing` deltas below. */
+export type FacingSpec = 'up' | 'down' | 'left' | 'right';
+
+const FACING_DELTAS: Record<FacingSpec, { dCol: number; dRow: number }> = {
+  up: { dCol: 0, dRow: -1 },
+  down: { dCol: 0, dRow: 1 },
+  left: { dCol: -1, dRow: 0 },
+  right: { dCol: 1, dRow: 0 },
+};
+
+/**
+ * Declarative world spec for the test-only scenario API (plan 007). Every field is optional so a
+ * test constructs only what it needs (`{ player:[3,3], trees:[[5,3]] }`). Coordinates are tile
+ * (col,row). `zombies` entries default to `kidZombie`; `walls` are built solid, `blueprints`
+ * passable-and-unbuilt. `rng`/`wood` pin combat + inventory determinism. See __test.applyScenario.
+ */
+export interface ScenarioSpec {
+  player?: [number, number];
+  facing?: FacingSpec;
+  mode?: 'command' | 'combat' | 'inspect';
+  wood?: number;
+  inventory?: Record<string, number>;
+  trees?: Array<[number, number]>;
+  zombies?: Array<[number, number] | { at: [number, number]; id?: string }>;
+  walls?: Array<[number, number]>;
+  blueprints?: Array<[number, number]>;
+  rng?: () => number;
+}
+
+/** Ids of the entities {@link ScenarioSpec} placed, in spec order, so a test can reference them. */
+export interface ScenarioResult {
+  treeIds: string[];
+  zombieIds: string[];
+  siteIds: string[];
+}
+
+/** The DEV-only debug surface installed at `window.game.__test` (see GameScene.create). */
+export interface GameTestApi {
+  applyScenario(spec: ScenarioSpec): ScenarioResult;
+  step(ms: number): void;
+  setRng(fn: () => number): void;
+  state(): ReturnType<GameScene['debugState']>;
+  order(a: Action): void;
+  enqueue(a: Action): void;
+  inspect(col: number, row: number): void;
+  blocked(col: number, row: number): boolean;
+}
+
 /**
  * World scene: the worker task system. The player unit pathfinds around obstacles (walls + live
  * trees), works through a queue of orders (tap = act now / clear; long-press = append), and builds
@@ -122,6 +170,14 @@ export class GameScene extends Phaser.Scene {
   private playerStats!: CombatantStats;
   private playerHp = 0;
   private lastFacing = { dCol: 0, dRow: 1 };
+
+  // Injectable RNG for combat hit-rolls (default Math.random). Threaded into every
+  // resolveMeleeAttack call site so the DEV-only test API can pin it — combat scenarios then stay
+  // deterministic even if a future enemy/player gains dodge > 0 (today both are 0). See plan 007 S3.
+  private rng: () => number = Math.random;
+  // Monotonic clock for the DEV-only fixed-step seam (__test.step); seeded from this.time.now on
+  // first use so driven steps never jump the scene clock backwards. See testStep().
+  private testClock = 0;
 
   // Input mode: Command (default tap-to-pathfind, unchanged), Combat (movepad drives the player
   // directly, bypassing the pathfinder), Inspect (tap shows a stats panel — Step 7). Mutually
@@ -329,6 +385,25 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.emitTasks();
+
+    // DEV-only test surface (plan 007). Gated on import.meta.env.DEV so `vite build` strips this
+    // whole block — the shipped production bundle has no `__test` install and window.game.__test is
+    // undefined there. The e2e runner therefore serves `vite dev`, where DEV === true.
+    if (import.meta.env.DEV) {
+      const api: GameTestApi = {
+        applyScenario: (spec) => this.testApplyScenario(spec),
+        step: (ms) => this.testStep(ms),
+        setRng: (fn) => {
+          this.rng = fn;
+        },
+        state: () => this.debugState(),
+        order: (a) => this.order(a),
+        enqueue: (a) => this.enqueue(a),
+        inspect: (c, r) => this.testInspect(c, r),
+        blocked: (c, r) => this.isTileBlocked(c, r),
+      };
+      (this.game as unknown as { __test?: GameTestApi }).__test = api;
+    }
   }
 
   override update(_time: number, delta: number): void {
@@ -806,7 +881,7 @@ export class GameScene extends Phaser.Scene {
     const row = pt.row + this.lastFacing.dRow;
     const zombie = this.zombies.find((z) => z.alive && z.col === col && z.row === row);
     if (!zombie) return;
-    zombie.hp -= resolveMeleeAttack(this.playerStats, zombie.def, UNARMED_BASE_DAMAGE);
+    zombie.hp -= resolveMeleeAttack(this.playerStats, zombie.def, UNARMED_BASE_DAMAGE, this.rng);
     if (zombie.hp <= 0) {
       zombie.alive = false;
       zombie.sprite.destroy();
@@ -1041,7 +1116,7 @@ export class GameScene extends Phaser.Scene {
           z.sprite.body.setVelocity(0, 0);
           if (now - z.lastContactAt >= CONTACT_DAMAGE_COOLDOWN_MS) {
             z.lastContactAt = now;
-            this.damagePlayer(resolveMeleeAttack(z.def, this.playerStats, UNARMED_BASE_DAMAGE));
+            this.damagePlayer(resolveMeleeAttack(z.def, this.playerStats, UNARMED_BASE_DAMAGE, this.rng));
           }
         } else {
           if (now - z.lastRepathAt >= 300) {
@@ -1107,6 +1182,13 @@ export class GameScene extends Phaser.Scene {
     if (!this.tilePlaceable(col, row)) return;
     if (!this.inv.spend(BUILDABLES.wall.cost)) return; // unaffordable — no-op
 
+    const site = this.createBlueprint(col, row);
+    this.enqueue({ kind: 'build', siteId: site.id });
+  }
+
+  /** Add a passable, unbuilt blueprint at a tile and register its occupancy (shared by real build
+   * placement and the DEV-only scenario API). Does NOT spend wood or enqueue — callers do that. */
+  private createBlueprint(col: number, row: number): BuildSite {
     const key = tileKey(col, row);
     const rect = this.add
       .rectangle(tileToWorldCenter(col), tileToWorldCenter(row), TILE_SIZE, TILE_SIZE, COLORS.blueprint, 0.35)
@@ -1114,7 +1196,7 @@ export class GameScene extends Phaser.Scene {
     const site: BuildSite = { id: `site-${this.nextSiteId++}`, col, row, rect, visual: null, progress: 0, done: false };
     this.sites.push(site);
     this.siteTiles.add(key);
-    this.enqueue({ kind: 'build', siteId: site.id });
+    return site;
   }
 
   /** Complete a blueprint into a solid, blocking wall (materialises on the worker-vacated tile). */
@@ -1130,6 +1212,121 @@ export class GameScene extends Phaser.Scene {
     body.updateFromGameObject();
     this.occupied.add(tileKey(site.col, site.row));
     this.repath();
+  }
+
+  // --- DEV-only scenario / fixed-step test API (plan 007) -------------------
+  //
+  // These build a known world and drive the game deterministically. The `window.game.__test`
+  // install that exposes them is DEV-gated in create() so `vite build` dead-code-eliminates it —
+  // the methods below ship (unreachable) but the player-facing surface never does. NB the seam only
+  // exists under `vite dev` (import.meta.env.DEV === true), which the e2e runner must serve from.
+
+  /**
+   * Reset the live world to empty — destroy every tree/zombie/site/marker GameObject and clear all
+   * the plain-data queue/occupancy state, mirroring create()'s reset block (which assumes a fresh
+   * scene with nothing to destroy). Zeroes inventory + player HP. Called by testApplyScenario before
+   * it places the spec's entities, so a scenario never inherits the boot fixtures or a prior run.
+   */
+  private testResetWorld(): void {
+    for (const t of this.trees) t.sprite.destroy();
+    for (const z of this.zombies) z.sprite.destroy();
+    for (const s of this.sites) {
+      s.visual?.destroy();
+      s.rect.destroy();
+    }
+    for (const m of this.queueMarkers) m.destroy();
+    this.walls.clear(false, false); // drop the (now-destroyed) wall-rect refs; children handled above
+
+    this.queue.clear();
+    this.trees = [];
+    this.nextTreeId = 0;
+    this.zombies = [];
+    this.nextZombieId = 0;
+    this.sites = [];
+    this.siteTiles.clear();
+    this.occupied.clear();
+    this.nextSiteId = 0;
+    this.path = [];
+    this.pathIndex = 0;
+    this.actionGoal = null;
+    this.chopElapsed = 0;
+    this.chopping = false;
+    this.punchLockUntil = 0;
+    this.buildMode = false;
+    this.queueMarkers = [];
+    this.outlinedTreeIds.clear();
+    this.paintedThisGesture.clear();
+    this.rng = Math.random;
+
+    // Zero the shared Inventory in place (keep the same instance so UIScene's 'change' binding holds).
+    const snap = this.inv.snapshot();
+    if (Object.keys(snap).length) this.inv.spend(snap);
+
+    this.playerHp = this.playerStats.maxHp;
+    this.game.events.emit('player:hpChanged', { hp: this.playerHp, maxHp: this.playerStats.maxHp });
+  }
+
+  /** Construct the world declared by `spec` (see {@link ScenarioSpec}) and return the placed ids. */
+  private testApplyScenario(spec: ScenarioSpec): ScenarioResult {
+    this.testResetWorld();
+
+    const [pcol, prow] = spec.player ?? [Math.floor(this.gridDims.cols / 2), Math.floor(this.gridDims.rows / 2)];
+    this.player.body.reset(tileToWorldCenter(pcol), tileToWorldCenter(prow));
+    this.player.body.setVelocity(0, 0);
+    this.lastFacing = spec.facing ? { ...FACING_DELTAS[spec.facing] } : { dCol: 0, dRow: 1 };
+
+    this.mode = spec.mode ?? 'command';
+    this.game.events.emit('mode:changed', this.mode);
+
+    const inv = spec.inventory ?? (spec.wood != null ? { wood: spec.wood } : {});
+    for (const [id, n] of Object.entries(inv)) if (n > 0) this.inv.add(id, n);
+
+    const treeIds: string[] = [];
+    for (const [c, r] of spec.trees ?? []) {
+      this.addTree(c, r);
+      treeIds.push(this.trees[this.trees.length - 1].id);
+    }
+
+    for (const [c, r] of spec.walls ?? []) this.finishSite(this.createBlueprint(c, r));
+
+    const siteIds: string[] = [];
+    for (const [c, r] of spec.blueprints ?? []) siteIds.push(this.createBlueprint(c, r).id);
+
+    const zombieIds: string[] = [];
+    for (const z of spec.zombies ?? []) {
+      const at = Array.isArray(z) ? z : z.at;
+      const id = Array.isArray(z) ? 'kidZombie' : z.id ?? 'kidZombie';
+      this.addZombie(id, at[0], at[1]);
+      zombieIds.push(this.zombies[this.zombies.length - 1].id);
+    }
+
+    if (spec.rng) this.rng = spec.rng;
+
+    this.updateVision();
+    this.emitTasks();
+    return { treeIds, zombieIds, siteIds };
+  }
+
+  /**
+   * Advance gameplay by `ms` in fixed 1/60s slices, deterministically. Stops the RAF game loop and
+   * drives `game.step(clock, fixedDelta)` itself — this runs each scene's update → Arcade physics →
+   * clock → tweens → timers, so movement/chop/build/contact-cooldown/regrow all resolve with zero
+   * wall-clock (a manual `scene.update()` would NOT advance physics/clock/timers — see plan 007 B1).
+   */
+  private testStep(ms: number): void {
+    const fixed = 1000 / 60;
+    if (this.game.loop.running) this.game.loop.stop();
+    if (this.testClock === 0) this.testClock = this.time.now;
+    const steps = Math.max(1, Math.round(ms / fixed));
+    for (let i = 0; i < steps; i++) {
+      this.testClock += fixed;
+      this.game.step(this.testClock, fixed);
+    }
+  }
+
+  /** Inspect the entity at a tile (drives the same panel path as an Inspect-mode tap). */
+  private testInspect(col: number, row: number): void {
+    this.inspectAt(tileToWorldCenter(col), tileToWorldCenter(row));
   }
 
   // --- Debug (headless smoke test reads this) ------------------------------
