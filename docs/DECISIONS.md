@@ -27,6 +27,11 @@ absent before the doubling (the old 640px map stayed under the error threshold),
 desktop/headless (highp / clean resample) — which is exactly why neither this nor the prior seam
 reproduced in CI.
 
+**Confirmed on-device (flip test):** temporarily rendering the single map-tall ground texture with
+`setFlipY(true)` moved the lines from the bottom to the **top** of the map — they follow the texture's
+V mapping, not screen/framebuffer position. That rules out a screen-space composite artifact and nails
+it to texture-coordinate precision, so capping the texture height is the right lever.
+
 **Decided:** split the ground bake into vertically-stacked `RenderTexture` chunks of
 `GROUND_CHUNK_ROWS` (32 rows / 512px) each — under the 640px height that was seam-free pre-doubling, so
 the per-texel error stays sub-half-texel and no row flips. Chunks are tile-aligned and drawn 1:1, so
