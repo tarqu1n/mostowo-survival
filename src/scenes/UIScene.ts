@@ -67,6 +67,14 @@ export class UIScene extends Phaser.Scene {
   private hungerLabel!: Phaser.GameObjects.Text;
   private healthBarFg!: Phaser.GameObjects.Rectangle;
   private healthLabel!: Phaser.GameObjects.Text;
+
+  // Always-on HUD meters (top-left): compact HP + food bars so survival state is readable at a glance
+  // without opening the STATUS panel. Passive (not interactive), fed by the same value updates as the
+  // Wellbeing panel's bars — see updateHealthBar/updateHungerBar, which drive both in lockstep.
+  private hudHealthBarFg!: Phaser.GameObjects.Rectangle;
+  private hudHealthLabel!: Phaser.GameObjects.Text;
+  private hudHungerBarFg!: Phaser.GameObjects.Rectangle;
+  private hudHungerLabel!: Phaser.GameObjects.Text;
   private playerMaxHp = 0;
   private playerHp = 0; // seeded lazily from the first player:hpChanged (HP isn't on the registry)
   private eatRows: Array<{ itemId: string; button: Button; nutrition: number }> = [];
@@ -345,6 +353,10 @@ export class UIScene extends Phaser.Scene {
     this.inventoryPanel.add(this.inventoryGrid);
     this.hudElements.push(this.inventoryPanel);
 
+    // Always-on HP + food bars, top-left (built before the Wellbeing panel so its seed values, which
+    // drive both sets of bars, land on objects that already exist).
+    this.buildHudBars();
+
     // Health & Wellbeing screen (plan 004) — meters + stat rows + edible list.
     this.buildWellbeingPanel();
 
@@ -406,6 +418,45 @@ export class UIScene extends Phaser.Scene {
     if (open) this.inventoryPanel.show();
     else this.inventoryPanel.hide();
     this.inventoryButton.setToggled(open);
+  }
+
+  // ---- Always-on HUD meters ------------------------------------------------
+
+  /**
+   * Build the compact top-left HP + food bars: a short text label, a dark-bg / coloured-fg meter, and
+   * a value readout overlaid on the fill. They live in the free strip above the queue readout and left
+   * of the zoom controls, stay visible in every mode, and are fed by updateHealthBar/updateHungerBar
+   * (shared with the Wellbeing panel). Value seeding happens there, once the panel is built.
+   */
+  private buildHudBars(): void {
+    const LABEL_X = 8;
+    const BAR_X = 40;
+    const BAR_W = 96;
+    const BAR_H = 9;
+    const healthY = 10;
+    const hungerY = 21;
+
+    // Dark bg rect + left-anchored coloured fg (origin 0,0.5 keeps the left edge fixed as scaleX
+    // shrinks), plus a centred value label with a black stroke so numbers stay legible over any fill.
+    const makeBar = (yc: number, colour: number): { fg: Phaser.GameObjects.Rectangle; value: Phaser.GameObjects.Text } => {
+      this.add.rectangle(BAR_X + BAR_W / 2, yc, BAR_W, BAR_H, 0x2a2a2a).setStrokeStyle(1, 0x000000, 0.5);
+      const fg = this.add.rectangle(BAR_X, yc, BAR_W, BAR_H, colour).setOrigin(0, 0.5);
+      const value = this.add
+        .text(BAR_X + BAR_W / 2, yc, '', { fontFamily: 'monospace', fontSize: '8px', color: '#ffffff' })
+        .setOrigin(0.5)
+        .setStroke('#000000', 2);
+      return { fg, value };
+    };
+
+    this.add.text(LABEL_X, healthY, 'HP', { fontFamily: 'monospace', fontSize: '8px', color: '#e8dcc0' }).setOrigin(0, 0.5);
+    const health = makeBar(healthY, 0x4caf50);
+    this.hudHealthBarFg = health.fg;
+    this.hudHealthLabel = health.value;
+
+    this.add.text(LABEL_X, hungerY, 'FOOD', { fontFamily: 'monospace', fontSize: '8px', color: '#e8dcc0' }).setOrigin(0, 0.5);
+    const hunger = makeBar(hungerY, 0xd8a24a);
+    this.hudHungerBarFg = hunger.fg;
+    this.hudHungerLabel = hunger.value;
   }
 
   // ---- Health & Wellbeing screen -------------------------------------------
@@ -510,20 +561,31 @@ export class UIScene extends Phaser.Scene {
     this.statusButton.setToggled(open);
   }
 
-  /** Scale + tint the hunger bar and update its label. Amber normally, red when near-empty/starving. */
+  /** Scale + tint the hunger bars (panel + always-on HUD) and update their labels. Amber normally,
+   * red when near-empty/starving. */
   private updateHungerBar(hunger: number): void {
     const ratio = Math.max(0, Math.min(1, hunger / HUNGER_MAX));
+    const colour = ratio <= 0.2 ? 0xc0392b : 0xd8a24a;
+    const rounded = Math.round(hunger);
     this.hungerBarFg.scaleX = ratio;
-    this.hungerBarFg.setFillStyle(ratio <= 0.2 ? 0xc0392b : 0xd8a24a);
-    this.hungerLabel.setText(`Hunger  ${Math.round(hunger)}/${HUNGER_MAX}`);
+    this.hungerBarFg.setFillStyle(colour);
+    this.hungerLabel.setText(`Hunger  ${rounded}/${HUNGER_MAX}`);
+    this.hudHungerBarFg.scaleX = ratio;
+    this.hudHungerBarFg.setFillStyle(colour);
+    this.hudHungerLabel.setText(`${rounded}/${HUNGER_MAX}`);
   }
 
-  /** Scale + tint the health bar and update its label. Green normally, red when low. */
+  /** Scale + tint the health bars (panel + always-on HUD) and update their labels. Green normally,
+   * red when low. */
   private updateHealthBar(): void {
     const ratio = this.playerMaxHp > 0 ? Math.max(0, Math.min(1, this.playerHp / this.playerMaxHp)) : 1;
+    const colour = ratio <= 0.3 ? 0xc0392b : 0x4caf50;
     this.healthBarFg.scaleX = ratio;
-    this.healthBarFg.setFillStyle(ratio <= 0.3 ? 0xc0392b : 0x4caf50);
+    this.healthBarFg.setFillStyle(colour);
     this.healthLabel.setText(`Health  ${this.playerHp}/${this.playerMaxHp}`);
+    this.hudHealthBarFg.scaleX = ratio;
+    this.hudHealthBarFg.setFillStyle(colour);
+    this.hudHealthLabel.setText(`${this.playerHp}/${this.playerMaxHp}`);
   }
 
   /** Refresh each edible row's label (live count + nutrition) and dim rows with no stock. */
