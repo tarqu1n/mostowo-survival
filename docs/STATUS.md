@@ -67,3 +67,21 @@ wrap-up) — see [WORKFLOW.md](WORKFLOW.md).
 `Panel`, `arrangeRow/Column/Grid`, shared `theme`). The HUD (`UIScene`) is refactored onto it; build
 inventory/build-menu panels from these primitives. Rationale in [DECISIONS.md](DECISIONS.md)
 (2026-07-12).
+
+## Inventory stacking + rock/stone node (plan 008)
+
+The throwaway wood counter is now a real **inventory**: `Inventory` is **slot-backed** (a bounded
+`Array<Slot>`), items **stack** to a per-item `maxStack` and **spill** into the next free slot, and
+the bag can genuinely **fill up** — surfaced as an always-visible **hotbar** (`src/ui/SlotGrid.ts`,
+bottom-centre, hidden in combat) plus an **ITEMS**-toggled full **INVENTORY** grid Panel. `maxStack`
+is injected (`maxStackOf`), so the pure system stays data-agnostic and plain-Node testable.
+Harvesting into a **full bag blocks and aborts the order** (guarded in both `beginCurrent` and
+`runHarvest`) so the worker never swings forever on a node it can't fell.
+
+**Stone is a real resource:** the tree/node machinery is generalised (`woodItemId/woodPerHit` →
+`yieldItemId/yieldPerHit`, plus per-species render fields so a rock isn't sized/anchored like a pine),
+and a **rock node** (`NODES.rock`, grey boulder extracted from the pack's `Rocks` sheet) yields
+**stone** — mining reuses the chop interaction/anim. Item icons are **32×32 placeholders** this slice;
+the repeatable **Gemini icon-generation pipeline** that replaces them with real art is **plan 009**
+(gated on a LAN-only key, so the mechanic ships green on placeholders). New Tier-1 stacking tests +
+Tier-2 `mine`/`block-full` scenarios.

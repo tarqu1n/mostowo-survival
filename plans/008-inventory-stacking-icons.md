@@ -1,7 +1,8 @@
 # Inventory Stacking + Placeholder Icons
 
-> Status: planned — critiqued (see `## Critique`); amended per findings #1/#2, Gemini pipeline split to
-> plan 009. Run /execute-plan to begin.
+> Status: **done** — all steps executed, full sweep green (Tier 1/2/3), pushed. Icons are placeholders;
+> real art lands via plan 009. Critiqued (see `## Critique`); amended per findings #1/#2, Gemini
+> pipeline split to plan 009.
 
 ## Summary
 
@@ -88,7 +89,7 @@ all `n` fit.
 
 ## Steps
 
-- [ ] **Step 1: Item data — `maxStack`, `icon`, add stone** `[delegate sonnet]` (parallel: A)
+- [x] **Step 1: Item data — `maxStack`, `icon`, add stone** `[delegate sonnet]` (parallel: A)
   - `src/data/types.ts`: add `maxStack: number` and `icon: string` (asset path relative to
     `public/assets/icons/`, e.g. `wood.png`) to `ItemDef`. Keep `color` (placeholder/fallback tint).
   - `src/data/items.ts`: set `wood` `maxStack: 50` + `icon: 'wood.png'`; add `stone`
@@ -101,7 +102,7 @@ all `n` fit.
   - Docs: none here.
   - Done when: `npm test` green; `npm run build` typechecks with the new `ItemDef` fields.
 
-- [ ] **Step 2: Inventory system — slots, stacking, capacity** `[inline]` (parallel: A)
+- [x] **Step 2: Inventory system — slots, stacking, capacity** `[inline]` (parallel: A)
   - Rewrite `src/systems/Inventory.ts` to be slot-backed per the design above. Constructor
     `{ capacity = <large default>, maxStackOf = () => Infinity } = {}`. Keep `get/has/canAfford/spend/
     snapshot` behaviour identical for callers; `spend` deducts across slots (clearing emptied slots).
@@ -117,7 +118,7 @@ all `n` fit.
   - Docs: none (system-level; STATUS.md updated in Step 7).
   - Done when: `npm test` green (new stacking tests + all existing Inventory/data tests).
 
-- [ ] **Step 3: Stone as a harvestable resource (rock node)** `[inline]`
+- [x] **Step 3: Stone as a harvestable resource (rock node)** `[inline]`
   - **Generalise yield fields:** rename `ResourceNodeDef.woodItemId`/`woodPerHit` →
     `yieldItemId`/`yieldPerHit` in `src/data/types.ts`; update `NODES.tree` in `src/data/nodes.ts` and the
     single consumer in `GameScene` (`this.inv.add(tree.def.woodItemId, tree.def.woodPerHit)`, ~line 1017).
@@ -148,7 +149,7 @@ all `n` fit.
   - Docs: `docs/ASSETS.md` (rock in the derived-file manifest); `docs/STATUS.md` note deferred to Step 7.
   - Done when: `npm test` + `npm run e2e` green; in-game you can harvest a rock and stone accrues.
 
-- [ ] **Step 4: Placeholder icons + Preload loads them** `[delegate sonnet]`
+- [x] **Step 4: Placeholder icons + Preload loads them** `[delegate sonnet]`
   - Create committed **32×32** placeholder PNGs `public/assets/icons/wood.png` + `stone.png` (simple
     on-theme flat squares w/ a letter, transparent bg — generate with a tiny PIL snippet, commit the
     PNGs). These guarantee icon texture keys always resolve until real art lands.
@@ -161,7 +162,7 @@ all `n` fit.
   - Docs: none here (item-icon docs — where icons live, placeholder→real flow — land with the pipeline in plan 009).
   - Done when: `npm run build` clean; icons present in `dist/`; `npm run smoke` still 0 console errors.
 
-- [ ] **Step 5: SlotGrid widget + hotbar & inventory Panel in UIScene** `[inline]`
+- [x] **Step 5: SlotGrid widget + hotbar & inventory Panel in UIScene** `[inline]`
   - Add `src/ui/SlotGrid.ts` — a `Container` widget that lays out `n` slots (bordered cells via kit
     `theme`, `arrangeGrid`/`arrangeRow`), and an `update(slots, itemLookup)` that per non-empty slot draws
     the item **icon** sprite (texture `iconKey(id)`, scaled to the cell) **or** falls back to a `color`
@@ -183,7 +184,7 @@ all `n` fit.
     chopping and rolls to a 2nd slot past `maxStack`; INVENTORY button opens/closes the grid; taps on
     them don't leak to the world; hotbar hidden in combat mode.
 
-- [ ] **Step 6: Block harvest when full (abort the order) + wire real capacity/maxStack** `[inline]`
+- [x] **Step 6: Block harvest when full (abort the order) + wire real capacity/maxStack** `[inline]`
   - `src/scenes/GameScene.ts`: construct `new Inventory({ capacity: INVENTORY_SLOTS, maxStackOf: (id) =>
     ITEMS[id]?.maxStack ?? DEFAULT_MAX_STACK })`. Guard the harvest yield (now generic — covers both trees
     and Step 3 rocks): if `!inv.canAccept(node.def.yieldItemId, node.def.yieldPerHit)`, block it.
@@ -206,7 +207,7 @@ all `n` fit.
   - Done when: `npm test` + `npm run e2e` green; harvesting into a full bag doesn't increment the item
     **and** leaves the worker idle (no jammed queue).
 
-- [ ] **Step 7: Wrap-up — docs + full sweep + push** `[inline]`
+- [x] **Step 7: Wrap-up — docs + full sweep + push** `[inline]`
   - Update `docs/STATUS.md` (feature/plan history: inventory stacking + hotbar/panel + rock/stone node +
     block-when-full; note item icons are **placeholders**, real art via **plan 009**).
   - Wrap-up gate: `npm test` + `npm run e2e` + `npm run smoke` all green; commit each coherent stage and
