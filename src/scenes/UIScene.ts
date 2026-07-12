@@ -1,10 +1,21 @@
 import Phaser from 'phaser';
-import { BASE_WIDTH, BASE_HEIGHT, COLORS, DEFAULT_ZOOM, ZOOM_STEP, MIN_ZOOM, MAX_ZOOM } from '../config';
+import {
+  BASE_WIDTH,
+  BASE_HEIGHT,
+  COLORS,
+  DEFAULT_ZOOM,
+  ZOOM_STEP,
+  MIN_ZOOM,
+  MAX_ZOOM,
+  HOTBAR_SLOTS,
+  INVENTORY_SLOTS,
+} from '../config';
 import { ITEMS } from '../data/items';
 import { BUILDABLES } from '../data/buildables';
+import { iconKey } from '../data/tileset';
 import type { Inventory } from '../systems/Inventory';
 import type { InspectableStats } from '../data/types';
-import { Button, Panel, arrangeRow } from '../ui';
+import { Button, Panel, SlotGrid, arrangeRow, type SlotVisual } from '../ui';
 
 /**
  * HUD overlay, run in parallel over GameScene (never replaces it). Renders the wood counter, a
@@ -21,7 +32,6 @@ import { Button, Panel, arrangeRow } from '../ui';
  */
 export class UIScene extends Phaser.Scene {
   private inv?: Inventory;
-  private woodText!: Phaser.GameObjects.Text;
   private buildButton!: Button;
   private modeIndicator!: Phaser.GameObjects.Text;
   private cancelButton!: Button;
@@ -35,6 +45,14 @@ export class UIScene extends Phaser.Scene {
   // this scene just mirrors it for button highlighting + showing/hiding the Combat-mode controls.
   private modeCombatButton!: Button;
   private modeInspectButton!: Button;
+
+  // Inventory (plan 008): an always-visible hotbar (first HOTBAR_SLOTS slots, hidden in combat) plus
+  // a button-toggled full grid Panel of all INVENTORY_SLOTS. Both are SlotGrid views over the shared
+  // Inventory's slots(), repainted on its 'change'.
+  private hotbar!: SlotGrid;
+  private inventoryButton!: Button;
+  private inventoryPanel!: Panel;
+  private inventoryGrid!: SlotGrid;
 
   // Combat mode: virtual movepad (bottom-right) + Punch button (bottom-left). The movepad is a
   // bespoke joystick (drag tracking below), not a kit widget; the Punch button is a kit Button.
@@ -67,14 +85,6 @@ export class UIScene extends Phaser.Scene {
 
   create(): void {
     this.inv = this.registry.get('inventory') as Inventory | undefined;
-
-    // Wood counter: a colour swatch in the item's placeholder colour + a live count.
-    this.add.rectangle(10, 12, 10, 10, ITEMS.wood.color).setOrigin(0, 0.5);
-    this.woodText = this.add.text(24, 6, '0', {
-      fontFamily: 'monospace',
-      fontSize: '13px',
-      color: '#e8dcc0',
-    });
 
     // Build toggle — a touch-sized button, top-right.
     const bw = 76;
@@ -111,7 +121,19 @@ export class UIScene extends Phaser.Scene {
     }).setVisible(false);
     this.hudElements.push(this.cancelButton);
 
-    // Queue indicator — current action + queued count, top-left under the wood counter.
+    // Inventory toggle — top-right, in the same stack under BUILD/CANCEL. Opens the full grid Panel.
+    const ibw = 72;
+    const ibh = 22;
+    this.inventoryButton = new Button(this, BASE_WIDTH - ibw / 2 - 8, 8 + bh + cbh + ibh / 2 + 12, {
+      width: ibw,
+      height: ibh,
+      label: 'ITEMS',
+      fontSize: 10,
+      onDown: () => this.toggleInventory(),
+    });
+    this.hudElements.push(this.inventoryButton);
+
+    // Queue indicator — current action + queued count, top-left.
     this.queueText = this.add.text(10, 26, '', { fontFamily: 'monospace', fontSize: '9px', color: '#9a8f74' });
 
     // Zoom controls — top-center: [−] 100% [+]. GameScene owns the actual camera zoom (and the
@@ -249,9 +271,32 @@ export class UIScene extends Phaser.Scene {
     });
     this.hudElements.push(debugButton);
 
+    // Hotbar — always-visible row of the first HOTBAR_SLOTS slots, bottom-centre. Hidden in combat
+    // mode (see onModeChanged) so it never clashes with the movepad/Punch controls.
+    this.hotbar = new SlotGrid(this, BASE_WIDTH / 2, BASE_HEIGHT - 70, {
+      slotCount: HOTBAR_SLOTS,
+      cols: HOTBAR_SLOTS,
+    });
+    this.hudElements.push(this.hotbar);
+
+    // Full inventory — a centred Panel holding a SlotGrid of every slot, toggled by the ITEMS button
+    // (and dismissible by tapping it, like the inspect panel). The grid is nested in the Panel so it
+    // shows/hides and positions with it.
+    this.inventoryPanel = new Panel(this, BASE_WIDTH / 2, BASE_HEIGHT / 2, {
+      width: 180,
+      height: 172,
+      depth: 20,
+      dismissible: true,
+      onDismiss: () => this.setInventoryOpen(false),
+    });
+    this.inventoryPanel.addText(16, { fontSize: '12px', color: '#e8dcc0' }).setText('INVENTORY');
+    this.inventoryGrid = new SlotGrid(this, 0, 14, { slotCount: INVENTORY_SLOTS, cols: HOTBAR_SLOTS });
+    this.inventoryPanel.add(this.inventoryGrid);
+    this.hudElements.push(this.inventoryPanel);
+
     // Seed + subscribe: read the shared Inventory's own 'change' directly (no event-bus hop).
-    this.refreshWood(this.inv?.snapshot() ?? {});
-    this.inv?.on('change', this.refreshWood, this);
+    this.refreshInventory();
+    this.inv?.on('change', this.refreshInventory, this);
     this.game.events.on('build:modeChanged', this.onBuildMode, this);
     this.game.events.on('tasks:changed', this.onTasks, this);
     this.game.events.on('zoom:changed', this.onZoomChanged, this);
@@ -262,7 +307,7 @@ export class UIScene extends Phaser.Scene {
 
     // Teardown so a future scene restart doesn't double-register on stale listeners.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.inv?.off('change', this.refreshWood, this);
+      this.inv?.off('change', this.refreshInventory, this);
       this.game.events.off('build:modeChanged', this.onBuildMode, this);
       this.game.events.off('tasks:changed', this.onTasks, this);
       this.game.events.off('zoom:changed', this.onZoomChanged, this);
@@ -278,11 +323,28 @@ export class UIScene extends Phaser.Scene {
     return this.hudElements.some((el) => el.visible && el.getBounds().contains(x, y));
   }
 
-  private refreshWood(snapshot: Record<string, number>): void {
-    this.woodText.setText(String(snapshot[ITEMS.wood.id] ?? 0));
-    // Reflect affordability of a wall on the button (dim the label when you can't afford it).
-    const affordable = (snapshot[ITEMS.wood.id] ?? 0) >= (BUILDABLES.wall.cost.wood ?? 0);
+  /** Resolve an item id to its icon texture key + fallback colour for the slot grids. */
+  private readonly itemVisual = (id: string): SlotVisual | undefined =>
+    ITEMS[id] ? { iconKey: iconKey(id), color: ITEMS[id].color } : undefined;
+
+  /** Repaint the hotbar + full grid from the shared Inventory's slots, and re-dim BUILD by affordability. */
+  private refreshInventory(): void {
+    const slots = this.inv?.slots() ?? [];
+    this.hotbar.update(slots.slice(0, HOTBAR_SLOTS), this.itemVisual);
+    this.inventoryGrid.update(slots, this.itemVisual);
+    // Reflect affordability of a wall on the Build button (dim the label when you can't afford it).
+    const affordable = (this.inv?.get(ITEMS.wood.id) ?? 0) >= (BUILDABLES.wall.cost.wood ?? 0);
     this.buildButton.label.setAlpha(affordable ? 1 : 0.4);
+  }
+
+  private toggleInventory(): void {
+    this.setInventoryOpen(!this.inventoryPanel.visible);
+  }
+
+  private setInventoryOpen(open: boolean): void {
+    if (open) this.inventoryPanel.show();
+    else this.inventoryPanel.hide();
+    this.inventoryButton.setToggled(open);
   }
 
   private onBuildMode(active: boolean): void {
@@ -320,6 +382,10 @@ export class UIScene extends Phaser.Scene {
     this.movepadBase.setVisible(inCombat);
     this.movepadKnob.setVisible(inCombat);
     this.combatPunchButton.setVisible(inCombat);
+    // Hide the hotbar in combat so it doesn't clash with the movepad/Punch controls; and drop the
+    // full inventory panel open across a mode switch.
+    this.hotbar.setVisible(!inCombat);
+    if (inCombat) this.setInventoryOpen(false);
     if (!inCombat) {
       this.movepadPointerId = null;
       this.movepadKnob.setPosition(this.movepadCenter.x, this.movepadCenter.y);

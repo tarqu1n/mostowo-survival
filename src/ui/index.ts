@@ -7,6 +7,8 @@ export { Button } from './Button';
 export type { ButtonConfig } from './Button';
 export { Panel } from './Panel';
 export type { PanelConfig } from './Panel';
+export { SlotGrid } from './SlotGrid';
+export type { SlotGridConfig, SlotData, SlotVisual, SlotVisualLookup } from './SlotGrid';
 export { UI_THEME, UI_FONT } from './theme';
 export type { ButtonVariant } from './theme';
 export { arrangeRow, arrangeColumn, arrangeGrid } from './layout';
