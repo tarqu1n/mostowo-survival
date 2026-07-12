@@ -1961,11 +1961,6 @@ export class GameScene extends Phaser.Scene {
     }
     rt.endDraw();
     rt.texture.setFilter(Phaser.Textures.FilterMode.NEAREST); // crisp pixels when the camera scales it
-    // TEMP DIAGNOSTIC (dark-lines investigation): flip the single map-tall ground texture vertically.
-    // If the on-device dark lines are a texture-space sampling-precision artifact (worse toward large
-    // V), flipping the V mapping moves them to the TOP of the map; if they stay at the bottom they're
-    // screen-space. Reverted when the fix lands. See the UIScene "GROUND FLIP DIAG" marker.
-    rt.setFlipY(true);
   }
 
   // --- Camera zoom -----------------------------------------------------------

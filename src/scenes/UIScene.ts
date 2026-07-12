@@ -120,21 +120,6 @@ export class UIScene extends Phaser.Scene {
       this.cameras.main.centerOn(BASE_WIDTH / 2, BASE_HEIGHT / 2);
     }
 
-    // TEMP DIAGNOSTIC (dark-lines investigation): an unmistakable "this build is live" marker, since
-    // the ground is rendered vertically flipped (see GameScene.drawGround) but flipped grass-noise
-    // looks identical. Confirms the new bundle loaded, then read where the dark lines sit. Removed
-    // when the fix lands.
-    this.add
-      .text(BASE_WIDTH / 2, BASE_HEIGHT / 2, 'GROUND FLIP DIAG\nlines at TOP = precision\nbottom = screen', {
-        fontFamily: 'monospace',
-        fontSize: '10px',
-        color: '#ffff00',
-        backgroundColor: '#000000',
-        align: 'center',
-      })
-      .setOrigin(0.5)
-      .setDepth(10_000);
-
     // Build toggle — a touch-sized button, top-right.
     const bw = 76;
     const bh = 26;
