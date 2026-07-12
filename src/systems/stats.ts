@@ -31,7 +31,12 @@ function combatantExtra(stats: CombatantStats): { label: string; value: string }
 }
 
 export function enemyStats(unit: EnemyUnit): InspectableStats {
-  return { name: unit.def.name, maxHp: unit.def.maxHp, currentHp: unit.hp, extra: combatantExtra(unit.def) };
+  return {
+    name: unit.def.name,
+    maxHp: unit.def.maxHp,
+    currentHp: unit.hp,
+    extra: combatantExtra(unit.def),
+  };
 }
 
 export function playerCombatStats(stats: CombatantStats, hp: number): InspectableStats {

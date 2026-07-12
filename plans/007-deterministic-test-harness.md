@@ -60,8 +60,8 @@ current smoke:
   (seconds), not the suite — which requires each scenario to be an independently runnable/filterable
   file (see Step 5; this is why Tier 2 should use the Playwright **test runner** for native
   `--grep`/per-file selection rather than one hand-rolled monolith).
-- **Wrap-up gate (before finishing a feature):** `npm test` (all unit) + `npm run e2e` (all scenarios)
-  + `npm run smoke` (boot canary) — the full sweep. Fast enough to run often *because* the heavy work
+- **Wrap-up gate (before finishing a feature):** `npm test` (all unit) + `npm run e2e` (all scenarios) +
+  `npm run smoke` (boot canary) — the full sweep. Fast enough to run often *because* the heavy work
   moved to Tier 1 and the browser tier is a handful of adjacent-entity scenarios, not a playthrough.
 
 **Harness shape — recommended (decide at critique):** a **hybrid**, *not* a single mechanism —
@@ -251,8 +251,8 @@ current smoke:
     list — *inner loop:* `npm run test:watch` (auto-scoped to changed files) + `npx playwright test
     <the-one-scenario>` when you need browser fidelity; *wrap-up gate:* `npm test` + `npm run e2e` +
     `npm run smoke`. Include how to add a unit test and a scenario, and the `vitest related` /
-    per-file forms. `docs/DECISIONS.md`: dated entry resolving the harness-shape open question (Vitest
-    + scenario API + fixed-step; per-behaviour minimal scenarios; why the live playthrough was retired)
+    per-file forms. `docs/DECISIONS.md`: dated entry resolving the harness-shape open question (Vitest +
+    scenario API + fixed-step; per-behaviour minimal scenarios; why the live playthrough was retired)
     and flip the "isolated test setups" **[OPEN]** → **[DECIDED]**. `CLAUDE.md`: refresh the "Testing
     direction" note. If a GitHub Actions workflow runs the smoke, point it at `npm test` (+ e2e) too.
   - Done when: docs describe the three tiers, the two-speed run-only-what-you-touch workflow, and how

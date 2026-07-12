@@ -38,7 +38,10 @@ const BLANK_TEX = 'ui-slot-blank';
  * dropping it into `UIScene.hudElements` makes it a UI-tap region only while visible.
  */
 export class SlotGrid extends Phaser.GameObjects.Container {
-  private readonly cells: Array<{ icon: Phaser.GameObjects.Image; count: Phaser.GameObjects.Text }> = [];
+  private readonly cells: Array<{
+    icon: Phaser.GameObjects.Image;
+    count: Phaser.GameObjects.Text;
+  }> = [];
   private readonly cellSize: number;
 
   constructor(scene: Phaser.Scene, x: number, y: number, cfg: SlotGridConfig) {
@@ -94,10 +97,18 @@ export class SlotGrid extends Phaser.GameObjects.Container {
       }
       const vis = lookup(slot.id);
       if (vis && this.scene.textures.exists(vis.iconKey)) {
-        icon.setTexture(vis.iconKey).clearTint().setDisplaySize(iconSize, iconSize).setVisible(true);
+        icon
+          .setTexture(vis.iconKey)
+          .clearTint()
+          .setDisplaySize(iconSize, iconSize)
+          .setVisible(true);
       } else {
         // Fallback: a coloured swatch (the item's placeholder colour) so a missing icon never blanks.
-        icon.setTexture(BLANK_TEX).setTint(vis?.color ?? 0xffffff).setDisplaySize(iconSize, iconSize).setVisible(true);
+        icon
+          .setTexture(BLANK_TEX)
+          .setTint(vis?.color ?? 0xffffff)
+          .setDisplaySize(iconSize, iconSize)
+          .setVisible(true);
       }
       count.setText(String(slot.count)).setVisible(slot.count > 1);
     }

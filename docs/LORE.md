@@ -26,7 +26,7 @@ areas, NPCs, enemies, items, and in-jokes.
 
 As details land, note the mapping so it's reusable:
 
-| Real Mostowo thing | In-game form | Notes |
-| --- | --- | --- |
-| _e.g. a specific area_ | _map zone / resource area_ | _TBD_ |
-| _e.g. a local person_ | _NPC / named enemy_ | _TBD_ |
+|Real Mostowo thing|In-game form|Notes|
+|---|---|---|
+|_e.g. a specific area_|_map zone / resource area_|_TBD_|
+|_e.g. a local person_|_NPC / named enemy_|_TBD_|

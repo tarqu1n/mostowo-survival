@@ -38,7 +38,9 @@ import { parseArgs, requireEnv, writeBase64Png, readPngAsBase64 } from './lib.mj
 const args = parseArgs(process.argv.slice(2));
 
 if (!args.description) {
-  console.error('Usage: node scripts/gen-art/pixellab.mjs --description "..." [--width 16] [--height 16] [--model pixflux|bitforge] [--out path.png]');
+  console.error(
+    'Usage: node scripts/gen-art/pixellab.mjs --description "..." [--width 16] [--height 16] [--model pixflux|bitforge] [--out path.png]',
+  );
   process.exit(1);
 }
 
@@ -48,7 +50,9 @@ const model = args.model === 'bitforge' || args['style-image'] ? 'bitforge' : 'p
 const endpoint = `https://api.pixellab.ai/v1/generate-image-${model}`;
 
 if (args['style-image'] && model !== 'bitforge') {
-  console.error('--style-image requires bitforge (pass --model bitforge, or omit --model — it is inferred).');
+  console.error(
+    '--style-image requires bitforge (pass --model bitforge, or omit --model — it is inferred).',
+  );
   process.exit(1);
 }
 

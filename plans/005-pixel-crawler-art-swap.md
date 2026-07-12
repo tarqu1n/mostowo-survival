@@ -231,8 +231,8 @@ assertions in GameScene create for a cheap extra guard.
     import the removed helpers) — expected; typecheck/build acceptance is deferred to Step 5.
   - Docs: update the module doc block at top of `tileset.ts` (note directional facing is new
     behaviour; the abstract-roles promise still holds).
-  - Done when: `tileset.ts` type-checks in isolation, exports the new schema + `PIXEL_CRAWLER_TILESET`
-    + helpers, and `ACTIVE_TILESET === PIXEL_CRAWLER_TILESET`.
+  - Done when: `tileset.ts` type-checks in isolation, exports the new schema + `PIXEL_CRAWLER_TILESET` +
+    helpers, and `ACTIVE_TILESET === PIXEL_CRAWLER_TILESET`.
 
 - [x] **Step 3: Rewrite the loader (PreloadScene)** `[inline]`
   - Outcome: Rewrote `PreloadScene.preload()` asset block. Base now `${BASE_URL}assets/tilesets/${id}${spriteRoot?'/'+spriteRoot:''}` (dropped hardcoded `/sprites`). Added a local `url(rel)=encodeURI(base+'/'+rel)` wrapper applied to **every** load. Terrain: collects all `TileSource`s (ground+wall+tree), loads each distinct `sheetFrame` sheet once (deduped via `sheetKey`, `load.spritesheet` @ `TILE_SIZE`) and each `image` tile once (`tileImageKey`, `load.image`). Actors: `loadStrip(key, strip)` → `load.spritesheet(key, url, {frameWidth/Height: strip.frameSize})` for the 6 player strips (`playerAnimKey(state,facing)`) + enemy Run (`enemyWalkKey`); texture key == anim key per strip. Loading-bar UI untouched. Imports `TILE_SIZE` from `../config` (not the removed tileset re-export). Also removed the now-unneeded `TILE_SIZE` import/re-export from `tileset.ts`. PreloadScene type-checks clean; only GameScene errors remain (Step 4).

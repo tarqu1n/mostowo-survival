@@ -7,7 +7,9 @@ import { twoTrees, threeTrees } from './scenarios';
 // through the REAL pointer path (onPointerUp's tap decision), so it proves the tap-vs-queue routing,
 // not just the underlying TaskQueue. MIN_ZOOM pins the camera (whole map visible, no scroll room →
 // follow never moves it) so screen↔tile mapping stays fixed while the worker walks between taps.
-test('tapping a second tree while harvesting the first queues it instead of interrupting', async ({ page }) => {
+test('tapping a second tree while harvesting the first queues it instead of interrupting', async ({
+  page,
+}) => {
   await startGame(page);
   const { treeIds } = await applyScenario(page, twoTrees());
   for (let i = 0; i < 4; i++) await emit(page, 'zoom:delta', -0.5); // → MIN_ZOOM, static camera
@@ -51,7 +53,9 @@ test('tapping a second tree while harvesting the first queues it instead of inte
 // the re-queue is a plain append. Three trees give an unambiguous middle to pull out and re-add.
 // Driven through the DEV `enqueue` seam (which the tap path routes into — proven in the spec above)
 // so the queue-order assertions don't hinge on pixel-mapping every tile onto the canvas.
-test('re-enqueuing an already-queued tree moves it to the end of the harvest queue', async ({ page }) => {
+test('re-enqueuing an already-queued tree moves it to the end of the harvest queue', async ({
+  page,
+}) => {
   await startGame(page);
   const { treeIds } = await applyScenario(page, threeTrees());
 

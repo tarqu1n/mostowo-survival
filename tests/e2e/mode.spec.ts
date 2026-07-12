@@ -4,7 +4,9 @@ import { startGame, applyScenario, emit, state, captured } from './harness';
 // Tier-2: the three mutually-exclusive input modes toggle correctly and broadcast 'mode:changed'
 // (which UIScene mirrors for button highlight + Combat-control visibility).
 
-test('Combat and Inspect toggles switch the authoritative mode, mutually exclusive', async ({ page }) => {
+test('Combat and Inspect toggles switch the authoritative mode, mutually exclusive', async ({
+  page,
+}) => {
   await startGame(page);
   await applyScenario(page, { player: [11, 20] });
   expect((await state(page)).mode).toBe('command');

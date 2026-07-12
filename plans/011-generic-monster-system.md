@@ -54,13 +54,13 @@ advisor-backed, roadmap-aligned call over 010's baked strips) — but the plan b
 fully-testable, night-waves-critical AI FSM with a riskier, eyeball-only weapon+idle-footprint
 subsystem, so the real question is whether to split/sequence, not any defect in the "how."
 
-| # | Finding | Lens | Severity | Suggested action |
-| - | ------- | ---- | -------- | ---------------- |
-| 1 | Couples the roadmap-critical, unit-testable AI FSM with a visually-risky, human-verify-only weapon-attachment + idle-footprint subsystem; the stated "Next" (night-waves) needs only the AI half, and contact damage already works without held weapons | Right-sizing / roadmap | Medium | **RESOLVED — sequenced AI-first (Phase A / Phase B) in one plan, review gate between** |
-| 2 | Piloting runtime pinning supersedes 010's stamp-tool + rigid-slot baked strips (010's own finding #3), yet it's framed only as "shared primitives, 010 deferred/untouched" — a future session could resume 010's now-redundant tooling | Cross-cutting consistency / reversibility | Medium | Step B7 records pinning **supersedes** the stamp tool for rigid slots (only deformable chest/legs still need strips) **and updates 010's header** |
-| 3 | The two biggest new pieces have no machine gate: per-tick weapon pin and the 32px→`scale:2` idle render swap on a physics-bodied sprite vs `fitActorBody` — the scale/origin↔Arcade-body interaction rests entirely on a manual eyeball | Executability / gaps & risks | Medium | Steps B4/B5 stay `[inline]` + per-step review; the idle scale-swap↔body interaction is called out as its own in-step check |
-| 4 | Patrol state is built ahead of any consumer — no live monster has a route (scenario/test-only); wander is the only roaming mode the design doc names | Right-sizing | Low | Accepted (locked with Matt, cheap branch in a pure fn) — noted as test-only surface until content uses it |
-| 5 | Weapon-stat source-of-truth hedged ("pull from config if you prefer"); and manifest `weapons.scale?` isn't constrained to integers despite the settled integer-pixel-scale decision | Cross-cutting consistency | Low | `src/data/weapons.ts` is the **single** source for damage/attackMs; weapon `scale` **must be integer** |
+|#|Finding|Lens|Severity|Suggested action|
+|-|-------|----|--------|----------------|
+|1|Couples the roadmap-critical, unit-testable AI FSM with a visually-risky, human-verify-only weapon-attachment + idle-footprint subsystem; the stated "Next" (night-waves) needs only the AI half, and contact damage already works without held weapons|Right-sizing / roadmap|Medium|**RESOLVED — sequenced AI-first (Phase A / Phase B) in one plan, review gate between**|
+|2|Piloting runtime pinning supersedes 010's stamp-tool + rigid-slot baked strips (010's own finding #3), yet it's framed only as "shared primitives, 010 deferred/untouched" — a future session could resume 010's now-redundant tooling|Cross-cutting consistency / reversibility|Medium|Step B7 records pinning **supersedes** the stamp tool for rigid slots (only deformable chest/legs still need strips) **and updates 010's header**|
+|3|The two biggest new pieces have no machine gate: per-tick weapon pin and the 32px→`scale:2` idle render swap on a physics-bodied sprite vs `fitActorBody` — the scale/origin↔Arcade-body interaction rests entirely on a manual eyeball|Executability / gaps & risks|Medium|Steps B4/B5 stay `[inline]` + per-step review; the idle scale-swap↔body interaction is called out as its own in-step check|
+|4|Patrol state is built ahead of any consumer — no live monster has a route (scenario/test-only); wander is the only roaming mode the design doc names|Right-sizing|Low|Accepted (locked with Matt, cheap branch in a pure fn) — noted as test-only surface until content uses it|
+|5|Weapon-stat source-of-truth hedged ("pull from config if you prefer"); and manifest `weapons.scale?` isn't constrained to integers despite the settled integer-pixel-scale decision|Cross-cutting consistency|Low|`src/data/weapons.ts` is the **single** source for damage/attackMs; weapon `scale` **must be integer**|
 
 ## Summary
 
@@ -302,8 +302,8 @@ scale-swap (critique #3).
     `length === frames`; (b) every id in every `EnemyDef.weaponPool` exists in `MONSTER_WEAPONS` **and**
     in the manifest `weapons` catalogue; (c) every manifest `weapons[*].scale` (when set) is an integer.
   - Side effects: `StripAnim`/`ActorRender` additions are **optional**, so the player manifest +
-    PreloadScene/GameScene still compile unchanged. Docs: module doc in `tileset.ts`. Done when: `tsc`
-    + `npm test` green; new data tests pass; `ACTIVE_TILESET` player path unchanged.
+    PreloadScene/GameScene still compile unchanged. Docs: module doc in `tileset.ts`. Done when: `tsc` +
+    `npm test` green; new data tests pass; `ACTIVE_TILESET` player path unchanged.
   - Outcome: `tileset.ts` — added `AttachPoint` + `WeaponArt` interfaces; extended `StripAnim` with
     optional `anchors?.{mainHand}` (frame-px space, len === frames) + `render?` footprint override;
     extended the `enemy` actor type with required `idle`/`weapons` and populated the manifest (32px

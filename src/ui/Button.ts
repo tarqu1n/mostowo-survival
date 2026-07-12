@@ -34,7 +34,11 @@ export class Button extends Phaser.GameObjects.Container {
     super(scene, x, y);
 
     const palette =
-      cfg.variant === 'danger' ? UI_THEME.danger : cfg.variant === 'olive' ? UI_THEME.olive : UI_THEME.button;
+      cfg.variant === 'danger'
+        ? UI_THEME.danger
+        : cfg.variant === 'olive'
+          ? UI_THEME.olive
+          : UI_THEME.button;
     this.baseFill = palette.fill;
     this.activeFill = cfg.activeFill ?? UI_THEME.button.fillActive;
 

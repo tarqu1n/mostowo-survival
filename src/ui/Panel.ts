@@ -42,7 +42,11 @@ export class Panel extends Phaser.GameObjects.Container {
         cfg.fill ?? UI_THEME.panel.fill,
         cfg.fillAlpha ?? UI_THEME.panel.fillAlpha,
       )
-      .setStrokeStyle(1, cfg.stroke ?? UI_THEME.panel.stroke, cfg.strokeAlpha ?? UI_THEME.panel.strokeAlpha);
+      .setStrokeStyle(
+        1,
+        cfg.stroke ?? UI_THEME.panel.stroke,
+        cfg.strokeAlpha ?? UI_THEME.panel.strokeAlpha,
+      );
     this.add(this.bg);
     this.setSize(cfg.width, cfg.height);
     if (cfg.depth !== undefined) this.setDepth(cfg.depth);
@@ -61,7 +65,11 @@ export class Panel extends Phaser.GameObjects.Container {
    * controls vertical anchoring (0.5 = centre on the row, 0 = top-anchored, for multi-line blocks).
    * Returns the Text so callers can update it later with setText.
    */
-  addText(offsetY: number, style: Phaser.Types.GameObjects.Text.TextStyle, originY = 0.5): Phaser.GameObjects.Text {
+  addText(
+    offsetY: number,
+    style: Phaser.Types.GameObjects.Text.TextStyle,
+    originY = 0.5,
+  ): Phaser.GameObjects.Text {
     const t = this.scene.add
       .text(0, -this.halfHeight + offsetY, '', { fontFamily: UI_THEME.font, ...style })
       .setOrigin(0.5, originY);

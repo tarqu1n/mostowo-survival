@@ -64,10 +64,21 @@ import { Inventory } from '../systems/Inventory';
 import { worldToTile, tileToWorldCenter, snapToTileCenter, tileKey } from '../systems/grid';
 import { findPath, reachableAdjacent, type Cell } from '../systems/pathfind';
 import { TaskQueue, type Action } from '../systems/tasks';
-import { cycleLengthMs, phaseAt, tintAlphaAt, dayCountForTotal, type DayPhase } from '../systems/daynight';
+import {
+  cycleLengthMs,
+  phaseAt,
+  tintAlphaAt,
+  dayCountForTotal,
+  type DayPhase,
+} from '../systems/daynight';
 import { drainHunger, feed, isStarving } from '../systems/needs';
 import { resolveMeleeAttack } from '../systems/combat';
-import { stepMonster, initialMonsterState, type MonsterState, type MonsterMode } from '../systems/monsterAI';
+import {
+  stepMonster,
+  initialMonsterState,
+  type MonsterState,
+  type MonsterMode,
+} from '../systems/monsterAI';
 import { weaponTransform } from '../systems/attachment';
 import { hurtboxContains, hurtboxTiles, DEFAULT_HURTBOX } from '../systems/hurtbox';
 import { bakeGlowTexture } from '../render/glowTexture';
@@ -324,7 +335,10 @@ export class GameScene extends Phaser.Scene {
 
   private ui!: UIScene;
   private userZoom = DEFAULT_ZOOM; // the user-facing zoom level (100/200/300%); camera scale is this × RENDER_SCALE
-  private gridDims = { cols: Math.floor(MAP_WIDTH / TILE_SIZE), rows: Math.floor(MAP_HEIGHT / TILE_SIZE) };
+  private gridDims = {
+    cols: Math.floor(MAP_WIDTH / TILE_SIZE),
+    rows: Math.floor(MAP_HEIGHT / TILE_SIZE),
+  };
   private downScreen = new Phaser.Math.Vector2(); // pointerdown position in screen/base-canvas px
   private downOnUI = false;
   private sawPointerDown = false; // this scene observed the press; guards against a leaked pointerup (see onPointerUp)
@@ -425,26 +439,35 @@ export class GameScene extends Phaser.Scene {
     // idle/walk loop (velocity-driven locomotion); chop/mine/gather loop while harvesting in place;
     // attack is a one-shot swing. Chop/mine/attack run faster (ACTION_ANIM_FRAMERATE) so a hit lands per
     // swing; gather is a calmer forage loop at the locomotion rate.
-    (['idle', 'walk', 'chop', 'mine', 'gather', 'attack', 'death'] as PlayerState[]).forEach((state) => {
-      const isAction = state === 'chop' || state === 'mine' || state === 'attack';
-      const oneShot = state === 'attack' || state === 'death'; // play once and hold the last frame
-      (['down', 'side', 'up'] as Facing[]).forEach((facing) => {
-        const key = playerAnimKey(state, facing);
-        if (this.anims.exists(key)) return;
-        this.anims.create({
-          key,
-          frames: this.anims.generateFrameNumbers(key, { start: 0, end: playerActor[state][facing].frames - 1 }),
-          frameRate: state === 'death' ? DEATH_ANIM_FRAMERATE : isAction ? ACTION_ANIM_FRAMERATE : 10,
-          repeat: oneShot ? 0 : -1,
+    (['idle', 'walk', 'chop', 'mine', 'gather', 'attack', 'death'] as PlayerState[]).forEach(
+      (state) => {
+        const isAction = state === 'chop' || state === 'mine' || state === 'attack';
+        const oneShot = state === 'attack' || state === 'death'; // play once and hold the last frame
+        (['down', 'side', 'up'] as Facing[]).forEach((facing) => {
+          const key = playerAnimKey(state, facing);
+          if (this.anims.exists(key)) return;
+          this.anims.create({
+            key,
+            frames: this.anims.generateFrameNumbers(key, {
+              start: 0,
+              end: playerActor[state][facing].frames - 1,
+            }),
+            frameRate:
+              state === 'death' ? DEATH_ANIM_FRAMERATE : isAction ? ACTION_ANIM_FRAMERATE : 10,
+            repeat: oneShot ? 0 : -1,
+          });
         });
-      });
-    });
+      },
+    );
     // Enemy (skeleton): a single Run strip (frame 0 doubles as the idle pose, flipped by movement-x —
     // the mob sheets ship no directional variants) plus a one-shot Death collapse played on kill.
     if (!this.anims.exists(enemyWalkKey)) {
       this.anims.create({
         key: enemyWalkKey,
-        frames: this.anims.generateFrameNumbers(enemyWalkKey, { start: 0, end: enemyActor.walk.frames - 1 }),
+        frames: this.anims.generateFrameNumbers(enemyWalkKey, {
+          start: 0,
+          end: enemyActor.walk.frames - 1,
+        }),
         frameRate: 10,
         repeat: -1,
       });
@@ -452,7 +475,10 @@ export class GameScene extends Phaser.Scene {
     if (!this.anims.exists(enemyIdleKey)) {
       this.anims.create({
         key: enemyIdleKey,
-        frames: this.anims.generateFrameNumbers(enemyIdleKey, { start: 0, end: enemyActor.idle.frames - 1 }),
+        frames: this.anims.generateFrameNumbers(enemyIdleKey, {
+          start: 0,
+          end: enemyActor.idle.frames - 1,
+        }),
         frameRate: 6, // slow, gentle breathing bob
         repeat: -1,
       });
@@ -460,7 +486,10 @@ export class GameScene extends Phaser.Scene {
     if (!this.anims.exists(enemyDeathKey)) {
       this.anims.create({
         key: enemyDeathKey,
-        frames: this.anims.generateFrameNumbers(enemyDeathKey, { start: 0, end: enemyActor.death.frames - 1 }),
+        frames: this.anims.generateFrameNumbers(enemyDeathKey, {
+          start: 0,
+          end: enemyActor.death.frames - 1,
+        }),
         frameRate: DEATH_ANIM_FRAMERATE,
         repeat: 0,
       });
@@ -468,7 +497,10 @@ export class GameScene extends Phaser.Scene {
     const p = this.add.sprite(MAP_WIDTH / 2, MAP_HEIGHT / 2, playerAnimKey('idle', 'down'));
     this.physics.add.existing(p);
     this.player = p as typeof this.player;
-    this.player.setDepth(10).setScale(playerActor.render.scale).setOrigin(playerActor.render.originX, playerActor.render.originY);
+    this.player
+      .setDepth(10)
+      .setScale(playerActor.render.scale)
+      .setOrigin(playerActor.render.originX, playerActor.render.originY);
     this.player.setData('baseScale', playerActor.render.scale); // rest scale the flinch squash returns to
     this.player.body.setCollideWorldBounds(true);
     this.fitActorBody(this.player, playerActor.render);
@@ -493,7 +525,10 @@ export class GameScene extends Phaser.Scene {
     this.fogShape = this.add.graphics().setVisible(false);
     const fogMask = this.fogShape.createGeometryMask();
     fogMask.setInvertAlpha(true);
-    this.add.rectangle(MAP_WIDTH / 2, MAP_HEIGHT / 2, MAP_WIDTH, MAP_HEIGHT, 0x000000, 0.2).setDepth(5).setMask(fogMask);
+    this.add
+      .rectangle(MAP_WIDTH / 2, MAP_HEIGHT / 2, MAP_WIDTH, MAP_HEIGHT, 0x000000, 0.2)
+      .setDepth(5)
+      .setMask(fogMask);
     this.updateVision();
 
     // Night overlay — mirrors the fog rect's map size/centre but unmasked (a global dim, not a vision
@@ -516,7 +551,10 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.walls);
 
     // Build ghost — hidden until build mode; recoloured valid/invalid as it tracks the tapped tile.
-    this.ghost = this.add.rectangle(0, 0, TILE_SIZE, TILE_SIZE, COLORS.ghostValid, 0.5).setVisible(false).setDepth(6);
+    this.ghost = this.add
+      .rectangle(0, 0, TILE_SIZE, TILE_SIZE, COLORS.ghostValid, 0.5)
+      .setVisible(false)
+      .setDepth(6);
 
     // HUD overlay runs alongside this scene; grab its instance for the UI-tap guard. UIScene
     // itself isn't restarted on a death-restart (only 'Game' is), so re-emit mode:changed here to
@@ -605,7 +643,12 @@ export class GameScene extends Phaser.Scene {
       this.dayCount = dayCount;
       this.registry.set('dayPhase', phase);
       this.registry.set('dayCount', dayCount);
-      this.game.events.emit('time:changed', { phase, dayCount, cycleMs, tNorm: cycleMs / cycleLengthMs() });
+      this.game.events.emit('time:changed', {
+        phase,
+        dayCount,
+        cycleMs,
+        tNorm: cycleMs / cycleLengthMs(),
+      });
     }
 
     // Hunger drains every frame too (drainHunger clamps a big refocus delta to [0,max]). Emit only when
@@ -725,7 +768,8 @@ export class GameScene extends Phaser.Scene {
     if (this.playerDying) return; // death collapse owns the sprite until the restart
     if (this.time.now < this.attackLockUntil) return; // attack swing in progress — don't stomp it
     const facing = this.facingDir();
-    const state: PlayerState = this.harvestSwing ?? (this.player.body.velocity.lengthSq() > 1 ? 'walk' : 'idle');
+    const state: PlayerState =
+      this.harvestSwing ?? (this.player.body.velocity.lengthSq() > 1 ? 'walk' : 'idle');
     this.player.setFlipX(facing === 'side' && this.lastFacing.dCol < 0);
     this.player.anims.play(playerAnimKey(state, facing), true);
   }
@@ -816,15 +860,25 @@ export class GameScene extends Phaser.Scene {
       // Prefer this species' stand tiles (a tall tree restricts to its base, never up in the canopy);
       // fall back to any adjacent tile if those are walled off. A rock omits standOffsets → all-adjacent.
       const stand =
-        reachableAdjacent(this.playerTile(), target, this.isBlocked, this.gridDims, tree.def.standOffsets) ??
-        reachableAdjacent(this.playerTile(), target, this.isBlocked, this.gridDims);
+        reachableAdjacent(
+          this.playerTile(),
+          target,
+          this.isBlocked,
+          this.gridDims,
+          tree.def.standOffsets,
+        ) ?? reachableAdjacent(this.playerTile(), target, this.isBlocked, this.gridDims);
       if (!stand || !this.pathTo(stand)) this.completeCurrent();
       return;
     }
     // build
     const site = this.siteById(a.siteId);
     if (!site || site.done) return this.completeCurrent();
-    const stand = reachableAdjacent(this.playerTile(), { col: site.col, row: site.row }, this.isBlocked, this.gridDims);
+    const stand = reachableAdjacent(
+      this.playerTile(),
+      { col: site.col, row: site.row },
+      this.isBlocked,
+      this.gridDims,
+    );
     if (!stand || !this.pathTo(stand)) this.completeCurrent();
   }
 
@@ -881,7 +935,10 @@ export class GameScene extends Phaser.Scene {
 
   private emitTasks(): void {
     this.refreshQueueHighlights();
-    this.game.events.emit('tasks:changed', { current: this.queue.current?.kind ?? null, pending: this.queue.pending });
+    this.game.events.emit('tasks:changed', {
+      current: this.queue.current?.kind ?? null,
+      pending: this.queue.pending,
+    });
   }
 
   /** Outline every queued target in yellow (trees to harvest, sites to build) + pip queued move tiles. */
@@ -916,7 +973,16 @@ export class GameScene extends Phaser.Scene {
         if (site && !site.done) site.rect.setStrokeStyle(2, COLORS.queued, 1);
       } else {
         this.queueMarkers.push(
-          this.add.rectangle(tileToWorldCenter(a.col), tileToWorldCenter(a.row), 6, 6, COLORS.queued, 0.85).setDepth(4),
+          this.add
+            .rectangle(
+              tileToWorldCenter(a.col),
+              tileToWorldCenter(a.row),
+              6,
+              6,
+              COLORS.queued,
+              0.85,
+            )
+            .setDepth(4),
         );
       }
     }
@@ -929,13 +995,20 @@ export class GameScene extends Phaser.Scene {
    * per-frame OutlineFX PostFX — no shader runs in the frame loop.
    */
   private addTreeGlow(tree: TreeNode, pulse: boolean): void {
-    const radius = Phaser.Math.Clamp(Math.round(GLOW_SCREEN_PX / this.nodeScale(tree.sprite, tree.def)), 2, 16);
+    const radius = Phaser.Math.Clamp(
+      Math.round(GLOW_SCREEN_PX / this.nodeScale(tree.sprite, tree.def)),
+      2,
+      16,
+    );
     const glow = bakeGlowTexture(this, tree.sprite.texture.key, COLORS.queued, radius);
     // Align the padded halo canvas onto the tree: its content sits `pad` texels in from every edge,
     // so the tree's display origin shifts by `pad` and the scale matches.
     const img = this.add
       .image(tree.sprite.x, tree.sprite.y, glow.key)
-      .setDisplayOrigin(tree.sprite.displayOriginX + glow.pad, tree.sprite.displayOriginY + glow.pad)
+      .setDisplayOrigin(
+        tree.sprite.displayOriginX + glow.pad,
+        tree.sprite.displayOriginY + glow.pad,
+      )
       .setScale(tree.sprite.scaleX, tree.sprite.scaleY)
       .setDepth(tree.sprite.depth - 0.5); // between the ground (0) and the tree (1)
     this.glowSprites.set(tree.id, img);
@@ -1093,7 +1166,11 @@ export class GameScene extends Phaser.Scene {
     }
 
     // downScreen and pointer are backing-store px (device-scaled); DRAG_PX is a design-space distance.
-    if (!this.isPanning && Phaser.Math.Distance.Between(this.downScreen.x, this.downScreen.y, pointer.x, pointer.y) > DRAG_PX * RENDER_SCALE) {
+    if (
+      !this.isPanning &&
+      Phaser.Math.Distance.Between(this.downScreen.x, this.downScreen.y, pointer.x, pointer.y) >
+        DRAG_PX * RENDER_SCALE
+    ) {
       this.isPanning = true;
       this.setFollowing(false); // manual pan always breaks the follow-lock
     }
@@ -1197,7 +1274,9 @@ export class GameScene extends Phaser.Scene {
   private enemyAt(col: number, row: number): EnemyUnit | undefined {
     const target = { col, row };
     return this.enemies.find(
-      (z) => z.alive && hurtboxContains({ col: z.col, row: z.row }, z.def.hurtbox ?? DEFAULT_HURTBOX, target),
+      (z) =>
+        z.alive &&
+        hurtboxContains({ col: z.col, row: z.row }, z.def.hurtbox ?? DEFAULT_HURTBOX, target),
     );
   }
 
@@ -1486,7 +1565,9 @@ export class GameScene extends Phaser.Scene {
     // facing.
     if (vec.dx !== 0 || vec.dy !== 0) {
       this.lastFacing =
-        Math.abs(vec.dx) >= Math.abs(vec.dy) ? { dCol: Math.sign(vec.dx), dRow: 0 } : { dCol: 0, dRow: Math.sign(vec.dy) };
+        Math.abs(vec.dx) >= Math.abs(vec.dy)
+          ? { dCol: Math.sign(vec.dx), dRow: 0 }
+          : { dCol: 0, dRow: Math.sign(vec.dy) };
     }
   }
 
@@ -1500,9 +1581,12 @@ export class GameScene extends Phaser.Scene {
    * empty ground closes any open panel. */
   private inspectAt(x: number, y: number): void {
     const pick = this.pickSpriteAt(x, y);
-    if (pick?.kind === 'enemy') return void this.game.events.emit('inspect:show', enemyStats(pick.enemy));
-    if (pick?.kind === 'tree') return void this.game.events.emit('inspect:show', treeStats(pick.tree));
-    if (pick?.kind === 'site') return void this.game.events.emit('inspect:show', wallStats(pick.site));
+    if (pick?.kind === 'enemy')
+      return void this.game.events.emit('inspect:show', enemyStats(pick.enemy));
+    if (pick?.kind === 'tree')
+      return void this.game.events.emit('inspect:show', treeStats(pick.tree));
+    if (pick?.kind === 'site')
+      return void this.game.events.emit('inspect:show', wallStats(pick.site));
     this.game.events.emit('inspect:hide');
   }
 
@@ -1522,7 +1606,10 @@ export class GameScene extends Phaser.Scene {
     const col = worldToTile(x);
     const row = worldToTile(y);
     let best: { pick: PointerPick; depth: number; order: number } | null = null;
-    const consider = (obj: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite | Phaser.GameObjects.Rectangle, pick: PointerPick): void => {
+    const consider = (
+      obj: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite | Phaser.GameObjects.Rectangle,
+      pick: PointerPick,
+    ): void => {
       const order = this.children.getIndex(obj);
       if (!best || obj.depth > best.depth || (obj.depth === best.depth && order > best.order)) {
         best = { pick, depth: obj.depth, order };
@@ -1530,12 +1617,18 @@ export class GameScene extends Phaser.Scene {
     };
     for (const z of this.enemies) {
       if (!z.alive) continue;
-      const footprint = hurtboxContains({ col: z.col, row: z.row }, z.def.hurtbox ?? DEFAULT_HURTBOX, { col, row });
-      if (footprint || this.alphaHit(z.sprite, x, y)) consider(z.sprite, { kind: 'enemy', enemy: z });
+      const footprint = hurtboxContains(
+        { col: z.col, row: z.row },
+        z.def.hurtbox ?? DEFAULT_HURTBOX,
+        { col, row },
+      );
+      if (footprint || this.alphaHit(z.sprite, x, y))
+        consider(z.sprite, { kind: 'enemy', enemy: z });
     }
     for (const t of this.trees) {
       if (!t.alive) continue;
-      if ((t.col === col && t.row === row) || this.alphaHit(t.sprite, x, y)) consider(t.sprite, { kind: 'tree', tree: t });
+      if ((t.col === col && t.row === row) || this.alphaHit(t.sprite, x, y))
+        consider(t.sprite, { kind: 'tree', tree: t });
     }
     for (const s of this.sites) {
       // An unbuilt blueprint is a plain rectangle (no texture) — its filled tile IS its shape, so an
@@ -1555,14 +1648,23 @@ export class GameScene extends Phaser.Scene {
    * AABB hit if the pixel can't be read (e.g. a texture whose source canvas isn't sampleable) rather
    * than silently missing.
    */
-  private alphaHit(s: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite, x: number, y: number): boolean {
+  private alphaHit(
+    s: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite,
+    x: number,
+    y: number,
+  ): boolean {
     if (!s.getBounds().contains(x, y)) return false;
     let localX = (x - s.x) / s.scaleX + s.displayOriginX;
     let localY = (y - s.y) / s.scaleY + s.displayOriginY;
     if (s.flipX) localX = s.frame.width - localX;
     if (s.flipY) localY = s.frame.height - localY;
     try {
-      const alpha = this.textures.getPixelAlpha(Math.floor(localX), Math.floor(localY), s.texture.key, s.frame.name);
+      const alpha = this.textures.getPixelAlpha(
+        Math.floor(localX),
+        Math.floor(localY),
+        s.texture.key,
+        s.frame.name,
+      );
       return alpha === null ? false : alpha > 0;
     } catch {
       return true; // texture source not sampleable — fall back to the AABB hit already confirmed above
@@ -1604,12 +1706,22 @@ export class GameScene extends Phaser.Scene {
   /** Spawn one resource node of `def` (tree, rock, …) at a tile; sized/anchored from its own data. */
   private addNode(def: ResourceNodeDef, col: number, row: number): void {
     const { key, frame } = resolveTile(ACTIVE_TILESET.tiles[def.tile]);
-    const sprite = this.add.image(tileToWorldCenter(col), tileToWorldCenter(row), key, frame).setDepth(1);
+    const sprite = this.add
+      .image(tileToWorldCenter(col), tileToWorldCenter(row), key, frame)
+      .setDepth(1);
     // Each species sizes/anchors itself from its def (critique #2): a pine scales to ~2.6 tiles and
     // anchors near its base so the canopy overhangs up; a rock is ~1 tile, centred. sprite.x/y stay
     // the tile centre, so treeAt()'s distance check is unaffected regardless of scale/origin.
     sprite.setScale(this.nodeScale(sprite, def)).setOrigin(def.originX, def.originY);
-    this.trees.push({ id: `${def.id}-${this.nextTreeId++}`, sprite, def, hp: def.maxHp, alive: true, col, row });
+    this.trees.push({
+      id: `${def.id}-${this.nextTreeId++}`,
+      sprite,
+      def,
+      hp: def.maxHp,
+      alive: true,
+      col,
+      row,
+    });
   }
 
   /** Base display scale for a node image (derived from its source height + the def's `tilesTall`). */
@@ -1627,7 +1739,13 @@ export class GameScene extends Phaser.Scene {
   private randomiseWorld(): void {
     this.cancelAll(); // drop harvest orders that reference the nodes we're about to destroy
     for (const t of this.trees) t.sprite.destroy();
-    for (const z of this.enemies) { this.cleanupActorFx(z.sprite); z.weapon?.sprite.destroy(); z.hands?.main.destroy(); z.hands?.off.destroy(); z.sprite.destroy(); }
+    for (const z of this.enemies) {
+      this.cleanupActorFx(z.sprite);
+      z.weapon?.sprite.destroy();
+      z.hands?.main.destroy();
+      z.hands?.off.destroy();
+      z.sprite.destroy();
+    }
     this.trees = [];
     this.enemies = [];
 
@@ -1747,7 +1865,9 @@ export class GameScene extends Phaser.Scene {
     const def = ENEMIES[enemyId];
     const enemyActor = ACTIVE_TILESET.actors.enemy;
     const { render } = enemyActor;
-    const sprite = this.add.sprite(tileToWorldCenter(col), tileToWorldCenter(row), enemyWalkKey).setDepth(9);
+    const sprite = this.add
+      .sprite(tileToWorldCenter(col), tileToWorldCenter(row), enemyWalkKey)
+      .setDepth(9);
     sprite.setScale(render.scale).setOrigin(render.originX, render.originY);
     sprite.setData('baseScale', render.scale); // rest scale the flinch squash returns to
     this.physics.add.existing(sprite);
@@ -1760,13 +1880,17 @@ export class GameScene extends Phaser.Scene {
     // Roll a held weapon from the enemy's pool (Phase B) — or take a scenario-forced id. The weapon is
     // a plain image (no physics body); it's pinned to the hand each tick in syncEnemyAttachments.
     const pool = def.weaponPool ?? [];
-    const weaponId = opts?.weaponId ?? (pool.length ? pool[Math.floor(this.rng() * pool.length)] : undefined);
+    const weaponId =
+      opts?.weaponId ?? (pool.length ? pool[Math.floor(this.rng() * pool.length)] : undefined);
     let weapon: EnemyUnit['weapon'];
     const art = weaponId ? enemyActor.weapons[weaponId] : undefined;
     const stats = weaponId ? MONSTER_WEAPONS[weaponId] : undefined;
     if (weaponId && art && stats) {
       const wsprite = this.add.image(sprite.x, sprite.y, resolveTile(art.source).key);
-      wsprite.setOrigin(art.pivot[0], art.pivot[1]).setScale(art.scale ?? 1).setDepth(sprite.depth + art.z);
+      wsprite
+        .setOrigin(art.pivot[0], art.pivot[1])
+        .setScale(art.scale ?? 1)
+        .setDepth(sprite.depth + art.z);
       weapon = { id: weaponId, sprite: wsprite, def: stats, swingRot: 0 };
     }
 
@@ -1775,7 +1899,10 @@ export class GameScene extends Phaser.Scene {
     const handArt = enemyActor.hand;
     const handKey = resolveTile(handArt.source).key;
     const mkHand = (z: number) =>
-      this.add.image(sprite.x, sprite.y, handKey).setOrigin(handArt.pivot[0], handArt.pivot[1]).setDepth(sprite.depth + z);
+      this.add
+        .image(sprite.x, sprite.y, handKey)
+        .setOrigin(handArt.pivot[0], handArt.pivot[1])
+        .setDepth(sprite.depth + z);
     const hands = { main: mkHand(handArt.mainZ), off: mkHand(handArt.offZ) };
 
     this.enemies.push({
@@ -1876,7 +2003,11 @@ export class GameScene extends Phaser.Scene {
     // Weapon at the main-hand grip: resting `rot` + the live coded swing (about its grip = this anchor).
     if (z.weapon) {
       const t = pin(strip.anchors?.mainHand, z.weapon.swingRot);
-      if (t) z.weapon.sprite.setPosition(z.sprite.x + t.x, z.sprite.y + t.y).setFlipX(t.flipX).setAngle(t.rotation);
+      if (t)
+        z.weapon.sprite
+          .setPosition(z.sprite.x + t.x, z.sprite.y + t.y)
+          .setFlipX(t.flipX)
+          .setAngle(t.rotation);
     }
     // Fists: a fist doesn't rotate, so pin position + mirror only (angle stays 0). The gripping hand
     // sits at the SAME anchor as the weapon, so it stays put while the weapon arcs about it.
@@ -1901,7 +2032,7 @@ export class GameScene extends Phaser.Scene {
     if (z.activeStrip === which) return;
     z.activeStrip = which;
     const enemy = ACTIVE_TILESET.actors.enemy;
-    const render = which === 'idle' ? enemy.idle.render ?? enemy.render : enemy.render;
+    const render = which === 'idle' ? (enemy.idle.render ?? enemy.render) : enemy.render;
     // Base frame of the target strip first, so fitActorBody reads the right frame size below.
     z.sprite.setTexture(which === 'idle' ? enemyIdleKey : enemyWalkKey, 0);
     z.sprite.setScale(render.scale).setOrigin(render.originX, render.originY);
@@ -1970,7 +2101,12 @@ export class GameScene extends Phaser.Scene {
 
       // Otherwise honour the FSM's move command: repath when asked, then walk (or stand if no target).
       if (decision.repath && decision.targetTile) {
-        const path = findPath({ col: z.col, row: z.row }, decision.targetTile, this.isBlocked, this.gridDims);
+        const path = findPath(
+          { col: z.col, row: z.row },
+          decision.targetTile,
+          this.isBlocked,
+          this.gridDims,
+        );
         z.path = path ?? [];
         z.pathIndex = 0;
         // Only a truly UNREACHABLE calm-mode pick (findPath → null) strands the monster — drop to idle
@@ -2010,9 +2146,12 @@ export class GameScene extends Phaser.Scene {
     if (col < 0 || row < 0 || col >= this.gridDims.cols || row >= this.gridDims.rows) return false;
     if (this.occupied.has(key) || this.siteTiles.has(key)) return false;
     // Only blocking nodes (trees/rocks) veto placement — a non-blocking bush can be built over.
-    if (this.trees.some((t) => t.alive && t.def.blocksPath && t.col === col && t.row === row)) return false;
+    if (this.trees.some((t) => t.alive && t.def.blocksPath && t.col === col && t.row === row))
+      return false;
     // Must have a tile the worker can stand on to build it (Finding 4 — no stranded blueprints).
-    return reachableAdjacent(this.playerTile(), { col, row }, this.isBlocked, this.gridDims) !== null;
+    return (
+      reachableAdjacent(this.playerTile(), { col, row }, this.isBlocked, this.gridDims) !== null
+    );
   }
 
   private updateGhost(pointer: Phaser.Input.Pointer): void {
@@ -2048,9 +2187,24 @@ export class GameScene extends Phaser.Scene {
   private createBlueprint(col: number, row: number): BuildSite {
     const key = tileKey(col, row);
     const rect = this.add
-      .rectangle(tileToWorldCenter(col), tileToWorldCenter(row), TILE_SIZE, TILE_SIZE, COLORS.blueprint, 0.35)
+      .rectangle(
+        tileToWorldCenter(col),
+        tileToWorldCenter(row),
+        TILE_SIZE,
+        TILE_SIZE,
+        COLORS.blueprint,
+        0.35,
+      )
       .setDepth(1);
-    const site: BuildSite = { id: `site-${this.nextSiteId++}`, col, row, rect, visual: null, progress: 0, done: false };
+    const site: BuildSite = {
+      id: `site-${this.nextSiteId++}`,
+      col,
+      row,
+      rect,
+      visual: null,
+      progress: 0,
+      done: false,
+    };
     this.sites.push(site);
     this.siteTiles.add(key);
     return site;
@@ -2086,7 +2240,13 @@ export class GameScene extends Phaser.Scene {
    */
   private testResetWorld(): void {
     for (const t of this.trees) t.sprite.destroy();
-    for (const z of this.enemies) { this.cleanupActorFx(z.sprite); z.weapon?.sprite.destroy(); z.hands?.main.destroy(); z.hands?.off.destroy(); z.sprite.destroy(); }
+    for (const z of this.enemies) {
+      this.cleanupActorFx(z.sprite);
+      z.weapon?.sprite.destroy();
+      z.hands?.main.destroy();
+      z.hands?.off.destroy();
+      z.sprite.destroy();
+    }
     for (const s of this.sites) {
       s.visual?.destroy();
       s.rect.destroy();
@@ -2137,7 +2297,10 @@ export class GameScene extends Phaser.Scene {
   private testApplyScenario(spec: ScenarioSpec): ScenarioResult {
     this.testResetWorld();
 
-    const [pcol, prow] = spec.player ?? [Math.floor(this.gridDims.cols / 2), Math.floor(this.gridDims.rows / 2)];
+    const [pcol, prow] = spec.player ?? [
+      Math.floor(this.gridDims.cols / 2),
+      Math.floor(this.gridDims.rows / 2),
+    ];
     this.player.body.reset(tileToWorldCenter(pcol), tileToWorldCenter(prow));
     this.player.body.setVelocity(0, 0);
     this.lastFacing = spec.facing ? { ...FACING_DELTAS[spec.facing] } : { dCol: 0, dRow: 1 };
@@ -2174,10 +2337,14 @@ export class GameScene extends Phaser.Scene {
     const enemyIds: string[] = [];
     for (const z of spec.enemies ?? []) {
       const at = Array.isArray(z) ? z : z.at;
-      const id = Array.isArray(z) ? 'kidZombie' : z.id ?? 'kidZombie';
+      const id = Array.isArray(z) ? 'kidZombie' : (z.id ?? 'kidZombie');
       const opts = Array.isArray(z)
         ? undefined
-        : { patrolRoute: z.patrolRoute?.map(([c, r]) => ({ col: c, row: r })), mode: z.mode, weaponId: z.weaponId };
+        : {
+            patrolRoute: z.patrolRoute?.map(([c, r]) => ({ col: c, row: r })),
+            mode: z.mode,
+            weaponId: z.weaponId,
+          };
       this.addEnemy(id, at[0], at[1], opts);
       enemyIds.push(this.enemies[this.enemies.length - 1].id);
     }
@@ -2330,7 +2497,10 @@ export class GameScene extends Phaser.Scene {
    * Capping chunk height keeps that error sub-texel so no row is mis-sampled. See GROUND_CHUNK_ROWS.
    */
   private drawGround(): void {
-    const groundVariants = ACTIVE_TILESET.tiles.ground.map((g) => ({ ...resolveTile(g.source), weight: g.weight }));
+    const groundVariants = ACTIVE_TILESET.tiles.ground.map((g) => ({
+      ...resolveTile(g.source),
+      weight: g.weight,
+    }));
     const cols = Math.ceil(MAP_WIDTH / TILE_SIZE);
     const rows = Math.ceil(MAP_HEIGHT / TILE_SIZE);
     for (let startRow = 0; startRow < rows; startRow += GROUND_CHUNK_ROWS) {
@@ -2421,14 +2591,19 @@ export class GameScene extends Phaser.Scene {
   private updateVision(): void {
     this.fogShape.clear();
     this.fogShape.fillStyle(0xffffff);
-    this.fogShape.fillCircle(this.player.x, this.player.y, this.playerStats.vision ?? PLAYER_START_VISION);
+    this.fogShape.fillCircle(
+      this.player.x,
+      this.player.y,
+      this.playerStats.vision ?? PLAYER_START_VISION,
+    );
     this.player.setVisible(this.inVisionRange(this.player.x, this.player.y));
   }
 
   /** True if a world point is within the character's vision radius (see fog of war above). */
   private inVisionRange(x: number, y: number): boolean {
     return (
-      Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) <= (this.playerStats.vision ?? PLAYER_START_VISION)
+      Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) <=
+      (this.playerStats.vision ?? PLAYER_START_VISION)
     );
   }
 

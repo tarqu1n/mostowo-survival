@@ -63,3 +63,4 @@ vision in [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md).
 - [docs/RENDERING.md](docs/RENDERING.md) — custom PostFX pipelines + "when to reach for a shader"
 - [docs/WORKFLOW.md](docs/WORKFLOW.md) — run / build / deploy / test commands + review gates
 - [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — code conventions (data-driven design, scene wiring, input gating, worker tasks)
+- [docs/STANDARDS.md](docs/STANDARDS.md) — tooling (lint/format/hooks), naming conventions, TS posture, commit style

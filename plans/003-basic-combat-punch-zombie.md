@@ -172,12 +172,12 @@ target — this slice deliberately implements only a minimal slice of that (see 
   out of scope.
 - **Starting numbers for the full cast** (all placeholders, tune by feel):
 
-  | | maxHp | armour | speed | vision | strength | dex | dodge |
+  ||maxHp|armour|speed|vision|strength|dex|dodge|
   |---|---|---|---|---|---|---|---|
-  | Player | 10 | 0 | 90 | 80 (5 tiles) | 0 | 0 | 0 |
-  | Kid zombie | 3 | 0 | 45 | 80 (5 tiles) | 1 | — | 0 |
-  | Tree (object) | 3 | 0 (inert) | 0 (inert) | — | — | — | — |
-  | Wall (object) | 10 | 0 (inert) | 0 (inert) | — | — | — | — |
+  |Player|10|0|90|80 (5 tiles)|0|0|0|
+  |Kid zombie|3|0|45|80 (5 tiles)|1|—|0|
+  |Tree (object)|3|0 (inert)|0 (inert)|—|—|—|—|
+  |Wall (object)|10|0 (inert)|0 (inert)|—|—|—|—|
 
 ## Steps
 
@@ -242,8 +242,8 @@ target — this slice deliberately implements only a minimal slice of that (see 
     intended before any scene code consumes it.
 
 - [x] **Step 2: Wire the kid zombie tileset entry** `[delegate]`
-  - Outcome: `tileset.ts` gained `actors.kidZombie`/`kidZombieDamaged` (9+9 filename-sorted paths)
-    + `kidZombieFrameKey`/`kidZombieDamagedFrameKey` helpers. `PreloadScene.ts` loads both frame
+  - Outcome: `tileset.ts` gained `actors.kidZombie`/`kidZombieDamaged` (9+9 filename-sorted paths) +
+    `kidZombieFrameKey`/`kidZombieDamagedFrameKey` helpers. `PreloadScene.ts` loads both frame
     sets. `GameScene.ts::create()` builds `'kid-zombie-walk'`/`'kid-zombie-damaged'` anims right
     after `'player-walk'` (guarded, no sprite/spawn yet — that's Step 4). Verified via a real
     headless-browser run: zero 404s/console errors, both anim keys exist with 9 frames each.
@@ -555,12 +555,12 @@ target — this slice deliberately implements only a minimal slice of that (see 
 Fresh-eyes review verdict: well-researched and accurate about the codebase, but the data/combat
 layer over-builds for a first slice whose only content is one enemy and one flat-damage attack.
 
-| # | Finding | Lens | Severity | Outcome |
+|#|Finding|Lens|Severity|Outcome|
 |---|---|---|---|---|
-| 1 | Full stats schema + `combat.ts` (dex, dodge/hit-chance roll, `rangedDamage`, `activationRange`) exercised by nothing this slice actually does | Alternative approaches / Right-sizing | High | **Kept as-is, deliberately** — explicit user call to lock the full shape in now rather than revisit piecemeal later (see Context & decisions) |
-| 2 | 8 steps bundle 3 input modes + combat engine + AI + tileset wiring + inspector + smoke tests + 4 doc updates into one pass — denser than plans 001/002 | Right-sizing / scope discipline | Medium | Not addressed — still open, see below |
-| 3 | Plan pivots to combat while CLAUDE.md's Status line says "Next: survival systems (day/night, hunger)"; Step 8 doesn't reconcile that pointer | Roadmap/strategic fit | Medium | Not addressed — still open, see below |
-| 4 | In-place HP reset on death let an adjacent zombie immediately re-damage the "reset" player (silent death-loop) | Gaps & risks | Low | **Resolved** — death now triggers `scene.restart()` instead of an in-place heal (see Context & decisions's "Death = restart" entry); the whole scene resets, so the zombie can't still be adjacent |
+|1|Full stats schema + `combat.ts` (dex, dodge/hit-chance roll, `rangedDamage`, `activationRange`) exercised by nothing this slice actually does|Alternative approaches / Right-sizing|High|**Kept as-is, deliberately** — explicit user call to lock the full shape in now rather than revisit piecemeal later (see Context & decisions)|
+|2|8 steps bundle 3 input modes + combat engine + AI + tileset wiring + inspector + smoke tests + 4 doc updates into one pass — denser than plans 001/002|Right-sizing / scope discipline|Medium|Not addressed — still open, see below|
+|3|Plan pivots to combat while CLAUDE.md's Status line says "Next: survival systems (day/night, hunger)"; Step 8 doesn't reconcile that pointer|Roadmap/strategic fit|Medium|Not addressed — still open, see below|
+|4|In-place HP reset on death let an adjacent zombie immediately re-damage the "reset" player (silent death-loop)|Gaps & risks|Low|**Resolved** — death now triggers `scene.restart()` instead of an in-place heal (see Context & decisions's "Death = restart" entry); the whole scene resets, so the zombie can't still be adjacent|
 
 Findings #2 and #3 remain open as of this critique pass — not yet decided with the user.
 

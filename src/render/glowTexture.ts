@@ -28,14 +28,20 @@ const cache = new Map<string, GlowTexture>();
  * texels; `color` is 0xRRGGBB. Requires a 2D canvas + readable source image (same-origin assets),
  * which holds under Vite dev, the GitHub Pages build, and the headless smoke's real browser.
  */
-export function bakeGlowTexture(scene: Phaser.Scene, srcKey: string, color: number, radius: number): GlowTexture {
+export function bakeGlowTexture(
+  scene: Phaser.Scene,
+  srcKey: string,
+  color: number,
+  radius: number,
+): GlowTexture {
   const cacheKey = `${srcKey}|${color}|${radius}`;
   const cached = cache.get(cacheKey);
   if (cached && scene.textures.exists(cached.key)) return cached;
 
   const pad = Math.ceil(radius);
   const glowKey = `glow:${cacheKey}`;
-  const srcImg = scene.textures.get(srcKey).getSourceImage() as HTMLImageElement | HTMLCanvasElement;
+  const srcImg = scene.textures.get(srcKey).getSourceImage() as
+    HTMLImageElement | HTMLCanvasElement;
   const w = srcImg.width;
   const h = srcImg.height;
   const gw = w + pad * 2;

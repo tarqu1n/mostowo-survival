@@ -11,8 +11,8 @@ wood into a character `Inventory`. Orders **queue** (tap = act now / clear; **lo
 **Build** places a passable *blueprint* and the worker walks over and **builds it over time** into a
 solid, blocking wall. **Cancel** clears the queue (blueprints survive). Data-driven items/nodes/buildables
 (`src/data/`), pure systems (`src/systems/`: `pathfind`, `tasks`, `grid`, `Inventory`), decoupled
-`UIScene` HUD. On the **Phaser 3 + TypeScript + Vite** mobile-first scaffold (Boot→Preload→MainMenu→Game
-+ UI overlay), GitHub Pages auto-deploy. Verified via headless smoke (`npm run smoke`).
+`UIScene` HUD. On the **Phaser 3 + TypeScript + Vite** mobile-first scaffold (Boot→Preload→MainMenu→Game +
+UI overlay), GitHub Pages auto-deploy. Verified via headless smoke (`npm run smoke`).
 
 ## Basic combat + first enemy (plan 003)
 
@@ -121,8 +121,8 @@ persisted**. New Tier-1 `daynight`/`needs` unit tests + three Tier-2 scenarios
 
 Combat now *reads*. On a landed hit, both the player and a zombie **flash red and squash-"flinch"**:
 one tween over a plain `{ t }` object (1→0) drives a live **`HitFlashPipeline`** PostFX (WebGL; a
-`setTintFill` fallback on Canvas — see [render/hitFlashPipeline.ts](../src/render/hitFlashPipeline.ts)
-+ docs/RENDERING.md) *and* a scale-only squash, so flash and flinch decay in lockstep and the squash
+`setTintFill` fallback on Canvas — see [render/hitFlashPipeline.ts](../src/render/hitFlashPipeline.ts) +
+docs/RENDERING.md) *and* a scale-only squash, so flash and flinch decay in lockstep and the squash
 never fights the actor's Arcade body. The skeleton ships **no attack strip**, so a zombie's bite is a
 coded **lunge** toward its target (`GameScene.zombieLungeAt`) — it moves the Arcade **body** via
 `body.reset` (a `sprite.x` tween would be stomped by physics each frame) out-and-back, only during the

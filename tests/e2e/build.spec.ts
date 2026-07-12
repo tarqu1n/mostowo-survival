@@ -5,7 +5,9 @@ import { wallToRouteAround } from './scenarios';
 // Tier-2: building + occupancy on the REAL grid (blueprint passable while unbuilt → worker builds it
 // → solid blocking wall), and that the pathfinder respects that live grid.
 
-test('a placed blueprint is passable until built, then becomes a blocking wall', async ({ page }) => {
+test('a placed blueprint is passable until built, then becomes a blocking wall', async ({
+  page,
+}) => {
   await startGame(page);
   // Player adjacent to a single blueprint (stand tile is the player's own tile → builds in place).
   const { siteIds } = await applyScenario(page, { player: [3, 3], blueprints: [[4, 3]], wood: 0 });
@@ -35,7 +37,9 @@ test('a built wall blocks its tile and the pathfinder will not path onto it', as
   expect(s.prow).toBe(3);
 });
 
-test('Cancel clears the queue but leaves the blueprint standing (non-destructive)', async ({ page }) => {
+test('Cancel clears the queue but leaves the blueprint standing (non-destructive)', async ({
+  page,
+}) => {
   await startGame(page);
   const { siteIds } = await applyScenario(page, { player: [3, 3], blueprints: [[4, 3]] });
   await order(page, { kind: 'build', siteId: siteIds[0] });

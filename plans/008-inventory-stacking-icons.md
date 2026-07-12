@@ -248,9 +248,9 @@ well-grounded in the codebase — safe to execute after tightening two under-spe
 bundled Gemini pipeline was the main scope risk, not a correctness one. Findings #1/#2 folded into the
 plan above; #3 resolved by splitting the pipeline to plan 009; #4 accepted (locked with Matt).
 
-| # | Finding | Severity | Resolution |
-| - | ------- | -------- | ---------- |
-| 1 | Block-harvest that only skips the per-hit yield never fells the node → harvest task never completes → worker swings forever on a jammed queue. | Medium | **Folded in** (Step 6): abort the order on `!canAccept`, required; Tier-2 asserts queue idles. |
-| 2 | Rock reusing tree-shaped rendering inherits the pine's `treeScale` (2.6 tiles) + origin → renders oversized/mis-anchored. | Medium | **Folded in** (Step 3): per-species render params (scale/origin/stand-offsets); `addTree`→`addNode(def, render)`. |
-| 3 | Plan bundles four semi-independent efforts incl. a second Python art-gen pipeline gated on a LAN-only key. | Medium | **Resolved**: Gemini pipeline split to plan 009; mechanic ships on placeholders. |
-| 4 | Hotbar has no functional role this slice (display duplication of first N slots). | Low | **Accepted** (locked with Matt): keep as display-only; no select/consume plumbing built. |
+|#|Finding|Severity|Resolution|
+|-|-------|--------|----------|
+|1|Block-harvest that only skips the per-hit yield never fells the node → harvest task never completes → worker swings forever on a jammed queue.|Medium|**Folded in** (Step 6): abort the order on `!canAccept`, required; Tier-2 asserts queue idles.|
+|2|Rock reusing tree-shaped rendering inherits the pine's `treeScale` (2.6 tiles) + origin → renders oversized/mis-anchored.|Medium|**Folded in** (Step 3): per-species render params (scale/origin/stand-offsets); `addTree`→`addNode(def, render)`.|
+|3|Plan bundles four semi-independent efforts incl. a second Python art-gen pipeline gated on a LAN-only key.|Medium|**Resolved**: Gemini pipeline split to plan 009; mechanic ships on placeholders.|
+|4|Hotbar has no functional role this slice (display duplication of first N slots).|Low|**Accepted** (locked with Matt): keep as display-only; no select/consume plumbing built.|

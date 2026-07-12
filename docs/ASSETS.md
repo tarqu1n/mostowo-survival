@@ -69,11 +69,11 @@ Reproducible tooling for the catalogue/demos: [`scripts/pixel-crawler/`](../scri
 
 Every Pixel Crawler PNG loads one of 3 ways — mechanical rule, no per-file judgement calls:
 
-| Class | Rule | Load |
+|Class|Rule|Load|
 |---|---|---|
-| **Grid tilesheet** | under `Environment/Tilesets/` | `load.spritesheet` @ 16px, address by frame index |
-| **Animation strip** | filename ends `-Sheet.png` | `load.spritesheet` @ frameSize = sheet height |
-| **Multi-object sheet** | everything else (`Props/Static/*`, static `Structures/{Stations,Buildings}` props, `Weapons/*`) | can't grid-slice — extract the one object you want by connected-component bbox → a derived PNG |
+|**Grid tilesheet**|under `Environment/Tilesets/`|`load.spritesheet` @ 16px, address by frame index|
+|**Animation strip**|filename ends `-Sheet.png`|`load.spritesheet` @ frameSize = sheet height|
+|**Multi-object sheet**|everything else (`Props/Static/*`, static `Structures/{Stations,Buildings}` props, `Weapons/*`)|can't grid-slice — extract the one object you want by connected-component bbox → a derived PNG|
 
 **Detection** (run this whenever the pack updates or you add a new sheet): a file that is *not*
 `*-Sheet.png` and *not* under `Environment/Tilesets/` is a multi-object candidate. Run `--scan`;
@@ -110,13 +110,13 @@ needs to be treated as precious.
 
 **Derived-file manifest** (`output ← source sheet · component index`):
 
-| Output | Source sheet | Index |
+|Output|Source sheet|Index|
 |---|---|---|
-| `_derived/tree_pine.png` | `Environment/Props/Static/Trees/Model_02/Size_03.png` | 3 |
-| `_derived/rock.png` | `Environment/Props/Static/Rocks.png` | 5 |
-| `_derived/weapons/club.png` | `Weapons/Bone/Bone.png` | 1 (bone mace, grip at bottom; `sips -Z 40` → 7×40) |
-| `_derived/weapons/knife.png` | `Weapons/Bone/Bone.png` | 7 (bone dagger, grip at bottom; `sips -Z 18` → 4×18) |
-| `_derived/hand.png` | `Weapons/Hands/Hands.png` | 0 (tan fist, 7×7 — the shared hand mitt, see "Weapon attachment" below) |
+|`_derived/tree_pine.png`|`Environment/Props/Static/Trees/Model_02/Size_03.png`|3|
+|`_derived/rock.png`|`Environment/Props/Static/Rocks.png`|5|
+|`_derived/weapons/club.png`|`Weapons/Bone/Bone.png`|1 (bone mace, grip at bottom; `sips -Z 40` → 7×40)|
+|`_derived/weapons/knife.png`|`Weapons/Bone/Bone.png`|7 (bone dagger, grip at bottom; `sips -Z 18` → 4×18)|
+|`_derived/hand.png`|`Weapons/Hands/Hands.png`|0 (tan fist, 7×7 — the shared hand mitt, see "Weapon attachment" below)|
 
 > The two bone weapons are extracted big (80/27px) then downscaled to sit proportionately on the
 > ~30px skeleton (club distinctly larger than the knife). They draw at integer scale 1 from these

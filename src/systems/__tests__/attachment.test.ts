@@ -38,7 +38,14 @@ describe('weaponTransform', () => {
   });
 
   it('treats a missing anchor rot as 0', () => {
-    const t = weaponTransform({ anchor: { x: 32, y: 32 }, actorRender: ACTOR, frameW: 64, frameH: 64, flipX: false, extraRot: 20 });
+    const t = weaponTransform({
+      anchor: { x: 32, y: 32 },
+      actorRender: ACTOR,
+      frameW: 64,
+      frameH: 64,
+      flipX: false,
+      extraRot: 20,
+    });
     expect(t.rotation).toBe(20);
   });
 

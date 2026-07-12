@@ -19,7 +19,12 @@ test('a chasing enemy closes distance and contact-damages the player', async ({ 
 test('Attack kills an adjacent enemy in three hits', async ({ page }) => {
   await startGame(page);
   // Player facing right with the enemy on the adjacent tile; Combat mode so Attack is live.
-  await applyScenario(page, { player: [10, 10], enemies: [[11, 10]], facing: 'right', mode: 'combat' });
+  await applyScenario(page, {
+    player: [10, 10],
+    enemies: [[11, 10]],
+    facing: 'right',
+    mode: 'combat',
+  });
   expect((await state(page)).enemies).toBe(1);
 
   // kidZombie maxHp 3, unarmed flat-1 damage → exactly three attacks. dodge 0 → always hits.
@@ -36,7 +41,12 @@ test('Attack connects with a tall enemy body, not only its feet tile', async ({ 
   // tile above that torso, facing down → Attack targets row 9, the torso tile (NOT the feet tile).
   // Without the body hurtbox this whiffs. No step() between attacks, so the enemy stays on its
   // frame-0 tile (Attack resolves synchronously) — three flat-1 hits on maxHp 3 kill it.
-  await applyScenario(page, { player: [10, 8], enemies: [[10, 10]], facing: 'down', mode: 'combat' });
+  await applyScenario(page, {
+    player: [10, 8],
+    enemies: [[10, 10]],
+    facing: 'down',
+    mode: 'combat',
+  });
   expect((await state(page)).enemies).toBe(1);
 
   for (let i = 0; i < 3; i++) await emit(page, 'combat:attack');
@@ -61,7 +71,12 @@ test('attacking a surviving enemy triggers its hit flash', async ({ page }) => {
   await startGame(page);
   // Adjacent enemy the player faces, Combat mode so Attack is live. kidZombie maxHp 3, flat-1 damage →
   // one attack leaves it alive, so the hit flash (not a death/destroy) is what we should see.
-  await applyScenario(page, { player: [10, 10], enemies: [[11, 10]], facing: 'right', mode: 'combat' });
+  await applyScenario(page, {
+    player: [10, 10],
+    enemies: [[11, 10]],
+    facing: 'right',
+    mode: 'combat',
+  });
 
   await emit(page, 'combat:attack');
   await step(page, 50); // let the flash bookkeeping run a frame
@@ -72,7 +87,12 @@ test('attacking a surviving enemy triggers its hit flash', async ({ page }) => {
 
 test('a killed enemy leaves a lingering corpse playing its death collapse', async ({ page }) => {
   await startGame(page);
-  await applyScenario(page, { player: [10, 10], enemies: [[11, 10]], facing: 'right', mode: 'combat' });
+  await applyScenario(page, {
+    player: [10, 10],
+    enemies: [[11, 10]],
+    facing: 'right',
+    mode: 'combat',
+  });
 
   for (let i = 0; i < 3; i++) await emit(page, 'combat:attack'); // kidZombie maxHp 3, flat-1 → dead on the 3rd
 
@@ -88,7 +108,9 @@ test('a killed enemy leaves a lingering corpse playing its death collapse', asyn
   expect((await state(page)).corpses).toBe(1);
 });
 
-test('attacking slows the player — a mid-swing movepad drive covers far less ground', async ({ page }) => {
+test('attacking slows the player — a mid-swing movepad drive covers far less ground', async ({
+  page,
+}) => {
   await startGame(page);
 
   // Baseline: drive east for 300ms at full speed (no swing in progress).

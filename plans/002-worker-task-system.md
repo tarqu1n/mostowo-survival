@@ -227,15 +227,15 @@ and it fixes the current straight-line-into-wall bug) — no hard High, but corr
 "reachable adjacent tile", the down/up input split, and a smoke test that can't exercise the queue.
 Fixes folded into Steps 1/3/4/5/7 below.
 
-| # | Finding | Severity | Fixed in |
-| - | ------- | -------- | -------- |
-| 1 | Harvest/build pick the nearest *unblocked* neighbour but never check it's *reachable*; an un-completable task silently stalls the whole FIFO queue. | Medium | Steps 1+4+5: pick the adjacent tile by a successful `findPath` (iterate the 8 candidates); if none reachable, **skip** the task + emit `tasks:changed` — never stall. |
-| 2 | Heavy worker infra lands ahead of documented next slices (trap + night wave; day/night, hunger) while NPCs are still "draft" — speculative-generality risk. | Medium | Accepted: user-directed detour; fixes the real wall-collision bug + exercises the queue. Sequence day/night + hunger next. |
-| 3 | Down/up split under-specified: move/harvest resolve on `pointerup`, build on `pointerdown`, but the `hudHitTest` guard + build seam currently live only in `onPointerDown`. | Medium | Steps 3+4: one unified gate — UI-guard on **both** down & up; build placement on **down** (always append); move/harvest on **up** with a drag-distance reject. |
-| 4 | Reserve-wood-at-placement + passable blueprint + no refund ⇒ a walled-off blueprint is dead wood and the worker can stall. | Medium | Step 5: reject placement (invalid ghost, no spend) unless the tile has a **reachable adjacent** tile at placement time; dynamic walling-off later is escaped via Cancel (reserve-no-refund is user-locked). |
-| 5 | Step 7 smoke can't exercise the queue: `mouse.click` = short duration = *replace*; no long-press helper. | Medium | Step 7: add a `longPressBase` helper (`down` → hold ≥`LONGPRESS_MS` → `up`); expose `queue.pending`/`path.length`/`sites.length`. |
-| 6 | Blueprint placed on the worker's own tile — adjacent-tile pathing + completion ordering undefined. | Low | Steps 4+5: adjacent-tile selection handles "worker on the build/target tile" (it steps to a neighbour first; wall materialises on the vacated tile). |
-| 7 | `findPath` `[]` (goal===start, already there) vs `null` (unreachable) must be handled distinctly by executors. | Low | Steps 1+4: contract fixed — `[]` = arrived/act-now, `null` = drop; executors branch explicitly. |
+|#|Finding|Severity|Fixed in|
+|-|-------|--------|--------|
+|1|Harvest/build pick the nearest *unblocked* neighbour but never check it's *reachable*; an un-completable task silently stalls the whole FIFO queue.|Medium|Steps 1+4+5: pick the adjacent tile by a successful `findPath` (iterate the 8 candidates); if none reachable, **skip** the task + emit `tasks:changed` — never stall.|
+|2|Heavy worker infra lands ahead of documented next slices (trap + night wave; day/night, hunger) while NPCs are still "draft" — speculative-generality risk.|Medium|Accepted: user-directed detour; fixes the real wall-collision bug + exercises the queue. Sequence day/night + hunger next.|
+|3|Down/up split under-specified: move/harvest resolve on `pointerup`, build on `pointerdown`, but the `hudHitTest` guard + build seam currently live only in `onPointerDown`.|Medium|Steps 3+4: one unified gate — UI-guard on **both** down & up; build placement on **down** (always append); move/harvest on **up** with a drag-distance reject.|
+|4|Reserve-wood-at-placement + passable blueprint + no refund ⇒ a walled-off blueprint is dead wood and the worker can stall.|Medium|Step 5: reject placement (invalid ghost, no spend) unless the tile has a **reachable adjacent** tile at placement time; dynamic walling-off later is escaped via Cancel (reserve-no-refund is user-locked).|
+|5|Step 7 smoke can't exercise the queue: `mouse.click` = short duration = *replace*; no long-press helper.|Medium|Step 7: add a `longPressBase` helper (`down` → hold ≥`LONGPRESS_MS` → `up`); expose `queue.pending`/`path.length`/`sites.length`.|
+|6|Blueprint placed on the worker's own tile — adjacent-tile pathing + completion ordering undefined.|Low|Steps 4+5: adjacent-tile selection handles "worker on the build/target tile" (it steps to a neighbour first; wall materialises on the vacated tile).|
+|7|`findPath` `[]` (goal===start, already there) vs `null` (unreachable) must be handled distinctly by executors.|Low|Steps 1+4: contract fixed — `[]` = arrived/act-now, `null` = drop; executors branch explicitly.|
 
 ## Out of scope
 

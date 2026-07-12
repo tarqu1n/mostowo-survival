@@ -14,7 +14,12 @@ function clamp(v: number, lo: number, hi: number): number {
  * guard: on tab-refocus Phaser can hand a huge `deltaMs`, and this must never send hunger below 0
  * (nor, defensively, above `max`).
  */
-export function drainHunger(current: number, deltaMs: number, drainPerSec: number, max: number): number {
+export function drainHunger(
+  current: number,
+  deltaMs: number,
+  drainPerSec: number,
+  max: number,
+): number {
   return clamp(current - (drainPerSec * deltaMs) / 1000, 0, max);
 }
 

@@ -25,8 +25,7 @@ export type PlayerState = 'idle' | 'walk' | 'chop' | 'mine' | 'gather' | 'attack
 
 /** A terrain tile: a standalone PNG (load.image) OR frame N of a sheet sliced at TILE_SIZE. */
 export type TileSource =
-  | { kind: 'image'; path: string }
-  | { kind: 'sheetFrame'; sheet: string; frame: number };
+  { kind: 'image'; path: string } | { kind: 'sheetFrame'; sheet: string; frame: number };
 
 /**
  * A grip/attach point for a held prop (a monster weapon today), authored in the strip frame's OWN
@@ -173,9 +172,18 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
   id: 'pixel-crawler',
   tiles: {
     ground: [
-      { source: { kind: 'sheetFrame', sheet: 'Environment/Tilesets/Floors_Tiles.png', frame: 252 }, weight: 14 }, // grass (2,10)
-      { source: { kind: 'sheetFrame', sheet: 'Environment/Tilesets/Floors_Tiles.png', frame: 251 }, weight: 10 }, // grass (1,10)
-      { source: { kind: 'sheetFrame', sheet: 'Environment/Tilesets/Floors_Tiles.png', frame: 253 }, weight: 10 }, // grass (3,10)
+      {
+        source: { kind: 'sheetFrame', sheet: 'Environment/Tilesets/Floors_Tiles.png', frame: 252 },
+        weight: 14,
+      }, // grass (2,10)
+      {
+        source: { kind: 'sheetFrame', sheet: 'Environment/Tilesets/Floors_Tiles.png', frame: 251 },
+        weight: 10,
+      }, // grass (1,10)
+      {
+        source: { kind: 'sheetFrame', sheet: 'Environment/Tilesets/Floors_Tiles.png', frame: 253 },
+        weight: 10,
+      }, // grass (3,10)
     ],
     wall: { kind: 'sheetFrame', sheet: 'Environment/Tilesets/Wall_Tiles.png', frame: 83 }, // grey stone fill (8,3)
     tree: { kind: 'image', path: '_derived/tree_pine.png' }, // extracted green pine (Model_02/Size_03 idx 3)
@@ -189,14 +197,38 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
       // originY 0.78 ≈ the feet row (content bottom ≈ y48 of the 64px frame) so they rest on the tile.
       render: { scale: 1, originX: 0.5, originY: 0.78 },
       idle: {
-        down: { path: 'Entities/Characters/Body_A/Animations/Idle_Base/Idle_Down-Sheet.png', frameSize: 64, frames: 4 },
-        side: { path: 'Entities/Characters/Body_A/Animations/Idle_Base/Idle_Side-Sheet.png', frameSize: 64, frames: 4 },
-        up: { path: 'Entities/Characters/Body_A/Animations/Idle_Base/Idle_Up-Sheet.png', frameSize: 64, frames: 4 },
+        down: {
+          path: 'Entities/Characters/Body_A/Animations/Idle_Base/Idle_Down-Sheet.png',
+          frameSize: 64,
+          frames: 4,
+        },
+        side: {
+          path: 'Entities/Characters/Body_A/Animations/Idle_Base/Idle_Side-Sheet.png',
+          frameSize: 64,
+          frames: 4,
+        },
+        up: {
+          path: 'Entities/Characters/Body_A/Animations/Idle_Base/Idle_Up-Sheet.png',
+          frameSize: 64,
+          frames: 4,
+        },
       },
       walk: {
-        down: { path: 'Entities/Characters/Body_A/Animations/Walk_Base/Walk_Down-Sheet.png', frameSize: 64, frames: 6 },
-        side: { path: 'Entities/Characters/Body_A/Animations/Walk_Base/Walk_Side-Sheet.png', frameSize: 64, frames: 6 },
-        up: { path: 'Entities/Characters/Body_A/Animations/Walk_Base/Walk_Up-Sheet.png', frameSize: 64, frames: 6 },
+        down: {
+          path: 'Entities/Characters/Body_A/Animations/Walk_Base/Walk_Down-Sheet.png',
+          frameSize: 64,
+          frames: 6,
+        },
+        side: {
+          path: 'Entities/Characters/Body_A/Animations/Walk_Base/Walk_Side-Sheet.png',
+          frameSize: 64,
+          frames: 6,
+        },
+        up: {
+          path: 'Entities/Characters/Body_A/Animations/Walk_Base/Walk_Up-Sheet.png',
+          frameSize: 64,
+          frames: 6,
+        },
       },
       // Each action maps to the Body_A motion that reads right for it: chop = Slice_Base
       // (side-swing axe, fells trees); mine = Crush_Base (overhead smash, reads as a pickaxe on
@@ -205,31 +237,91 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
       // NB Pierce ships its up strip as `Pierce_Top-Sheet.png` (not `_Up`) — the manifest lists
       // explicit paths, so the odd name is captured here.
       chop: {
-        down: { path: 'Entities/Characters/Body_A/Animations/Slice_Base/Slice_Down-Sheet.png', frameSize: 64, frames: 8 },
-        side: { path: 'Entities/Characters/Body_A/Animations/Slice_Base/Slice_Side-Sheet.png', frameSize: 64, frames: 8 },
-        up: { path: 'Entities/Characters/Body_A/Animations/Slice_Base/Slice_Up-Sheet.png', frameSize: 64, frames: 8 },
+        down: {
+          path: 'Entities/Characters/Body_A/Animations/Slice_Base/Slice_Down-Sheet.png',
+          frameSize: 64,
+          frames: 8,
+        },
+        side: {
+          path: 'Entities/Characters/Body_A/Animations/Slice_Base/Slice_Side-Sheet.png',
+          frameSize: 64,
+          frames: 8,
+        },
+        up: {
+          path: 'Entities/Characters/Body_A/Animations/Slice_Base/Slice_Up-Sheet.png',
+          frameSize: 64,
+          frames: 8,
+        },
       },
       mine: {
-        down: { path: 'Entities/Characters/Body_A/Animations/Crush_Base/Crush_Down-Sheet.png', frameSize: 64, frames: 8 },
-        side: { path: 'Entities/Characters/Body_A/Animations/Crush_Base/Crush_Side-Sheet.png', frameSize: 64, frames: 8 },
-        up: { path: 'Entities/Characters/Body_A/Animations/Crush_Base/Crush_Up-Sheet.png', frameSize: 64, frames: 8 },
+        down: {
+          path: 'Entities/Characters/Body_A/Animations/Crush_Base/Crush_Down-Sheet.png',
+          frameSize: 64,
+          frames: 8,
+        },
+        side: {
+          path: 'Entities/Characters/Body_A/Animations/Crush_Base/Crush_Side-Sheet.png',
+          frameSize: 64,
+          frames: 8,
+        },
+        up: {
+          path: 'Entities/Characters/Body_A/Animations/Crush_Base/Crush_Up-Sheet.png',
+          frameSize: 64,
+          frames: 8,
+        },
       },
       gather: {
-        down: { path: 'Entities/Characters/Body_A/Animations/Collect_Base/Collect_Down-Sheet.png', frameSize: 64, frames: 8 },
-        side: { path: 'Entities/Characters/Body_A/Animations/Collect_Base/Collect_Side-Sheet.png', frameSize: 64, frames: 8 },
-        up: { path: 'Entities/Characters/Body_A/Animations/Collect_Base/Collect_Up-Sheet.png', frameSize: 64, frames: 8 },
+        down: {
+          path: 'Entities/Characters/Body_A/Animations/Collect_Base/Collect_Down-Sheet.png',
+          frameSize: 64,
+          frames: 8,
+        },
+        side: {
+          path: 'Entities/Characters/Body_A/Animations/Collect_Base/Collect_Side-Sheet.png',
+          frameSize: 64,
+          frames: 8,
+        },
+        up: {
+          path: 'Entities/Characters/Body_A/Animations/Collect_Base/Collect_Up-Sheet.png',
+          frameSize: 64,
+          frames: 8,
+        },
       },
       attack: {
-        down: { path: 'Entities/Characters/Body_A/Animations/Pierce_Base/Pierce_Down-Sheet.png', frameSize: 64, frames: 8 },
-        side: { path: 'Entities/Characters/Body_A/Animations/Pierce_Base/Pierce_Side-Sheet.png', frameSize: 64, frames: 8 },
-        up: { path: 'Entities/Characters/Body_A/Animations/Pierce_Base/Pierce_Top-Sheet.png', frameSize: 64, frames: 8 },
+        down: {
+          path: 'Entities/Characters/Body_A/Animations/Pierce_Base/Pierce_Down-Sheet.png',
+          frameSize: 64,
+          frames: 8,
+        },
+        side: {
+          path: 'Entities/Characters/Body_A/Animations/Pierce_Base/Pierce_Side-Sheet.png',
+          frameSize: 64,
+          frames: 8,
+        },
+        up: {
+          path: 'Entities/Characters/Body_A/Animations/Pierce_Base/Pierce_Top-Sheet.png',
+          frameSize: 64,
+          frames: 8,
+        },
       },
       // death = Death_Base: an 8-frame collapse. Directional like the other player strips (up ships as
       // `Death_Up`, not the `_Top` oddity Pierce has), played once and held on the last (downed) frame.
       death: {
-        down: { path: 'Entities/Characters/Body_A/Animations/Death_Base/Death_Down-Sheet.png', frameSize: 64, frames: 8 },
-        side: { path: 'Entities/Characters/Body_A/Animations/Death_Base/Death_Side-Sheet.png', frameSize: 64, frames: 8 },
-        up: { path: 'Entities/Characters/Body_A/Animations/Death_Base/Death_Up-Sheet.png', frameSize: 64, frames: 8 },
+        down: {
+          path: 'Entities/Characters/Body_A/Animations/Death_Base/Death_Down-Sheet.png',
+          frameSize: 64,
+          frames: 8,
+        },
+        side: {
+          path: 'Entities/Characters/Body_A/Animations/Death_Base/Death_Side-Sheet.png',
+          frameSize: 64,
+          frames: 8,
+        },
+        up: {
+          path: 'Entities/Characters/Body_A/Animations/Death_Base/Death_Up-Sheet.png',
+          frameSize: 64,
+          frames: 8,
+        },
       },
     },
     enemy: {
@@ -250,8 +342,18 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
         // mainHand holds the weapon OUT to the front (was ~x20 = straight up the face); `rot` leans the
         // shaft forward off the skull. offHand = the free fist at the far side. y follows the bob.
         anchors: {
-          mainHand: [{ x: 24, y: 20, rot: 14 }, { x: 24, y: 21, rot: 14 }, { x: 24, y: 20, rot: 14 }, { x: 24, y: 19, rot: 14 }],
-          offHand: [{ x: 10, y: 20 }, { x: 10, y: 21 }, { x: 10, y: 20 }, { x: 10, y: 19 }],
+          mainHand: [
+            { x: 24, y: 20, rot: 14 },
+            { x: 24, y: 21, rot: 14 },
+            { x: 24, y: 20, rot: 14 },
+            { x: 24, y: 19, rot: 14 },
+          ],
+          offHand: [
+            { x: 10, y: 20 },
+            { x: 10, y: 21 },
+            { x: 10, y: 20 },
+            { x: 10, y: 19 },
+          ],
         },
       },
       // Run strip (frame 0 doubles as the Phase-A frozen idle). Per-frame mainHand grip + offHand points
@@ -261,24 +363,56 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
         frameSize: 64,
         frames: 6,
         anchors: {
-          mainHand: [{ x: 43, y: 41, rot: 14 }, { x: 44, y: 40, rot: 14 }, { x: 43, y: 39, rot: 14 }, { x: 43, y: 41, rot: 14 }, { x: 44, y: 40, rot: 14 }, { x: 43, y: 39, rot: 14 }],
-          offHand: [{ x: 28, y: 47 }, { x: 29, y: 46 }, { x: 28, y: 45 }, { x: 28, y: 47 }, { x: 29, y: 46 }, { x: 28, y: 45 }],
+          mainHand: [
+            { x: 43, y: 41, rot: 14 },
+            { x: 44, y: 40, rot: 14 },
+            { x: 43, y: 39, rot: 14 },
+            { x: 43, y: 41, rot: 14 },
+            { x: 44, y: 40, rot: 14 },
+            { x: 43, y: 39, rot: 14 },
+          ],
+          offHand: [
+            { x: 28, y: 47 },
+            { x: 29, y: 46 },
+            { x: 28, y: 45 },
+            { x: 28, y: 47 },
+            { x: 29, y: 46 },
+            { x: 28, y: 45 },
+          ],
         },
       },
       // Death cells are 96×64 (wider than the 64² Run cells) — the collapse needs horizontal room.
       // Sliced at 64 it flickered (every 3rd slice empty) and jumped L/R; 96×8 reads as a clean fall.
-      death: { path: 'Entities/Mobs/Skeleton Crew/Skeleton - Base/Death/Death-Sheet.png', frameSize: 64, frameWidth: 96, frames: 8 },
+      death: {
+        path: 'Entities/Mobs/Skeleton Crew/Skeleton - Base/Death/Death-Sheet.png',
+        frameSize: 64,
+        frameWidth: 96,
+        frames: 8,
+      },
       // Equippable weapon ART (stats in data/weapons.ts, shared id). Sources are extracted from
       // Weapons/Bone/Bone.png into _derived/weapons/ in B2 (files not needed until the B4/B5 load).
       // pivot = grip end (bottom-centre); z 1 draws the weapon in front of the depth-9 skeleton.
       weapons: {
-        club: { source: { kind: 'image', path: '_derived/weapons/club.png' }, pivot: [0.5, 0.9], z: 1 },
-        knife: { source: { kind: 'image', path: '_derived/weapons/knife.png' }, pivot: [0.5, 0.9], z: 1 },
+        club: {
+          source: { kind: 'image', path: '_derived/weapons/club.png' },
+          pivot: [0.5, 0.9],
+          z: 1,
+        },
+        knife: {
+          source: { kind: 'image', path: '_derived/weapons/knife.png' },
+          pivot: [0.5, 0.9],
+          z: 1,
+        },
       },
       // Visible fist layered on both hands (the Base skeleton's own hands are unreadable nubs). One tan
       // fist extracted from Weapons/Hands into _derived/hand.png; centred on the anchor, mirrored with
       // the body. mainZ 2 draws it over the weapon (z 1); offZ 1 sits the free fist beside the body.
-      hand: { source: { kind: 'image', path: '_derived/hand.png' }, pivot: [0.5, 0.5], mainZ: 2, offZ: 1 },
+      hand: {
+        source: { kind: 'image', path: '_derived/hand.png' },
+        pivot: [0.5, 0.5],
+        mainZ: 2,
+        offZ: 1,
+      },
     },
   },
 };
@@ -305,7 +439,8 @@ export const resolveTile = (source: TileSource): { key: string; frame?: number }
     : { key: sheetKey(source.sheet), frame: source.frame };
 
 /** Texture/anim key for a player state+facing strip, e.g. `player-walk-side`. */
-export const playerAnimKey = (state: PlayerState, facing: Facing): string => `player-${state}-${facing}`;
+export const playerAnimKey = (state: PlayerState, facing: Facing): string =>
+  `player-${state}-${facing}`;
 
 /** Texture/anim key for the enemy Run strip (frame 0 doubles as the Phase-A frozen idle). */
 export const enemyWalkKey = 'enemy-walk';

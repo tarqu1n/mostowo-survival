@@ -7,7 +7,13 @@ import { startGame, applyScenario, enqueue, state, isWebGL } from './harness';
 
 test('queued trees are highlighted; the head of the harvest queue pulses', async ({ page }) => {
   await startGame(page);
-  const { treeIds } = await applyScenario(page, { player: [3, 3], trees: [[5, 3], [7, 3]] });
+  const { treeIds } = await applyScenario(page, {
+    player: [3, 3],
+    trees: [
+      [5, 3],
+      [7, 3],
+    ],
+  });
 
   await enqueue(page, { kind: 'harvest', treeId: treeIds[0] });
   await enqueue(page, { kind: 'harvest', treeId: treeIds[1] });

@@ -323,13 +323,13 @@ edits. Earlier drafts warned of an uncommitted plan-011; that caveat is stale.)
 
 **Verdict:** Solid, well-grounded plan — its riskiest technical bet (the inverted geometry mask on `nightOverlay`) holds up under source inspection, and every load-bearing factual claim checks out; cleared to execute after the tap-to-feed wiring + stale-caveat fixes, now applied.
 
-| # | Finding | Severity | Resolution |
-| - | ------- | -------- | ---------- |
-| 1 | Tap-to-feed was placed in `onPointerDown` with an early-return, but order resolution lives in `onPointerUp` and was gated only on `!buildMode` — it would bleed into Combat/Inspect and fail to suppress the order. | Medium | ✅ Step 5: resolved in `onPointerUp`, `command` mode only, as a short tap checked before `actionAt`. |
-| 2 | The ⚠️ working-tree caveat was stale — tree is clean, plan-011 already committed (`ca30c55`), and its changes don't touch the build symbols. | Low | ✅ Caveat corrected (re-locate by symbol; no in-progress work to clobber). |
-| 3 | Campfire wasn't wired into Inspect — `inspectAt` only handled `tree`/`site`, so a fire was a dead object in inspect mode. | Low | ✅ Step 5: added a `campfireStats` adapter + `campfire` inspect case. |
-| 4 | "Blocked outside base" e2e had no seam — `testApplyScenario` places fires via `finishSite(createBlueprint(...))`, bypassing `tilePlaceable`/`isInBase`. | Low | ✅ Step 7: added a `debug:tryPlace` placeability seam; Step 8 asserts rejection through it. |
-| 5 | The palette (which exposes Campfire) preceded the materialiser, leaving a window where building a fire spent 20 resources into a no-op stub. | Low | ✅ Reordered: campfire runtime is now Step 5, palette Step 6. |
-| 6 | Campfire is sequenced ahead of CLAUDE.md's named "Next" (enemy night-waves + equipment queue). | Low | Kept by design — a fire that reveals approaching enemies is a natural precursor to night-waves; strong pillar fit. Owner's call. |
+|#|Finding|Severity|Resolution|
+|-|-------|--------|----------|
+|1|Tap-to-feed was placed in `onPointerDown` with an early-return, but order resolution lives in `onPointerUp` and was gated only on `!buildMode` — it would bleed into Combat/Inspect and fail to suppress the order.|Medium|✅ Step 5: resolved in `onPointerUp`, `command` mode only, as a short tap checked before `actionAt`.|
+|2|The ⚠️ working-tree caveat was stale — tree is clean, plan-011 already committed (`ca30c55`), and its changes don't touch the build symbols.|Low|✅ Caveat corrected (re-locate by symbol; no in-progress work to clobber).|
+|3|Campfire wasn't wired into Inspect — `inspectAt` only handled `tree`/`site`, so a fire was a dead object in inspect mode.|Low|✅ Step 5: added a `campfireStats` adapter + `campfire` inspect case.|
+|4|"Blocked outside base" e2e had no seam — `testApplyScenario` places fires via `finishSite(createBlueprint(...))`, bypassing `tilePlaceable`/`isInBase`.|Low|✅ Step 7: added a `debug:tryPlace` placeability seam; Step 8 asserts rejection through it.|
+|5|The palette (which exposes Campfire) preceded the materialiser, leaving a window where building a fire spent 20 resources into a no-op stub.|Low|✅ Reordered: campfire runtime is now Step 5, palette Step 6.|
+|6|Campfire is sequenced ahead of CLAUDE.md's named "Next" (enemy night-waves + equipment queue).|Low|Kept by design — a fire that reveals approaching enemies is a natural precursor to night-waves; strong pillar fit. Owner's call.|
 
 No High-severity findings — nothing blocked execution.

@@ -49,11 +49,15 @@ if (!box) fail('game canvas not found');
 else await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 
 await page
-  .waitForFunction(() => window.game.scene.getScene('Game')?.scene.isActive(), null, { timeout: 5000 })
+  .waitForFunction(() => window.game.scene.getScene('Game')?.scene.isActive(), null, {
+    timeout: 5000,
+  })
   .then(() => ok('Game scene active'))
   .catch(() => fail('Game scene never became active'));
 await page
-  .waitForFunction(() => window.game.scene.getScene('UI')?.scene.isActive(), null, { timeout: 5000 })
+  .waitForFunction(() => window.game.scene.getScene('UI')?.scene.isActive(), null, {
+    timeout: 5000,
+  })
   .then(() => ok('UI scene active'))
   .catch(() => fail('UI scene never became active'));
 

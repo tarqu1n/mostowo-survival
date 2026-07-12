@@ -183,11 +183,11 @@ the design doc calls for — proceed, but fix one stale anchor: the plan's anima
 written against a `chopping` boolean and 4-state `PlayerState` that no longer exist, so its proposed
 mechanism fought the code that's actually there.
 
-| # | Finding | Lens | Severity | Suggested action |
-| - | ------- | ---- | -------- | ---------------- |
-| 1 | Step 6's anim wiring was mis-anchored: it said mirror a `chopping` boolean (`:201`/`:415`) and a 4-state `PlayerState`, but the code uses `harvestSwing:'chop'\|'mine'\|null` (`:202`/`:416`/`:495`) selected by node type (`:748`) and a 5-state enum incl. `mine` (`tileset.ts:22`). **Resolved:** Step 6 rewritten to extend the `harvestSwing` union with `'gather'`. | Cross-cutting consistency / Alt approaches | Medium | ✅ Done — Step 6 now extends `harvestSwing`; `updatePlayerAnim` (`:495`) unchanged. |
-| 2 | `harvestAnim?:'chop'\|'gather'` node-def flag (Step 5) partly duplicates the existing tile-based anim selection — `mine` already keys off `tile==='rock'`. | Right-sizing | Low | Optional: could key gather off `tile==='bush'` instead of a new field. Kept the field (Step 6 reads it) — deferred, not blocking. |
-| 3 | The Wellbeing screen's full combat-stats block (Step 8) duplicates Inspect-mode's player stats and exceeds GAME-DESIGN's description (meters + eat list). Explicitly locked with Matt — deliberate. | Right-sizing | Low | Kept as a deliberate superset per Matt's locked decision. No change. |
+|#|Finding|Lens|Severity|Suggested action|
+|-|-------|----|--------|----------------|
+|1|Step 6's anim wiring was mis-anchored: it said mirror a `chopping` boolean (`:201`/`:415`) and a 4-state `PlayerState`, but the code uses `harvestSwing:'chop'\|'mine'\|null` (`:202`/`:416`/`:495`) selected by node type (`:748`) and a 5-state enum incl. `mine` (`tileset.ts:22`). **Resolved:** Step 6 rewritten to extend the `harvestSwing` union with `'gather'`.|Cross-cutting consistency / Alt approaches|Medium|✅ Done — Step 6 now extends `harvestSwing`; `updatePlayerAnim` (`:495`) unchanged.|
+|2|`harvestAnim?:'chop'\|'gather'` node-def flag (Step 5) partly duplicates the existing tile-based anim selection — `mine` already keys off `tile==='rock'`.|Right-sizing|Low|Optional: could key gather off `tile==='bush'` instead of a new field. Kept the field (Step 6 reads it) — deferred, not blocking.|
+|3|The Wellbeing screen's full combat-stats block (Step 8) duplicates Inspect-mode's player stats and exceeds GAME-DESIGN's description (meters + eat list). Explicitly locked with Matt — deliberate.|Right-sizing|Low|Kept as a deliberate superset per Matt's locked decision. No change.|
 
 ## Steps
 
@@ -252,8 +252,8 @@ mechanism fought the code that's actually there.
     with mode row / build indicator). Format `Day N [day|night]` (ASCII fallback used to dodge tofu
     glyphs). Seeded from `registry.dayPhase`/`dayCount` in `create()`; live-updated via `onTimeChanged`
     subscribed to `time:changed` with a matching `.off` in SHUTDOWN. Build + typecheck green.
-  - `UIScene.ts`: add a **passive** readout (plain text, **not** pushed to `hudElements`) showing phase
-    + day, e.g. `Day 1 ☀` / `Day 1 ☾` (ASCII fallback `Day 1 [day]`/`[night]` if the glyph renders
+  - `UIScene.ts`: add a **passive** readout (plain text, **not** pushed to `hudElements`) showing phase +
+    day, e.g. `Day 1 ☀` / `Day 1 ☾` (ASCII fallback `Day 1 [day]`/`[night]` if the glyph renders
     poorly at 12px). Place it in free space top-centre-ish (below the zoom row / above the build
     indicator — pick a slot that doesn't overlap existing widgets at 360px wide). Seed from
     `registry.get('dayPhase') ?? 'day'` + `get('dayCount') ?? 1` in `create()`.
@@ -290,8 +290,8 @@ mechanism fought the code that's actually there.
     load loop. `GameScene.ts` — `isBlocked` and `tilePlaceable` now gate node-block on `t.def.blocksPath`
     (bush blocks neither routing nor build-placement; the tap hit-test stays ungated so bushes are still
     harvestable); 3 fixed berry bushes spawned near camp (21,43)/(24,38)/(17,41). Placeholder art baked
-    by new `scripts/placeholder-art.mjs` (zlib PNG encoder — no image deps): `icons/berries.png` (32×32)
-    + `_derived/bush.png` (28×24), both render-verified. `npm run build` green; boot canary clean (both
+    by new `scripts/placeholder-art.mjs` (zlib PNG encoder — no image deps): `icons/berries.png` (32×32) +
+    `_derived/bush.png` (28×24), both render-verified. `npm run build` green; boot canary clean (both
     assets load, no console error). Behavioral forage (route-through/adjacent-harvest/regrow/eat) is
     asserted deterministically in Step 9's `survival-forage.spec.ts`.
   - **Item:** `types.ts` — add `nutrition?: number` to `ItemDef` (optional, so `wood`/`stone` stay
@@ -462,8 +462,8 @@ mechanism fought the code that's actually there.
     pre-step `state()` reflects the seed) and spawns bushes via the existing `addNode(NODES.berryBush,…)`.
     Imported `DAY_MS`. `harness.ts` `DebugState` mirrors the five new fields. Added three Tier-2 specs
     (`tests/e2e/survival-{daynight,hunger,forage}.spec.ts`): day→night flip + overlay darkening + day
-    increment; hunger drain + starvation→HP loss; forage-a-bush→berries→eat→hunger-rise. `npm run build`
-    + `npm test` (105) + `npm run e2e` (27, 5 new) + `npm run smoke` all green. No `debugState` alpha
+    increment; hunger drain + starvation→HP loss; forage-a-bush→berries→eat→hunger-rise. `npm run build` +
+    `npm test` (105) + `npm run e2e` (27, 5 new) + `npm run smoke` all green. No `debugState` alpha
     read was needed beyond `nightAlpha`; no temporary skip-to-night HUD button added (optional, skipped).
   - **`debugState()`** (`:1447-1478`): add `hunger`, `dayPhase`, `dayCount`, `clockMs` to the returned
     snapshot (leave `playerHp` — already there).

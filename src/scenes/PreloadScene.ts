@@ -37,7 +37,11 @@ export class PreloadScene extends Phaser.Scene {
     const bar = this.add.rectangle(barX, barY, 1, 12, COLORS.ui).setOrigin(0, 0.5);
 
     this.add
-      .text(BASE_WIDTH / 2, barY - 24, 'Loading…', { fontFamily: 'monospace', fontSize: '12px', color: '#e8dcc0' })
+      .text(BASE_WIDTH / 2, barY - 24, 'Loading…', {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: '#e8dcc0',
+      })
       .setOrigin(0.5);
 
     this.load.on('progress', (p: number) => {
@@ -91,9 +95,18 @@ export class PreloadScene extends Phaser.Scene {
       });
     };
     const { player, enemy } = manifest.actors;
-    const playerStates: PlayerState[] = ['idle', 'walk', 'chop', 'mine', 'gather', 'attack', 'death'];
+    const playerStates: PlayerState[] = [
+      'idle',
+      'walk',
+      'chop',
+      'mine',
+      'gather',
+      'attack',
+      'death',
+    ];
     (['down', 'side', 'up'] as Facing[]).forEach((facing) => {
-      for (const state of playerStates) loadStrip(playerAnimKey(state, facing), player[state][facing]);
+      for (const state of playerStates)
+        loadStrip(playerAnimKey(state, facing), player[state][facing]);
     });
     loadStrip(enemyWalkKey, enemy.walk);
     loadStrip(enemyIdleKey, enemy.idle); // 32px Idle bob — its own footprint (Phase B)
@@ -112,7 +125,10 @@ export class PreloadScene extends Phaser.Scene {
     // slice (plan 008) — the repeatable generated set lands in plan 009. The UI falls back to the
     // item's `color` rect if a key is ever missing, so an icon-less item never hard-crashes.
     for (const item of Object.values(ITEMS)) {
-      this.load.image(iconKey(item.id), encodeURI(`${import.meta.env.BASE_URL}assets/icons/${item.icon}`));
+      this.load.image(
+        iconKey(item.id),
+        encodeURI(`${import.meta.env.BASE_URL}assets/icons/${item.icon}`),
+      );
     }
   }
 

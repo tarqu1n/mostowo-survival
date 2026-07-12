@@ -79,12 +79,7 @@ function octile(ac: number, ar: number, bc: number, br: number): number {
  * - otherwise → a non-empty list of tiles to step *to*, ending at `goal`, **never
  *   including `start`**.
  */
-export function findPath(
-  start: Cell,
-  goal: Cell,
-  isBlocked: Blocked,
-  dims: Dims,
-): Cell[] | null {
+export function findPath(start: Cell, goal: Cell, isBlocked: Blocked, dims: Dims): Cell[] | null {
   if (start.col === goal.col && start.row === goal.row) return [];
   if (isWall(goal.col, goal.row, isBlocked, dims)) return null;
   if (isWall(start.col, start.row, isBlocked, dims)) return null;
@@ -99,7 +94,11 @@ export function findPath(
 
   const startKey = key(start.col, start.row);
   gScore.set(startKey, 0);
-  open.push({ col: start.col, row: start.row, f: octile(start.col, start.row, goal.col, goal.row) });
+  open.push({
+    col: start.col,
+    row: start.row,
+    f: octile(start.col, start.row, goal.col, goal.row),
+  });
 
   while (open.length > 0) {
     // Pop the lowest-f node.

@@ -1,0 +1,24 @@
+{
+  // Markdown in this repo is loaded into LLM context (CLAUDE.md, docs/, plans/).
+  // Posture: minimum tokens — rules that force extra characters (blank-line padding,
+  // URL wrapping, mandatory H1/alt/fence-language) are OFF; rules that strip
+  // characters (trailing spaces, repeated blanks, padded emphasis) stay ON.
+  "config": {
+    "default": true,
+    "MD004": { "style": "dash" },
+    "MD012": { "maximum": 1 },
+    "MD060": { "style": "tight" }, // table pipes — zero padding is fewer tokens than compact/aligned
+    "MD013": false, // line length — wrapping churn, no token benefit
+    "MD022": false, // blank lines around headings — padding
+    "MD024": { "siblings_only": true },
+    "MD031": false, // blank lines around fences — padding
+    "MD032": false, // blank lines around lists — padding
+    "MD034": false, // bare URLs are the cheapest form
+    "MD035": { "style": "---" },
+    "MD040": false, // fence language optional — add only where it aids comprehension
+    "MD041": false, // no mandatory leading H1
+    "MD045": false, // no forced image alt text
+  },
+  "globs": ["**/*.md"],
+  "ignores": ["node_modules/**", "dist/**", "public/**", "playwright-report/**", "test-results/**"],
+}

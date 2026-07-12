@@ -63,12 +63,26 @@ npm run build     # typecheck (tsc --noEmit) + static production build -> dist/
 npm run preview   # serve the production build locally (http://localhost:4173/mostowo-survival/)
 npm run typecheck # types only, no build
 
+# Lint/format/markdown (see STANDARDS.md for the full posture)
+npm run lint      # ESLint (flat config, eslint.config.js)
+npm run lint:fix  # ESLint --fix
+npm run lint:md   # markdownlint-cli2 (docs are LLM context — token-lean lint posture)
+npm run format    # Prettier --write (not .md — markdownlint owns that)
+npm run format:check
+npm run check     # typecheck && lint && lint:md && format:check && test — the full local gate
+
 # Tests (see "Testing" below for the two-speed loop)
 npm test          # Tier-1 unit tests (Vitest, plain Node, fast)
 npm run test:watch# Tier-1 watch mode — reruns only the tests affected by the file you just saved
 npm run e2e       # Tier-2 deterministic Playwright scenarios (starts its own `vite dev`)
 npm run smoke     # Tier-3 boot canary (needs `npm run preview` running)
 ```
+
+**Pre-commit hook** (husky + lint-staged, installed automatically by `npm install` via the `prepare`
+script): `.husky/pre-commit` runs `npx lint-staged` — lints/formats **staged files only**, so it's
+fast even mid-refactor on a phone. It does **not** run the full typecheck/test suite — that's
+`npm run check`'s job (and CI's). Skip it with `git commit --no-verify` when you need to (e.g. a WIP
+commit you'll clean up before pushing).
 
 Verified working on Node 22 (Phaser 3.90, Vite 6, TypeScript 5.9). `npm run build` typechecks then
 bundles; the ~1.4 MB JS chunk is Phaser itself (~341 KB gzipped) — expected, not worth splitting.
@@ -105,11 +119,11 @@ A **three-tier deterministic harness** (plan 007 — see DECISIONS.md for the *w
 single live-game playthrough was retired: it raced real-time walks/chops and broke whenever anything
 on its one linear path changed. Now:
 
-| Tier | What | Command | When |
-| --- | --- | --- | --- |
-| **1 — unit** | Pure systems (`pathfind`/`tasks`/`combat`/`grid`/`stats`/`Inventory`) + data invariants, in plain Node | `npm test` | most iteration |
-| **2 — scenario** | Browser-real integration/render/input, one behaviour per spec, driven deterministically | `npm run e2e` | when a change needs browser fidelity |
-| **3 — boot canary** | Production bundle boots, reaches Game+UI, renders (compiles shaders), zero console errors | `npm run smoke` | before shipping |
+|Tier|What|Command|When|
+|---|---|---|---|
+|**1 — unit**|Pure systems (`pathfind`/`tasks`/`combat`/`grid`/`stats`/`Inventory`) + data invariants, in plain Node|`npm test`|most iteration|
+|**2 — scenario**|Browser-real integration/render/input, one behaviour per spec, driven deterministically|`npm run e2e`|when a change needs browser fidelity|
+|**3 — boot canary**|Production bundle boots, reaches Game+UI, renders (compiles shaders), zero console errors|`npm run smoke`|before shipping|
 
 ### Two-speed loop — run only what you touch
 

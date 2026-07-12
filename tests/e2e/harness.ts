@@ -72,7 +72,8 @@ export async function bootIntoGame(page: Page): Promise<void> {
       .then(() => true)
       .catch(() => false);
   }
-  if (!installed) throw new Error('game.__test never installed — MainMenu tap did not start the Game scene');
+  if (!installed)
+    throw new Error('game.__test never installed — MainMenu tap did not start the Game scene');
 }
 
 /** Boot the game, start the world (menu → Game), and wait for the DEV test surface to install. */
@@ -83,7 +84,14 @@ export async function startGame(page: Page): Promise<void> {
   await page.evaluate(() => {
     const g = (window as any).game;
     g.__captured = {};
-    for (const ev of ['inspect:show', 'inspect:hide', 'mode:changed', 'zoom:changed', 'camera:followChanged', 'player:hit']) {
+    for (const ev of [
+      'inspect:show',
+      'inspect:hide',
+      'mode:changed',
+      'zoom:changed',
+      'camera:followChanged',
+      'player:hit',
+    ]) {
       g.events.on(ev, (payload: unknown) => {
         g.__captured[ev] = payload ?? true;
       });
@@ -128,7 +136,10 @@ export function blocked(page: Page, col: number, row: number): Promise<boolean> 
 
 /** Emit a game event (drives the HUD-wired paths: mode toggles, zoom, attack, follow). */
 export function emit(page: Page, event: string, ...args: unknown[]): Promise<void> {
-  return page.evaluate(({ event, args }) => (window as any).game.events.emit(event, ...args), { event, args });
+  return page.evaluate(({ event, args }) => (window as any).game.events.emit(event, ...args), {
+    event,
+    args,
+  });
 }
 
 /** Read the last-captured payload for an event (see startGame's capture install). */
@@ -149,18 +160,27 @@ export function isWebGL(page: Page): Promise<boolean> {
 
 /** Current wood held (reads the shared Inventory in the registry). */
 export function wood(page: Page): Promise<number> {
-  return page.evaluate(() => (window as any).game.scene.getScene('Game').registry.get('inventory').get('wood'));
+  return page.evaluate(() =>
+    (window as any).game.scene.getScene('Game').registry.get('inventory').get('wood'),
+  );
 }
 
 /** Current amount of item `id` held (reads the shared Inventory in the registry). */
 export function held(page: Page, id: string): Promise<number> {
-  return page.evaluate((i) => (window as any).game.scene.getScene('Game').registry.get('inventory').get(i), id);
+  return page.evaluate(
+    (i) => (window as any).game.scene.getScene('Game').registry.get('inventory').get(i),
+    id,
+  );
 }
 
 /** Map a world tile (col,row) to a client (screen) pixel through the live camera zoom/scroll, for
  * real-pointer gesture specs. Mirrors scripts/smoke.mjs's worldToClient (camera worldView + the
  * Scale.FIT canvas scale from the backing-store width, i.e. BASE_WIDTH × RENDER_SCALE). */
-export function tileToClient(page: Page, col: number, row: number): Promise<{ x: number; y: number }> {
+export function tileToClient(
+  page: Page,
+  col: number,
+  row: number,
+): Promise<{ x: number; y: number }> {
   return page.evaluate(
     ([col, row]) => {
       const TILE = 16;

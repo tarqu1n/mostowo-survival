@@ -4,7 +4,9 @@ import { startGame, applyScenario, inspect, captured } from './harness';
 // Tier-2: Inspect-mode hit-testing + the GameScene→UIScene 'inspect:show'/'inspect:hide' wiring
 // (which stats reach the panel for each entity kind, and that empty ground dismisses it).
 
-test('inspecting each entity kind shows its stats, empty ground hides the panel', async ({ page }) => {
+test('inspecting each entity kind shows its stats, empty ground hides the panel', async ({
+  page,
+}) => {
   await startGame(page);
   await applyScenario(page, {
     player: [3, 3],
@@ -15,7 +17,11 @@ test('inspecting each entity kind shows its stats, empty ground hides the panel'
   });
 
   await inspect(page, 7, 3); // enemy (highest priority)
-  expect(await captured(page, 'inspect:show')).toMatchObject({ name: 'Kid Zombie', maxHp: 3, currentHp: 3 });
+  expect(await captured(page, 'inspect:show')).toMatchObject({
+    name: 'Kid Zombie',
+    maxHp: 3,
+    currentHp: 3,
+  });
 
   await inspect(page, 5, 3); // tree
   expect(await captured(page, 'inspect:show')).toMatchObject({ name: 'Tree', maxHp: 3 });
@@ -29,7 +35,9 @@ test('inspecting each entity kind shows its stats, empty ground hides the panel'
   expect(await captured(page, 'inspect:hide')).toBe(true);
 });
 
-test('a tall node is picked up its drawn trunk, above its foot tile, not by a fat tile hitbox', async ({ page }) => {
+test('a tall node is picked up its drawn trunk, above its foot tile, not by a fat tile hitbox', async ({
+  page,
+}) => {
   await startGame(page);
   await applyScenario(page, { player: [3, 3], mode: 'inspect', trees: [[5, 3]] });
 

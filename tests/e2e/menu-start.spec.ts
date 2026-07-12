@@ -12,7 +12,9 @@ import { step, state } from './harness';
 // BETWEEN the down and the up — so we hold the press, wait for the world to boot, THEN release.
 // The harness's startGame() clicks dead-centre, which maps to the player's own tile (a no-op move),
 // which is exactly why this hid in every other spec; here we press off-centre so a leak would move.
-test('tapping the title screen to start does not issue a move order on the map', async ({ page }) => {
+test('tapping the title screen to start does not issue a move order on the map', async ({
+  page,
+}) => {
   await page.goto('/', { waitUntil: 'load' });
   await page.waitForFunction(() => (window as any).game?.isBooted, null, { timeout: 15_000 });
 

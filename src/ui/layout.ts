@@ -11,7 +11,9 @@ export function arrangeRow<T extends Positionable>(
   items: T[],
   opts: { startX: number; y: number; width: number; gap: number },
 ): T[] {
-  items.forEach((it, i) => it.setPosition(opts.startX + opts.width / 2 + i * (opts.width + opts.gap), opts.y));
+  items.forEach((it, i) =>
+    it.setPosition(opts.startX + opts.width / 2 + i * (opts.width + opts.gap), opts.y),
+  );
   return items;
 }
 
@@ -20,14 +22,24 @@ export function arrangeColumn<T extends Positionable>(
   items: T[],
   opts: { x: number; startY: number; height: number; gap: number },
 ): T[] {
-  items.forEach((it, i) => it.setPosition(opts.x, opts.startY + opts.height / 2 + i * (opts.height + opts.gap)));
+  items.forEach((it, i) =>
+    it.setPosition(opts.x, opts.startY + opts.height / 2 + i * (opts.height + opts.gap)),
+  );
   return items;
 }
 
 /** Lay items into a `cols`-wide grid, filling left-to-right then top-to-bottom. */
 export function arrangeGrid<T extends Positionable>(
   items: T[],
-  opts: { startX: number; startY: number; cellW: number; cellH: number; cols: number; gapX: number; gapY: number },
+  opts: {
+    startX: number;
+    startY: number;
+    cellW: number;
+    cellH: number;
+    cols: number;
+    gapX: number;
+    gapY: number;
+  },
 ): T[] {
   items.forEach((it, i) => {
     const col = i % opts.cols;

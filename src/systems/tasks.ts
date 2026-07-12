@@ -5,9 +5,9 @@
 
 /** An action in a worker's task queue: move, harvest, or build. */
 export type Action =
-  | { kind: 'move'; col: number; row: number }         // path to the tile and stop
-  | { kind: 'harvest'; treeId: string }                // path adjacent to the tree, chop until felled
-  | { kind: 'build'; siteId: string };                 // path adjacent to the blueprint, work until built
+  | { kind: 'move'; col: number; row: number } // path to the tile and stop
+  | { kind: 'harvest'; treeId: string } // path adjacent to the tree, chop until felled
+  | { kind: 'build'; siteId: string }; // path adjacent to the blueprint, work until built
 
 /** Queue holding a current action and pending actions for a worker. */
 export class TaskQueue {

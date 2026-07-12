@@ -67,7 +67,11 @@ describe('acquire (radius-only)', () => {
 describe('de-aggro (distance-only)', () => {
   it('keeps chasing at exactly the drop radius', () => {
     const prev: MonsterState = { ...initialMonsterState(), mode: 'chase', lastChaseRepathMs: 0 };
-    const inputs = baseInputs({ nowMs: 1000, monsterPos: { x: 0, y: 0 }, playerPos: { x: DROP, y: 0 } });
+    const inputs = baseInputs({
+      nowMs: 1000,
+      monsterPos: { x: 0, y: 0 },
+      playerPos: { x: DROP, y: 0 },
+    });
     const { state } = stepMonster(prev, inputs, mulberry32(1));
     expect(state.mode).toBe('chase');
   });
@@ -100,7 +104,11 @@ describe('veer band', () => {
   });
 
   it('perturbs the chase target within veerMaxTiles on each axis, for any rng draw', () => {
-    const prev: MonsterState = { ...initialMonsterState(), mode: 'chase', lastChaseRepathMs: -1000 };
+    const prev: MonsterState = {
+      ...initialMonsterState(),
+      mode: 'chase',
+      lastChaseRepathMs: -1000,
+    };
     // Player at the drop edge so perturbation is at its max.
     const inputs = baseInputs({
       nowMs: 1000,
@@ -120,7 +128,11 @@ describe('veer band', () => {
 
   it('throttles chase repaths to the repath cadence', () => {
     const prev: MonsterState = { ...initialMonsterState(), mode: 'chase', lastChaseRepathMs: 900 };
-    const inputs = baseInputs({ nowMs: 1000, monsterPos: { x: 0, y: 0 }, playerPos: { x: 150, y: 0 } });
+    const inputs = baseInputs({
+      nowMs: 1000,
+      monsterPos: { x: 0, y: 0 },
+      playerPos: { x: 150, y: 0 },
+    });
     // Only 100ms since the last repath (< 300) → no repath this tick.
     const { repath } = stepMonster(prev, inputs, mulberry32(1));
     expect(repath).toBe(false);
@@ -136,8 +148,12 @@ describe('wander', () => {
       expect(state.mode).toBe('wander');
       expect(repath).toBe(true);
       expect(targetTile).not.toBeNull();
-      expect(Math.abs(targetTile!.col - inputs.monster.col)).toBeLessThanOrEqual(inputs.wanderRadiusTiles);
-      expect(Math.abs(targetTile!.row - inputs.monster.row)).toBeLessThanOrEqual(inputs.wanderRadiusTiles);
+      expect(Math.abs(targetTile!.col - inputs.monster.col)).toBeLessThanOrEqual(
+        inputs.wanderRadiusTiles,
+      );
+      expect(Math.abs(targetTile!.row - inputs.monster.row)).toBeLessThanOrEqual(
+        inputs.wanderRadiusTiles,
+      );
       expect(targetTile).not.toEqual(inputs.monster);
     }
   });
@@ -181,7 +197,12 @@ describe('patrol', () => {
 
   it('advances waypoints with a pause at each, wrapping back to the start', () => {
     const rng = mulberry32(1);
-    let state: MonsterState = { ...initialMonsterState(route), mode: 'patrol', patrolIndex: 0, goalTile: route[0] };
+    let state: MonsterState = {
+      ...initialMonsterState(route),
+      mode: 'patrol',
+      patrolIndex: 0,
+      goalTile: route[0],
+    };
     const visited: number[] = [];
 
     // Walk the full loop: arrive → pause → advance, for one wrap plus one.

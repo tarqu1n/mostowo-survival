@@ -198,8 +198,8 @@ save persistence, camera/scrolling world, multiple maps.
     (no wall under button), asserts no console errors: **SMOKE PASSED**. Exposed `window.game` for
     test/debug. Docs updated: `CLAUDE.md` Status, `docs/GAME-DESIGN.md` MVP slice ticks,
     `docs/WORKFLOW.md` conventions (data/systems/UIScene, input-guard, listener teardown, smoke).
-  - **Verify** via the headless smoke pattern in `docs/WORKFLOW.md` (`npm run build && npm run preview`
-    + Chromium at `/opt/pw-browsers/`): drive tap→chop (assert wood count rises), toggle Build, place a
+  - **Verify** via the headless smoke pattern in `docs/WORKFLOW.md` (`npm run build && npm run preview` +
+    Chromium at `/opt/pw-browsers/`): drive tap→chop (assert wood count rises), toggle Build, place a
     wall (assert wood drops by 2), and confirm no console/runtime errors. **Explicitly assert the
     Finding-1 arbitration:** tapping the Build button toggles mode **without** queuing a world move or
     placing a wall under it. Capture before/after screenshots to eyeball the HUD/layout.
@@ -228,10 +228,10 @@ mobile-first tap controls) and is correctly sized as a foundation slice; the rea
 the input/event wiring the UIScene + bus transition introduces, not in strategy. Fixes folded into
 Steps 4–7 below.
 
-| # | Finding | Severity | Fixed in |
-| - | ------- | -------- | -------- |
-| 1 | GameScene's blanket `input.on('pointerdown')` fires for *every* tap, including taps landing on the UIScene Build button above it → tapping Build also routes a world move/chop/place (and exiting build mode also places a wall on that tile). No cross-scene input arbitration. | High | Steps 4–6: world routing gated on `!pointerOverUI` (HUD hit-region guard). |
-| 2 | The existing `pointermove` drag handler (updates `target` while pointer down) is unmentioned — dragging overrides the chop approach and, in build mode, slides the player under the ghost. | Medium | Step 4: consolidate *all* pointer handlers (down + move) into one intent gate. |
-| 3 | `game.events`/`registry` survive scene shutdown; listeners registered in `create()` with no teardown double-register on any future scene restart. | Medium | Steps 4–5 + 7: `this.events.once('shutdown', …)` cleanup in both scenes; baked into the convention note. |
-| 4 | Inventory is shared via `registry` *and* re-emitted onto the bus as `inventory:changed` — UIScene has the instance already and could subscribe to its native `'change'` directly. | Low | Step 5: UIScene listens to the shared Inventory's `'change'` directly; bus reserved for `build:*`. |
-| 5 | Trees spawn at "fixed positions" but build validity uses tile-key occupancy / "overlaps a live tree" — ambiguous if trees aren't grid-aligned. | Low | Step 4: snap tree spawns to tile centres via the Step-3 grid helpers. |
+|#|Finding|Severity|Fixed in|
+|-|-------|--------|--------|
+|1|GameScene's blanket `input.on('pointerdown')` fires for *every* tap, including taps landing on the UIScene Build button above it → tapping Build also routes a world move/chop/place (and exiting build mode also places a wall on that tile). No cross-scene input arbitration.|High|Steps 4–6: world routing gated on `!pointerOverUI` (HUD hit-region guard).|
+|2|The existing `pointermove` drag handler (updates `target` while pointer down) is unmentioned — dragging overrides the chop approach and, in build mode, slides the player under the ghost.|Medium|Step 4: consolidate *all* pointer handlers (down + move) into one intent gate.|
+|3|`game.events`/`registry` survive scene shutdown; listeners registered in `create()` with no teardown double-register on any future scene restart.|Medium|Steps 4–5 + 7: `this.events.once('shutdown', …)` cleanup in both scenes; baked into the convention note.|
+|4|Inventory is shared via `registry` *and* re-emitted onto the bus as `inventory:changed` — UIScene has the instance already and could subscribe to its native `'change'` directly.|Low|Step 5: UIScene listens to the shared Inventory's `'change'` directly; bus reserved for `build:*`.|
+|5|Trees spawn at "fixed positions" but build validity uses tile-key occupancy / "overlaps a live tree" — ambiguous if trees aren't grid-aligned.|Low|Step 4: snap tree spawns to tile centres via the Step-3 grid helpers.|

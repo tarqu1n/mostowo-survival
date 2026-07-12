@@ -23,7 +23,9 @@ export function parseArgs(argv) {
 export function requireEnv(name) {
   const v = process.env[name];
   if (!v) {
-    console.error(`Missing ${name}. Put it in a local .env and \`export $(grep -v '^#' .env | xargs)\`, or export it directly — never commit it (see .gitignore).`);
+    console.error(
+      `Missing ${name}. Put it in a local .env and \`export $(grep -v '^#' .env | xargs)\`, or export it directly — never commit it (see .gitignore).`,
+    );
     process.exit(1);
   }
   return v;

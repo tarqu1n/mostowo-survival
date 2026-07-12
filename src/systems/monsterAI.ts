@@ -129,11 +129,19 @@ function clampTile(c: Cell, dims: Dims): Cell {
 
 /** The player's tile, perturbed by up to `veerMaxTiles` when inside the veer band (else exact). */
 function perturbedChaseTarget(inputs: MonsterInputs, d: number, rng: () => number): Cell {
-  const maxOff = chaseVeerMaxTiles(d, inputs.chaseDropRadiusPx, inputs.veerBandPx, inputs.veerMaxTiles);
+  const maxOff = chaseVeerMaxTiles(
+    d,
+    inputs.chaseDropRadiusPx,
+    inputs.veerBandPx,
+    inputs.veerMaxTiles,
+  );
   if (maxOff <= 0) return { ...inputs.playerTile };
   const dcol = Math.round((rng() * 2 - 1) * maxOff);
   const drow = Math.round((rng() * 2 - 1) * maxOff);
-  return clampTile({ col: inputs.playerTile.col + dcol, row: inputs.playerTile.row + drow }, inputs.dims);
+  return clampTile(
+    { col: inputs.playerTile.col + dcol, row: inputs.playerTile.row + drow },
+    inputs.dims,
+  );
 }
 
 /** A random reachable (in-bounds, unblocked, non-self) tile within `radius`, or `null` if none found. */
@@ -178,9 +186,19 @@ function stepIdle(prev: MonsterState, inputs: MonsterInputs, rng: () => number):
       repath: true,
     };
   }
-  const goal = pickWanderTile(inputs.monster, inputs.wanderRadiusTiles, inputs.dims, inputs.isBlocked, rng);
+  const goal = pickWanderTile(
+    inputs.monster,
+    inputs.wanderRadiusTiles,
+    inputs.dims,
+    inputs.isBlocked,
+    rng,
+  );
   if (!goal) return { state: prev, targetTile: null, repath: false }; // no free tile → stand, retry next tick
-  return { state: { ...prev, mode: 'wander', goalTile: goal, timerMs: 0 }, targetTile: goal, repath: true };
+  return {
+    state: { ...prev, mode: 'wander', goalTile: goal, timerMs: 0 },
+    targetTile: goal,
+    repath: true,
+  };
 }
 
 function stepWander(prev: MonsterState, inputs: MonsterInputs, rng: () => number): MonsterDecision {
@@ -196,7 +214,11 @@ function stepPatrol(prev: MonsterState, inputs: MonsterInputs): MonsterDecision 
   const route = prev.patrolRoute;
   if (!route || route.length === 0) {
     // Route vanished → fall back to idle.
-    return { state: { ...prev, mode: 'idle', goalTile: null, timerMs: 0 }, targetTile: null, repath: false };
+    return {
+      state: { ...prev, mode: 'idle', goalTile: null, timerMs: 0 },
+      targetTile: null,
+      repath: false,
+    };
   }
   const goal = prev.goalTile ?? route[prev.patrolIndex % route.length];
   if (!sameTile(inputs.monster, goal)) {
@@ -204,14 +226,22 @@ function stepPatrol(prev: MonsterState, inputs: MonsterInputs): MonsterDecision 
   }
   // At the waypoint: pause (timerMs === 0 ⇒ just arrived, begin it), then advance to the next.
   if (prev.timerMs === 0) {
-    return { state: { ...prev, timerMs: inputs.nowMs + inputs.patrolPauseMs }, targetTile: null, repath: false };
+    return {
+      state: { ...prev, timerMs: inputs.nowMs + inputs.patrolPauseMs },
+      targetTile: null,
+      repath: false,
+    };
   }
   if (inputs.nowMs < prev.timerMs) {
     return { state: prev, targetTile: null, repath: false }; // still pausing
   }
   const idx = (prev.patrolIndex + 1) % route.length;
   const next = route[idx];
-  return { state: { ...prev, patrolIndex: idx, goalTile: next, timerMs: 0 }, targetTile: next, repath: true };
+  return {
+    state: { ...prev, patrolIndex: idx, goalTile: next, timerMs: 0 },
+    targetTile: next,
+    repath: true,
+  };
 }
 
 /**
@@ -228,7 +258,13 @@ export function stepMonster(
   // Acquire: any calm mode flips to chase the instant the player is within radius.
   if (prev.mode !== 'chase' && d <= inputs.acquireRadiusPx) {
     return {
-      state: { ...prev, mode: 'chase', lastChaseRepathMs: inputs.nowMs, timerMs: 0, goalTile: null },
+      state: {
+        ...prev,
+        mode: 'chase',
+        lastChaseRepathMs: inputs.nowMs,
+        timerMs: 0,
+        goalTile: null,
+      },
       targetTile: perturbedChaseTarget(inputs, d, rng),
       repath: true,
     };

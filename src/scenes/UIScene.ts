@@ -126,7 +126,9 @@ export class UIScene extends Phaser.Scene {
   /** Interactive HUD elements GameScene must treat as UI, not world — tested live so a hidden
    * button (Cancel when idle, the panel when closed) never swallows a world tap. Kit widgets are
    * Containers; a Container's getBounds() is the union of its children's bounds. */
-  private hudElements: Array<Phaser.GameObjects.Container | Phaser.GameObjects.Text | Phaser.GameObjects.Arc> = [];
+  private hudElements: Array<
+    Phaser.GameObjects.Container | Phaser.GameObjects.Text | Phaser.GameObjects.Arc
+  > = [];
 
   constructor() {
     super('UI');
@@ -160,7 +162,12 @@ export class UIScene extends Phaser.Scene {
 
     // Starving vignette: same baked edge-vignette, yellow, one depth below the damage flash. Alpha
     // starts at 0 and is driven live by updateHungerBar; no tween — hunger changes gradually.
-    const hungerVignetteKey = bakeVignetteTexture(this, HUNGER_VIGNETTE_COLOR, BASE_WIDTH, BASE_HEIGHT);
+    const hungerVignetteKey = bakeVignetteTexture(
+      this,
+      HUNGER_VIGNETTE_COLOR,
+      BASE_WIDTH,
+      BASE_HEIGHT,
+    );
     this.hungerVignette = this.add
       .image(BASE_WIDTH / 2, BASE_HEIGHT / 2, hungerVignetteKey)
       .setDisplaySize(BASE_WIDTH, BASE_HEIGHT)
@@ -192,14 +199,19 @@ export class UIScene extends Phaser.Scene {
     // Cancel button — clears the worker's task queue. Sits under the Build button, top-right.
     const cbw = 60;
     const cbh = 22;
-    this.cancelButton = new Button(this, BASE_WIDTH - cbw / 2 - 8, 8 + bh / 2 + bh / 2 + cbh / 2 + 6, {
-      width: cbw,
-      height: cbh,
-      label: 'CANCEL',
-      variant: 'danger',
-      fontSize: 10,
-      onDown: () => this.game.events.emit('tasks:cancel'),
-    }).setVisible(false);
+    this.cancelButton = new Button(
+      this,
+      BASE_WIDTH - cbw / 2 - 8,
+      8 + bh / 2 + bh / 2 + cbh / 2 + 6,
+      {
+        width: cbw,
+        height: cbh,
+        label: 'CANCEL',
+        variant: 'danger',
+        fontSize: 10,
+        onDown: () => this.game.events.emit('tasks:cancel'),
+      },
+    ).setVisible(false);
     this.hudElements.push(this.cancelButton);
 
     // Inventory toggle — top-right, in the same stack under BUILD/CANCEL. Opens the full grid Panel.
@@ -215,7 +227,11 @@ export class UIScene extends Phaser.Scene {
     this.hudElements.push(this.inventoryButton);
 
     // Queue indicator — current action + queued count, top-left.
-    this.queueText = this.add.text(10, 26, '', { fontFamily: 'monospace', fontSize: '9px', color: '#9a8f74' });
+    this.queueText = this.add.text(10, 26, '', {
+      fontFamily: 'monospace',
+      fontSize: '9px',
+      color: '#9a8f74',
+    });
 
     // Zoom controls — top-center: [−] 100% [+]. GameScene owns the actual camera zoom (and the
     // pinch-gesture path to it); this only emits deltas + mirrors the current value back as text.
@@ -231,7 +247,11 @@ export class UIScene extends Phaser.Scene {
     });
     const initialZoom = (this.registry.get('zoom') as number | undefined) ?? DEFAULT_ZOOM;
     this.zoomText = this.add
-      .text(BASE_WIDTH / 2, zY, `${Math.round(initialZoom * 100)}%`, { fontFamily: 'monospace', fontSize: '10px', color: '#e8dcc0' })
+      .text(BASE_WIDTH / 2, zY, `${Math.round(initialZoom * 100)}%`, {
+        fontFamily: 'monospace',
+        fontSize: '10px',
+        color: '#e8dcc0',
+      })
       .setOrigin(0.5);
     this.zoomInButton = new Button(this, BASE_WIDTH / 2 + zGap, zY, {
       width: zbSize,
@@ -265,11 +285,16 @@ export class UIScene extends Phaser.Scene {
     const initialPhase = (this.registry.get('dayPhase') as 'day' | 'night' | undefined) ?? 'day';
     const initialDayCount = (this.registry.get('dayCount') as number | undefined) ?? 1;
     this.timeText = this.add
-      .text(BASE_WIDTH / 2, zY + zbSize / 2 + 6 + fbh + 10, `Day ${initialDayCount} [${initialPhase}]`, {
-        fontFamily: 'monospace',
-        fontSize: '11px',
-        color: '#e8dcc0',
-      })
+      .text(
+        BASE_WIDTH / 2,
+        zY + zbSize / 2 + 6 + fbh + 10,
+        `Day ${initialDayCount} [${initialPhase}]`,
+        {
+          fontFamily: 'monospace',
+          fontSize: '11px',
+          color: '#e8dcc0',
+        },
+      )
       .setOrigin(0.5);
 
     // Mode toggle — Command (default, no button needed) / Combat / Inspect, mutually exclusive.
@@ -290,7 +315,12 @@ export class UIScene extends Phaser.Scene {
       fontSize: 9,
       onDown: () => this.game.events.emit('mode:inspectToggle'),
     });
-    arrangeRow([this.modeCombatButton, this.modeInspectButton], { startX: 8, y: 48, width: mbw, gap: 8 });
+    arrangeRow([this.modeCombatButton, this.modeInspectButton], {
+      startX: 8,
+      y: 48,
+      width: mbw,
+      gap: 8,
+    });
     this.hudElements.push(this.modeCombatButton, this.modeInspectButton);
 
     // STATUS — opens the Health & Wellbeing screen. Left column, below the mode row (clear of the
@@ -311,7 +341,9 @@ export class UIScene extends Phaser.Scene {
       .setStrokeStyle(1, COLORS.ui, 0.6)
       .setInteractive({ useHandCursor: true })
       .setVisible(false);
-    this.movepadKnob = this.add.circle(this.movepadCenter.x, this.movepadCenter.y, 14, COLORS.ui, 0.85).setVisible(false);
+    this.movepadKnob = this.add
+      .circle(this.movepadCenter.x, this.movepadCenter.y, 14, COLORS.ui, 0.85)
+      .setVisible(false);
     this.movepadBase.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       this.movepadPointerId = pointer.id;
       this.updateMovepad(pointer);
@@ -339,9 +371,16 @@ export class UIScene extends Phaser.Scene {
       dismissible: true,
       onDismiss: () => this.game.events.emit('inspect:hide'),
     });
-    this.inspectPanelTitle = this.inspectPanelBg.addText(16, { fontSize: '13px', color: '#e8dcc0' });
+    this.inspectPanelTitle = this.inspectPanelBg.addText(16, {
+      fontSize: '13px',
+      color: '#e8dcc0',
+    });
     this.inspectPanelHp = this.inspectPanelBg.addText(38, { fontSize: '11px', color: '#e8dcc0' });
-    this.inspectPanelExtra = this.inspectPanelBg.addText(58, { fontSize: '10px', color: '#9a8f74', align: 'center' }, 0);
+    this.inspectPanelExtra = this.inspectPanelBg.addText(
+      58,
+      { fontSize: '10px', color: '#9a8f74', align: 'center' },
+      0,
+    );
     this.hudElements.push(this.inspectPanelBg);
 
     // Movepad drag tracking: scoped to whichever pointer id pressed the base, so a second finger
@@ -431,7 +470,10 @@ export class UIScene extends Phaser.Scene {
       onDismiss: () => this.setInventoryOpen(false),
     });
     this.inventoryPanel.addText(16, { fontSize: '12px', color: '#e8dcc0' }).setText('INVENTORY');
-    this.inventoryGrid = new SlotGrid(this, 0, 14, { slotCount: INVENTORY_SLOTS, cols: HOTBAR_SLOTS });
+    this.inventoryGrid = new SlotGrid(this, 0, 14, {
+      slotCount: INVENTORY_SLOTS,
+      cols: HOTBAR_SLOTS,
+    });
     this.inventoryPanel.add(this.inventoryGrid);
     this.hudElements.push(this.inventoryPanel);
 
@@ -481,7 +523,12 @@ export class UIScene extends Phaser.Scene {
     this.damageVignette.setAlpha(DAMAGE_VIGNETTE_ALPHA);
     // Cubic.easeIn holds near the peak briefly before dropping off, so the flash registers rather than
     // fading the instant it appears (Quad.easeOut lost most of it in the first ~80ms).
-    this.tweens.add({ targets: this.damageVignette, alpha: 0, duration: DAMAGE_VIGNETTE_MS, ease: 'Cubic.easeIn' });
+    this.tweens.add({
+      targets: this.damageVignette,
+      alpha: 0,
+      duration: DAMAGE_VIGNETTE_MS,
+      ease: 'Cubic.easeIn',
+    });
   }
 
   /** True if (x, y) in game coords lands on a *visible* interactive HUD element. */
@@ -539,22 +586,39 @@ export class UIScene extends Phaser.Scene {
 
     // Dark bg rect + left-anchored coloured fg (origin 0,0.5 keeps the left edge fixed as scaleX
     // shrinks), plus a centred value label with a black stroke so numbers stay legible over any fill.
-    const makeBar = (yc: number, colour: number): { fg: Phaser.GameObjects.Rectangle; value: Phaser.GameObjects.Text } => {
-      this.add.rectangle(BAR_X + BAR_W / 2, yc, BAR_W, BAR_H, 0x2a2a2a).setStrokeStyle(1, 0x000000, 0.5);
+    const makeBar = (
+      yc: number,
+      colour: number,
+    ): { fg: Phaser.GameObjects.Rectangle; value: Phaser.GameObjects.Text } => {
+      this.add
+        .rectangle(BAR_X + BAR_W / 2, yc, BAR_W, BAR_H, 0x2a2a2a)
+        .setStrokeStyle(1, 0x000000, 0.5);
       const fg = this.add.rectangle(BAR_X, yc, BAR_W, BAR_H, colour).setOrigin(0, 0.5);
       const value = this.add
-        .text(BAR_X + BAR_W / 2, yc, '', { fontFamily: 'monospace', fontSize: '8px', color: '#ffffff' })
+        .text(BAR_X + BAR_W / 2, yc, '', {
+          fontFamily: 'monospace',
+          fontSize: '8px',
+          color: '#ffffff',
+        })
         .setOrigin(0.5)
         .setStroke('#000000', 2);
       return { fg, value };
     };
 
-    this.add.text(LABEL_X, healthY, 'HP', { fontFamily: 'monospace', fontSize: '8px', color: '#e8dcc0' }).setOrigin(0, 0.5);
+    this.add
+      .text(LABEL_X, healthY, 'HP', { fontFamily: 'monospace', fontSize: '8px', color: '#e8dcc0' })
+      .setOrigin(0, 0.5);
     const health = makeBar(healthY, 0x4caf50);
     this.hudHealthBarFg = health.fg;
     this.hudHealthLabel = health.value;
 
-    this.add.text(LABEL_X, hungerY, 'FOOD', { fontFamily: 'monospace', fontSize: '8px', color: '#e8dcc0' }).setOrigin(0, 0.5);
+    this.add
+      .text(LABEL_X, hungerY, 'FOOD', {
+        fontFamily: 'monospace',
+        fontSize: '8px',
+        color: '#e8dcc0',
+      })
+      .setOrigin(0, 0.5);
     const hunger = makeBar(hungerY, 0xd8a24a);
     this.hudHungerBarFg = hunger.fg;
     this.hudHungerLabel = hunger.value;
@@ -582,13 +646,19 @@ export class UIScene extends Phaser.Scene {
       dismissible: true,
       onDismiss: () => this.setWellbeingOpen(false),
     });
-    this.wellbeingPanel.addText(16, { fontSize: '12px', color: '#e8dcc0' }).setText('HEALTH & WELLBEING');
+    this.wellbeingPanel
+      .addText(16, { fontSize: '12px', color: '#e8dcc0' })
+      .setText('HEALTH & WELLBEING');
 
     // A left-anchored two-rect meter (dark bg + coloured fg scaled by value). Returns the fg rect;
     // callers set `fg.scaleX = value/max` and re-tint it. Origin (0, 0.5) keeps the left edge fixed.
     const makeBar = (offsetY: number, colour: number): Phaser.GameObjects.Rectangle => {
-      const bg = this.add.rectangle(0, top(offsetY), BAR_W, BAR_H, 0x2a2a2a).setStrokeStyle(1, 0x000000, 0.5);
-      const fg = this.add.rectangle(-BAR_W / 2, top(offsetY), BAR_W, BAR_H, colour).setOrigin(0, 0.5);
+      const bg = this.add
+        .rectangle(0, top(offsetY), BAR_W, BAR_H, 0x2a2a2a)
+        .setStrokeStyle(1, 0x000000, 0.5);
+      const fg = this.add
+        .rectangle(-BAR_W / 2, top(offsetY), BAR_W, BAR_H, colour)
+        .setOrigin(0, 0.5);
       this.wellbeingPanel.add([bg, fg]);
       return fg;
     };
@@ -600,7 +670,8 @@ export class UIScene extends Phaser.Scene {
 
     // Player stats — read once from the registry (combat's private stat bag, surfaced by GameScene).
     const s = this.registry.get('playerStats') as CombatantStats | undefined;
-    const statLine = (label: string, value: number | string): string => `${label.padEnd(9)}${value}`;
+    const statLine = (label: string, value: number | string): string =>
+      `${label.padEnd(9)}${value}`;
     const statsText = s
       ? [
           statLine('Max HP', s.maxHp),
@@ -626,7 +697,9 @@ export class UIScene extends Phaser.Scene {
 
     // Edible list — one interactive row per item with `nutrition`. The row emits needs:eat (guarded to
     // count > 0). Rows live inside the panel, so the panel's bounds cover them for the world-tap gate.
-    this.wellbeingPanel.addText(248, { fontSize: '11px', color: '#9a8f74' }).setText('— AVAILABLE TO EAT —');
+    this.wellbeingPanel
+      .addText(248, { fontSize: '11px', color: '#9a8f74' })
+      .setText('— AVAILABLE TO EAT —');
     const edibles = Object.values(ITEMS).filter((it) => it.nutrition != null);
     edibles.forEach((it, i) => {
       const rowY = top(272 + i * 30);
@@ -640,7 +713,8 @@ export class UIScene extends Phaser.Scene {
         label: it.name,
         fontSize: 10,
         onDown: () => {
-          if ((this.inv?.get(it.id) ?? 0) > 0) this.game.events.emit('needs:eat', { itemId: it.id });
+          if ((this.inv?.get(it.id) ?? 0) > 0)
+            this.game.events.emit('needs:eat', { itemId: it.id });
         },
       });
       this.wellbeingPanel.add(button);
@@ -677,14 +751,17 @@ export class UIScene extends Phaser.Scene {
 
     // Steady yellow starving vignette: 0 at/above the low cutoff, ramping to full as hunger hits 0.
     const vignetteAlpha =
-      ratio < HUNGER_LOW_FRACTION ? HUNGER_VIGNETTE_MAX_ALPHA * (1 - ratio / HUNGER_LOW_FRACTION) : 0;
+      ratio < HUNGER_LOW_FRACTION
+        ? HUNGER_VIGNETTE_MAX_ALPHA * (1 - ratio / HUNGER_LOW_FRACTION)
+        : 0;
     this.hungerVignette.setAlpha(vignetteAlpha);
   }
 
   /** Scale + tint the health bars (panel + always-on HUD) and update their labels. Green normally,
    * red when low. */
   private updateHealthBar(): void {
-    const ratio = this.playerMaxHp > 0 ? Math.max(0, Math.min(1, this.playerHp / this.playerMaxHp)) : 1;
+    const ratio =
+      this.playerMaxHp > 0 ? Math.max(0, Math.min(1, this.playerHp / this.playerMaxHp)) : 1;
     const colour = ratio <= 0.3 ? 0xc0392b : 0x4caf50;
     this.healthBarFg.scaleX = ratio;
     this.healthBarFg.setFillStyle(colour);
@@ -722,7 +799,11 @@ export class UIScene extends Phaser.Scene {
   /** Reflect the worker's live task state: current action label + queued count, and Cancel visibility. */
   private onTasks(state: { current: string | null; pending: number }): void {
     const busy = state.current !== null || state.pending > 0;
-    this.queueText.setText(busy ? `▶ ${state.current ?? 'idle'}${state.pending ? ` · +${state.pending} queued` : ''}` : '');
+    this.queueText.setText(
+      busy
+        ? `▶ ${state.current ?? 'idle'}${state.pending ? ` · +${state.pending} queued` : ''}`
+        : '',
+    );
     this.cancelButton.setVisible(busy);
   }
 
@@ -769,8 +850,14 @@ export class UIScene extends Phaser.Scene {
 
   private showInspectPanel(stats: InspectableStats): void {
     this.inspectPanelTitle.setText(stats.name);
-    this.inspectPanelHp.setText(stats.currentHp !== undefined ? `HP: ${stats.currentHp}/${stats.maxHp}` : `Max HP: ${stats.maxHp}`);
-    this.inspectPanelExtra.setText((stats.extra ?? []).map((e) => `${e.label}: ${e.value}`).join('\n'));
+    this.inspectPanelHp.setText(
+      stats.currentHp !== undefined
+        ? `HP: ${stats.currentHp}/${stats.maxHp}`
+        : `Max HP: ${stats.maxHp}`,
+    );
+    this.inspectPanelExtra.setText(
+      (stats.extra ?? []).map((e) => `${e.label}: ${e.value}`).join('\n'),
+    );
     this.inspectPanelBg.show();
   }
 
@@ -786,8 +873,14 @@ export class UIScene extends Phaser.Scene {
     const dy = pointer.y / RENDER_SCALE - this.movepadCenter.y;
     const dist = Math.min(this.movepadRadius, Math.hypot(dx, dy));
     const angle = Math.atan2(dy, dx);
-    this.movepadKnob.setPosition(this.movepadCenter.x + Math.cos(angle) * dist, this.movepadCenter.y + Math.sin(angle) * dist);
+    this.movepadKnob.setPosition(
+      this.movepadCenter.x + Math.cos(angle) * dist,
+      this.movepadCenter.y + Math.sin(angle) * dist,
+    );
     const norm = dist / this.movepadRadius;
-    this.game.events.emit('combat:move', { dx: Math.cos(angle) * norm, dy: Math.sin(angle) * norm });
+    this.game.events.emit('combat:move', {
+      dx: Math.cos(angle) * norm,
+      dy: Math.sin(angle) * norm,
+    });
   }
 }

@@ -99,7 +99,7 @@ describe('BUILDABLES', () => {
     }
   });
 
-  it("wall costs wood, and ITEMS.wood exists", () => {
+  it('wall costs wood, and ITEMS.wood exists', () => {
     expect(BUILDABLES.wall.cost.wood).toBeGreaterThan(0);
     expect(ITEMS.wood).toBeDefined();
   });

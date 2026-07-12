@@ -26,7 +26,9 @@ import { parseArgs, requireEnv, writeBase64Png } from './lib.mjs';
 const args = parseArgs(process.argv.slice(2));
 
 if (!args.prompt) {
-  console.error('Usage: node scripts/gen-art/retrodiffusion.mjs --prompt "..." [--style rd_tile__single_tile] [--width 16] [--height 16] [--out path.png]');
+  console.error(
+    'Usage: node scripts/gen-art/retrodiffusion.mjs --prompt "..." [--style rd_tile__single_tile] [--width 16] [--height 16] [--out path.png]',
+  );
   process.exit(1);
 }
 

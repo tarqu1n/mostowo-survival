@@ -11,7 +11,12 @@ import Phaser from 'phaser';
  */
 const cache = new Map<string, string>();
 
-export function bakeVignetteTexture(scene: Phaser.Scene, color: number, w: number, h: number): string {
+export function bakeVignetteTexture(
+  scene: Phaser.Scene,
+  color: number,
+  w: number,
+  h: number,
+): string {
   const cacheKey = `vignette|${color}|${w}x${h}`;
   const cached = cache.get(cacheKey);
   if (cached && scene.textures.exists(cached)) return cached;
