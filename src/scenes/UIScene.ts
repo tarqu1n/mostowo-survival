@@ -11,6 +11,9 @@ import {
   HOTBAR_SLOTS,
   INVENTORY_SLOTS,
   HUNGER_MAX,
+  HUNGER_LOW_FRACTION,
+  HUNGER_VIGNETTE_COLOR,
+  HUNGER_VIGNETTE_MAX_ALPHA,
   DAMAGE_VIGNETTE_MS,
   DAMAGE_VIGNETTE_ALPHA,
   DAMAGE_VIGNETTE_COLOR,
@@ -95,6 +98,11 @@ export class UIScene extends Phaser.Scene {
   // easily-missed centre sprite. Non-interactive, so it never blocks the HUD buttons beneath it.
   private damageVignette!: Phaser.GameObjects.Image;
 
+  // Steady yellow "starving vignette", a sibling of the damage one but persistent, not pulsed: its
+  // alpha ramps in as hunger drops below HUNGER_LOW_FRACTION (driven by updateHungerBar). Sits just
+  // below the damage vignette so a hit still flashes red over it. Also non-interactive.
+  private hungerVignette!: Phaser.GameObjects.Image;
+
   // Combat mode: virtual movepad (bottom-right) + Punch button (bottom-left). The movepad is a
   // bespoke joystick (drag tracking below), not a kit widget; the Punch button is a kit Button.
   // Drag is tracked here (not GameScene) via a scene-level pointermove/up, gated by which pointer id
@@ -148,6 +156,15 @@ export class UIScene extends Phaser.Scene {
       .image(BASE_WIDTH / 2, BASE_HEIGHT / 2, vignetteKey)
       .setDisplaySize(BASE_WIDTH, BASE_HEIGHT)
       .setDepth(100000)
+      .setAlpha(0);
+
+    // Starving vignette: same baked edge-vignette, yellow, one depth below the damage flash. Alpha
+    // starts at 0 and is driven live by updateHungerBar; no tween — hunger changes gradually.
+    const hungerVignetteKey = bakeVignetteTexture(this, HUNGER_VIGNETTE_COLOR, BASE_WIDTH, BASE_HEIGHT);
+    this.hungerVignette = this.add
+      .image(BASE_WIDTH / 2, BASE_HEIGHT / 2, hungerVignetteKey)
+      .setDisplaySize(BASE_WIDTH, BASE_HEIGHT)
+      .setDepth(99999)
       .setAlpha(0);
 
     // Build toggle — a touch-sized button, top-right.
@@ -649,7 +666,7 @@ export class UIScene extends Phaser.Scene {
    * red when near-empty/starving. */
   private updateHungerBar(hunger: number): void {
     const ratio = Math.max(0, Math.min(1, hunger / HUNGER_MAX));
-    const colour = ratio <= 0.2 ? 0xc0392b : 0xd8a24a;
+    const colour = ratio <= HUNGER_LOW_FRACTION ? 0xc0392b : 0xd8a24a;
     const rounded = Math.round(hunger);
     this.hungerBarFg.scaleX = ratio;
     this.hungerBarFg.setFillStyle(colour);
@@ -657,6 +674,11 @@ export class UIScene extends Phaser.Scene {
     this.hudHungerBarFg.scaleX = ratio;
     this.hudHungerBarFg.setFillStyle(colour);
     this.hudHungerLabel.setText(`${rounded}/${HUNGER_MAX}`);
+
+    // Steady yellow starving vignette: 0 at/above the low cutoff, ramping to full as hunger hits 0.
+    const vignetteAlpha =
+      ratio < HUNGER_LOW_FRACTION ? HUNGER_VIGNETTE_MAX_ALPHA * (1 - ratio / HUNGER_LOW_FRACTION) : 0;
+    this.hungerVignette.setAlpha(vignetteAlpha);
   }
 
   /** Scale + tint the health bars (panel + always-on HUD) and update their labels. Green normally,

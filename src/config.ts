@@ -188,11 +188,20 @@ export const NIGHT_MAX_ALPHA = 0.55;
  * Hunger (see systems/needs.ts). HUNGER_DRAIN_PER_SEC empties a full HUNGER_MAX in ~250s (~1.5
  * day/night cycles at current DAY_MS/NIGHT_MS) — tune by feel. While starving (hunger <= 0), the
  * player takes STARVE_DAMAGE every STARVE_DAMAGE_INTERVAL_MS (1 HP / 2s).
+ *
+ * `HUNGER_LOW_FRACTION` is the "near-empty" cutoff (fraction of HUNGER_MAX): below it the HUD hunger
+ * bars turn red AND a steady yellow edge vignette fades in (UIScene, same baked-texture approach as
+ * the red damage vignette). Unlike the damage flash it doesn't pulse — its alpha ramps smoothly from
+ * 0 at the cutoff up to HUNGER_VIGNETTE_MAX_ALPHA as hunger reaches 0, a persistent "you're starving"
+ * cue round the screen edges.
  */
 export const HUNGER_MAX = 100;
 export const HUNGER_DRAIN_PER_SEC = 0.4;
 export const STARVE_DAMAGE = 1;
 export const STARVE_DAMAGE_INTERVAL_MS = 2_000;
+export const HUNGER_LOW_FRACTION = 0.2;
+export const HUNGER_VIGNETTE_COLOR = 0xe0b020;
+export const HUNGER_VIGNETTE_MAX_ALPHA = 0.5;
 
 /** Semantic colour palette (dark & grotty). Expand as the art identity firms up. */
 export const COLORS = {
