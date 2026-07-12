@@ -21,6 +21,7 @@ export interface DebugState {
   mode: 'command' | 'combat' | 'inspect';
   outlinedTreeIds: string[];
   pulsingTreeId: string | null;
+  queuedTreeIds: string[];
 }
 
 /** Boot the game, start the world (menu → Game), and wait for the DEV test surface to install. */

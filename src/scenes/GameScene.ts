@@ -162,8 +162,9 @@ export interface GameTestApi {
 
 /**
  * World scene: the worker task system. The player unit pathfinds around obstacles (walls + live
- * trees), works through a queue of orders (tap = act now / clear; long-press = append), and builds
- * walls as timed on-site jobs (place a passable blueprint → worker walks over → works → solid wall).
+ * trees), works through a queue of orders (tap a tree = queue a chop, or un-queue it if already
+ * queued; tap the ground = move now / clear; long-press = queue either), and builds walls as timed
+ * on-site jobs (place a passable blueprint → worker walks over → works → solid wall).
  *
  * All pointer input flows through one gate: the HUD hit-region is ignored on BOTH down and up; build
  * placement resolves on `pointerdown`; move/harvest orders resolve on `pointerup` (long-press = queue).
@@ -696,11 +697,30 @@ export class GameScene extends Phaser.Scene {
     this.emitTasks();
   }
 
-  /** Append an order; if the worker was idle, start it. */
+  /** Append an order; if the worker was idle, start it. Tapping a tree that's already queued toggles
+   *  it back off (see {@link toggleHarvest}) — never a duplicate chop order. */
   private enqueue(a: Action): void {
+    if (a.kind === 'harvest' && this.isHarvestQueued(a.treeId)) {
+      this.toggleHarvest(a.treeId);
+      return;
+    }
     const wasIdle = this.queue.current === null;
     this.queue.append(a);
     if (wasIdle) this.beginCurrent();
+    this.emitTasks();
+  }
+
+  /** True if a tree already has a harvest order (current or pending). */
+  private isHarvestQueued(treeId: string): boolean {
+    return this.queue.all().some((x) => x.kind === 'harvest' && x.treeId === treeId);
+  }
+
+  /** Remove a tree's harvest order. Tapping a queued tree un-queues it; tapping it again re-queues it
+   *  at the END of the list (a fresh `enqueue` append). If it was the live chop, advance to the next
+   *  order (or go idle) so the worker doesn't keep swinging at a tree you just cancelled. */
+  private toggleHarvest(treeId: string): void {
+    const wasCurrent = this.queue.removeWhere((x) => x.kind === 'harvest' && x.treeId === treeId);
+    if (wasCurrent) this.beginCurrent();
     this.emitTasks();
   }
 
@@ -902,6 +922,11 @@ export class GameScene extends Phaser.Scene {
       if (!this.pointerOnHud(pointer)) this.updateGhost(pointer);
       return;
     }
+    // Combat mode: the movepad (tracked independently in UIScene) owns all dragging. A world drag
+    // must never fall through to the camera-pan below — steering the movepad drags the thumb off the
+    // small pad, and without this gate that off-pad travel panned the world and broke the follow-lock,
+    // yanking the camera around whenever the player changed direction.
+    if (this.mode === 'combat') return;
     if (!pointer.isDown || this.downOnUI || this.pointerOnHud(pointer)) return;
 
     // Command-mode-only: queue-painting (long-press-drag) issues tap-to-pathfind orders, which
@@ -957,8 +982,12 @@ export class GameScene extends Phaser.Scene {
     if (this.mode !== 'command') return;
 
     const action = this.actionAt(pointer.worldX, pointer.worldY);
-    if (pointer.getDuration() >= LONGPRESS_MS) this.enqueue(action); // held-still long-press = append one
-    else this.order(action); // quick tap = act now
+    // A tap on a tree queues it: it falls in behind the current job (or starts at once if the worker
+    // is idle) instead of interrupting an in-progress harvest — chopping is the loop you batch up, so
+    // tapping tree after tree should build a chop list, not keep re-targeting. A tap on the ground
+    // still redirects the worker now (act-now move); a held-still long-press queues either kind.
+    if (action.kind === 'harvest' || pointer.getDuration() >= LONGPRESS_MS) this.enqueue(action);
+    else this.order(action); // quick tap on the ground = move now
   }
 
   /** The order implied by a world point: harvest the live tree whose sprite is drawn under it (see
@@ -1580,6 +1609,7 @@ export class GameScene extends Phaser.Scene {
     mode: 'command' | 'combat' | 'inspect';
     outlinedTreeIds: string[];
     pulsingTreeId: string | null;
+    queuedTreeIds: string[];
   } {
     const t = this.playerTile();
     return {
@@ -1596,6 +1626,10 @@ export class GameScene extends Phaser.Scene {
       mode: this.mode,
       outlinedTreeIds: [...this.outlinedTreeIds],
       pulsingTreeId: this.headHarvestTreeId(),
+      queuedTreeIds: this.queue
+        .all()
+        .filter((a): a is Extract<Action, { kind: 'harvest' }> => a.kind === 'harvest')
+        .map((a) => a.treeId),
     };
   }
 

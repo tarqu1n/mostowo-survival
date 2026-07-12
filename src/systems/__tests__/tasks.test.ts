@@ -69,6 +69,49 @@ describe('TaskQueue', () => {
     expect(q.all()).toEqual([]);
   });
 
+  it('removeWhere() drops a pending action, leaving current untouched', () => {
+    const q = new TaskQueue();
+    q.append(harvest('t1')); // current
+    q.append(harvest('t2'));
+    q.append(harvest('t3'));
+
+    const currentChanged = q.removeWhere((a) => a.kind === 'harvest' && a.treeId === 't2');
+    expect(currentChanged).toBe(false);
+    expect(q.current).toEqual(harvest('t1'));
+    expect(q.all()).toEqual([harvest('t1'), harvest('t3')]);
+  });
+
+  it('removeWhere() drops current and shifts the next pending into current', () => {
+    const q = new TaskQueue();
+    q.append(harvest('t1')); // current
+    q.append(harvest('t2'));
+
+    const currentChanged = q.removeWhere((a) => a.kind === 'harvest' && a.treeId === 't1');
+    expect(currentChanged).toBe(true);
+    expect(q.current).toEqual(harvest('t2'));
+    expect(q.pending).toBe(0);
+  });
+
+  it('removeWhere() draining the last action goes idle and reports the change', () => {
+    const q = new TaskQueue();
+    q.append(harvest('t1'));
+
+    const currentChanged = q.removeWhere((a) => a.kind === 'harvest' && a.treeId === 't1');
+    expect(currentChanged).toBe(true);
+    expect(q.current).toBeNull();
+    expect(q.all()).toEqual([]);
+  });
+
+  it('removeWhere() with no match leaves the queue and current unchanged', () => {
+    const q = new TaskQueue();
+    q.append(harvest('t1'));
+    q.append(harvest('t2'));
+
+    const currentChanged = q.removeWhere((a) => a.kind === 'harvest' && a.treeId === 'nope');
+    expect(currentChanged).toBe(false);
+    expect(q.all()).toEqual([harvest('t1'), harvest('t2')]);
+  });
+
   it('walks a realistic sequence: replace, append x2, next, next, clear', () => {
     const q = new TaskQueue();
 

@@ -34,6 +34,18 @@ export class TaskQueue {
   }
 
   /**
+   * Remove every action (current and pending) matching `match`. If the current action is removed,
+   * the next pending action shifts into current (as `next()` would). Returns true when the current
+   * action changed — i.e. the caller must restart execution on the new current (or go idle).
+   */
+  removeWhere(match: (a: Action) => boolean): boolean {
+    const currentRemoved = this._current !== null && match(this._current);
+    this.queue = this.queue.filter((a) => !match(a));
+    if (currentRemoved) this._current = this.queue.shift() ?? null;
+    return currentRemoved;
+  }
+
+  /**
    * Shift the next queued action into current and return it. Returns null if drained.
    */
   next(): Action | null {
