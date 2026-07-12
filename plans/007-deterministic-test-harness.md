@@ -128,7 +128,7 @@ current smoke:
 
 ## Steps
 
-- [ ] **Step 1: Add Vitest + the test scripts** `[inline]`
+- [x] **Step 1: Add Vitest + the test scripts** `[inline]`
   - Add `vitest` to `devDependencies`. Add `vitest.config.ts` (reuse Vite resolution; `environment:
     'node'` — the goal is *all* tests run in plain Node, see Step 3's Inventory decision; only add a
     `jsdom` override glob if a test genuinely can't avoid the DOM). Set **`passWithNoTests: true`**
@@ -141,7 +141,7 @@ current smoke:
   - Done when: `npm test` exits 0 with no test files (`passWithNoTests`); `npm run test:watch`
     watches; `npx vitest run <name>` runs a single file — confirm the selective forms work.
 
-- [ ] **Step 2: Unit-test the Phaser-free pure systems** `[delegate sonnet]` (parallel: A)
+- [x] **Step 2: Unit-test the Phaser-free pure systems** `[delegate sonnet]` (parallel: A)
   - New `src/systems/__tests__/` (or `*.test.ts` beside each). Cover, from the coverage map:
     - `pathfind.test.ts` — `findPath` reaches an open tile routing around a wall; returns null onto a
       blocked tile; `reachableAdjacent` picks a walkable neighbour. Build the grid inline (no scene).
@@ -158,7 +158,7 @@ current smoke:
   - Done when: `npm test` green; each pure system has meaningful coverage of its current smoke-implied
     behaviour.
 
-- [ ] **Step 3: Unit-test Inventory + data invariants** `[delegate sonnet]` (parallel: A)
+- [x] **Step 3: Unit-test Inventory + data invariants** `[delegate sonnet]` (parallel: A)
   - `Inventory` extends `Phaser.Events.EventEmitter` ([Inventory.ts:1](src/systems/Inventory.ts#L1)),
     but that class **is** `eventemitter3`. Critique S5: importing the full `phaser` package under jsdom
     runs its `Device`/canvas feature-detection at import (touches `document`/`canvas.getContext`) and
@@ -172,7 +172,7 @@ current smoke:
     sane. These catch data-edit regressions cheaply.
   - Done when: `npm test` green including the jsdom file; data invariants assert real constraints.
 
-- [ ] **Step 4: Build the scenario-setup + fixed-step API on GameScene** `[inline]`
+- [x] **Step 4: Build the scenario-setup + fixed-step API on GameScene** `[inline]`
   - Add a **test-only** control surface, namespaced so it reads as non-production: install
     `window.game.__test = { applyScenario, step, setRng, ... }` (methods on `GameScene`, or a
     `src/debug/testApi.ts` the scene installs). **Gate purely on `import.meta.env.DEV`** — NOT a
@@ -211,7 +211,7 @@ current smoke:
     zombie closes distance and its contact damage fires; and `grep` of a plain `npm run build` bundle
     shows **no** `__test` install code.
 
-- [ ] **Step 5: Port the integration/input/render assertions to deterministic scenarios** `[delegate sonnet]`
+- [x] **Step 5: Port the integration/input/render assertions to deterministic scenarios** `[delegate sonnet]`
   - **One independently runnable file per concern** (`tests/e2e/{chop,combat,build,inspect,zoom,...}.spec.ts`)
     — this is what lets you run *only* the scenario for the feature you're touching during dev.
     **Recommended: use the Playwright test runner (`@playwright/test`)** rather than extending the
@@ -237,7 +237,7 @@ current smoke:
     the full `npm run e2e` passes **repeatably** (≥5×, `retries:0` — the bar the current smoke fails);
     no `waitForTimeout`-based gameplay assertions remain.
 
-- [ ] **Step 6: Slim `smoke.mjs` to a boot canary + retire the playthrough** `[inline]`
+- [x] **Step 6: Slim `smoke.mjs` to a boot canary + retire the playthrough** `[inline]`
   - Reduce `scripts/smoke.mjs` to: boot, reach `Game`+`UI` active, assert **zero console/page errors**
     (keeps the shader-compile gate), screenshot for eyeballing — delete the §0–§8 playthrough now
     covered by Tiers 1–2. Rename to `scripts/boot-check.mjs` if clearer; update the `smoke` script.
@@ -246,7 +246,7 @@ current smoke:
   - Done when: `npm run smoke` (boot canary) + `npm test` + `npm run e2e` all green; the linear
     playthrough is gone.
 
-- [ ] **Step 7: Document + update CI/workflow references** `[delegate sonnet]` (parallel: B)
+- [x] **Step 7: Document + update CI/workflow references** `[delegate sonnet]` (parallel: B)
   - `docs/WORKFLOW.md`: document the **two-speed loop** as the day-to-day workflow, not just the script
     list — *inner loop:* `npm run test:watch` (auto-scoped to changed files) + `npx playwright test
     <the-one-scenario>` when you need browser fidelity; *wrap-up gate:* `npm test` + `npm run e2e` +

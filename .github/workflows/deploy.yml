@@ -27,6 +27,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run test # Tier-1 unit gate (fast, no browser) — blocks a deploy on a logic regression
       - run: npm run build
         env:
           NODE_ENV: production

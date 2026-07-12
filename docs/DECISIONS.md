@@ -102,8 +102,50 @@ the zombie aggros, hold still, let it stop one tile below, then punch) — stabl
 Direction: prefer **isolated, deterministic scenarios** — place the player + entities on known tiles,
 set facing, trigger the one action under test, assert the result — over navigating there through live
 play. The end-to-end smoke stays as a broad boot/core-loop sanity check; specific behaviours get their
-own focused setups. **[OPEN]** harness shape: a debug scenario API on GameScene vs a dedicated test
-scene vs a query-param scenario loader — to be specced.
+own focused setups. **[RESOLVED 2026-07-12 — see the "Three-tier deterministic test harness" entry
+below]** harness shape: a debug scenario API on GameScene, chosen over a dedicated test scene or a
+query-param loader.
+
+## 2026-07-12 — [DECIDED] Three-tier deterministic test harness (plan 007), retiring the live-game smoke
+
+Resolves the harness-shape **[OPEN]** above. The single ~400-line `scripts/smoke.mjs` drove the
+*whole* running game start-to-finish through the real UI and asserted ~35 things along one linear
+playthrough — so it broke whenever anything on that path changed (the queue-marker assertion broke
+when the outline shader landed; the chop step flaked on wall-clock timing when the glow got heavier),
+and one playthrough can't cover every action. Replaced with three tiers:
+
+1. **Unit tests — Vitest, plain Node (`npm test`).** The pure systems (`pathfind`, `tasks`, `combat`,
+   `grid`, `stats`, `Inventory`) + data invariants, where most of the previously-smoke-asserted logic
+   actually lives. Millisecond-fast, zero timing. Vitest because the project is already Vite (native
+   fit, shared resolution/tsconfig). `Inventory` was made Node-testable by importing `eventemitter3`
+   directly instead of via the full `phaser` package (behaviour-identical emitter — avoids Phaser's
+   canvas feature-detection at import, so no jsdom/canvas-mock).
+2. **Scenario tests — Playwright, deterministic (`npm run e2e`).** For the genuine
+   integration/render/input surface that needs a browser (zoom/pan/camera, mode toggles, Inspect
+   panels, the outline PostFX attach, movepad, scene restart, shader compile). Driven by a **DEV-only
+   scenario API** on `GameScene` (`window.game.__test`): `applyScenario(spec)` builds a known world
+   from a **declarative spec** (`{player:[3,3], trees:[[5,3]]}`) fed to one `applyScenario` — never
+   hand-authored maps — and a **fixed-delta `step(ms)`** seam that stops the RAF loop and drives
+   `game.step(t, fixedDelta)` so movement/chop/build/contact-cooldown/regrow resolve with **zero
+   wall-clock** (a manual `scene.update()` would NOT advance physics/clock/timers). Named fixture
+   builders (`tests/e2e/scenarios.ts`: `justATree`/`oneZombie`/`wallToRouteAround`) for shared shapes;
+   one behaviour per spec, entities placed adjacent so there's no multi-second walk to race.
+3. **Boot canary (`npm run smoke`).** What's left of the old smoke: boot the production bundle, reach
+   `Game`+`UI`, render a few frames (compiling every WebGL shader), assert **zero console errors**,
+   screenshot. No gameplay, no timing.
+
+**Why a debug scenario API over the alternatives:** a separate test Scene would duplicate the
+world-wiring we want to exercise; a query-param loader is just a less-flexible front-end to the same
+setter. A method call from Playwright's `page.evaluate` reuses the real scene + real systems at the
+lowest friction. **Gated on `import.meta.env.DEV`** so `vite build` dead-code-eliminates the install —
+`window.game.__test` is genuinely absent from the shipped bundle — which forces the e2e runner to
+serve `vite dev` (where `DEV===true`), NOT `vite preview` (production, `DEV===false`). Combat call
+sites now take an injectable `rng` (default `Math.random`) so scenarios stay deterministic even if a
+future enemy gains `dodge > 0`.
+
+**Two-speed dev loop (the payoff):** inner loop `npm run test:watch` reruns only the unit tests whose
+module graph touches the changed file (+ `npx playwright test <one-spec>` when browser fidelity is
+needed); wrap-up gate `npm test` + `npm run e2e` + `npm run smoke`. See WORKFLOW.md.
 
 ## 2026-07-12 — [DECIDED] Workers chop/build from a resource's base tile, facing the target
 
@@ -348,8 +390,8 @@ processed sprites get committed. Detail in ASSETS.md.
   marketplace vs vendoring skills into `.claude/skills/`. (Tracked in WORKFLOW.md.)
 - **[OPEN] MVP vertical slice details:** exact mechanics/scope for the first playable — to be nailed
   down by a `plan-feature` plan. Draft slice is in GAME-DESIGN.md.
-- **[OPEN] Plan the testing rework — TODO:** run `plan-feature` for isolated, deterministic test
-  scenarios (place player + entities on known tiles, set facing, trigger one action, assert) to
-  replace the fragile live-game end-to-end smoke. See the 2026-07-12 "isolated test setups" decision
-  above; pick the harness shape (debug scenario API vs test scene vs query-param loader). The current
-  smoke stays as a boot/core-loop sanity check until then.
+- **[DONE] Testing rework — shipped (plan 007):** the fragile live-game smoke is retired for a
+  three-tier harness (Vitest unit tests + deterministic Playwright scenarios driven by a DEV-only
+  `window.game.__test` scenario/fixed-step API + a thin boot canary). Harness shape settled on the
+  debug scenario API. See the 2026-07-12 "Three-tier deterministic test harness" decision above and
+  WORKFLOW.md for the day-to-day two-speed loop.

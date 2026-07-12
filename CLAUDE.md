@@ -63,8 +63,15 @@ drawn behind the tree, head-of-queue pulses via an alpha tween. This replaced th
 WebGL PostFX pipeline (`OutlinePipeline`, retired): a tree's silhouette is static, so the halo is baked
 once per species instead of shaded every frame — same look on WebGL *and* Canvas (no fallback fork), no
 shader in the frame loop; see [docs/RENDERING.md](docs/RENDERING.md). See
-[docs/DECISIONS.md](docs/DECISIONS.md) (2026-07-12). **Testing direction:** move to isolated,
-deterministic scenario setups rather than one live-game end-to-end smoke (decision logged).
+[docs/DECISIONS.md](docs/DECISIONS.md) (2026-07-12).
+
+**Three-tier test harness landed (plan 007):** the fragile live-game smoke is retired for
+**Tier 1** Vitest unit tests over the pure systems + data (`npm test`, plain Node), **Tier 2**
+deterministic Playwright scenarios (`npm run e2e`) driven by a DEV-only `window.game.__test`
+scenario/fixed-step API on `GameScene` (`applyScenario` builds a known world from a declarative
+spec; `step(ms)` advances gameplay with zero wall-clock), and **Tier 3** a thin boot canary
+(`npm run smoke`). Two-speed dev loop (`npm run test:watch` inner, full sweep at wrap-up) —
+see [docs/WORKFLOW.md](docs/WORKFLOW.md).
 
 **Menu UI stays in Phaser (no DOM overlay), on a small Container-based UI kit** (`src/ui/`:
 `Button`, `Panel`, `arrangeRow/Column/Grid`, shared `theme`). The HUD (`UIScene`) is refactored onto
