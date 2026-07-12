@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { startGame, applyScenario, order, step, state, blocked } from './harness';
+import { startGame, applyScenario, order, step, state, blocked, emit } from './harness';
 import { wallToRouteAround } from './scenarios';
 
 // Tier-2: building + occupancy on the REAL grid (blueprint passable while unbuilt → worker builds it
@@ -33,4 +33,18 @@ test('a built wall blocks its tile and the pathfinder will not path onto it', as
   expect(s.currentKind).toBeNull();
   expect(s.pcol).toBe(3);
   expect(s.prow).toBe(3);
+});
+
+test('Cancel clears the queue but leaves the blueprint standing (non-destructive)', async ({ page }) => {
+  await startGame(page);
+  const { siteIds } = await applyScenario(page, { player: [3, 3], blueprints: [[4, 3]] });
+  await order(page, { kind: 'build', siteId: siteIds[0] });
+  expect((await state(page)).currentKind).toBe('build');
+
+  await emit(page, 'tasks:cancel'); // HUD Cancel button
+  const s = await state(page);
+  expect(s.currentKind).toBeNull(); // queue cleared
+  expect(s.pending).toBe(0);
+  expect(s.sites).toBe(1); // blueprint survives
+  expect(await blocked(page, 4, 3)).toBe(false); // still an unbuilt, passable blueprint
 });

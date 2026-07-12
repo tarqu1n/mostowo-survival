@@ -29,3 +29,15 @@ test('Punch kills an adjacent kid zombie in three hits', async ({ page }) => {
   }
   expect((await state(page)).zombies).toBe(0);
 });
+
+test('the movepad drives the player directly, bypassing the pathfinder', async ({ page }) => {
+  await startGame(page);
+  await applyScenario(page, { player: [10, 10], mode: 'combat' });
+
+  // A movepad vector sets velocity directly (no task queue, no path) — the player just translates.
+  await emit(page, 'combat:move', { dx: 1, dy: 0 });
+  await step(page, 800);
+  const s = await state(page);
+  expect(s.pcol).toBeGreaterThan(10); // moved east
+  expect(s.currentKind).toBeNull(); // no task/path was involved
+});
