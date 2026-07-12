@@ -1,6 +1,33 @@
 # Layered Equipment System + Anchor-Stamp Tooling
 
-> Status: planned — run /execute-plan to begin. (Code anchors re-verified against current tree on the plan-feature rerun.)
+> Status: planned, but **gate 2 open** — a fresh-eyes critique flagged a High sequencing question
+> (see `## Critique`). Do NOT run /execute-plan until Matt resolves finding #1 (equipment vs. the
+> survival slice). Code anchors re-verified against current tree on the plan-feature rerun.
+
+## Critique
+
+Fresh-eyes review (independent sub-agent, source-only) run on the plan-feature rerun.
+
+**Verdict:** Well-researched and its code anchors check out, but it builds an equipment rendering +
+bespoke authoring pipeline that **no gameplay consumes**, ahead of the project's stated next milestone
+(day/night + hunger, already drafted as unexecuted plan 004) — so the top question is *why now*, not
+*how*.
+
+| # | Finding | Lens | Severity | Suggested action |
+| - | ------- | ---- | -------- | ---------------- |
+| 1 | Builds equipment rendering/authoring while the stated next milestone (day/night + hunger — plan 004 written but unexecuted) and the MVP slice's remaining items are unbuilt; the plan's own "Out of scope" confirms *no equip gameplay* consumes any of it | Roadmap / strategic fit | **High** | Defer to after the survival slice, or get an explicit steer from Matt that equipment jumps the queue before executing |
+| 2 | Over-built for a pipeline with zero consumer: full 5-slot model + rotation-capable anchor tool + auto-seeding + previewer + docs, yet only one rigid slot is proven and the tool admittedly can't produce 2 of the 5 slots (deformable chest/legs) | Right-sizing / scope | Medium | If built at all, cut to schema + render spine + one hand-made slot; defer the stamp tool/seeder/previewer until a real custom piece is needed |
+| 3 | Commits per-frame *derived PNG strips* via a bespoke tool when route 2 (packs) is the stated primary supply; the runtime already tracks the body via child sprites + setProgress, so anchors could pin a *single icon* at runtime instead of pre-stamping 26-frame strips | Alternative approaches | Medium | Consider runtime anchor-pinning of one icon (anchors stay data, no committed derived art) before committing to a stamp-and-bake tool |
+| 4 | Whole-pipeline acceptance (Step 6) is a manual screenshot eyeball, but Steps 4/5/7 are `[delegate sonnet]`; a delegated agent cannot self-verify per-frame alignment — the crucial gate depends on a human | Executability & sequencing | Medium | Lean on the per-step review gate; make Step 5's "wrong anchor is visibly off" the machine-checkable proxy and state Step 6 needs Matt's eye |
+| 5 | The Python previewer partly re-implements `compose.py`'s `preview()` grid helper (plan already hedges "or a sibling compose_equip.py") | Cross-cutting consistency | Low | Reuse `compose.py`/`objects.py` helpers rather than a parallel compositor path |
+
+**#1 detail:** README, CLAUDE.md ("Next: survival systems"), and GAME-DESIGN's MVP item 4 all point at
+day/night + hunger next, and `plans/004-day-night-hunger-survival.md` is already written and unexecuted
+(alongside queued 008/009). Equipment appears nowhere in the MVP slice; this plan scopes out equip
+gameplay/stat-effects/inventory, so its only in-game artifact is one statically-wired piece that does
+nothing. Not a "how" defect (seams clean, anchors accurate, invariant sound) — a sequencing one. Start
+here: resolve #1 (go/no-go on timing). If deferred, the rest are moot; if greenlit anyway, apply #2/#3
+to cut scope to schema + render spine + one slot and drop the tool until a custom piece exists.
 
 ## Summary
 
