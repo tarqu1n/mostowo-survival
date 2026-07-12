@@ -156,8 +156,9 @@ export interface GameTestApi {
 
 /**
  * World scene: the worker task system. The player unit pathfinds around obstacles (walls + live
- * trees), works through a queue of orders (tap = act now / clear; long-press = append), and builds
- * walls as timed on-site jobs (place a passable blueprint → worker walks over → works → solid wall).
+ * trees), works through a queue of orders (tap a tree = queue a chop; tap the ground = move now /
+ * clear; long-press = queue either), and builds walls as timed on-site jobs (place a passable
+ * blueprint → worker walks over → works → solid wall).
  *
  * All pointer input flows through one gate: the HUD hit-region is ignored on BOTH down and up; build
  * placement resolves on `pointerdown`; move/harvest orders resolve on `pointerup` (long-press = queue).
@@ -612,6 +613,9 @@ export class GameScene extends Phaser.Scene {
 
   /** Append an order; if the worker was idle, start it. */
   private enqueue(a: Action): void {
+    // Re-tapping a tree that's already current or queued is a no-op, not a duplicate chop order — the
+    // worker would otherwise walk back to a felled tree (or chop the same one twice) for nothing.
+    if (a.kind === 'harvest' && this.queue.all().some((x) => x.kind === 'harvest' && x.treeId === a.treeId)) return;
     const wasIdle = this.queue.current === null;
     this.queue.append(a);
     if (wasIdle) this.beginCurrent();
@@ -874,8 +878,12 @@ export class GameScene extends Phaser.Scene {
     if (this.mode !== 'command') return;
 
     const action = this.actionAt(pointer.worldX, pointer.worldY);
-    if (pointer.getDuration() >= LONGPRESS_MS) this.enqueue(action); // held-still long-press = append one
-    else this.order(action); // quick tap = act now
+    // A tap on a tree queues it: it falls in behind the current job (or starts at once if the worker
+    // is idle) instead of interrupting an in-progress harvest — chopping is the loop you batch up, so
+    // tapping tree after tree should build a chop list, not keep re-targeting. A tap on the ground
+    // still redirects the worker now (act-now move); a held-still long-press queues either kind.
+    if (action.kind === 'harvest' || pointer.getDuration() >= LONGPRESS_MS) this.enqueue(action);
+    else this.order(action); // quick tap on the ground = move now
   }
 
   /** The order implied by a world point: harvest the live tree whose sprite is drawn under it (see

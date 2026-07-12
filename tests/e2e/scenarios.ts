@@ -14,6 +14,11 @@ export function justATree(): ScenarioSpec {
   return { player: [3, 3], trees: [[5, 3]], wood: 0 };
 }
 
+/** Player at [3,3], two live trees to the east — for exercising harvest queueing (tap A, tap B). */
+export function twoTrees(): ScenarioSpec {
+  return { player: [3, 3], trees: [[5, 3], [8, 3]], wood: 0 };
+}
+
 /** Player at [3,3], one rock one tile to the right — the minimal mining world. */
 export function justARock(): ScenarioSpec {
   return { player: [3, 3], rocks: [[5, 3]], inventory: {} };
