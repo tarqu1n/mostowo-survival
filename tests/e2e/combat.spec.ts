@@ -30,6 +30,19 @@ test('Punch kills an adjacent kid zombie in three hits', async ({ page }) => {
   expect((await state(page)).zombies).toBe(0);
 });
 
+test('Punch connects with a tall enemy body, not only its feet tile', async ({ page }) => {
+  await startGame(page);
+  // Zombie feet at row 10; its ~2-tile body (hurtbox height 2) overhangs UP into row 9. Player one
+  // tile above that torso, facing down → Punch targets row 9, the torso tile (NOT the feet tile).
+  // Without the body hurtbox this whiffs. No step() between punches, so the zombie stays on its
+  // frame-0 tile (Punch resolves synchronously) — three flat-1 hits on maxHp 3 kill it.
+  await applyScenario(page, { player: [10, 8], zombies: [[10, 10]], facing: 'down', mode: 'combat' });
+  expect((await state(page)).zombies).toBe(1);
+
+  for (let i = 0; i < 3; i++) await emit(page, 'combat:punch');
+  expect((await state(page)).zombies).toBe(0);
+});
+
 test('the movepad drives the player directly, bypassing the pathfinder', async ({ page }) => {
   await startGame(page);
   await applyScenario(page, { player: [10, 10], mode: 'combat' });

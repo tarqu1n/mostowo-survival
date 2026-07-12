@@ -7,6 +7,43 @@ Format: `YYYY-MM-DD — [DECIDED|PROPOSED|OPEN] Title` then a short rationale.
 
 ---
 
+## 2026-07-12 — [DECIDED] Map decoupled from viewport, doubled to offset the larger actors
+
+The world was exactly one base-screen (camera bounds = `BASE_WIDTH×BASE_HEIGHT`), so the larger
+native-scale character/trees left little room to roam or build. **Decided:** separate the *map* from
+the *viewport* — new `MAP_WIDTH`/`MAP_HEIGHT` (config) = 2× the base in each dimension (a 45×80-tile
+world); `BASE_*` stays the fixed render/HUD design size. Grid, physics + camera bounds, ground bake,
+fog cover, and the player spawn (now the map centre, tile 22,40) key off `MAP_*`; default tree/zombie
+spawns re-centred to keep the *starting* scene identical relative to the player, with room beyond. The
+camera now scrolls/follows at every zoom (there's no "whole map at zoom 1" any more; MIN_ZOOM stays 1
+since zooming further out would need a fractional, blurry scale).
+
+**Perf caveat that bit us:** `drawGround` issued one `RenderTexture.drawFrame()` per tile — each flushes
+the GPU. Fine at ~900 tiles; at the doubled map's ~3600 it took **~25s** on the headless software
+renderer (scene never "became active", timing out every test). Fixed by batching the whole ground into
+one `beginDraw…batchDrawFrame…endDraw` pass → ~160ms. Lesson: bake many-frame RenderTextures with the
+batch API, never a per-frame `drawFrame` loop.
+
+## 2026-07-12 — [DECIDED] Data-driven hurtbox (footprint ≠ hurtbox); world props sized to the actor
+
+Follow-on from the native-scale decision below. With the character now ~2 tiles tall, two problems
+surfaced: (1) it dwarfed the trees, and (2) tall sprites + single-tile hit-testing meant you could be
+next to an enemy's *drawn* torso yet whiff, because targeting only matched its feet tile.
+
+**Decided:** separate a creature's **footprint** (movement/occupancy — always the single feet tile,
+unchanged) from its **hurtbox** (combat targeting — a data-driven tile extent). `Hurtbox { width,
+height }` on `CombatantStats` (`src/data/types.ts`), anchored at the feet tile, centred horizontally
+and rising upward to match the drawn silhouette; pure helpers in `src/systems/hurtbox.ts`
+(`hurtboxContains`/`hurtboxTiles`, `DEFAULT_HURTBOX = {1,1}`). Player and kid-zombie both declare
+`{1,2}`. Consumed by `GameScene.zombieAt` (Punch + Inspect hit-tests) and by contact damage (a zombie
+in melee reach of any player-body tile connects). For a `{1,1}` hurtbox every path reduces to the old
+exact-tile behaviour, so it's a clean generalisation. Chosen over hardcoding "+1 tile" so future large
+(`{2,3}` ogre) or small (`{1,1}` critter) monsters just declare their size — no targeting-code change.
+
+Also bumped `TREE_TILES_TALL` 2.6 → 5 so a pine towers over the ~2-tile character (scaling the *world*
+up, never the crisp actor down). Rule captured in [CONVENTIONS.md](CONVENTIONS.md) ("Footprint vs
+hurtbox"). Verified: 8 new Tier-1 hurtbox unit tests + a Tier-2 "punch the overhang tile" regression.
+
 ## 2026-07-12 — [DECIDED] Actors render at native 1:1; camera zoom is integer-only
 
 Reported: the player sprite looked "slightly stretched / pixels clipping" at 300% zoom. Cause: actors

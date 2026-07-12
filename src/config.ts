@@ -2,12 +2,23 @@
  * Global game constants. Keep tunables here so they're easy to find and change from any device.
  */
 
+import type { Hurtbox } from './data/types';
+
 /**
  * Base render resolution. Mobile-first: a portrait canvas (9:16-ish) that Phaser's Scale.FIT
  * scales up to fill any screen (letterboxing on wider desktop displays). Design at this size.
  */
 export const BASE_WIDTH = 360;
 export const BASE_HEIGHT = 640;
+
+/**
+ * World (map) size in pixels — the playable area, larger than the render viewport (BASE_*). The
+ * camera scrolls/follows within it. Held at 2× the base in each dimension (a 45×80-tile map) so the
+ * room to roam and build scales with the larger native-scale actors (see DECISIONS.md 2026-07-12);
+ * BASE_* stays the fixed viewport/HUD design size.
+ */
+export const MAP_WIDTH = BASE_WIDTH * 2;
+export const MAP_HEIGHT = BASE_HEIGHT * 2;
 
 /** Pixel size of a world tile at base resolution. */
 export const TILE_SIZE = 16;
@@ -41,7 +52,8 @@ export const BUILD_MS = 2500;
 /** Pointer travel (px, base res) above which a press is treated as a drag, not an order. */
 export const DRAG_PX = 12;
 
-/** Camera zoom bounds + default. 1 = whole map visible (no camera scroll room); tune to taste. */
+/** Camera zoom bounds + default. The map (MAP_*) is larger than the viewport, so the camera scrolls
+ * and follows the player at every level (higher = more zoomed in); tune to taste. */
 export const MIN_ZOOM = 1;
 export const MAX_ZOOM = 3;
 export const DEFAULT_ZOOM = 2;
@@ -62,6 +74,13 @@ export const VISION_RADIUS = TILE_SIZE * 5;
 export const PLAYER_MAX_HP = 10;
 export const PLAYER_START_SPEED = 90;
 export const PLAYER_START_VISION = VISION_RADIUS;
+
+/**
+ * Player body extent for combat targeting (see `Hurtbox` in data/types). The character sprite is
+ * ~1 tile wide and ~2 tall, so its torso occupies the tile above its feet — a zombie touching that
+ * tile still connects. Footprint/occupancy stays the single feet tile.
+ */
+export const PLAYER_HURTBOX: Hurtbox = { width: 1, height: 2 };
 
 /** Base damage of an unarmed hit — shared by Punch and a zombie's bite via resolveMeleeAttack. */
 export const UNARMED_BASE_DAMAGE = 1;

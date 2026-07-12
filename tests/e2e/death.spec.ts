@@ -22,6 +22,6 @@ test('the player dying restarts the scene and resets the world', async ({ page }
   expect(logs.some((l) => l.includes('restarting'))).toBe(true); // the death→restart signal
   const s = await state(page);
   expect(s.playerHp).toBe(10); // restarted at full HP
-  expect(s.pcol).toBe(11); // player back at the spawn centre (BASE_WIDTH/2 / TILE)
-  expect(s.prow).toBe(20); // (BASE_HEIGHT/2 / TILE)
+  expect(s.pcol).toBe(22); // player back at the spawn centre (MAP_WIDTH/2 / TILE)
+  expect(s.prow).toBe(40); // (MAP_HEIGHT/2 / TILE)
 });

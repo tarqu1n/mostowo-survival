@@ -34,7 +34,7 @@ export const NODES: Record<string, ResourceNodeDef> = {
     color: 0x2f5d34,
     stumpColor: 0x5a3f28,
     tile: 'tree',
-    tilesTall: 2.6, // big pine on a 16px tile — canopy overhangs upward
+    tilesTall: 5, // big pine towering over the ~2-tile character (see DECISIONS.md 2026-07-12)
     originX: 0.5,
     originY: 0.92, // anchor near the base so the trunk sits on the tile
     standOffsets: TREE_BASE_STAND_OFFSETS,

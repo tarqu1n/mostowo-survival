@@ -27,6 +27,15 @@ _To be firmed up as we go. Starting position:_
   on-site job: place a passable *blueprint* (wood reserved on placement), worker paths to a reachable
   adjacent tile and works `BUILD_MS`, then it becomes a blocking wall. `hudHitTest` is visibility-aware
   so hidden buttons don't swallow world taps. Pathing obstacles = completed walls + live trees.
-- **Pixel art:** integer scaling, `pixelArt: true`, nearest-neighbour; design at a fixed low base
-  resolution and scale up.
+- **Footprint vs hurtbox.** A creature's **footprint** (movement, occupancy, pathfinding) is always its
+  single feet tile — logic keys off `col`/`row`, never the sprite transform. Its **hurtbox** (combat
+  targeting: Punch/Inspect hit-tests, contact reach) is a separate, data-driven tile extent that can
+  span more tiles to match a tall/wide sprite (`Hurtbox` in `src/data/types.ts`, pure helpers in
+  `src/systems/hurtbox.ts`, consumed by `GameScene.zombieAt` + contact). New enemies just declare a
+  `hurtbox` (omit → `DEFAULT_HURTBOX`, one tile); no targeting code changes. Keeps a ~2-tile sprite
+  hittable by its drawn torso without letting it *occupy* two tiles.
+- **Pixel art:** integer scaling only, `pixelArt: true`, nearest-neighbour; design at a fixed low base
+  resolution and scale up. Actors render at native `render.scale = 1` and camera zoom is integer-only
+  (both required for crisp nearest-neighbour — see [RENDERING.md](RENDERING.md)); size the world/props to
+  the actor, never fractionally down-scale an actor to fit.
 - Keep functions small; name for the domain (resource, node, recipe, stockpile), not the framework.
