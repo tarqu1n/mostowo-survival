@@ -3,6 +3,15 @@
 > Status: planned, but **gate 2 open** — a fresh-eyes critique flagged a High sequencing question
 > (see `## Critique`). Do NOT run /execute-plan until Matt resolves finding #1 (equipment vs. the
 > survival slice). Code anchors re-verified against current tree on the plan-feature rerun.
+>
+> **Partially superseded by plan 011 (2026-07-12):** monster weapons shipped via **runtime
+> anchor-pinning** (`AttachPoint` + `weaponTransform` — see docs/DECISIONS.md), piloting this plan's
+> own critique finding #3. That **supersedes Step 4's anchor-stamp tool and the rigid-slot baked
+> strips** (helmet/mainHand/offHand below) — do not resume building the stamp tool. This plan now
+> stays live **only** for the **deformable `chest`/`legs` slots** (route 2 matching-pack strips or
+> hand-drawn art — the one thing pinning can't do) and the layering spine (Steps 1–3); both remain
+> deferred pending finding #1. `AttachPoint`/`weaponTransform` are shared primitives — a future rigid
+> slot adopts pinning as a refactor of them, not a rewrite.
 
 ## Critique
 

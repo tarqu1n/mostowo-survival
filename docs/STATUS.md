@@ -171,3 +171,21 @@ than a tint on the screen-centred, easily-missed player sprite. Kept off the sta
 passive tick, not an impact). Tuning: the `HIT_*` / `*_SHAKE_*` / `DAMAGE_VIGNETTE_*` block in
 `config.ts`. A Tier-2 `combat` scenario asserts a landed bite emits `player:hit`; the boot canary bakes
 the vignette clean. (Still open: non-linear movement — accel/decel — since movement still feels rigid.)
+
+## Generic monster AI + swappable weapons (plan 011)
+
+The single-behaviour kid zombie is now a **generic, data-driven monster**. A pure, unit-tested FSM
+(`src/systems/monsterAI.ts`, 13 Tier-1 tests) drives `idle`/`wander`/`patrol`/`chase` off
+radius-only aggro (`EnemyDef.vision`) and distance-only de-aggro with a "losing the scent" veer band
+near the chase-drop radius (tuning in `config.ts`'s "Monster AI tuning" block); `GameScene.updateZombies`
+just persists the FSM's `MonsterState` and moves toward its `targetTile`. New Tier-2 `monster`
+scenarios cover radius-acquire→chase, chase→give-up, and patrol waypoint cycling.
+
+Each skeleton now spawns holding a **club** (2 dmg, ~1500ms) or **knife** (1 dmg, ~750ms), rolled
+from `EnemyDef.weaponPool` (`MONSTER_WEAPONS`, `src/data/weapons.ts`) and wired to real
+damage/cadence. The weapon is held via **runtime anchor-pinning** — no baked per-frame art — synced
+every tick by the pure `weaponTransform` (`src/systems/attachment.ts`); the attack "animation" is a
+coded swing tween since the pack ships no mob attack strip. Also wired the pack's real 4-frame Idle
+bob (32px canvas, its own render footprint), so a calm, stationary zombie no longer freeze-frames on
+Run frame 0. See [ASSETS.md](ASSETS.md#weapon-attachment-runtime-pinning-plan-011) and
+[DECISIONS.md](DECISIONS.md) — this supersedes plan 010's anchor-stamp tool for rigid attachments.

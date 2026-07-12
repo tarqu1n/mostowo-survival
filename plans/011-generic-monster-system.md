@@ -1,6 +1,7 @@
 # Generic Monster System (AI states + swappable weapons)
 
-> Status: **in progress — Phase A done + committed; Phase B B1–B6 done, only B7 (docs) + deploy left.**
+> Status: **in review — all steps done (Phase A A1–A4 + Phase B B1–B7). B7 docs uncommitted; deploy
+> (commit B7 + push `master`) + Matt's eyeball pending.**
 > Sequenced AI-first (Matt's call after the critique). Code anchors are from a source sweep on
 > 2026-07-12 — **reconfirm each `file:line` before editing** (they drift).
 
@@ -15,10 +16,10 @@
   tween-stop bug fix. All green (`tsc`/`npm test` 128/`npm run smoke`; `monster.spec` 5/5).
 
 **Remaining:**
-1. **B7 (docs)** `[delegate sonnet]` — ASSETS.md pin note, DECISIONS.md (pinning supersedes 010's
-   stamp tool), update 010's header, STATUS.md, CLAUDE.md Status line.
-2. Do **B7**, then set Status → `in review`.
-3. **Deploy** = `git push` to `master` (auto-deploys via GitHub Actions). Matt then **eyeballs**:
+1. ~~B7 (docs)~~ **DONE** — ASSETS.md pin note, DECISIONS.md supersession entry, 010 header, STATUS.md,
+   CLAUDE.md Status line. Uncommitted in the working tree.
+2. **Deploy** = commit the B7 docs, then `git push` to `master` (auto-deploys via GitHub Actions).
+   Matt then **eyeballs**:
    weapon-in-hand through idle/walk + left-facing mirror; club-vs-knife pace; idle-bob feet-on-tile.
    Anchors (`tileset.ts` `enemy.walk/idle` `mainHand`), weapon `pivot`, and idle `render.originY 0.95`
    are **rough placeholders** — expect a tuning pass after the eyeball.
@@ -419,7 +420,7 @@ scale-swap (critique #3).
     `monster.spec` 5/5 + full e2e green **except** an intermittent `startGame` 15s boot-timeout under
     5-worker load (pre-existing infra flake, not weapon-related — passes on re-run / single-threaded).
 
-- [ ] **Step B7: Docs** `[delegate sonnet]`
+- [x] **Step B7: Docs** `[delegate sonnet]`
   - `docs/ASSETS.md` — short **"Weapon attachment (runtime pinning)"** note: anchors-on-`StripAnim`, one
     pinned sprite synced per tick, coded swing, the two derived weapon rows (B2), the wired idle strip
     (32px footprint). Cross-link, don't duplicate, the extraction section.
@@ -435,6 +436,16 @@ scale-swap (critique #3).
   - `CLAUDE.md` Status — one lean line.
   - Side effects: docs only. Done when: docs match shipped code; the 010 header + DECISIONS entry state
     the supersession, not just "shared primitives".
+  - Outcome: edited 5 files (docs only, `git diff --stat`: +96/-2). `docs/ASSETS.md` — new "Weapon
+    attachment (runtime pinning, plan 011)" subsection (anchors-on-`StripAnim`, per-tick `weaponTransform`
+    sync + why-not-`animationupdate`, coded swing, art/gameplay split, 32px idle footprint; cross-links
+    the B2 derived rows + DECISIONS, no duplication). `docs/DECISIONS.md` — new top entry logging the AI
+    FSM (radius aggro / distance-only de-aggro + veer band / wander vs patrol) + runtime-pinning weapons
+    (club/knife stats), stating the **supersession** of 010's stamp tool + rigid-slot strips (only
+    deformable chest/legs still need strips) + shared-primitive convergence. `plans/010-*.md` — header
+    blockquote records the partial supersession ("do not resume building the stamp tool"). `docs/STATUS.md`
+    — one plan-011 entry. `CLAUDE.md` — landed-list extended one clause; "Next" line left (still accurate).
+    Nothing excluded touched (011 plan, code, 012, menu-start.spec all clean).
 
 ## Out of scope
 

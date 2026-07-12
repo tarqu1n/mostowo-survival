@@ -178,6 +178,34 @@ actors — see `src/data/tileset.ts`.
 Verified: `npm run build` clean, `npm run smoke` (33/33, no console errors), manual screenshot
 check of grass/tree/wall/directional-player/skeleton.
 
+### Weapon attachment (runtime pinning, plan 011)
+
+Monster weapons (club/knife) are held via **runtime anchor-pinning**, not baked per-frame art.
+`StripAnim.anchors.mainHand` (`src/data/tileset.ts`) carries one `AttachPoint {x,y,rot?}` per
+animation frame, in that frame's own pixel space — the enemy's `idle` (4 frames, 32px canvas) and
+`walk`/Run (6 frames, 64px canvas) strips each carry their own set, since an anchor array is only
+meaningful relative to a specific strip's frames. Every tick the pure `weaponTransform`
+(`src/systems/attachment.ts`) resolves the active frame's anchor through the strip's render
+footprint into a world-px offset/angle, and GameScene repositions the one pinned weapon sprite —
+every update tick, not on `animationupdate`, because lunge/veer tweens slide the sprite between
+frame changes. Swapping/randomising a weapon is then just re-pointing which sprite is pinned — zero
+baked art per weapon. The attack "swing" is a coded tween (rotate the pinned sprite about its grip)
+rather than a sprite animation, since the pack ships no mob attack strip — see `WEAPON_SWING_*` in
+`config.ts`.
+
+Weapon **ART** (source image — extracted per the pipeline above, see the `club`/`knife` derived-file
+rows in the manifest table above — plus grip `pivot` and draw `z`) lives in the manifest
+(`actors.enemy.weapons`); weapon **GAMEPLAY** (damage, attack cadence) lives solely in
+`src/data/weapons.ts` (`MONSTER_WEAPONS`), joined by a shared weapon id — no stat duplicated in the
+art manifest.
+
+**Idle footprint:** the skeleton's Idle sheet is 128×32 = 4 frames of 32px, half the 64px Run
+canvas, so it's wired with its own `StripAnim.render` override (`scale:2`, low `originY`) instead of
+inheriting the actor default — see the `ActorRender`/`StripAnim.render` doc in `tileset.ts`.
+
+Full decision rationale (this supersedes plan 010's anchor-stamp tool for rigid attachments) —
+[DECISIONS.md](DECISIONS.md).
+
 > **Sourcing / generating new art?** The tileset candidates weighed up, the AI-gen service trials
 > (Retro Diffusion / PixelLab), and the Gemini bespoke-asset pipeline live in the R&D log:
 > [ASSET-EXPERIMENTS.md](ASSET-EXPERIMENTS.md).

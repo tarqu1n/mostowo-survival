@@ -7,6 +7,44 @@ Format: `YYYY-MM-DD — [DECIDED|PROPOSED|OPEN] Title` then a short rationale.
 
 ---
 
+## 2026-07-12 — [DECIDED] Generic monster AI (pure FSM) + weapons via runtime anchor-pinning — supersedes plan 010's stamp tool for rigid slots (plan 011)
+
+Turned the single-behaviour kid zombie into a data-driven monster, in two parts.
+
+**AI** is a pure, unit-tested FSM (`src/systems/monsterAI.ts`: `stepMonster`) with four modes —
+`idle`/`wander`/`patrol`/`chase` — driven by **radius-only aggro** (`EnemyDef.vision`, no
+line-of-sight/wall occlusion) and **distance-only de-aggro** (no timeout): past
+`MONSTER_CHASE_DROP_RADIUS_PX` the monster gives up, with a "losing the scent" **veer band** just
+inside that radius (`MONSTER_VEER_BAND_PX`/`MONSTER_VEER_MAX_TILES`) that injects growing path noise
+as the chase gets marginal, rather than a hard binary snap. `wander` = aimless roam with pauses
+(`MONSTER_WANDER_RADIUS_TILES`/`MONSTER_IDLE_MS_MIN/MAX`); `patrol` = a fixed route with a pause at
+each waypoint (`MONSTER_PATROL_PAUSE_MS`) — real content authoring a route is future work,
+test/scenario-only for now. Zero Phaser imports in the FSM; `GameScene` just persists the returned
+`.mode`/`targetTile`/`repath` onto each zombie.
+
+**Weapons** are held via **runtime anchor-pinning**, not baked per-frame strips — the live pilot of
+plan 010's own critique finding #3 (which floated pinning a single icon at runtime instead of
+committing 26-frame stamped strips). An `AttachPoint {x,y,rot?}` per animation frame lives on
+`StripAnim.anchors.mainHand` (co-located with the strip it's relative to); the pure
+`weaponTransform` (`src/systems/attachment.ts`) resolves it through the strip's render footprint
+into a world offset **every tick** — not on `animationupdate`, since lunge/veer tweens slide the
+sprite between frame changes. One weapon sprite is pinned per monster and swapped/randomised at zero
+art cost; the attack "animation" is a coded tween swing (rotate about the grip) since the pack ships
+no mob attack strip. Each skeleton spawns with a **club** (2 dmg, ~1500ms) or **knife** (1 dmg,
+~750ms) rolled from `EnemyDef.weaponPool`, stats owned solely by `src/data/weapons.ts`
+(`MONSTER_WEAPONS`) — art (source/pivot/z) stays in the manifest, joined by a shared id, the same
+art-vs-gameplay split the codebase already uses elsewhere.
+
+**Supersedes, not merely diverges from, plan 010's anchor-stamp tool + rigid-slot baked strips**
+(its critique findings #2/#3): runtime pinning is now the chosen path for *rigid* attachments
+generally — the monster weapon today, and 010's player rigid slots (helmet/mainHand/offHand) later.
+The stamp-and-bake tool and per-frame committed strips for rigid slots are now **redundant**; only
+010's **deformable `chest`/`legs`** (cloth/mail that must bend with the body) still need
+matching-pack or hand-drawn strips, since a pinned rigid icon can't deform. The two approaches
+deliberately **share their low-level primitives** (`AttachPoint`, `weaponTransform`), so 010's rigid
+slots can adopt pinning later as a **refactor**, not a rewrite. `plans/010-layered-equipment-system.md`'s
+header is updated to record this so a future session doesn't resume the dead stamp tool.
+
 ## 2026-07-12 — [DECIDED] Theme is dark-fantasy, not zombie apocalypse (story pivot, follows the art)
 
 The active art has been medieval-fantasy (Pixel Crawler — skeletons, orcs, bonfires) since plan 005,

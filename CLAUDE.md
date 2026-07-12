@@ -38,8 +38,9 @@ Patterns each seam follows: [docs/CONVENTIONS.md](docs/CONVENTIONS.md).
 ## Status
 
 Core loop, worker task system, build/blueprints, basic combat + a first enemy, the Pixel Crawler art
-swap, a three-tier test harness, and a first day/night + hunger survival slice have all landed. **Full
-feature/plan history:** [docs/STATUS.md](docs/STATUS.md).
+swap, a three-tier test harness, a first day/night + hunger survival slice, and a generic monster AI +
+swappable weapons system have all landed. **Full feature/plan history:**
+[docs/STATUS.md](docs/STATUS.md).
 
 **Next:** enemy night-waves + the equipment queue — see [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md)
 MVP slice; [docs/DECISIONS.md](docs/DECISIONS.md) for settled vs open.
