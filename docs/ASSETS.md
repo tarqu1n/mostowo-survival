@@ -114,6 +114,8 @@ needs to be treated as precious.
 |---|---|---|
 | `_derived/tree_pine.png` | `Environment/Props/Static/Trees/Model_02/Size_03.png` | 3 |
 | `_derived/rock.png` | `Environment/Props/Static/Rocks.png` | 5 |
+| `_derived/weapons/club.png` | `Weapons/Bone/Bone.png` | 1 (bone mace, grip at bottom) |
+| `_derived/weapons/knife.png` | `Weapons/Bone/Bone.png` | 7 (bone dagger, grip at bottom) |
 
 The rock is wired as the `rock` tile role (`ACTIVE_TILESET.tiles.rock`), rendering the `rock`
 resource node that yields stone (plan 008). Other multi-object sheets (`Vegetation`, `Resources`,

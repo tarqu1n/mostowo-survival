@@ -17,5 +17,6 @@ export const ENEMIES: Record<string, EnemyDef> = {
     dex: 0,
     dodge: 0,
     hurtbox: { width: 1, height: 2 }, // skeleton sprite ≈ 1 tile wide, ~2 tall — torso overhangs up
+    weaponPool: ['club', 'knife'], // rolls one per spawn (Phase B) — club: slow/2dmg, knife: fast/1dmg
   },
 };

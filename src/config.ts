@@ -164,6 +164,16 @@ export const ZOMBIE_LUNGE_PX = 7;
 export const ZOMBIE_LUNGE_MS = 120;
 
 /**
+ * Monster weapon swing feel (Phase B — see GameScene.zombieLungeAt / systems/attachment.ts). The
+ * skeleton pack ships no mob attack strip, so the bite's weapon "swing" is coded: rotate the held
+ * weapon about its grip through `WEAPON_SWING_ARC_DEG`, with a brief `WEAPON_SWING_SCALE_POP` pop,
+ * over `WEAPON_SWING_MS` (yoyo). Swing *feel* only — weapon damage/cadence live in data/weapons.ts.
+ */
+export const WEAPON_SWING_ARC_DEG = 75;
+export const WEAPON_SWING_SCALE_POP = 1.12;
+export const WEAPON_SWING_MS = 140;
+
+/**
  * Monster AI tuning (see systems/monsterAI.ts). The FSM is idle → wander|patrol → chase.
  * Aggro is radius-only, using the enemy's own `EnemyDef.vision` as the acquire radius (no separate
  * const). De-aggro is distance-only: as the player nears the outer edge of chase range the monster

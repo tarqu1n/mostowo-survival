@@ -3,6 +3,8 @@ import { ITEMS } from '../items';
 import { NODES } from '../nodes';
 import { BUILDABLES } from '../buildables';
 import { ENEMIES } from '../enemies';
+import { MONSTER_WEAPONS } from '../weapons';
+import { ACTIVE_TILESET } from '../tileset';
 
 // Pure-data invariant tests: catch a data-edit regression (a typo'd item id, a stat that breaks
 // an assumption another test suite relies on) cheaply, without touching Phaser or the systems
@@ -133,5 +135,42 @@ describe('ENEMIES', () => {
     expect(ENEMIES.kidZombie.strength).toBe(1);
     expect(ENEMIES.kidZombie.armour).toBe(0);
     expect(ENEMIES.kidZombie.dodge).toBe(0);
+  });
+});
+
+describe('monster weapons + attach anchors', () => {
+  const enemy = ACTIVE_TILESET.actors.enemy;
+  const enemyStrips = [enemy.idle, enemy.walk, enemy.death];
+
+  it('every enemy strip with mainHand anchors has exactly one anchor per frame', () => {
+    // Anchors are meaningless except per-frame; a length mismatch would pin the weapon to a stale
+    // frame. Co-located on the strip so this invariant is cheap to assert.
+    for (const strip of enemyStrips) {
+      const anchors = strip.anchors?.mainHand;
+      if (anchors) expect(anchors.length).toBe(strip.frames);
+    }
+  });
+
+  it('every weaponPool id resolves in BOTH the stats catalogue and the manifest art catalogue', () => {
+    for (const e of Object.values(ENEMIES)) {
+      for (const id of e.weaponPool ?? []) {
+        expect(MONSTER_WEAPONS[id], `missing stats for weapon '${id}'`).toBeDefined();
+        expect(enemy.weapons[id], `missing art for weapon '${id}'`).toBeDefined();
+      }
+    }
+  });
+
+  it('every manifest weapon scale, when set, is an integer (crisp at integer zoom)', () => {
+    for (const art of Object.values(enemy.weapons)) {
+      if (art.scale !== undefined) expect(Number.isInteger(art.scale)).toBe(true);
+    }
+  });
+
+  it('MONSTER_WEAPONS entries are keyed by their own id with positive damage + cadence', () => {
+    for (const [key, w] of Object.entries(MONSTER_WEAPONS)) {
+      expect(w.id).toBe(key);
+      expect(w.damage).toBeGreaterThan(0);
+      expect(w.attackMs).toBeGreaterThan(0);
+    }
   });
 });

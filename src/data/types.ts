@@ -103,6 +103,12 @@ export interface EnemyDef extends CombatantStats {
   id: string;
   name: string;
   color: number; // placeholder tint until the real sprite is wired (Step 2)
+  /**
+   * Weapon ids this enemy may spawn holding — keys shared by data/weapons.ts (MONSTER_WEAPONS stats)
+   * and the manifest weapons catalogue (art). One is rolled per spawn (Phase B); empty/undefined =
+   * unarmed (contact bite only, UNARMED_BASE_DAMAGE).
+   */
+  weaponPool?: string[];
 }
 
 /** The shape the Inspect-mode stats panel renders, regardless of what it's inspecting. */

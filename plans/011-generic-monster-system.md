@@ -241,7 +241,7 @@ scale-swap (critique #3).
 
 ### Phase B — Weapons + idle bob (visual; eyeball-gated)
 
-- [ ] **Step B1: Data + manifest schema — anchors, idle strip, weapon catalogue, swing config** `[inline]`
+- [x] **Step B1: Data + manifest schema — anchors, idle strip, weapon catalogue, swing config** `[inline]`
   - `src/data/tileset.ts`: add `export interface AttachPoint { x: number; y: number; rot?: number }`.
     Extend `StripAnim` with optional `anchors?: { mainHand?: AttachPoint[] }` (doc: length MUST equal
     `frames`) and `render?: ActorRender` (per-strip footprint override; doc the idle-footprint reason).
@@ -265,8 +265,20 @@ scale-swap (critique #3).
   - Side effects: `StripAnim`/`ActorRender` additions are **optional**, so the player manifest +
     PreloadScene/GameScene still compile unchanged. Docs: module doc in `tileset.ts`. Done when: `tsc`
     + `npm test` green; new data tests pass; `ACTIVE_TILESET` player path unchanged.
+  - Outcome: `tileset.ts` — added `AttachPoint` + `WeaponArt` interfaces; extended `StripAnim` with
+    optional `anchors?.{mainHand}` (frame-px space, len === frames) + `render?` footprint override;
+    extended the `enemy` actor type with required `idle`/`weapons` and populated the manifest (32px
+    idle strip w/ `render{scale:2,originY:0.95}` + 4 anchors — **confirmed Idle-Sheet is 128×32 = 4×32px**;
+    6 walk anchors; club/knife weapon-art rows pointing at `_derived/weapons/*.png` — files land in B2);
+    added `enemyIdleKey`. New `src/data/weapons.ts` (`MONSTER_WEAPONS` — club 2dmg/1500ms, knife
+    1dmg/750ms, single source of truth). `types.ts` `EnemyDef.weaponPool?`; `enemies.ts`
+    `kidZombie.weaponPool=['club','knife']`. `config.ts` swing-feel consts (`WEAPON_SWING_ARC_DEG 75`,
+    `_SCALE_POP 1.12`, `_MS 140`). `data.test.ts` +4 tests (anchor len === frames; weaponPool resolves
+    in both catalogues; weapon scale integer-when-set; MONSTER_WEAPONS keyed by id w/ positive stats).
+    `tsc` clean; `npm test` 122 green (+4). Anchor/pivot/idle-origin values are rough placeholders,
+    hand-tuned in B4/B5. No runtime path changed (nothing loads the new assets/keys yet).
 
-- [ ] **Step B2: Extract club + knife art from `Bone.png`** `[inline]`
+- [x] **Step B2: Extract club + knife art from `Bone.png`** `[inline]`
   - `python3 scripts/pixel-crawler/extract.py --list "Weapons/Bone/Bone.png"` to read component
     indices/bboxes, **eyeball which is a club and which is a knife/dagger**, then
     `extract.py "Weapons/Bone/Bone.png" <idx> _derived/weapons/club.png` and likewise `knife.png`.
@@ -274,8 +286,15 @@ scale-swap (critique #3).
   - Side effects: writes only under `.../pixel-crawler/_derived/weapons/` (pack-safe). Docs: two rows in
     the `docs/ASSETS.md` derived-file manifest. Done when: both PNGs exist, single-object, load without
     error.
+  - Outcome: `--list` showed 13 components; extracted **club = idx 1** (bone mace, 14×80, bulbous knob
+    top, grip+pommel bottom) and **knife = idx 7** (bone dagger, 6×27, grip bottom) → clean single
+    objects (viewed), both grips at the bottom (confirms B1 pivot `[0.5, 0.9]`). Files:
+    `_derived/weapons/{club,knife}.png` + 2 rows in `docs/ASSETS.md`. ⚠️ **B5 note:** the club is 80px
+    vs the ~30px skeleton — oversized at native scale (integer-scale rule = no clean down-scale), so
+    B5's eyeball must resolve sizing (bake a smaller derived variant, or accept a big characterful bone
+    club). Flag raised at the B4/B5 check-in.
 
-- [ ] **Step B3: Pure weapon-attach transform + unit tests** `[inline]`
+- [x] **Step B3: Pure weapon-attach transform + unit tests** `[inline]`
   - New `src/systems/attachment.ts`: pure `weaponTransform({ anchor, actorRender, stripRender, frameW,
     frameH, flipX, extraRot })` → `{ x, y, rotation, flipX }` (offset relative to the actor origin in
     world px, honouring the strip's own render when present; **flipX mirrors the x-offset and negates
@@ -284,6 +303,13 @@ scale-swap (critique #3).
     `extraRot` adds to the anchor's resting `rot`; a 32px-strip anchor maps to the same world offset as
     the equivalent 64px point (footprint independence).
   - Side effects: none. Done when: `npm test` green; no Phaser imports.
+  - Outcome: added `src/systems/attachment.ts` (`weaponTransform(input) → { x, y, rotation, flipX }`,
+    pure) + `src/systems/__tests__/attachment.test.ts` (6 tests). Offset = `(anchor - origin×frameSize) ×
+    scale` in world px, using the strip's own render when present (`stripRender ?? actorRender`) — that's
+    what makes 32px@2 and 64px@1 agree. `flipX` mirrors x and negates the angle; `rotation` is in
+    **degrees** (`anchor.rot + extraRot`) to match the swing constants. Type-only import of
+    `AttachPoint`/`ActorRender` from `data/tileset` (erased at build) — **zero Phaser imports**. `tsc`
+    clean; `npm test` 128 green (+6).
 
 - [ ] **Step B4: Wire the real idle bob (32px footprint swap)** `[inline]`
   - Load the idle strip: extend `PreloadScene.ts:97-98` to also load `enemy.idle` (its own frameSize).

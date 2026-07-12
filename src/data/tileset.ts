@@ -29,6 +29,20 @@ export type TileSource =
   | { kind: 'sheetFrame'; sheet: string; frame: number };
 
 /**
+ * A grip/attach point for a held prop (a monster weapon today), authored in the strip frame's OWN
+ * pixel space (origin = frame top-left, +x right, +y down). `rot` (degrees, default 0) is the prop's
+ * resting angle at this frame. `weaponTransform` (systems/attachment.ts, Phase B) maps this through
+ * the strip's render (scale/origin) to a world-px offset from the actor origin — so anchors authored
+ * against a 32px Idle frame and a 64px Run frame that point at the same hand resolve to the same world
+ * spot (footprint independence). Shared primitive the player's rigid slots (plan 010) will reuse.
+ */
+export interface AttachPoint {
+  x: number;
+  y: number;
+  rot?: number;
+}
+
+/**
  * A horizontal animation strip. Frames are `frameSize` px tall and, by default, `frameSize` px wide
  * (square). A sheet whose cells are wider than tall — e.g. the skeleton Death sheet packs its collapse
  * into 96×64 cells so the motion has horizontal room — sets `frameWidth` to that wider value; slicing
@@ -41,6 +55,19 @@ export interface StripAnim {
   frames: number;
   /** Cell width in px when the frame isn't square; defaults to `frameSize`. */
   frameWidth?: number;
+  /**
+   * Per-frame attach points for held props, keyed by slot. Each array's length MUST equal `frames`
+   * (one anchor per animation frame — asserted in data.test.ts). Only `mainHand` (the monster weapon)
+   * exists today. Optional: a strip carrying no held prop omits it.
+   */
+  anchors?: { mainHand?: AttachPoint[] };
+  /**
+   * Per-strip render footprint override. A strip whose source canvas differs from the actor's default
+   * footprint (the 32px skeleton Idle vs the 64px Run) carries its own scale/origin so it still grounds
+   * on the tile; GameScene applies it on the state change and reverts to the actor default otherwise.
+   * Scale MUST stay an integer (crisp at integer zoom). Omit to inherit the actor default footprint.
+   */
+  render?: ActorRender;
 }
 
 /** Display scale + origin so a padded actor canvas (e.g. 64px) sits right on a 16px tile. */
@@ -48,6 +75,20 @@ export interface ActorRender {
   scale: number;
   originX: number;
   originY: number;
+}
+
+/**
+ * Art for an equippable monster weapon: its `source` image, the grip `pivot` (setOrigin, as [x,y]
+ * fractions of the image — the point pinned to the hand anchor and rotated about when swinging), the
+ * draw-order `z` added to the wielder's depth (weapon in front), and an optional integer display
+ * `scale`. GAMEPLAY stats (damage, attack cadence) live in data/weapons.ts, NOT here — single source
+ * of truth; the two are joined by a shared weapon id.
+ */
+export interface WeaponArt {
+  source: TileSource;
+  pivot: [number, number];
+  z: number;
+  scale?: number;
 }
 
 export interface TilesetManifest {
@@ -82,10 +123,18 @@ export interface TilesetManifest {
       death: Record<Facing, StripAnim>;
     };
     /**
-     * Enemy: single-orientation Run strip (frame 0 doubles as idle; GameScene flips by move-x) plus a
-     * single-orientation Death strip (one-shot collapse, played on kill — see GameScene.killZombie).
+     * Enemy: single-orientation Run (`walk`) strip + a one-shot Death collapse (see GameScene.killZombie),
+     * plus (Phase B) a slow Idle bob on its own 32px footprint and a catalogue of equippable `weapons`
+     * (art only — stats in data/weapons.ts) the mob rolls from per spawn. `walk`/`idle` carry per-frame
+     * `mainHand` anchors so the held weapon pins to the hand each tick.
      */
-    enemy: { render: ActorRender; walk: StripAnim; death: StripAnim };
+    enemy: {
+      render: ActorRender;
+      idle: StripAnim;
+      walk: StripAnim;
+      death: StripAnim;
+      weapons: Record<string, WeaponArt>;
+    };
   };
 }
 
@@ -166,10 +215,36 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
       // Native 1:1 like the player (crisp at integer zoom). The skeleton's feet reach the frame
       // bottom (content bbox ≈ y34–64), so originY 0.96 grounds it on the tile.
       render: { scale: 1, originX: 0.5, originY: 0.96 },
-      walk: { path: 'Entities/Mobs/Skeleton Crew/Skeleton - Base/Run/Run-Sheet.png', frameSize: 64, frames: 6 },
+      // Idle bob: a 128×32 sheet = 4 frames of 32px, half the 64px Run canvas — so it carries its OWN
+      // footprint (scale 2 → matches the Run's on-screen size; integer, stays crisp) with a low origin
+      // to keep the feet on the tile. render origin + anchors are rough first-pass, hand-tuned in B4/B5.
+      idle: {
+        path: 'Entities/Mobs/Skeleton Crew/Skeleton - Base/Idle/Idle-Sheet.png',
+        frameSize: 32,
+        frames: 4,
+        render: { scale: 2, originX: 0.5, originY: 0.95 },
+        anchors: { mainHand: [{ x: 20, y: 18 }, { x: 20, y: 19 }, { x: 20, y: 18 }, { x: 20, y: 17 }] },
+      },
+      // Run strip (frame 0 doubles as the Phase-A frozen idle). Per-frame mainHand grip points (frame-px
+      // space, one per frame) so the held weapon tracks the hand through the run cycle — rough, tuned in B5.
+      walk: {
+        path: 'Entities/Mobs/Skeleton Crew/Skeleton - Base/Run/Run-Sheet.png',
+        frameSize: 64,
+        frames: 6,
+        anchors: {
+          mainHand: [{ x: 40, y: 36 }, { x: 41, y: 35 }, { x: 40, y: 34 }, { x: 40, y: 36 }, { x: 41, y: 35 }, { x: 40, y: 34 }],
+        },
+      },
       // Death cells are 96×64 (wider than the 64² Run cells) — the collapse needs horizontal room.
       // Sliced at 64 it flickered (every 3rd slice empty) and jumped L/R; 96×8 reads as a clean fall.
       death: { path: 'Entities/Mobs/Skeleton Crew/Skeleton - Base/Death/Death-Sheet.png', frameSize: 64, frameWidth: 96, frames: 8 },
+      // Equippable weapon ART (stats in data/weapons.ts, shared id). Sources are extracted from
+      // Weapons/Bone/Bone.png into _derived/weapons/ in B2 (files not needed until the B4/B5 load).
+      // pivot = grip end (bottom-centre); z 1 draws the weapon in front of the depth-9 skeleton.
+      weapons: {
+        club: { source: { kind: 'image', path: '_derived/weapons/club.png' }, pivot: [0.5, 0.9], z: 1 },
+        knife: { source: { kind: 'image', path: '_derived/weapons/knife.png' }, pivot: [0.5, 0.9], z: 1 },
+      },
     },
   },
 };
@@ -198,8 +273,11 @@ export const resolveTile = (source: TileSource): { key: string; frame?: number }
 /** Texture/anim key for a player state+facing strip, e.g. `player-walk-side`. */
 export const playerAnimKey = (state: PlayerState, facing: Facing): string => `player-${state}-${facing}`;
 
-/** Texture/anim key for the enemy Run strip (frame 0 doubles as idle). */
+/** Texture/anim key for the enemy Run strip (frame 0 doubles as the Phase-A frozen idle). */
 export const enemyWalkKey = 'enemy-walk';
+
+/** Texture/anim key for the enemy Idle bob strip (32px footprint — see actors.enemy.idle, Phase B). */
+export const enemyIdleKey = 'enemy-idle';
 
 /** Texture/anim key for the enemy Death strip (one-shot collapse on kill). */
 export const enemyDeathKey = 'enemy-death';
