@@ -7,6 +7,31 @@ Format: `YYYY-MM-DD — [DECIDED|PROPOSED|OPEN] Title` then a short rationale.
 
 ---
 
+## 2026-07-12 — [DECIDED] Theme is dark-fantasy, not zombie apocalypse (story pivot, follows the art)
+
+The active art has been medieval-fantasy (Pixel Crawler — skeletons, orcs, bonfires) since plan 005,
+but that swap was explicitly logged as **art-only, "not a story change"** (see 2026-07-11 [PROPOSED]
+below): the story stayed a zombie apocalypse and the fantasy mobs were "reskinnable stand-ins". We're
+now **making it a story change** — the game *is* a **dark-fantasy survival adventure**, not a zombie
+one. This resolves the growing mismatch where the art, the title screen, and the enemy sprite
+(skeleton) all read fantasy while the design docs still said "zombie apocalypse".
+
+**Framing (kept deliberately light — a generic dark-fantasy wilds, not heavy bespoke lore):** you're
+camped at Mostowo when the **old woods wake** — the dead don't stay down and creatures come out of the
+treeline at night. Everything else is **unchanged**: the four pillars (base building · survival ·
+crafting · base defense), the day/night risk/reward rhythm, hunger as the core pressure, the
+real-Mostowo grounding, mobile-first, and the **dark-and-grotty-but-funny** tone (which fantasy
+carries as well as horror did).
+
+**Scope of this change:** prose/design docs only — `GAME-DESIGN.md` (pitch, setting, enemies, MVP),
+`LORE.md`, and the one-liner in `CLAUDE.md`, plus the title-screen copy (already de-zombified: "MOSTOWO
+/ SURVIVAL", tagline *"something stirs in the old woods"*). **Code identifiers are left as-is** for now
+— the enemy's data id stays `kidZombie` / name `Kid Zombie`, and `zombieAt`/`ZombieUnit`/`zombieStats`
+keep their names (a rename is a mechanical refactor to schedule separately, not a design decision). New
+content should be authored fantasy-first; the zombie names in code are legacy, not intent.
+
+Supersedes the "not a story change" caveat in the 2026-07-11 [PROPOSED] entry below.
+
 ## 2026-07-12 — [DECIDED] Bake the ground in bounded vertical chunks to kill the residual dark horizontal lines
 
 The RENDER_SCALE fix below **helped but didn't fully land it** — faint, evenly-spaced *horizontal*

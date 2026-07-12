@@ -14,13 +14,14 @@ is design intent — keep it aligned with the objectives below whenever we plan 
 
 ## Pitch
 
-You're camping at **Mostowo** when a **zombie apocalypse** breaks out. By day you range across the
-campsite, forest, and surrounding areas scavenging resources; by night you hole up in your patch of
-the camp and defend it as zombie animals, humans, and worse come through the map. Build, fortify,
-craft, and survive night after night. Pixel-art, browser, single-player.
+You're camped at **Mostowo** when the **old woods wake** — the dead don't stay down, and things you
+can't name start coming out of the treeline. By day you range across the campsite, forest, and
+surrounding areas scavenging resources; by night you hole up in your patch of the camp and defend it
+as skeletons, beasts, and worse come through the map. Build, fortify, craft, and survive night after
+night. Pixel-art, browser, single-player.
 
-Tone: **slightly dark and grotty, but funny** — grim setting undercut by humorous items, enemies,
-and visual gags.
+Tone: **dark-fantasy, slightly grotty, but funny** — a grim setting undercut by humorous items,
+enemies, and visual gags.
 
 ## Objectives (the north star — plan features against these)
 
@@ -39,19 +40,20 @@ not assume mouse/keyboard — touch is the baseline, pointer/keys are convenienc
 
 ## Setting & theme
 
-The map is **based on the real place** the project is named after (a camping spot — reference image
-from Google Maps to be added, see "Map" below). Locations, landmarks, and flavour draw on the
-**people, stories, and themes of that place**: named areas, local characters reimagined as
-survivors/NPCs/zombies, in-jokes and site-specific detail. This is what makes it *ours* rather than
-a generic zombie game.
+A **dark-fantasy** take on the real place: the woods around the camp are old, and something in them
+has woken. The map is **based on the real place** the project is named after (a camping spot —
+reference image from Google Maps to be added, see "Map" below). Locations, landmarks, and flavour draw
+on the **people, stories, and themes of that place**: named areas, local characters reimagined as
+survivors/NPCs/monsters, in-jokes and site-specific detail. This is what makes it *ours* rather than
+a generic fantasy-survival game.
 
 > TODO: capture the specific Mostowo people/stories/landmarks to draw on — add them to
 > [LORE.md](LORE.md) as they're shared so any session can theme content consistently.
 
 ## Story intro
 
-A **short story** sets it up: an ordinary camping trip at Mostowo, then the outbreak. Delivered as
-an intro sequence (text + simple stills) before the first day begins. Draft to live in
+A **short story** sets it up: an ordinary camping trip at Mostowo, then the night the woods turn.
+Delivered as an intro sequence (text + simple stills) before the first day begins. Draft to live in
 [LORE.md](LORE.md).
 
 ## Core gameplay loop (day / night cycle)
@@ -66,8 +68,8 @@ exist even by day but can often be avoided.
 - **Craft:** tools, weapons, consumables.
 - **Crafting stations:** new stations unlock deeper crafting tiers (progression gate).
 
-**Nighttime — defend.** Zombie **animals, humans, and other creatures** come through the map. The
-player is heavily incentivised to be back at base defending, not caught out in the open.
+**Nighttime — defend.** **Skeletons, beasts, and other creatures** come out of the woods and through
+the map. The player is heavily incentivised to be back at base defending, not caught out in the open.
 
 ## Enemy design — roaming vs attacking (the core tension)
 
@@ -78,14 +80,14 @@ player is heavily incentivised to be back at base defending, not caught out in t
   base, the more roaming aggro you risk dragging into a fight you're not set up for. This is what
   makes "get home and hold the line" the emotionally correct play, not just a suggestion.
 
-Enemy variety leans into the humour: zombie campsite animals, zombified local characters, absurd
-creatures — grotty but funny.
+Enemy variety leans into the humour: undead campsite critters, cursed local characters, absurd
+woodland beasts — grotty but funny.
 
-> **First enemy in (plan 003):** the kid zombie's AI is a deliberately minimal stub — one state
-> machine, `idle`/`chasing` on a vision-radius check, no deaggro. It's a proof of the combat/AI
-> plumbing (stats schema, `resolveMeleeAttack`, pathfind-based chase), not the roaming/attacking
-> model above — noise-based aggro, deaggro, pack-pulling, and additional enemy types are still to
-> design.
+> **First enemy in (plan 003):** the first enemy (rendered as a skeleton; legacy data id `kidZombie`)
+> has a deliberately minimal stub AI — one state machine, `idle`/`chasing` on a vision-radius check,
+> no deaggro. It's a proof of the combat/AI plumbing (stats schema, `resolveMeleeAttack`,
+> pathfind-based chase), not the roaming/attacking model above — noise-based aggro, deaggro,
+> pack-pulling, and additional enemy types are still to design.
 
 ## Maps & world structure
 
@@ -180,12 +182,13 @@ Smallest thing that captures the day→fortify→night→defend *feel*:
 2. ~~**Day:** one or two resource nodes to harvest → items into an inventory.~~ ✅ tap-to-chop trees →
    wood into a character `Inventory` (plan 001).
 3. **Fortify:** ~~place a wall segment~~ ✅ (walls, plan 001) · and one trap from gathered resources (todo).
-4. **Night:** a short timed wave of a couple of roaming/attacking zombies; base + trap + player can
+4. **Night:** a short timed wave of a couple of roaming/attacking monsters; base + trap + player can
    repel them; ~~day/night tint + a survival meter ticking through it~~ ✅ (plan 004 — real-time
    day/night cycle, hunger→health cascade, Health & Wellbeing screen as the eat surface; night is
    tint+phase only so far, no waves yet). **Partially done (plan 003):** Combat mode (movepad +
-   Punch), a shared stats/damage-resolution model, and one fixed-spawn kid zombie with idle/chasing AI
-   + contact damage are in. Still todo: the short timed wave itself (spawning/pacing) and traps.
+   Punch), a shared stats/damage-resolution model, and one fixed-spawn enemy (skeleton) with
+   idle/chasing AI + contact damage are in. Still todo: the short timed wave itself (spawning/pacing)
+   and traps.
 
 Weather, deep crafting trees, full map, save system, richer AI layer on *after* the slice is fun.
 
@@ -195,9 +198,9 @@ Single-player, client-side saves — `localStorage` for the MVP, IndexedDB if th
 
 ## Art direction
 
-Dark, grotty, grimy palette with **comic timing** — funny item icons, characterful zombies, visual
-gags. Placeholder/programmatic art first; real pixel art via free CC0 tilesets and Gemini-generated
-assets (see [ASSETS.md](ASSETS.md)).
+Dark, grotty, grimy palette with **comic timing** — funny item icons, characterful monsters, visual
+gags. Medieval-fantasy pixel art (see [ASSETS.md](ASSETS.md)); real pixel art via free CC0 tilesets
+and Gemini-generated assets.
 
 ## Not doing (for now)
 

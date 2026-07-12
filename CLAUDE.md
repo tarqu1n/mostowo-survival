@@ -46,9 +46,10 @@ MVP slice; [docs/DECISIONS.md](docs/DECISIONS.md) for settled vs open.
 
 ## The game in one line
 
-Camping at **Mostowo** when a **zombie apocalypse** hits: by day scavenge the camp/forest, by night
-fortify and defend your base. Pillars: **base building · survival · crafting · base defense**, on a
-**day/night cycle**. Dark-and-grotty but funny. Full vision in [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md).
+Camped at **Mostowo** when the **old woods wake**: by day scavenge the camp/forest, by night fortify
+and defend your base as the dead and worse come out of the treeline. Pillars: **base building ·
+survival · crafting · base defense**, on a **day/night cycle**. Dark-fantasy, grotty but funny. Full
+vision in [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md).
 
 ## Docs
 

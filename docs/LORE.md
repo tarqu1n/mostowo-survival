@@ -3,13 +3,13 @@
 The story, and the real-place details that theme the game. Fill this in as Matt shares them so any
 session themes content consistently. Keep it grounded in the real Mostowo.
 
-## Intro story (outbreak)
+## Intro story (the woods wake)
 
-_Draft the short opening story here — an ordinary camping trip at Mostowo, then the zombie outbreak.
-This is shown as the intro sequence before day one._
+_Draft the short opening story here — an ordinary camping trip at Mostowo, then the night the old
+woods wake. This is shown as the intro sequence before day one._
 
 - Setup / normal camping day: _TBD_
-- The turn (outbreak trigger): _TBD_
+- The turn (the woods wake): _TBD_
 - Player's starting situation & goal: _TBD_
 
 ## Real-place details to draw on
@@ -18,7 +18,7 @@ Capture the actual people, stories, landmarks, and local colour of Mostowo so th
 areas, NPCs, enemies, items, and in-jokes.
 
 - **Landmarks / areas** (become map zones): _TBD — pending Google Maps screenshot + notes_
-- **People** (become survivors / NPCs / named zombies): _TBD_
+- **People** (become survivors / NPCs / named monsters): _TBD_
 - **Stories / local legends / running jokes** (become events, flavour text, quests): _TBD_
 - **Site-specific objects** (become items/resources): _TBD_
 
