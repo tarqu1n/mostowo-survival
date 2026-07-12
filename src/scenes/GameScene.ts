@@ -333,6 +333,7 @@ export class GameScene extends Phaser.Scene {
 
   override update(_time: number, delta: number): void {
     this.chopping = false; // re-set true by runHarvest only while actually felling in place
+    this.syncGlowTransforms(); // keep queued-tree halos locked to their (possibly animating) trees
     const action = this.queue.current;
     if (!action) {
       // Combat mode drives velocity directly via onCombatMove/onCombatMoveEnd — don't stomp it
@@ -608,6 +609,26 @@ export class GameScene extends Phaser.Scene {
         repeat: -1,
         ease: 'Sine.InOut',
       });
+    }
+  }
+
+  /**
+   * Keep each queued tree's glow halo locked onto its tree. The glow is a sibling GameObject that
+   * shares the tree's origin (the trunk base), so mirroring position/scale/rotation reproduces any
+   * visual animation the tree plays — chop bounce, walk-past sway, fall — about the same pivot,
+   * without every animation having to know the glow exists. Runs only for currently-glowing trees (a
+   * handful), so the per-frame cost is trivial (nothing like the old per-frame PostFX pass).
+   *
+   * Keep tree *logic* (targeting, pathfinding, occupancy) keyed off `col`/`row`, never the animated
+   * sprite transform — a sway or a mid-fall lean must not move the tree's logical tile.
+   */
+  private syncGlowTransforms(): void {
+    for (const [id, glow] of this.glowSprites) {
+      const s = this.treeById(id)?.sprite;
+      if (!s) continue;
+      glow.setPosition(s.x, s.y);
+      glow.setScale(s.scaleX, s.scaleY);
+      glow.rotation = s.rotation;
     }
   }
 
@@ -920,13 +941,10 @@ export class GameScene extends Phaser.Scene {
     tree.hp -= 1;
     this.inv.add(tree.def.woodItemId, tree.def.woodPerHit);
     // Bump relative to the tree's fitted base scale (not an absolute 1 — the pine is scaled down).
-    // The queued glow (if any) shares the tree's scale + origin, so bounce it on the same tween so the
-    // halo tracks the tree through the chop animation instead of hanging at the un-bumped size.
+    // Animate only the tree — its queued glow halo mirrors this (and any future sway/fall) each frame
+    // via syncGlowTransforms(), so animations never have to drive the glow themselves.
     const base = this.treeScale(tree.sprite);
-    const targets: Phaser.GameObjects.GameObject[] = [tree.sprite];
-    const glow = this.glowSprites.get(tree.id);
-    if (glow) targets.push(glow);
-    this.tweens.add({ targets, scale: base * 1.18, duration: 80, yoyo: true });
+    this.tweens.add({ targets: tree.sprite, scale: base * 1.18, duration: 80, yoyo: true });
     if (tree.hp <= 0) {
       tree.alive = false;
       // No dedicated stump sprite in the pack yet (see docs/ASSETS.md) — tint the felled tree

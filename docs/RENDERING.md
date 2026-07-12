@@ -41,6 +41,16 @@ edge, author the radius in **source texels** (convert from a screen-px target us
 scale) so it reads consistently across sprites, and keep the bake behind a cache so it runs once, not
 per attach.
 
+**Baked effect on an animated host:** the halo is a *separate* GameObject, so if the host sprite
+animates (the tree's chop bounce, and planned walk-past sway / fall), the halo must follow. Don't
+hand-couple each animation to the glow — that breaks the first time someone adds an animation and
+forgets. Instead **mirror the host's transform once per frame** for the handful of active effects
+(`GameScene.syncGlowTransforms`: copy `position`/`scale`/`rotation`). Because the glow shares the
+host's origin, one mirror reproduces *any* affine animation about the same pivot, and new animations
+need no glow-specific code. Corollary: keep game **logic** (targeting, pathfinding, occupancy) keyed
+off the tile (`col`/`row`), never the animated sprite transform — a sway or a mid-fall lean is purely
+visual and must not move the object's logical position.
+
 ## Custom PostFX pipelines (for genuinely per-frame effects)
 
 A PostFX pipeline runs a fragment shader over a sprite *after* it's drawn, into a padded
