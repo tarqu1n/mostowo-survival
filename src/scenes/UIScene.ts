@@ -137,12 +137,16 @@ export class UIScene extends Phaser.Scene {
     }
 
     // Damage vignette: a full-viewport red edge-flash, invisible at rest, pulsed on `player:hit`.
-    // Baked once (see render/vignetteTexture); top depth + scrollFactor 0 so it's a fixed overlay, and
-    // never made interactive so pointer input still falls through to the HUD/world beneath it.
+    // Baked once (see render/vignetteTexture); a plain world object sized to the design viewport and
+    // never made interactive so pointer input still falls through to the HUD/world beneath it. NOT
+    // scrollFactor 0: this scene's camera is zoomed (RENDER_SCALE) and centerOn'd, so its scroll is
+    // non-zero — a scrollFactor-0 object skips that compensation and, under zoom, pins its centre to
+    // screen (0,0) scaled up, covering only the top-left quadrant. As a world object it maps like every
+    // other HUD widget. The camera never scrolls, so it stays a fixed overlay regardless.
     const vignetteKey = bakeVignetteTexture(this, DAMAGE_VIGNETTE_COLOR, BASE_WIDTH, BASE_HEIGHT);
     this.damageVignette = this.add
       .image(BASE_WIDTH / 2, BASE_HEIGHT / 2, vignetteKey)
-      .setScrollFactor(0)
+      .setDisplaySize(BASE_WIDTH, BASE_HEIGHT)
       .setDepth(100000)
       .setAlpha(0);
 
