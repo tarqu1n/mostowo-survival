@@ -1509,7 +1509,7 @@ export class GameScene extends Phaser.Scene {
   /**
    * Dev menu: clear the scattered world — every resource node and zombie — then scatter a fresh
    * random batch on empty tiles: a mix of trees/rocks/bushes (trees weighted so wood stays plentiful)
-   * plus a few zombies. The player's own walls/blueprints are left standing (only `occupied`/`siteTiles`
+   * plus a pack of zombies. The player's own walls/blueprints are left standing (only `occupied`/`siteTiles`
    * are read, never cleared). Zombies keep a few tiles clear of the player so a randomise never spawns
    * an instant bite. Wired to the dev-menu Randomise button.
    */
@@ -1538,14 +1538,14 @@ export class GameScene extends Phaser.Scene {
     };
 
     const nodePool = [NODES.tree, NODES.tree, NODES.tree, NODES.rock, NODES.berryBush];
-    const nodeCount = 6 + Math.floor(Math.random() * 9); // 6..14
+    const nodeCount = 24 + Math.floor(Math.random() * 25); // 24..48
     for (let i = 0; i < nodeCount; i++) {
       const tile = pickTile(0);
       if (!tile) break;
       this.addNode(nodePool[Math.floor(Math.random() * nodePool.length)], tile.col, tile.row);
     }
 
-    const zombieCount = 1 + Math.floor(Math.random() * 4); // 1..4
+    const zombieCount = 8 + Math.floor(Math.random() * 9); // 8..16
     for (let i = 0; i < zombieCount; i++) {
       const tile = pickTile(6); // keep zombies clear of the player's tile
       if (!tile) break;
