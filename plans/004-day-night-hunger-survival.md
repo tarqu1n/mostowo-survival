@@ -248,7 +248,12 @@ mechanism fought the code that's actually there.
   - Done when: `npm run build` green; running the game visibly darkens toward night and lightens toward
     day on a loop; `debugState()` (extended Step 10) will expose `clockMs`/`dayPhase`/`dayCount`.
 
-- [ ] **Step 3: Day/night HUD readout (UIScene)** `[delegate sonnet]`
+- [x] **Step 3: Day/night HUD readout (UIScene)** `[delegate sonnet]`
+  - Outcome: `UIScene.ts` — added passive `timeText` (NOT in `hudElements`) top-centre at
+    `(BASE_WIDTH/2, zY + zbSize/2 + 6 + fbh + 10)` ≈ (180, 70), below the FOLLOW button (no overlap
+    with mode row / build indicator). Format `Day N [day|night]` (ASCII fallback used to dodge tofu
+    glyphs). Seeded from `registry.dayPhase`/`dayCount` in `create()`; live-updated via `onTimeChanged`
+    subscribed to `time:changed` with a matching `.off` in SHUTDOWN. Build + typecheck green.
   - `UIScene.ts`: add a **passive** readout (plain text, **not** pushed to `hudElements`) showing phase
     + day, e.g. `Day 1 ☀` / `Day 1 ☾` (ASCII fallback `Day 1 [day]`/`[night]` if the glyph renders
     poorly at 12px). Place it in free space top-centre-ish (below the zoom row / above the build

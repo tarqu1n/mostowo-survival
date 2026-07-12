@@ -41,6 +41,7 @@ export class UIScene extends Phaser.Scene {
   private zoomOutButton!: Button;
   private zoomInButton!: Button;
   private followButton!: Button;
+  private timeText!: Phaser.GameObjects.Text;
 
   // Mode toggle (Command/Combat/Inspect — see plan 003). GameScene owns the authoritative mode;
   // this scene just mirrors it for button highlighting + showing/hiding the Combat-mode controls.
@@ -187,6 +188,20 @@ export class UIScene extends Phaser.Scene {
     }).setToggled(initialFollowing);
     this.hudElements.push(this.followButton);
 
+    // Day/night readout — passive (not interactive, not pushed to hudElements), top-centre just
+    // below the zoom/follow stack. ASCII form (not the ☀/☾ glyphs) to avoid tofu boxes at 12px in
+    // the monospace HUD font. Seeded from the registry (GameScene seeds 'dayPhase'/'dayCount' in its
+    // own create()); kept in sync via 'time:changed' below.
+    const initialPhase = (this.registry.get('dayPhase') as 'day' | 'night' | undefined) ?? 'day';
+    const initialDayCount = (this.registry.get('dayCount') as number | undefined) ?? 1;
+    this.timeText = this.add
+      .text(BASE_WIDTH / 2, zY + zbSize / 2 + 6 + fbh + 10, `Day ${initialDayCount} [${initialPhase}]`, {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#e8dcc0',
+      })
+      .setOrigin(0.5);
+
     // Mode toggle — Command (default, no button needed) / Combat / Inspect, mutually exclusive.
     // Left side, below the wood/queue readout. Laid out in a row via the kit's arrangeRow helper.
     const mbw = 64;
@@ -314,6 +329,7 @@ export class UIScene extends Phaser.Scene {
     this.game.events.on('mode:changed', this.onModeChanged, this);
     this.game.events.on('inspect:show', this.showInspectPanel, this);
     this.game.events.on('inspect:hide', this.hideInspectPanel, this);
+    this.game.events.on('time:changed', this.onTimeChanged, this);
 
     // Teardown so a future scene restart doesn't double-register on stale listeners.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -325,6 +341,7 @@ export class UIScene extends Phaser.Scene {
       this.game.events.off('mode:changed', this.onModeChanged, this);
       this.game.events.off('inspect:show', this.showInspectPanel, this);
       this.game.events.off('inspect:hide', this.hideInspectPanel, this);
+      this.game.events.off('time:changed', this.onTimeChanged, this);
     });
   }
 
@@ -382,6 +399,11 @@ export class UIScene extends Phaser.Scene {
 
   private onFollowChanged(following: boolean): void {
     this.followButton.setToggled(following);
+  }
+
+  /** Keep the passive day/night readout in sync with GameScene's clock (fires only on phase/day change). */
+  private onTimeChanged({ phase, dayCount }: { phase: 'day' | 'night'; dayCount: number }): void {
+    this.timeText.setText(`Day ${dayCount} [${phase}]`);
   }
 
   /** Reflects the authoritative mode from GameScene: button highlight + combat-controls visibility. */
