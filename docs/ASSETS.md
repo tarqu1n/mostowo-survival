@@ -142,10 +142,14 @@ not repeated here):
   GameScene picks chop vs mine from the harvested node's `tile` role (rock → mine, else chop).
 - **Enemy** (kid zombie data id, unchanged): Skeleton (Base) `Run/Run-Sheet.png` (64px, 6 frames)
   stands in for the sprite; single-orientation, frame 0 = idle, flips by movement-x only — mob
-  sheets in this pack ship no directional variants. Its `Death/Death-Sheet.png` (64px, 12 frames) is
-  now wired too — a one-shot collapse played on kill (`enemyDeathKey`), single-orientation like Run.
-  The pack ships **no skeleton attack strip**, so a zombie's bite is a coded lunge, not a sprite anim
-  (see docs/RENDERING.md / the combat-feedback STATUS entry).
+  sheets in this pack ship no directional variants. Its `Death/Death-Sheet.png` is wired too — a
+  one-shot collapse played on kill (`enemyDeathKey`), single-orientation like Run. **Its cells are
+  96×64, not 64² like Run** (the collapse needs horizontal room): the skeleton is centred in a wider
+  frame, so it's declared `frameSize: 64, frameWidth: 96, frames: 8`. Slicing it at the square 64 (the
+  first wiring did) lands the cuts *between* real frames — every 3rd slice is empty (flicker) and the
+  content jumps left/right (apparent "flying"); `StripAnim.frameWidth` exists for exactly this. The
+  pack ships **no skeleton attack strip**, so a zombie's bite is a coded lunge, not a sprite anim (see
+  docs/RENDERING.md / the combat-feedback STATUS entry).
 - **Player gather swing (added in plan 004):** a new `gather` `PlayerState` maps to the pack's
   `Collect_Base` strips (`Collect_{Down,Side,Up}-Sheet.png`, 8×64px) — foraging a berry bush plays
   this, distinct from the chop/mine swings above.

@@ -80,9 +80,14 @@ export class PreloadScene extends Phaser.Scene {
       }
     }
 
-    // Actors: each strip is its own square-framed spritesheet, keyed by role (texture key == anim key).
+    // Actors: each strip is its own spritesheet, keyed by role (texture key == anim key). Frames are
+    // `frameSize` tall and square by default; a non-square sheet (e.g. the 96×64 skeleton Death) sets
+    // `frameWidth`, so slice by that when present or the cells land between real frames.
     const loadStrip = (key: string, strip: StripAnim): void => {
-      this.load.spritesheet(key, url(strip.path), { frameWidth: strip.frameSize, frameHeight: strip.frameSize });
+      this.load.spritesheet(key, url(strip.path), {
+        frameWidth: strip.frameWidth ?? strip.frameSize,
+        frameHeight: strip.frameSize,
+      });
     };
     const { player, enemy } = manifest.actors;
     const playerStates: PlayerState[] = ['idle', 'walk', 'chop', 'mine', 'gather', 'punch', 'death'];

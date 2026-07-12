@@ -28,11 +28,19 @@ export type TileSource =
   | { kind: 'image'; path: string }
   | { kind: 'sheetFrame'; sheet: string; frame: number };
 
-/** A horizontal animation strip. Square frames, `frameSize` px each, `frames` count. */
+/**
+ * A horizontal animation strip. Frames are `frameSize` px tall and, by default, `frameSize` px wide
+ * (square). A sheet whose cells are wider than tall — e.g. the skeleton Death sheet packs its collapse
+ * into 96×64 cells so the motion has horizontal room — sets `frameWidth` to that wider value; slicing
+ * such a sheet at the square `frameSize` lands between real frames (empty gaps → flicker, content
+ * jumping left/right → apparent "flying"), so the width must be declared, not assumed.
+ */
 export interface StripAnim {
   path: string;
   frameSize: number;
   frames: number;
+  /** Cell width in px when the frame isn't square; defaults to `frameSize`. */
+  frameWidth?: number;
 }
 
 /** Display scale + origin so a padded actor canvas (e.g. 64px) sits right on a 16px tile. */
@@ -159,7 +167,9 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
       // bottom (content bbox ≈ y34–64), so originY 0.96 grounds it on the tile.
       render: { scale: 1, originX: 0.5, originY: 0.96 },
       walk: { path: 'Entities/Mobs/Skeleton Crew/Skeleton - Base/Run/Run-Sheet.png', frameSize: 64, frames: 6 },
-      death: { path: 'Entities/Mobs/Skeleton Crew/Skeleton - Base/Death/Death-Sheet.png', frameSize: 64, frames: 12 },
+      // Death cells are 96×64 (wider than the 64² Run cells) — the collapse needs horizontal room.
+      // Sliced at 64 it flickered (every 3rd slice empty) and jumped L/R; 96×8 reads as a clean fall.
+      death: { path: 'Entities/Mobs/Skeleton Crew/Skeleton - Base/Death/Death-Sheet.png', frameSize: 64, frameWidth: 96, frames: 8 },
     },
   },
 };
