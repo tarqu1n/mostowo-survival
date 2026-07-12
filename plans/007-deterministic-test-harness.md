@@ -31,6 +31,22 @@ than the live game, because driving the growing game itself will never keep up. 
 concrete shape of the `docs/DECISIONS.md` 2026-07-12 "isolated test setups" entry and resolves its
 **[OPEN] harness-shape** question.
 
+**One minimal setup per behaviour (settled with the user):** every test constructs only the world it
+needs — chop = player + one adjacent tree; combat = player + one adjacent zombie; pathfind = player +
+a wall to route around. This is the payoff of leaving the live game: fast (nothing unrelated ticks),
+isolated (a pathfind change can't break a combat test), and the setup *is* the spec of what's tested.
+Two guard-rails so it doesn't rot into a pile of bespoke maps:
+- **Declarative specs, not map files.** The differences between setups are one-line data
+  (`{player:[3,3], trees:[[5,3]]}` vs `{player:[3,3], zombies:[[4,3]]}`) fed to the *same*
+  `applyScenario(spec)` — never separate hand-authored maps.
+- **Named fixture builders for shared shapes.** A small `scenarios.ts` of builders (`justATree()`,
+  `oneZombie()`, `wallToRouteAround()`) returning specs, so common setups are reused, not copy-pasted;
+  any test may override. Don't over-abstract — add a builder only once ≥2 tests want it.
+- **One behaviour per test.** The chop test never also asserts combat.
+- **Small = few entities placed adjacent, not a shrunk canvas.** Tier 1 builds a literal tiny grid
+  (e.g. 5×5) inline; Tier 2 keeps the real Phaser world but places entities adjacent so there's no
+  multi-second walk to assert through.
+
 **Harness shape — recommended (decide at critique):** a **hybrid**, *not* a single mechanism —
 - **Tier 1 = Vitest**, chosen because the project is already Vite (`vite@6`, `vitest` is the native
   fit, shares `tsconfig`/resolution). Pure systems import no Phaser (verified — only `Inventory.ts`
