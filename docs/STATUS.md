@@ -44,6 +44,14 @@ per species instead of shaded every frame — same look on WebGL *and* Canvas (n
 shader in the frame loop; see [RENDERING.md](RENDERING.md). See [DECISIONS.md](DECISIONS.md)
 (2026-07-12).
 
+**Crisp actors at every zoom:** actors now render at native `render.scale = 1` and camera zoom is
+integer-only (`ZOOM_STEP = 1`; `setZoom` rounds every path). Same root cause as the ground bake — a
+fractional on-screen texel scale (`render.scale × zoom`) makes nearest-neighbour uneven — but a small
+framed sprite can't hide it behind a continuous texture the way the baked ground does. The player had
+rendered at `scale 0.5`, crisp only at the even default 200% and stretched/clipping at 300%
+(`0.5 × 3 = 1.5`). See [RENDERING.md](RENDERING.md) ("Pixel-art scale must be integer") and
+[DECISIONS.md](DECISIONS.md) (2026-07-12).
+
 ## Three-tier test harness landed (plan 007)
 
 The fragile live-game smoke is retired for **Tier 1** Vitest unit tests over the pure systems + data

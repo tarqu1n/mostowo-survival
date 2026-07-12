@@ -5,6 +5,11 @@ import { startGame, applyScenario, step, state } from './harness';
 // repeated contact hits (1s cooldown each); at 0 HP GameScene.scene.restart() re-runs create(),
 // resetting the world to its boot fixtures (player back at spawn centre, full HP, default spawns).
 test('the player dying restarts the scene and resets the world', async ({ page }) => {
+  // Heaviest test in the suite: 14000ms of driven `step()` = ~840 rendered frames. Under
+  // fullyParallel contention on the headless SwiftShader renderer (fill-rate sensitive — see
+  // docs/RENDERING.md) this runs near the default 30s budget; native-scale actors nudged it over.
+  // The work is deterministic, just wall-clock-heavy, so give it headroom rather than hide a flake.
+  test.setTimeout(60_000);
   const logs: string[] = [];
   page.on('console', (m) => logs.push(m.text()));
 
