@@ -85,6 +85,20 @@ bundles; the ~1.4 MB JS chunk is Phaser itself (~341 KB gzipped) — expected, n
 >
 > After that, every `git push` to `master` auto-deploys to `https://tarqu1n.github.io/mostowo-survival/`.
 
+## Dev menu (in-game debug tools)
+
+A **DEV** toggle at the bottom-right of the HUD opens an olive dev-menu panel (built from the
+`src/ui` kit in `UIScene`). Current tools:
+
+- **⟳ Randomise** — clears the scattered world (all resource nodes + zombies, leaving your
+  walls/blueprints) and scatters a fresh random batch: a mix of trees/rocks/bushes plus 1–4 zombies
+  (kept a few tiles clear of the player). Emits `debug:randomise` → `GameScene.randomiseWorld`.
+- **Day/night** — flips the cycle to the opposite phase of the current in-game day (label shows the
+  target: "GO NIGHT"/"GO DAY"). Emits `debug:toggleTime` → `GameScene.toggleDayNight`.
+
+**Add new debug affordances here** (a button in the panel → a `debug:*` event → a `GameScene`
+handler) rather than scattering ad-hoc buttons across the HUD.
+
 ## Testing
 
 A **three-tier deterministic harness** (plan 007 — see DECISIONS.md for the *why*). The old

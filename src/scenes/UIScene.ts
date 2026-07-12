@@ -22,7 +22,7 @@ import { iconKey } from '../data/tileset';
 import { bakeVignetteTexture } from '../render/vignetteTexture';
 import type { Inventory } from '../systems/Inventory';
 import type { InspectableStats } from '../data/types';
-import { Button, Panel, SlotGrid, arrangeRow, type SlotVisual } from '../ui';
+import { Button, Panel, SlotGrid, arrangeRow, UI_THEME, type SlotVisual } from '../ui';
 
 /**
  * HUD overlay, run in parallel over GameScene (never replaces it). Renders the wood counter, a
@@ -48,6 +48,13 @@ export class UIScene extends Phaser.Scene {
   private zoomInButton!: Button;
   private followButton!: Button;
   private timeText!: Phaser.GameObjects.Text;
+
+  // Dev menu (dev-only): a bottom-right DEV toggle that opens a small olive Panel of build-testing
+  // helpers — Randomise (scatter nodes + zombies) and a day/night flip. Only the toggle button and
+  // the Panel go in hudElements; the buttons nested in the Panel ride its bounds/visibility.
+  private devButton!: Button;
+  private devPanel!: Panel;
+  private devTimeButton!: Button;
 
   // Mode toggle (Command/Combat/Inspect — see plan 003). GameScene owns the authoritative mode;
   // this scene just mirrors it for button highlighting + showing/hiding the Combat-mode controls.
@@ -336,18 +343,53 @@ export class UIScene extends Phaser.Scene {
       color: '#6f6552',
     });
 
-    // TEMP (movement testing): scatter a fresh random batch of trees. Bottom-right, dashed olive.
+    // Dev menu (dev-only): a bottom-right DEV toggle opening a small olive Panel of build helpers.
     const dbw = 96;
     const dbh = 24;
-    const debugButton = new Button(this, BASE_WIDTH - dbw / 2 - 8, BASE_HEIGHT - dbh / 2 - 8, {
+    this.devButton = new Button(this, BASE_WIDTH - dbw / 2 - 8, BASE_HEIGHT - dbh / 2 - 8, {
       width: dbw,
       height: dbh,
-      label: '⟳ TREES',
+      label: 'DEV',
       variant: 'olive',
       fontSize: 11,
-      onDown: () => this.game.events.emit('debug:regenTrees'),
+      onDown: () => this.toggleDevMenu(),
     });
-    this.hudElements.push(debugButton);
+    this.hudElements.push(this.devButton);
+
+    // The menu panel sits just above the DEV button, right-aligned to it. Its buttons are nested
+    // children (like the Wellbeing eat-rows), so they show/hide and hit-test with the panel — only
+    // the panel itself is pushed to hudElements. Hidden until DEV is tapped.
+    const dpw = 124;
+    const dph = 96;
+    this.devPanel = new Panel(this, BASE_WIDTH - dpw / 2 - 8, BASE_HEIGHT - dbh - 16 - dph / 2, {
+      width: dpw,
+      height: dph,
+      fill: UI_THEME.olive.fill,
+      stroke: UI_THEME.olive.stroke,
+      strokeAlpha: UI_THEME.olive.strokeAlpha,
+      depth: 20,
+    });
+    this.devPanel.addText(14, { fontSize: '10px', color: UI_THEME.olive.text }).setText('DEV MENU');
+
+    const randomiseButton = new Button(this, 0, -4, {
+      width: 108,
+      height: 24,
+      label: '⟳ RANDOMISE',
+      variant: 'olive',
+      fontSize: 11,
+      onDown: () => this.game.events.emit('debug:randomise'),
+    });
+    const initialTimeLabel = initialPhase === 'day' ? 'GO NIGHT' : 'GO DAY';
+    this.devTimeButton = new Button(this, 0, 26, {
+      width: 108,
+      height: 24,
+      label: initialTimeLabel,
+      variant: 'olive',
+      fontSize: 11,
+      onDown: () => this.game.events.emit('debug:toggleTime'),
+    });
+    this.devPanel.add([randomiseButton, this.devTimeButton]);
+    this.hudElements.push(this.devPanel);
 
     // Hotbar — always-visible row of the first HOTBAR_SLOTS slots, bottom-centre. Hidden in combat
     // mode (see onModeChanged) so it never clashes with the movepad/Punch controls.
@@ -449,6 +491,13 @@ export class UIScene extends Phaser.Scene {
     if (open) this.inventoryPanel.show();
     else this.inventoryPanel.hide();
     this.inventoryButton.setToggled(open);
+  }
+
+  private toggleDevMenu(): void {
+    const open = !this.devPanel.visible;
+    if (open) this.devPanel.show();
+    else this.devPanel.hide();
+    this.devButton.setToggled(open);
   }
 
   // ---- Always-on HUD meters ------------------------------------------------
@@ -669,6 +718,8 @@ export class UIScene extends Phaser.Scene {
   /** Keep the passive day/night readout in sync with GameScene's clock (fires only on phase/day change). */
   private onTimeChanged({ phase, dayCount }: { phase: 'day' | 'night'; dayCount: number }): void {
     this.timeText.setText(`Day ${dayCount} [${phase}]`);
+    // Dev day/night button shows the phase it'll switch *to*, so it reads as an action.
+    this.devTimeButton.setLabel(phase === 'day' ? 'GO NIGHT' : 'GO DAY');
   }
 
   /** Reflects the authoritative mode from GameScene: button highlight + combat-controls visibility. */

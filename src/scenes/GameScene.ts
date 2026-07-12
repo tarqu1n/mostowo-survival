@@ -37,6 +37,7 @@ import {
   DEFAULT_MAX_STACK,
   PLAYER_HURTBOX,
   DAY_MS,
+  TWILIGHT_MS,
   HUNGER_MAX,
   HUNGER_DRAIN_PER_SEC,
   STARVE_DAMAGE,
@@ -476,7 +477,8 @@ export class GameScene extends Phaser.Scene {
 
     this.game.events.on('build:toggle', this.toggleBuild, this);
     this.game.events.on('tasks:cancel', this.cancelAll, this);
-    this.game.events.on('debug:regenTrees', this.regenerateTrees, this); // TEMP: movement testing
+    this.game.events.on('debug:randomise', this.randomiseWorld, this); // dev menu: scatter nodes + enemies
+    this.game.events.on('debug:toggleTime', this.toggleDayNight, this); // dev menu: flip day/night
     this.game.events.on('zoom:delta', this.adjustZoom, this);
     this.game.events.on('camera:center', this.centerOnPlayer, this);
     this.game.events.on('combat:punch', this.punch, this);
@@ -489,7 +491,8 @@ export class GameScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off('build:toggle', this.toggleBuild, this);
       this.game.events.off('tasks:cancel', this.cancelAll, this);
-      this.game.events.off('debug:regenTrees', this.regenerateTrees, this); // TEMP
+      this.game.events.off('debug:randomise', this.randomiseWorld, this);
+      this.game.events.off('debug:toggleTime', this.toggleDayNight, this);
       this.game.events.off('zoom:delta', this.adjustZoom, this);
       this.game.events.off('camera:center', this.centerOnPlayer, this);
       this.game.events.off('combat:punch', this.punch, this);
@@ -1499,28 +1502,83 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * TEMP (movement testing): clear all nodes and scatter a fresh random batch on empty tiles,
-   * avoiding walls, blueprints, and the player's own tile. Mostly trees with the odd rock so both
-   * resources are reachable from manual play. Wired to a debug HUD button.
+   * Dev menu: clear the scattered world — every resource node and zombie — then scatter a fresh
+   * random batch on empty tiles: a mix of trees/rocks/bushes (trees weighted so wood stays plentiful)
+   * plus a few zombies. The player's own walls/blueprints are left standing (only `occupied`/`siteTiles`
+   * are read, never cleared). Zombies keep a few tiles clear of the player so a randomise never spawns
+   * an instant bite. Wired to the dev-menu Randomise button.
    */
-  private regenerateTrees(): void {
+  private randomiseWorld(): void {
     this.cancelAll(); // drop harvest orders that reference the nodes we're about to destroy
     for (const t of this.trees) t.sprite.destroy();
+    for (const z of this.zombies) z.sprite.destroy();
     this.trees = [];
+    this.zombies = [];
 
-    const count = 6 + Math.floor(Math.random() * 9); // 6..14
     const pt = this.playerTile();
     const used = new Set<string>([tileKey(pt.col, pt.row)]);
-    let placed = 0;
-    for (let attempt = 0; placed < count && attempt < count * 30; attempt++) {
-      const col = Math.floor(Math.random() * this.gridDims.cols);
-      const row = Math.floor(Math.random() * this.gridDims.rows);
-      const key = tileKey(col, row);
-      if (used.has(key) || this.occupied.has(key) || this.siteTiles.has(key)) continue;
-      used.add(key);
-      this.addNode(Math.random() < 0.25 ? NODES.rock : NODES.tree, col, row);
-      placed += 1;
+    // Pick a random empty tile (in bounds, not a wall/blueprint/already-used), at least `minPlayerDist`
+    // tiles (Chebyshev) from the player. Returns null if it can't find one within the attempt budget.
+    const pickTile = (minPlayerDist: number): Cell | null => {
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const col = Math.floor(Math.random() * this.gridDims.cols);
+        const row = Math.floor(Math.random() * this.gridDims.rows);
+        const key = tileKey(col, row);
+        if (used.has(key) || this.occupied.has(key) || this.siteTiles.has(key)) continue;
+        if (Math.max(Math.abs(col - pt.col), Math.abs(row - pt.row)) < minPlayerDist) continue;
+        used.add(key);
+        return { col, row };
+      }
+      return null;
+    };
+
+    const nodePool = [NODES.tree, NODES.tree, NODES.tree, NODES.rock, NODES.berryBush];
+    const nodeCount = 6 + Math.floor(Math.random() * 9); // 6..14
+    for (let i = 0; i < nodeCount; i++) {
+      const tile = pickTile(0);
+      if (!tile) break;
+      this.addNode(nodePool[Math.floor(Math.random() * nodePool.length)], tile.col, tile.row);
     }
+
+    const zombieCount = 1 + Math.floor(Math.random() * 4); // 1..4
+    for (let i = 0; i < zombieCount; i++) {
+      const tile = pickTile(6); // keep zombies clear of the player's tile
+      if (!tile) break;
+      this.addZombie('kidZombie', tile.col, tile.row);
+    }
+  }
+
+  /**
+   * Dev menu: flip the day/night clock to the opposite phase of the current in-game day, jumping
+   * straight to full daylight / full dark rather than riding the twilight ramp. Stays within the
+   * current cycle so the day count doesn't change.
+   */
+  private toggleDayNight(): void {
+    const cycleMs = this.clockMs % cycleLengthMs();
+    const cycleStart = this.clockMs - cycleMs; // ms at the start of the current in-game day
+    // day -> start of night (full-dark plateau); night -> just past dawn (full daylight, same day).
+    this.clockMs = cycleStart + (phaseAt(cycleMs) === 'day' ? DAY_MS : TWILIGHT_MS);
+    this.applyClock();
+  }
+
+  /**
+   * Recompute the night-tint overlay + phase/day from `clockMs` and broadcast `time:changed`. The
+   * per-frame survival tick in update() does the same inline but only emits on a phase/day *change* —
+   * this forces the update (and re-emit) after a manual clock jump (see toggleDayNight).
+   */
+  private applyClock(): void {
+    const cycleMs = this.clockMs % cycleLengthMs();
+    this.nightOverlay.setAlpha(tintAlphaAt(cycleMs));
+    this.dayPhase = phaseAt(cycleMs);
+    this.dayCount = dayCountForTotal(this.clockMs);
+    this.registry.set('dayPhase', this.dayPhase);
+    this.registry.set('dayCount', this.dayCount);
+    this.game.events.emit('time:changed', {
+      phase: this.dayPhase,
+      dayCount: this.dayCount,
+      cycleMs,
+      tNorm: cycleMs / cycleLengthMs(),
+    });
   }
 
   private treeById(id: string): TreeNode | undefined {
