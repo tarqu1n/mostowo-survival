@@ -159,6 +159,9 @@ export const playerAnimKey = (state: PlayerState, facing: Facing): string => `pl
 /** Texture/anim key for the enemy Run strip (frame 0 doubles as idle). */
 export const enemyWalkKey = 'enemy-walk';
 
+/** Texture key for an item's icon image (loaded from `public/assets/icons/<icon>`). */
+export const iconKey = (id: string): string => `icon:${id}`;
+
 /** Weighted-random pick over `items` — used for ground variety (see `tiles.ground` doc above). */
 export function pickWeighted<T extends { weight: number }>(items: T[]): T {
   const total = items.reduce((sum, it) => sum + it.weight, 0);

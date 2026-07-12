@@ -6,11 +6,13 @@ import {
   tileImageKey,
   playerAnimKey,
   enemyWalkKey,
+  iconKey,
   type TileSource,
   type StripAnim,
   type Facing,
   type PlayerState,
 } from '../data/tileset';
+import { ITEMS } from '../data/items';
 
 /**
  * Loads the active tileset (see `src/data/tileset.ts`) and shows a simple loading bar. All keys are
@@ -86,6 +88,13 @@ export class PreloadScene extends Phaser.Scene {
       for (const state of playerStates) loadStrip(playerAnimKey(state, facing), player[state][facing]);
     });
     loadStrip(enemyWalkKey, enemy.walk);
+
+    // Item icons: one standalone 32×32 image per ITEMS entry, keyed `icon:<id>`. Placeholder art this
+    // slice (plan 008) — the repeatable generated set lands in plan 009. The UI falls back to the
+    // item's `color` rect if a key is ever missing, so an icon-less item never hard-crashes.
+    for (const item of Object.values(ITEMS)) {
+      this.load.image(iconKey(item.id), encodeURI(`${import.meta.env.BASE_URL}assets/icons/${item.icon}`));
+    }
   }
 
   create(): void {
