@@ -7,6 +7,28 @@ Format: `YYYY-MM-DD — [DECIDED|PROPOSED|OPEN] Title` then a short rationale.
 
 ---
 
+## 2026-07-12 — [DECIDED] Day/night + hunger survival slice (plan 004): real-time cycle, hunger→health cascade, inventory reuse defers "Equipped"
+
+**Day/night** is a continuous real-time clock (not tied to player action), driving a smooth tint
+overlay + a queryable phase. **Night this slice is tint + phase state only** — no enemy waves; waves
+layer on later off the same phase state, so the clock doesn't need revisiting when they land.
+
+**Hunger** is a core ticking pressure (Don't-Starve-style) that, at zero, drains **combat-owned
+`playerHp`** via plan 003's `damagePlayer` rather than a parallel health system — starvation death
+reuses the existing scene-restart path for free. **Survival state (hunger/clock/phase) is not
+persisted** — resets on every restart/reload, consistent with there being no save system yet.
+
+**Eating happens via the Health & Wellbeing screen**, which also surfaces read-only player stats — a
+deliberate superset of the design doc's "meters + eat list." **The inventory view is unchanged**,
+reusing plan 008's existing panel/hotbar; the "Equipped" section from the original design sketch is
+**deferred entirely to plan 010** rather than shipping a throwaway shell now.
+
+**Bushes forage, trees/rocks chop/mine:** a new `gather` player state (`Collect_Base` strips) plays
+for berry bushes, distinct from the existing chop/mine swings. `ResourceNodeDef` gained a required
+`blocksPath` flag (bushes: `false`, non-blocking — the worker routes through and forages from an
+adjacent tile; trees/rocks stay blocking) so build-placement and pathing gate on data, not a
+tile-role special case.
+
 ## 2026-07-12 — [DECIDED] Render the backing store at device resolution (RENDER_SCALE) to kill tile seams
 
 The "black lines on the doubled map" (reported on-device, Android/Brave) turned out **not** to be the

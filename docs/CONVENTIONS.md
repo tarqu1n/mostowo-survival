@@ -6,9 +6,12 @@ commands and the git/review workflow, see [WORKFLOW.md](WORKFLOW.md).
 _To be firmed up as we go. Starting position:_
 
 - **Data-driven design.** Items, recipes, buildings, resource nodes = data (TS/JSON), not
-  hard-coded logic. Adding content should mean editing data, not writing new systems.
+  hard-coded logic. Adding content should mean editing data, not writing new systems (e.g. a resource
+  node's `blocksPath`/`harvestAnim` flags gate pathing/build-placement and pick chop vs gather, no
+  per-species branch in code).
 - **Systems over god-objects.** Keep inventory / crafting / time-of-day / resources as separate,
-  testable modules.
+  testable modules (day/night and hunger are `systems/daynight`/`systems/needs` — pure, Phaser-free,
+  unit-tested).
 - **Scenes:** Boot → Preload → Menu → Game (world) → UI overlay. Keep UI decoupled from world logic.
   The core-loop slice set the pattern: content is data in **`src/data/`** (`ITEMS`/`NODES`/`BUILDABLES`
   + `types.ts`), logic is small modules in **`src/systems/`** (`Inventory`, `grid`), and the HUD is a

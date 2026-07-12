@@ -181,10 +181,11 @@ Smallest thing that captures the day→fortify→night→defend *feel*:
    wood into a character `Inventory` (plan 001).
 3. **Fortify:** ~~place a wall segment~~ ✅ (walls, plan 001) · and one trap from gathered resources (todo).
 4. **Night:** a short timed wave of a couple of roaming/attacking zombies; base + trap + player can
-   repel them; day/night tint + a survival meter ticking through it. **Partially done (plan 003):**
-   Combat mode (movepad + Punch), a shared stats/damage-resolution model, and one fixed-spawn kid
-   zombie with idle/chasing AI + contact damage are in. Still todo: wave-spawning/pacing, day/night
-   tint, and traps.
+   repel them; ~~day/night tint + a survival meter ticking through it~~ ✅ (plan 004 — real-time
+   day/night cycle, hunger→health cascade, Health & Wellbeing screen as the eat surface; night is
+   tint+phase only so far, no waves yet). **Partially done (plan 003):** Combat mode (movepad +
+   Punch), a shared stats/damage-resolution model, and one fixed-spawn kid zombie with idle/chasing AI
+   + contact damage are in. Still todo: the short timed wave itself (spawning/pacing) and traps.
 
 Weather, deep crafting trees, full map, save system, richer AI layer on *after* the slice is fun.
 

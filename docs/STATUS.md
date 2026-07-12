@@ -98,3 +98,21 @@ and a **rock node** (`NODES.rock`, grey boulder extracted from the pack's `Rocks
 the repeatable **Gemini icon-generation pipeline** that replaces them with real art is **plan 009**
 (gated on a LAN-only key, so the mechanic ships green on placeholders). New Tier-1 stacking tests +
 Tier-2 `mine`/`block-full` scenarios.
+
+## Day/night + hunger survival slice (plan 004)
+
+A real-time **day/night cycle** (`src/systems/daynight.ts`, pure): a continuous clock drives a
+map-sized tint overlay (smooth dawn/dusk ramps, flat mid-day/night) and a queryable `day`/`night`
+phase, surfaced as a passive `Day N` HUD readout. **Night is tint + phase state only** this slice —
+no enemy waves yet (they layer on later via the same phase state).
+
+**Hunger** (`src/systems/needs.ts`, pure) drains continuously and, at zero, **cascades into
+combat-owned `playerHp`** (`damagePlayer`, plan 003) on a fixed interval — reusing combat's existing
+death/restart path rather than a second health system. A new forageable **berry bush** (`berryBush`
+node, non-blocking, `blocksPath:false`) yields **`berries`** (a first edible item, `nutrition`) via a
+new **gather** player state (`Collect_Base` strips), distinct from the chop/mine swings. A **Health &
+Wellbeing** screen (STATUS button → Panel) shows hunger/health meters, read-only player stats, and an
+**available-to-eat** list wired to a `needs:eat` event; the inventory view is unchanged, reusing plan
+008's existing panel (no throwaway "Equipped" shell — deferred to plan 010). Survival state is **not
+persisted**. New Tier-1 `daynight`/`needs` unit tests + three Tier-2 scenarios
+(`survival-{daynight,hunger,forage}`).

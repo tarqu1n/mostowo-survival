@@ -143,6 +143,14 @@ not repeated here):
 - **Enemy** (kid zombie data id, unchanged): Skeleton (Base) `Run/Run-Sheet.png` (64px, 6 frames)
   stands in for the sprite; single-orientation, frame 0 = idle, flips by movement-x only — mob
   sheets in this pack ship no directional variants.
+- **Player gather swing (added in plan 004):** a new `gather` `PlayerState` maps to the pack's
+  `Collect_Base` strips (`Collect_{Down,Side,Up}-Sheet.png`, 8×64px) — foraging a berry bush plays
+  this, distinct from the chop/mine swings above.
+
+**Berry bush + berries are placeholder art (plan 004), not Pixel Crawler frames:**
+`icons/berries.png` + `_derived/bush.png` are baked by `scripts/placeholder-art.mjs` (same
+coloured-rect-placeholder pattern as plan 008's item icons) — real art for both rides the plan 009
+Gemini pipeline later.
 
 Manifest schema reshaped to roles: a `TileSource` union (`{kind:'image'}` standalone PNGs,
 `{kind:'sheetFrame'}` indexed frames of a 16px-sliced sheet) plus `StripAnim`/`ActorRender` for
