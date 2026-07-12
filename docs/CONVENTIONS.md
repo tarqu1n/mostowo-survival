@@ -34,6 +34,16 @@ _To be firmed up as we go. Starting position:_
   `src/systems/hurtbox.ts`, consumed by `GameScene.zombieAt` + contact). New enemies just declare a
   `hurtbox` (omit → `DEFAULT_HURTBOX`, one tile); no targeting code changes. Keeps a ~2-tile sprite
   hittable by its drawn torso without letting it *occupy* two tiles.
+- **Pointer picking is a sprite raycast, not a tile lookup.** `GameScene.pickSpriteAt` resolves which
+  world entity a tap landed on by walking the *drawn sprites*: a candidate is hit on its logical
+  footprint (a node's foot tile, a zombie's hurtbox, a site's tile — so the base is always a reliable
+  target even where the art is transparent between the feet) **or** on an opaque pixel of its sprite
+  (`alphaHit` — a cheap AABB filter then a `getPixelAlpha` texel read). So a tall base-anchored pine is
+  clickable up its whole trunk/canopy, not just its foot tile, and its transparent padding is *not* a
+  fat rectangular hitbox. Overlaps resolve by draw order — higher `depth` wins, ties break on
+  display-list order (drawn later = on top) — so the sprite you see on top is the one you pick. Both
+  `actionAt` (harvest vs move) and `inspectAt` route through it; combat (`zombieAt`) still keys off the
+  hurtbox tiles, not the raycast.
 - **Pixel art:** integer scaling only, `pixelArt: true`, nearest-neighbour; design at a fixed low base
   resolution and scale up. Actors render at native `render.scale = 1` and camera zoom is integer-only
   (both required for crisp nearest-neighbour — see [RENDERING.md](RENDERING.md)); size the world/props to

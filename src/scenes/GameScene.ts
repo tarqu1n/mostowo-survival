@@ -93,6 +93,16 @@ export interface ZombieUnit {
   pathIndex: number;
 }
 
+/**
+ * What a pointer "raycast" landed on: the specific world entity whose *rendered sprite* is drawn
+ * under the point (see {@link GameScene.pickSpriteAt}). `null` (the absence of a pick) means empty
+ * ground — no interactive sprite there — and the caller falls back to a plain move-to-tile.
+ */
+export type PointerPick =
+  | { kind: 'tree'; tree: TreeNode }
+  | { kind: 'zombie'; zombie: ZombieUnit }
+  | { kind: 'site'; site: BuildSite };
+
 /** Cardinal facing shorthand for {@link ScenarioSpec}, mapped to `lastFacing` deltas below. */
 export type FacingSpec = 'up' | 'down' | 'left' | 'right';
 
@@ -850,10 +860,13 @@ export class GameScene extends Phaser.Scene {
     else this.order(action); // quick tap = act now
   }
 
-  /** The order implied by a world point: harvest a live tree there, else move to that tile. */
+  /** The order implied by a world point: harvest the live tree whose sprite is drawn under it (see
+   * pickSpriteAt — the raycast, not the foot tile), else move to that tile. A pick that isn't a tree
+   * (a zombie, a blueprint — neither is a Command-mode harvest target) also falls through to move. */
   private actionAt(x: number, y: number): Action {
-    const tree = this.treeAt(x, y);
-    return tree ? { kind: 'harvest', treeId: tree.id } : { kind: 'move', col: worldToTile(x), row: worldToTile(y) };
+    const pick = this.pickSpriteAt(x, y);
+    if (pick?.kind === 'tree') return { kind: 'harvest', treeId: pick.tree.id };
+    return { kind: 'move', col: worldToTile(x), row: worldToTile(y) };
   }
 
   /** Append the target under the pointer to the queue, once per tile per paint gesture. */
@@ -940,28 +953,78 @@ export class GameScene extends Phaser.Scene {
     if (this.mode === 'combat') this.player.body.setVelocity(0, 0);
   }
 
-  /** Inspect-mode tap: hit-test zombies, then trees, then build sites (closest-thing-wins
-   * priority order) and show that entity's stats panel; empty ground closes any open panel. */
+  /** Inspect-mode tap: raycast the sprite drawn under the point (pickSpriteAt already resolves the
+   * zombie-over-tree-over-blueprint priority by draw order) and show that entity's stats panel;
+   * empty ground closes any open panel. */
   private inspectAt(x: number, y: number): void {
+    const pick = this.pickSpriteAt(x, y);
+    if (pick?.kind === 'zombie') return void this.game.events.emit('inspect:show', zombieStats(pick.zombie));
+    if (pick?.kind === 'tree') return void this.game.events.emit('inspect:show', treeStats(pick.tree));
+    if (pick?.kind === 'site') return void this.game.events.emit('inspect:show', wallStats(pick.site));
+    this.game.events.emit('inspect:hide');
+  }
+
+  /**
+   * Pointer "raycast": the topmost world entity under world point (x,y) — the *rendered sprite* the
+   * player sees there, not merely the tile beneath the point. Each candidate is hit either on its
+   * logical footprint (a node's foot tile, a zombie's hurtbox tiles, a site's tile — so the base a
+   * thing stands on is always a reliable target, even where the art is transparent between the feet)
+   * OR on an opaque pixel of its drawn sprite (so a tall base-anchored pine, whose canopy is drawn
+   * several tiles above its foot tile, is clickable up its whole trunk — which the old foot-tile
+   * hit-test missed). Overlaps resolve the way they're drawn: higher depth wins, ties break on
+   * display order (drawn later = on top), so a zombie in front of a tree — or the nearer of two
+   * overlapping pines — is the thing you click. Returns null when nothing is under the point (caller
+   * falls back to move-to-tile).
+   */
+  private pickSpriteAt(x: number, y: number): PointerPick | null {
     const col = worldToTile(x);
     const row = worldToTile(y);
+    let best: { pick: PointerPick; depth: number; order: number } | null = null;
+    const consider = (obj: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite | Phaser.GameObjects.Rectangle, pick: PointerPick): void => {
+      const order = this.children.getIndex(obj);
+      if (!best || obj.depth > best.depth || (obj.depth === best.depth && order > best.order)) {
+        best = { pick, depth: obj.depth, order };
+      }
+    };
+    for (const z of this.zombies) {
+      if (!z.alive) continue;
+      const footprint = hurtboxContains({ col: z.col, row: z.row }, z.def.hurtbox ?? DEFAULT_HURTBOX, { col, row });
+      if (footprint || this.alphaHit(z.sprite, x, y)) consider(z.sprite, { kind: 'zombie', zombie: z });
+    }
+    for (const t of this.trees) {
+      if (!t.alive) continue;
+      if ((t.col === col && t.row === row) || this.alphaHit(t.sprite, x, y)) consider(t.sprite, { kind: 'tree', tree: t });
+    }
+    for (const s of this.sites) {
+      // An unbuilt blueprint is a plain rectangle (no texture) — its filled tile IS its shape, so an
+      // on-tile hit is a cover; a finished wall has a sprite, so alpha-test it like any other node.
+      const obj = s.visual ?? s.rect;
+      const spriteHit = s.visual ? this.alphaHit(s.visual, x, y) : obj.getBounds().contains(x, y);
+      if ((s.col === col && s.row === row) || spriteHit) consider(obj, { kind: 'site', site: s });
+    }
+    return best ? (best as { pick: PointerPick }).pick : null;
+  }
 
-    const zombie = this.zombieAt(col, row);
-    if (zombie) {
-      this.game.events.emit('inspect:show', zombieStats(zombie));
-      return;
+  /**
+   * Does an opaque pixel of `s`'s sprite cover world point (x,y)? A cheap AABB reject first, then a
+   * per-pixel alpha read at the mapped texel — so a click in a pine's transparent canopy padding is
+   * not a hit. World sprites here are axis-aligned and scroll with the world (no rotation, default
+   * scrollFactor), so the world→texel map is a straight origin/scale/flip transform. Degrades to the
+   * AABB hit if the pixel can't be read (e.g. a texture whose source canvas isn't sampleable) rather
+   * than silently missing.
+   */
+  private alphaHit(s: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite, x: number, y: number): boolean {
+    if (!s.getBounds().contains(x, y)) return false;
+    let localX = (x - s.x) / s.scaleX + s.displayOriginX;
+    let localY = (y - s.y) / s.scaleY + s.displayOriginY;
+    if (s.flipX) localX = s.frame.width - localX;
+    if (s.flipY) localY = s.frame.height - localY;
+    try {
+      const alpha = this.textures.getPixelAlpha(Math.floor(localX), Math.floor(localY), s.texture.key, s.frame.name);
+      return alpha === null ? false : alpha > 0;
+    } catch {
+      return true; // texture source not sampleable — fall back to the AABB hit already confirmed above
     }
-    const tree = this.treeAt(x, y);
-    if (tree) {
-      this.game.events.emit('inspect:show', treeStats(tree));
-      return;
-    }
-    const site = this.sites.find((s) => s.col === col && s.row === row);
-    if (site) {
-      this.game.events.emit('inspect:show', wallStats(site));
-      return;
-    }
-    this.game.events.emit('inspect:hide');
   }
 
   // --- Resource nodes / harvesting -----------------------------------------
@@ -1030,14 +1093,6 @@ export class GameScene extends Phaser.Scene {
 
   private treeById(id: string): TreeNode | undefined {
     return this.trees.find((t) => t.id === id);
-  }
-
-  /** The live tree under a world point, if any (within ~one tile). */
-  private treeAt(x: number, y: number): TreeNode | null {
-    for (const tree of this.trees) {
-      if (tree.alive && Phaser.Math.Distance.Between(x, y, tree.sprite.x, tree.sprite.y) <= TILE_SIZE) return tree;
-    }
-    return null;
   }
 
   /** Light "bag full" feedback: a brief warning tint on the node (no new HUD text). */

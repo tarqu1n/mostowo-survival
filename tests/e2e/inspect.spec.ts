@@ -28,3 +28,19 @@ test('inspecting each entity kind shows its stats, empty ground hides the panel'
   await inspect(page, 1, 1);
   expect(await captured(page, 'inspect:hide')).toBe(true);
 });
+
+test('a tall node is picked up its drawn trunk, above its foot tile, not by a fat tile hitbox', async ({ page }) => {
+  await startGame(page);
+  await applyScenario(page, { player: [3, 3], mode: 'inspect', trees: [[5, 3]] });
+
+  // The pine is base-anchored on its foot tile (5,3) but drawn ~5 tiles tall: the pointer raycast
+  // hits its sprite two tiles UP the trunk (5,1) — a click the old foot-tile-only test missed.
+  await inspect(page, 5, 1);
+  expect(await captured(page, 'inspect:show')).toMatchObject({ name: 'Tree' });
+
+  // ...yet empty grass one tile to the SIDE of the base (4,3) is not the tree — the alpha test
+  // rejects the sprite's transparent padding, so there's no fat rectangular hitbox.
+  await page.evaluate(() => ((window as any).game.__captured['inspect:hide'] = null));
+  await inspect(page, 4, 3);
+  expect(await captured(page, 'inspect:hide')).toBe(true);
+});
