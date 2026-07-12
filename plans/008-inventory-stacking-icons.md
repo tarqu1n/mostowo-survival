@@ -13,8 +13,10 @@ consistent — with hard downscale/quantise to a **32×32** pixel target. Placeh
 now so the game stays green; real icons are generated once the LAN key is reachable.
 
 Seed content is **wood + stone** (two item types so stacking/variety and the icon *set* are both
-visible). Wood is obtained by chopping today; stone gets a **dev-only starter grant** so the second
-stack shows — a real stone *source* (rock/mining node) is out of scope here.
+visible). Wood is chopped from trees today; **stone gets a real in-world source** — a **rock resource
+node** you harvest for stone, built by *generalising the existing tree/node machinery* (a rock is just
+another node species) rather than a parallel system. Mining reuses the current harvest interaction/anim
+(a dedicated pickaxe/mine action is out of scope).
 
 ## Context & decisions
 
@@ -26,6 +28,10 @@ stack shows — a real stone *source* (rock/mining node) is out of scope here.
 - **Full behaviour = block harvest.** When the yield can't fully fit, don't chop (no ground-drop, no
   soft-cap this slice).
 - **Item set = wood + stone** only. Icons at **32×32**.
+- **Stone is a real resource** (Matt, this revision): add a **rock harvest node** *before* the inventory
+  work, by generalising the existing resource-node system (not a dev-grant, not a separate entity type).
+  Mining **reuses the chop interaction/anim** (reskinnable stand-in, per the pack's documented treatment);
+  a dedicated pickaxe/mine animation + tool is a later concern.
 - **Icons via Gemini**, generated for real this session **if** the `GEMINI_API_KEY` (in
   `guppi/house-helper/.env` on Matt's LAN) is reachable — Matt enables **Tailscale**; the Gemini
   endpoint itself (`generativelanguage.googleapis.com`) is a *public* Google API, so only the **key**
@@ -47,6 +53,15 @@ stack shows — a real stone *source* (rock/mining node) is out of scope here.
 - `src/scenes/GameScene.ts` — chop yield at `this.inv.add(tree.def.woodItemId, tree.def.woodPerHit)`
   (~line 1017); DEV `__test.applyScenario` seeds inventory (`spec.inventory` / `spec.wood`, ~line 1281)
   and `registry.set('inventory', this.inv)` (~line 281).
+- **Resource-node machinery to reuse (rock step):** `src/data/nodes.ts` (`NODES`, `tree` def) +
+  `ResourceNodeDef` in `types.ts` — but its yield fields are wood-specific (`woodItemId`/`woodPerHit`) →
+  generalise to `yieldItemId`/`yieldPerHit`. In `GameScene`, nodes live in `this.trees: TreeNode[]`
+  (harvest, glow, task `treeId`, pathfinding occupancy `this.trees.some(...)` all key off it). A rock is
+  just a `TreeNode` with a rock `def`, rock sprite, and `yieldItemId:'stone'` — **reuse the array + harvest
+  loop**; the `TreeNode`/`treeId` *identifier* rename to `ResourceNode`/`nodeId` is optional polish, not
+  required for stone to work. Node sprite is `ACTIVE_TILESET.tiles.tree` (single `TileSource`) — add a
+  `tiles.rock` source (extract a rock from the pack's `Rocks` sheet via `scripts/pixel-crawler/extract.py`,
+  else fall back to the node `color` rect) and resolve per species.
 - `scripts/gen-art/` (Node fetch CLI, `lib.mjs` `parseArgs/requireEnv/writeBase64Png`) and
   `scripts/pixel-crawler/` (**Python + PIL/numpy** image tooling). The Gemini reference
   (`guppi/house-helper/catalog_icons.py`) is Python → the icon pipeline is **Python** (consistent with
@@ -68,48 +83,74 @@ all `n` fit.
 
 ## Steps
 
-- [ ] **Step 1: Inventory system — slots, stacking, capacity** `[inline]` (parallel: A)
+- [ ] **Step 1: Item data — `maxStack`, `icon`, add stone** `[delegate sonnet]` (parallel: A)
+  - `src/data/types.ts`: add `maxStack: number` and `icon: string` (asset path relative to
+    `public/assets/icons/`, e.g. `wood.png`) to `ItemDef`. Keep `color` (placeholder/fallback tint).
+  - `src/data/items.ts`: set `wood` `maxStack: 50` + `icon: 'wood.png'`; add `stone`
+    (`{ id:'stone', name:'Stone', color:<grey ~0x8a8a8a>, maxStack:50, icon:'stone.png' }`).
+  - `src/data/__tests__/data.test.ts`: extend invariants — every `ItemDef.id === key`, `maxStack > 0`,
+    non-empty `icon` (mirror existing invariant style).
+  - Side effects: `UIScene.refreshWood`/`ITEMS.wood.color` still valid (Step 5 replaces that widget).
+    Write-disjoint from Step 2 (touches `types.ts`/`items.ts`/`data.test.ts`) and independent → parallel A.
+    Note: Step 3 also edits `types.ts` (yield-field rename) so it runs *after* this step, not alongside.
+  - Docs: none here.
+  - Done when: `npm test` green; `npm run build` typechecks with the new `ItemDef` fields.
+
+- [ ] **Step 2: Inventory system — slots, stacking, capacity** `[inline]` (parallel: A)
   - Rewrite `src/systems/Inventory.ts` to be slot-backed per the design above. Constructor
     `{ capacity = <large default>, maxStackOf = () => Infinity } = {}`. Keep `get/has/canAfford/spend/
     snapshot` behaviour identical for callers; `spend` deducts across slots (clearing emptied slots).
     Add: `add(id,n=1): number` (returns amount added), `canAccept(id,n=1): boolean`,
     `slots(): ReadonlyArray<{id:string;count:number}|null>` (copy). Emit `'change'` only on real change.
-  - Add config constants: `INVENTORY_SLOTS` (e.g. 20), `HOTBAR_SLOTS` (e.g. 5, ≤ INVENTORY_SLOTS),
-    `DEFAULT_MAX_STACK` (e.g. 50) in `src/config.ts`.
+  - Add config constants: `INVENTORY_SLOTS = 20`, `HOTBAR_SLOTS = 5` (≤ INVENTORY_SLOTS),
+    `DEFAULT_MAX_STACK = 50` in `src/config.ts`.
   - Extend `src/systems/__tests__/Inventory.test.ts`: partial-stack fill → new slot spill; `maxStack`
     respected; `add` returns leftover when capacity/stack exhausted; `canAccept` false when no room;
     `spend` across multiple slots; `snapshot`/`get` aggregate; **existing no-arg tests still pass**.
-  - Side effects: `GameScene` constructs `new Inventory()` (~line 281) — updated in Step 5 to inject
+  - Side effects: `GameScene` constructs `new Inventory()` (~line 281) — updated in Step 6 to inject
     capacity + `maxStackOf`; leaving it no-arg here keeps the build green between steps.
-  - Docs: none (system-level; STATUS.md updated in Step 7).
+  - Docs: none (system-level; STATUS.md updated in Step 8).
   - Done when: `npm test` green (new stacking tests + all existing Inventory/data tests).
 
-- [ ] **Step 2: Item data — `maxStack`, `icon`, add stone** `[delegate sonnet]` (parallel: A)
-  - `src/data/types.ts`: add `maxStack: number` and `icon: string` (asset path relative to
-    `public/assets/icons/`, e.g. `wood.png`) to `ItemDef`. Keep `color` (placeholder/fallback tint).
-  - `src/data/items.ts`: set `wood` `maxStack` + `icon: 'wood.png'`; add `stone`
-    (`{ id:'stone', name:'Stone', color:<grey>, maxStack:<n>, icon:'stone.png' }`).
-  - `src/data/__tests__/data.test.ts`: extend invariants — every `ItemDef.id === key`, `maxStack > 0`,
-    non-empty `icon` (mirror existing invariant style).
-  - Side effects: `UIScene.refreshWood`/`ITEMS.wood.color` still valid (Step 4 replaces that widget).
-    Write-disjoint from Step 1 (touches `types.ts`/`items.ts`/`data.test.ts` only) and no data dependency
-    on it → runs in parallel group A.
-  - Docs: none here.
-  - Done when: `npm test` green; `npm run build` typechecks with the new `ItemDef` fields.
+- [ ] **Step 3: Stone as a harvestable resource (rock node)** `[inline]`
+  - **Generalise yield fields:** rename `ResourceNodeDef.woodItemId`/`woodPerHit` →
+    `yieldItemId`/`yieldPerHit` in `src/data/types.ts`; update `NODES.tree` in `src/data/nodes.ts` and the
+    single consumer in `GameScene` (`this.inv.add(tree.def.woodItemId, tree.def.woodPerHit)`, ~line 1017).
+  - **Add the rock node:** `NODES.rock` (`yieldItemId:'stone'`, `yieldPerHit:1`, its own `maxHp`/`regrowMs`,
+    grey `color`/`stumpColor`) mirroring `tree`. Reuse the existing node machinery — spawn a few rocks into
+    `this.trees` (a rock is a `TreeNode` with the rock def + rock sprite); harvest/glow/occupancy/task-queue
+    all work unchanged since they key off the generic node. Resolve the sprite per species.
+  - **Rock sprite:** add `tiles.rock: TileSource` to the manifest (`src/data/tileset.ts`) + load it in
+    `PreloadScene`; extract a rock from the pack's `Rocks` sheet via `scripts/pixel-crawler/extract.py`
+    (add it to the derived-file manifest in `docs/ASSETS.md`). **If extraction is fiddly, fall back to a
+    placeholder rect in the node `color`** — don't block the step on art.
+  - **Harvest interaction:** reuse the current chop targeting + swing anim for rocks (mining == chopping
+    mechanically this slice). No new input/mode.
+  - Side effects: pathfinding blocks on live nodes (`this.trees.some`) so rocks are obstacles like trees —
+    intended. The `TreeNode`/`treeId` → `ResourceNode`/`nodeId` identifier rename is **optional** and can be
+    deferred (note it in the step output); the required change is the *data* generalisation + rock spawn.
+    Extend `__test.applyScenario` with a `rocks:` seed mirroring `trees:` (and optionally scatter rocks in
+    the `⟳ TREES` debug regen) so scenarios/manual play can produce stone.
+  - Tests: unit-cover the yield-field rename is a pure data change (`data.test.ts` node invariants still
+    hold — update field names). Add a Tier-2 scenario: place a rock adjacent, harvest it, assert `stone`
+    lands in the inventory via `state()`/`inspect`.
+  - Docs: `docs/ASSETS.md` (rock in the derived-file manifest); `docs/STATUS.md` note deferred to Step 8.
+  - Done when: `npm test` + `npm run e2e` green; in-game you can harvest a rock and stone accrues.
 
-- [ ] **Step 3: Placeholder icons + Preload loads them** `[delegate sonnet]`
+- [ ] **Step 4: Placeholder icons + Preload loads them** `[delegate sonnet]`
   - Create committed **32×32** placeholder PNGs `public/assets/icons/wood.png` + `stone.png` (simple
     on-theme flat squares w/ a letter, transparent bg — generate with a tiny PIL snippet, commit the
     PNGs). These guarantee icon texture keys always resolve until real art lands.
   - `src/scenes/PreloadScene.ts`: load each `ITEMS` entry's icon as `this.load.image(iconKey(id), url)`
     where `url = ${BASE_URL}assets/icons/${icon}`. Add an `iconKey(id) => 'icon:'+id` helper (colocate
     with the other key helpers). Icons are standalone images (not sheet-sliced) — no `TILE_SIZE` framing.
-  - Side effects: depends on Step 2 (`ITEMS[*].icon`). Keep robust: UI (Step 4) falls back to `color`
-    rect if a texture key is somehow missing, so a future icon-less item never hard-crashes.
-  - Docs: none here (asset-location note added in Step 6's `docs/ASSETS.md` edit).
+  - Side effects: depends on Step 1 (`ITEMS[*].icon`). Also edits `PreloadScene` — sequential after Step 3
+    (which added rock-sprite loading there). Keep robust: UI (Step 5) falls back to `color` rect if a
+    texture key is missing, so a future icon-less item never hard-crashes.
+  - Docs: none here (asset-location note added in Step 7's `docs/ASSETS.md` edit).
   - Done when: `npm run build` clean; icons present in `dist/`; `npm run smoke` still 0 console errors.
 
-- [ ] **Step 4: SlotGrid widget + hotbar & inventory Panel in UIScene** `[inline]`
+- [ ] **Step 5: SlotGrid widget + hotbar & inventory Panel in UIScene** `[inline]`
   - Add `src/ui/SlotGrid.ts` — a `Container` widget that lays out `n` slots (bordered cells via kit
     `theme`, `arrangeGrid`/`arrangeRow`), and an `update(slots, itemLookup)` that per non-empty slot draws
     the item **icon** sprite (texture `iconKey(id)`, scaled to the cell) **or** falls back to a `color`
@@ -125,30 +166,29 @@ all `n` fit.
       Add every new interactive/visible element to `hudElements` for `hudHitTest`; tear down listeners in
       `SHUTDOWN`.
   - Side effects: `hudHitTest` must see the hotbar/panel/button so world taps under them don't chop/move.
-    Panel open/close is visibility-driven (matches inspect panel). Depends on Steps 1–3.
+    Panel open/close is visibility-driven (matches inspect panel). Depends on Steps 1, 2, 4.
   - Docs: none here.
   - Done when: `npm run build` clean; manual/e2e check — hotbar shows a live wood stack that grows while
     chopping and rolls to a 2nd slot past `maxStack`; INVENTORY button opens/closes the grid; taps on
     them don't leak to the world; hotbar hidden in combat mode.
 
-- [ ] **Step 5: Block harvest when full + wire real capacity/maxStack + dev stone** `[inline]`
+- [ ] **Step 6: Block harvest when full + wire real capacity/maxStack** `[inline]`
   - `src/scenes/GameScene.ts`: construct `new Inventory({ capacity: INVENTORY_SLOTS, maxStackOf: (id) =>
-    ITEMS[id]?.maxStack ?? DEFAULT_MAX_STACK })`. Guard the chop yield: if
-    `!inv.canAccept(woodItemId, woodPerHit)`, **don't chop** (skip the hit; light feedback — e.g. reuse an
-    existing flash/no-op path, no new HUD text required). Optionally stop targeting a node when full.
-  - Dev-only **starter stone**: under `import.meta.env.DEV`, grant a few `stone` at world init so the
-    second item type is visible in the grid (not shipped in production play). Also accept `stone` in the
-    `__test.applyScenario` inventory seed (already generic over ids — verify) and let scenarios set a
-    small `capacity` to exercise block-when-full.
+    ITEMS[id]?.maxStack ?? DEFAULT_MAX_STACK })`. Guard the harvest yield (now generic — covers both trees
+    and the Step 3 rocks): if `!inv.canAccept(node.def.yieldItemId, node.def.yieldPerHit)`, **don't
+    harvest** (skip the hit; light feedback — e.g. reuse an existing flash/no-op path, no new HUD text
+    required). Optionally stop targeting a node when full.
+  - Let `__test.applyScenario` set a small `capacity` to exercise block-when-full (the inventory seed is
+    already generic over ids — verify `stone` round-trips too).
   - Side effects: `applyScenario` inventory reset/seed (~line 1263/1281) must still round-trip via the new
     slot API (`spend(snapshot)` to clear, `add` to seed). Verify determinism (Tier-2 harness).
-  - Tests: add/extend a Tier-2 scenario (`tests/e2e/`) — seed a tiny-capacity bag near-full, chop, assert
-    the chop is **blocked** (wood count unchanged) via `state()`/`inspect`. Extend `__test` inspect to
+  - Tests: add/extend a Tier-2 scenario (`tests/e2e/`) — seed a tiny-capacity bag near-full, harvest,
+    assert the hit is **blocked** (count unchanged) via `state()`/`inspect`. Extend `__test` inspect to
     expose inventory counts if needed.
   - Docs: none here.
-  - Done when: `npm test` + `npm run e2e` green; chopping into a full bag no longer increments wood.
+  - Done when: `npm test` + `npm run e2e` green; harvesting into a full bag no longer increments the item.
 
-- [ ] **Step 6: Gemini icon-generation pipeline (script + prompt manifest + docs)** `[inline]`
+- [ ] **Step 7: Gemini icon-generation pipeline (script + prompt manifest + docs)** `[inline]`
   - New `scripts/gen-icons/`:
     - `prompts.py` (or `.json`) — a **shared style preamble** (dark-grotty-but-funny; single centered
       item; flat/transparent or solid keyable background; chunky readable silhouette; limited palette;
@@ -170,12 +210,12 @@ all `n` fit.
     Gemini "proposed workflow" to the **actual** `scripts/gen-icons/` pipeline; note the Tailscale route
     to the key).
   - Side effects: script files are write-disjoint from game code; it only *writes into*
-    `public/assets/icons/` when run (overwriting Step 3 placeholders — intended). Depends on Step 2 (item
+    `public/assets/icons/` when run (overwriting Step 4 placeholders — intended). Depends on Step 1 (item
     ids for the manifest). Pure tooling — no game build impact.
   - Done when: `python3 scripts/gen-icons/generate.py --dry-run` prints the composed per-item prompts;
     docs updated; `.gitignore` covers raw scratch.
 
-- [ ] **Step 7: Generate real icons (gated on key) + wrap-up sweep** `[inline]` — **review checkpoint**
+- [ ] **Step 8: Generate real icons (gated on key) + wrap-up sweep** `[inline]` — **review checkpoint**
   - **If** the `GEMINI_API_KEY` is reachable this session (Matt confirms Tailscale up / provides the key,
     and the agent proxy allows `generativelanguage.googleapis.com`): run
     `python3 scripts/gen-icons/generate.py`, eyeball the 32×32 results at in-game scale, replace the
@@ -188,20 +228,24 @@ all `n` fit.
 
 ### Parallelism
 
-- **Group A: Steps 1 & 2** — both `[delegate]`-able in isolation, no data/ordering dependency
-  (Inventory takes an injected `maxStackOf`, not `ITEMS`), and write-disjoint (`Inventory.ts`+`config.ts`+
-  `Inventory.test.ts` vs `types.ts`+`items.ts`+`data.test.ts`). Step 1 is tagged `[inline]` for API-design
-  judgement, so in practice only Step 2 is a clean delegate; if Step 1 is also delegated they may run
-  concurrently. Steps 3→7 are sequential (each builds on prior output; Steps 4/5 share UIScene/GameScene
-  and the icon dir, so no further parallelism).
+- **Group A: Steps 1 & 2** — item-data (`types.ts`+`items.ts`+`data.test.ts`) vs Inventory-system
+  (`Inventory.ts`+`config.ts`+`Inventory.test.ts`): write-disjoint, no data/ordering dependency (Inventory
+  takes an injected `maxStackOf`, not `ITEMS`). Step 1 is a clean `[delegate]`; Step 2 is `[inline]` for
+  API-design judgement — if both are delegated they may run concurrently.
+- Steps **3→8 are sequential**: Step 3 also edits `types.ts` (yield-field rename) so it follows Step 1;
+  Steps 3/4 both edit `PreloadScene`, Steps 5/6 share `UIScene`/`GameScene`, and Steps 4/7/8 all touch the
+  icon dir — so no further parallelism.
 
 ## Out of scope
 
-- **A real stone source** (rock resource node / mining action + sprite) — stone is dev-granted/seedable
-  only this slice; a `NODES` rock entry is a future plan.
+- **A dedicated mining action** — pickaxe/mine animation + a distinct tool/interaction. Rocks reuse the
+  chop targeting + swing anim this slice (Step 3). Also **rock art polish** beyond one extracted/placeholder
+  rock sprite.
 - **Ground-drop / item pickups** when full (chose block-harvest), **drag-to-rearrange / split stacks**,
   and **equip/consume from slots** — later inventory UX.
 - **Persistence** of inventory to localStorage/IndexedDB (tracked separately).
 - **Icons beyond wood + stone**, and **any non-icon art** (tiles/mobs) — the pipeline is built to extend,
   but only these two are generated now.
 - **Crafting/recipes** consuming stacks — separate system.
+- The `TreeNode`/`treeId` → `ResourceNode`/`nodeId` **identifier rename** — optional polish; the data-level
+  yield-field generalisation (Step 3) is what's required for stone.
