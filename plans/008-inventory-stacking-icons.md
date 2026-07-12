@@ -1,16 +1,17 @@
-# Inventory Stacking + Item Icons
+# Inventory Stacking + Placeholder Icons
 
-> Status: planned — run /critique-plan (review gate) then /execute-plan to begin.
+> Status: planned — critiqued (see `## Critique`); amended per findings #1/#2, Gemini pipeline split to
+> plan 009. Run /execute-plan to begin.
 
 ## Summary
 
 Turn the throwaway top-left wood counter into a real **inventory**: items **stack** in bounded
 **slots** (a max stack per resource), shown as an always-visible **hotbar** plus a toggle-open
-**full grid panel**. Chopping (and future harvesting) **blocks when the inventory is full**. Alongside
-the mechanic, stand up a **repeatable icon-generation pipeline** — a Gemini ("Nano Banana") script
-driven by a **shared style preamble + per-item prompt manifest** so a whole *set* of icons comes out
-consistent — with hard downscale/quantise to a **32×32** pixel target. Placeholder icons are committed
-now so the game stays green; real icons are generated once the LAN key is reachable.
+**full grid panel**. Harvesting **blocks when the inventory is full** (and aborts the order so the
+worker doesn't swing forever). Items render **32×32** icons; this plan commits simple **placeholder**
+icons so the game is green from the start — the **repeatable Gemini icon-generation pipeline** that
+replaces them with real art is split into its own slice (**plan 009**), which can run whenever the LAN
+key is reachable without blocking the mechanic.
 
 Seed content is **wood + stone** (two item types so stacking/variety and the icon *set* are both
 visible). Wood is chopped from trees today; **stone gets a real in-world source** — a **rock resource
@@ -32,11 +33,15 @@ another node species) rather than a parallel system. Mining reuses the current h
   work, by generalising the existing resource-node system (not a dev-grant, not a separate entity type).
   Mining **reuses the chop interaction/anim** (reskinnable stand-in, per the pack's documented treatment);
   a dedicated pickaxe/mine animation + tool is a later concern.
-- **Icons via Gemini**, generated for real this session **if** the `GEMINI_API_KEY` (in
-  `guppi/house-helper/.env` on Matt's LAN) is reachable — Matt enables **Tailscale**; the Gemini
-  endpoint itself (`generativelanguage.googleapis.com`) is a *public* Google API, so only the **key**
-  needs the LAN. If it's not reachable in-session, ship the pipeline + committed **placeholder** icons
-  and Matt runs generation later. The game must be green either way.
+- **Icons = placeholders only this plan** (Matt, post-critique): the real **Gemini generation pipeline**
+  (script + shared style preamble + per-item prompt manifest → 32×32 downscale/quantise) is **split into
+  plan 009**, gated on the `GEMINI_API_KEY` (in `guppi/house-helper/.env`, LAN-only — reachable via
+  Tailscale; the Gemini endpoint itself is a public Google API, only the key needs the LAN). Plan 008
+  commits placeholder PNGs so the mechanic ships green regardless.
+- **Block-harvest aborts the order** (Matt, post-critique — critique finding #1): guarding only the
+  per-hit yield would leave the worker swinging forever on an un-fellable node. So when the bag can't
+  accept the yield, **abort/complete the harvest task** (don't just skip the hit), and the Tier-2 test
+  asserts the **queue goes idle**, not merely that the count is unchanged.
 
 **Patterns/files to mirror (from research):**
 
@@ -109,7 +114,7 @@ all `n` fit.
     `spend` across multiple slots; `snapshot`/`get` aggregate; **existing no-arg tests still pass**.
   - Side effects: `GameScene` constructs `new Inventory()` (~line 281) — updated in Step 6 to inject
     capacity + `maxStackOf`; leaving it no-arg here keeps the build green between steps.
-  - Docs: none (system-level; STATUS.md updated in Step 8).
+  - Docs: none (system-level; STATUS.md updated in Step 7).
   - Done when: `npm test` green (new stacking tests + all existing Inventory/data tests).
 
 - [ ] **Step 3: Stone as a harvestable resource (rock node)** `[inline]`
@@ -124,6 +129,12 @@ all `n` fit.
     `PreloadScene`; extract a rock from the pack's `Rocks` sheet via `scripts/pixel-crawler/extract.py`
     (add it to the derived-file manifest in `docs/ASSETS.md`). **If extraction is fiddly, fall back to a
     placeholder rect in the node `color`** — don't block the step on art.
+  - **Per-species render params (critique #2):** `addTree` hardcodes the pine's height/anchor
+    (`treeScale` via `TREE_TILES_TALL = 2.6`, `setOrigin(0.5, 0.92)`, and `TREE_BASE_STAND_OFFSETS`) —
+    a rock must **not** inherit these or it renders ~2.6 tiles tall and mis-anchored. Add render fields to
+    the node data (e.g. `tilesTall`/`originX`/`originY`, and stand-offsets) or pass a render descriptor,
+    and parameterise the spawn path (`addTree` → `addNode(def, render)`) so each species sizes/anchors
+    itself. A rock is ~1 tile, centred/base-anchored.
   - **Harvest interaction:** reuse the current chop targeting + swing anim for rocks (mining == chopping
     mechanically this slice). No new input/mode.
   - Side effects: pathfinding blocks on live nodes (`this.trees.some`) so rocks are obstacles like trees —
@@ -134,7 +145,7 @@ all `n` fit.
   - Tests: unit-cover the yield-field rename is a pure data change (`data.test.ts` node invariants still
     hold — update field names). Add a Tier-2 scenario: place a rock adjacent, harvest it, assert `stone`
     lands in the inventory via `state()`/`inspect`.
-  - Docs: `docs/ASSETS.md` (rock in the derived-file manifest); `docs/STATUS.md` note deferred to Step 8.
+  - Docs: `docs/ASSETS.md` (rock in the derived-file manifest); `docs/STATUS.md` note deferred to Step 7.
   - Done when: `npm test` + `npm run e2e` green; in-game you can harvest a rock and stone accrues.
 
 - [ ] **Step 4: Placeholder icons + Preload loads them** `[delegate sonnet]`
@@ -147,7 +158,7 @@ all `n` fit.
   - Side effects: depends on Step 1 (`ITEMS[*].icon`). Also edits `PreloadScene` — sequential after Step 3
     (which added rock-sprite loading there). Keep robust: UI (Step 5) falls back to `color` rect if a
     texture key is missing, so a future icon-less item never hard-crashes.
-  - Docs: none here (asset-location note added in Step 7's `docs/ASSETS.md` edit).
+  - Docs: none here (item-icon docs — where icons live, placeholder→real flow — land with the pipeline in plan 009).
   - Done when: `npm run build` clean; icons present in `dist/`; `npm run smoke` still 0 console errors.
 
 - [ ] **Step 5: SlotGrid widget + hotbar & inventory Panel in UIScene** `[inline]`
@@ -172,59 +183,40 @@ all `n` fit.
     chopping and rolls to a 2nd slot past `maxStack`; INVENTORY button opens/closes the grid; taps on
     them don't leak to the world; hotbar hidden in combat mode.
 
-- [ ] **Step 6: Block harvest when full + wire real capacity/maxStack** `[inline]`
+- [ ] **Step 6: Block harvest when full (abort the order) + wire real capacity/maxStack** `[inline]`
   - `src/scenes/GameScene.ts`: construct `new Inventory({ capacity: INVENTORY_SLOTS, maxStackOf: (id) =>
     ITEMS[id]?.maxStack ?? DEFAULT_MAX_STACK })`. Guard the harvest yield (now generic — covers both trees
-    and the Step 3 rocks): if `!inv.canAccept(node.def.yieldItemId, node.def.yieldPerHit)`, **don't
-    harvest** (skip the hit; light feedback — e.g. reuse an existing flash/no-op path, no new HUD text
-    required). Optionally stop targeting a node when full.
+    and Step 3 rocks): if `!inv.canAccept(node.def.yieldItemId, node.def.yieldPerHit)`, block it.
+  - **Abort the order — REQUIRED, not optional (critique #1).** The harvest task only completes when the
+    node's `hp <= 0` (~`GameScene:1023`); if we merely skip the per-hit yield, `hp` never decrements, the
+    task never resolves, and the worker swings forever on a jammed queue head (blocking every queued order
+    until CANCEL). So on `!canAccept` at harvest time, **abort/complete the current harvest task** (clear
+    the queue head, stop targeting the node) rather than just no-op the hit. Light feedback only (reuse an
+    existing flash; no new HUD text). Prefer checking room **before** committing to/continuing a harvest
+    order, so a full-bag tap on a node doesn't even start the walk-and-swing.
   - Let `__test.applyScenario` set a small `capacity` to exercise block-when-full (the inventory seed is
     already generic over ids — verify `stone` round-trips too).
   - Side effects: `applyScenario` inventory reset/seed (~line 1263/1281) must still round-trip via the new
     slot API (`spend(snapshot)` to clear, `add` to seed). Verify determinism (Tier-2 harness).
-  - Tests: add/extend a Tier-2 scenario (`tests/e2e/`) — seed a tiny-capacity bag near-full, harvest,
-    assert the hit is **blocked** (count unchanged) via `state()`/`inspect`. Extend `__test` inspect to
-    expose inventory counts if needed.
+  - Tests: add/extend a Tier-2 scenario (`tests/e2e/`) — seed a tiny-capacity bag **full**, order a
+    harvest, drive `step()`, and assert **both**: (a) the item count is unchanged, **and (b) the task
+    queue goes idle** (`state()` shows `current === null && pending === 0`) — i.e. the worker isn't stuck
+    swinging. Extend `__test` inspect to expose inventory counts if needed.
   - Docs: none here.
-  - Done when: `npm test` + `npm run e2e` green; harvesting into a full bag no longer increments the item.
+  - Done when: `npm test` + `npm run e2e` green; harvesting into a full bag doesn't increment the item
+    **and** leaves the worker idle (no jammed queue).
 
-- [ ] **Step 7: Gemini icon-generation pipeline (script + prompt manifest + docs)** `[inline]`
-  - New `scripts/gen-icons/`:
-    - `prompts.py` (or `.json`) — a **shared style preamble** (dark-grotty-but-funny; single centered
-      item; flat/transparent or solid keyable background; chunky readable silhouette; limited palette;
-      slight top-down 3/4 item-icon framing; **no text/no border**; designed to survive a hard 32×32
-      downscale) **+ one subject line per item** (`wood`, `stone`, …). Adding an item = one line.
-    - `generate.py` — reads the manifest, POSTs to
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent`
-      with header `x-goog-api-key: $GEMINI_API_KEY` (env; error clearly if unset, mirroring
-      `gen-art/lib.mjs requireEnv`). Saves raw ~1024px PNG to `scripts/.gen-icons/raw/<id>.png`
-      (gitignored), then **PIL post-process** → key out background to alpha → square-crop → **nearest-
-      neighbour downscale to 32×32** → optional palette quantise → `public/assets/icons/<id>.png`
-      (committed). Flags: `--only <id>` (regen one), `--dry-run` (build prompts, no API call), `--raw-only`.
-    - `README.md` — mirror `scripts/gen-art/README.md`: the Tailscale/LAN-key note (key from
-      `guppi/house-helper/.env`, never commit), run commands, the style rules, that **raw is gitignored /
-      processed 32×32 PNGs are committed**, and how to add a new item.
-  - `.gitignore`: add `scripts/.gen-icons/` (raw scratch) — mirror `scripts/.gen-art/`.
-  - Docs: update `docs/ASSETS.md` (new **Item icons** subsection: pipeline, 32×32 target, where icons
-    live `public/assets/icons/`, placeholder→real flow) and `docs/ASSET-EXPERIMENTS.md` (promote the
-    Gemini "proposed workflow" to the **actual** `scripts/gen-icons/` pipeline; note the Tailscale route
-    to the key).
-  - Side effects: script files are write-disjoint from game code; it only *writes into*
-    `public/assets/icons/` when run (overwriting Step 4 placeholders — intended). Depends on Step 1 (item
-    ids for the manifest). Pure tooling — no game build impact.
-  - Done when: `python3 scripts/gen-icons/generate.py --dry-run` prints the composed per-item prompts;
-    docs updated; `.gitignore` covers raw scratch.
-
-- [ ] **Step 8: Generate real icons (gated on key) + wrap-up sweep** `[inline]` — **review checkpoint**
-  - **If** the `GEMINI_API_KEY` is reachable this session (Matt confirms Tailscale up / provides the key,
-    and the agent proxy allows `generativelanguage.googleapis.com`): run
-    `python3 scripts/gen-icons/generate.py`, eyeball the 32×32 results at in-game scale, replace the
-    placeholder `wood.png`/`stone.png`, note origin. **Else:** leave placeholders committed; Matt runs the
-    pipeline locally later. Record which happened.
-  - Update `docs/STATUS.md` (feature/plan history: inventory stacking + hotbar/panel + icon pipeline).
+- [ ] **Step 7: Wrap-up — docs + full sweep + push** `[inline]`
+  - Update `docs/STATUS.md` (feature/plan history: inventory stacking + hotbar/panel + rock/stone node +
+    block-when-full; note item icons are **placeholders**, real art via **plan 009**).
   - Wrap-up gate: `npm test` + `npm run e2e` + `npm run smoke` all green; commit each coherent stage and
     `git push -u origin claude/inventory-stacking-icons-dmdjvx` per WORKFLOW.md.
-  - Done when: full sweep green, docs updated, work pushed; real vs placeholder icon status recorded.
+  - Done when: full sweep green, docs updated, work pushed.
+
+> **Icon generation → plan 009** (`plans/009-gemini-icon-pipeline.md`): the repeatable Gemini script +
+> shared style preamble + per-item prompt manifest + 32×32 downscale/quantise that replaces the
+> placeholder PNGs with real art. Split out post-critique (finding #3) so this mechanic isn't gated on a
+> LAN-only key; run 009 whenever the key is reachable.
 
 ### Parallelism
 
@@ -232,20 +224,32 @@ all `n` fit.
   (`Inventory.ts`+`config.ts`+`Inventory.test.ts`): write-disjoint, no data/ordering dependency (Inventory
   takes an injected `maxStackOf`, not `ITEMS`). Step 1 is a clean `[delegate]`; Step 2 is `[inline]` for
   API-design judgement — if both are delegated they may run concurrently.
-- Steps **3→8 are sequential**: Step 3 also edits `types.ts` (yield-field rename) so it follows Step 1;
-  Steps 3/4 both edit `PreloadScene`, Steps 5/6 share `UIScene`/`GameScene`, and Steps 4/7/8 all touch the
-  icon dir — so no further parallelism.
+- Steps **3→7 are sequential**: Step 3 also edits `types.ts` (yield-field rename) so it follows Step 1;
+  Steps 3/4 both edit `PreloadScene`, Steps 5/6 share `UIScene`/`GameScene` — so no further parallelism.
 
 ## Out of scope
 
+- **The Gemini icon-generation pipeline** — moved to **plan 009** (this plan ships placeholder icons only).
 - **A dedicated mining action** — pickaxe/mine animation + a distinct tool/interaction. Rocks reuse the
   chop targeting + swing anim this slice (Step 3). Also **rock art polish** beyond one extracted/placeholder
   rock sprite.
 - **Ground-drop / item pickups** when full (chose block-harvest), **drag-to-rearrange / split stacks**,
-  and **equip/consume from slots** — later inventory UX.
+  and **equip/consume from slots** — later inventory UX (the hotbar is display-only this slice — critique #4).
 - **Persistence** of inventory to localStorage/IndexedDB (tracked separately).
-- **Icons beyond wood + stone**, and **any non-icon art** (tiles/mobs) — the pipeline is built to extend,
-  but only these two are generated now.
 - **Crafting/recipes** consuming stacks — separate system.
 - The `TreeNode`/`treeId` → `ResourceNode`/`nodeId` **identifier rename** — optional polish; the data-level
   yield-field generalisation (Step 3) is what's required for stone.
+
+## Critique
+
+Fresh-eyes review (independent sub-agent, 2026-07-12). **Verdict:** strategically sound and unusually
+well-grounded in the codebase — safe to execute after tightening two under-specified reuse points; the
+bundled Gemini pipeline was the main scope risk, not a correctness one. Findings #1/#2 folded into the
+plan above; #3 resolved by splitting the pipeline to plan 009; #4 accepted (locked with Matt).
+
+| # | Finding | Severity | Resolution |
+| - | ------- | -------- | ---------- |
+| 1 | Block-harvest that only skips the per-hit yield never fells the node → harvest task never completes → worker swings forever on a jammed queue. | Medium | **Folded in** (Step 6): abort the order on `!canAccept`, required; Tier-2 asserts queue idles. |
+| 2 | Rock reusing tree-shaped rendering inherits the pine's `treeScale` (2.6 tiles) + origin → renders oversized/mis-anchored. | Medium | **Folded in** (Step 3): per-species render params (scale/origin/stand-offsets); `addTree`→`addNode(def, render)`. |
+| 3 | Plan bundles four semi-independent efforts incl. a second Python art-gen pipeline gated on a LAN-only key. | Medium | **Resolved**: Gemini pipeline split to plan 009; mechanic ships on placeholders. |
+| 4 | Hotbar has no functional role this slice (display duplication of first N slots). | Low | **Accepted** (locked with Matt): keep as display-only; no select/consume plumbing built. |
