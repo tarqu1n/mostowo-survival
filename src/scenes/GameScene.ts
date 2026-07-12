@@ -1270,7 +1270,10 @@ export class GameScene extends Phaser.Scene {
     sprite.anims.play(enemyDeathKey); // keeps its current flipX — collapses facing the way it ran
     this.corpses.add(sprite);
     const dur = this.anims.get(enemyDeathKey)?.duration ?? 600;
-    this.time.delayedCall(dur + DEATH_HOLD_MS, () => {
+    // TEMP: hold the settled final frame for 5 minutes so the death anim can be observed on the corpse
+    // (instead of the brief DEATH_HOLD_MS beat). Revisit once the skeleton death look is dialled in.
+    const CORPSE_LINGER_MS = 5 * 60_000;
+    this.time.delayedCall(dur + CORPSE_LINGER_MS, () => {
       this.corpses.delete(sprite);
       sprite.destroy();
     });

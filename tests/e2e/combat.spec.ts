@@ -68,7 +68,7 @@ test('punching a surviving zombie triggers its hit flash', async ({ page }) => {
   expect(s.zombieHitFlashes).toBeGreaterThan(0);
 });
 
-test('a punched-dead zombie plays its death collapse before the corpse is removed', async ({ page }) => {
+test('a punched-dead zombie leaves a lingering corpse playing its death collapse', async ({ page }) => {
   await startGame(page);
   await applyScenario(page, { player: [10, 10], zombies: [[11, 10]], facing: 'right', mode: 'combat' });
 
@@ -80,9 +80,10 @@ test('a punched-dead zombie plays its death collapse before the corpse is remove
   expect(dead.zombies).toBe(0);
   expect(dead.corpses).toBe(1);
 
-  // Past the collapse + hold beat (12f @ 12fps = 1s, +300ms hold), the corpse is removed.
-  await step(page, 1600);
-  expect((await state(page)).corpses).toBe(0);
+  // The corpse holds its settled final frame for a long linger (currently 5 min), so it's still
+  // present well past the ~1s collapse — it does not vanish on animation end.
+  await step(page, 2000);
+  expect((await state(page)).corpses).toBe(1);
 });
 
 test('the movepad drives the player directly, bypassing the pathfinder', async ({ page }) => {
