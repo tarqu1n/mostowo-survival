@@ -11,11 +11,15 @@ import {
   HOTBAR_SLOTS,
   INVENTORY_SLOTS,
   HUNGER_MAX,
+  DAMAGE_VIGNETTE_MS,
+  DAMAGE_VIGNETTE_ALPHA,
+  DAMAGE_VIGNETTE_COLOR,
 } from '../config';
 import { ITEMS } from '../data/items';
 import type { CombatantStats } from '../data/types';
 import { BUILDABLES } from '../data/buildables';
 import { iconKey } from '../data/tileset';
+import { bakeVignetteTexture } from '../render/vignetteTexture';
 import type { Inventory } from '../systems/Inventory';
 import type { InspectableStats } from '../data/types';
 import { Button, Panel, SlotGrid, arrangeRow, type SlotVisual } from '../ui';
@@ -79,6 +83,11 @@ export class UIScene extends Phaser.Scene {
   private playerHp = 0; // seeded lazily from the first player:hpChanged (HP isn't on the registry)
   private eatRows: Array<{ itemId: string; button: Button; nutrition: number }> = [];
 
+  // Full-viewport red "damage vignette" (top depth, camera-fixed, alpha 0 at rest). Its alpha is
+  // pulsed on a `player:hit` event so a bite reads as a peripheral red flash, not just a tint on the
+  // easily-missed centre sprite. Non-interactive, so it never blocks the HUD buttons beneath it.
+  private damageVignette!: Phaser.GameObjects.Image;
+
   // Combat mode: virtual movepad (bottom-right) + Punch button (bottom-left). The movepad is a
   // bespoke joystick (drag tracking below), not a kit widget; the Punch button is a kit Button.
   // Drag is tracked here (not GameScene) via a scene-level pointermove/up, gated by which pointer id
@@ -119,6 +128,16 @@ export class UIScene extends Phaser.Scene {
       this.cameras.main.setZoom(RENDER_SCALE);
       this.cameras.main.centerOn(BASE_WIDTH / 2, BASE_HEIGHT / 2);
     }
+
+    // Damage vignette: a full-viewport red edge-flash, invisible at rest, pulsed on `player:hit`.
+    // Baked once (see render/vignetteTexture); top depth + scrollFactor 0 so it's a fixed overlay, and
+    // never made interactive so pointer input still falls through to the HUD/world beneath it.
+    const vignetteKey = bakeVignetteTexture(this, DAMAGE_VIGNETTE_COLOR, BASE_WIDTH, BASE_HEIGHT);
+    this.damageVignette = this.add
+      .image(BASE_WIDTH / 2, BASE_HEIGHT / 2, vignetteKey)
+      .setScrollFactor(0)
+      .setDepth(100000)
+      .setAlpha(0);
 
     // Build toggle — a touch-sized button, top-right.
     const bw = 76;
@@ -373,6 +392,7 @@ export class UIScene extends Phaser.Scene {
     this.game.events.on('time:changed', this.onTimeChanged, this);
     this.game.events.on('hunger:changed', this.onHungerChanged, this);
     this.game.events.on('player:hpChanged', this.onPlayerHp, this);
+    this.game.events.on('player:hit', this.onPlayerHit, this);
 
     // Teardown so a future scene restart doesn't double-register on stale listeners.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -387,7 +407,16 @@ export class UIScene extends Phaser.Scene {
       this.game.events.off('time:changed', this.onTimeChanged, this);
       this.game.events.off('hunger:changed', this.onHungerChanged, this);
       this.game.events.off('player:hpChanged', this.onPlayerHp, this);
+      this.game.events.off('player:hit', this.onPlayerHit, this);
     });
+  }
+
+  /** Pulse the damage vignette: snap to its peak alpha and fade out. Restarts cleanly on a rapid
+   * second hit (kill the prior fade first) so back-to-back bites each read as a fresh flash. */
+  private onPlayerHit(): void {
+    this.tweens.killTweensOf(this.damageVignette);
+    this.damageVignette.setAlpha(DAMAGE_VIGNETTE_ALPHA);
+    this.tweens.add({ targets: this.damageVignette, alpha: 0, duration: DAMAGE_VIGNETTE_MS, ease: 'Quad.easeOut' });
   }
 
   /** True if (x, y) in game coords lands on a *visible* interactive HUD element. */

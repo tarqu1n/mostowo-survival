@@ -23,7 +23,12 @@ import {
   CONTACT_DAMAGE_COOLDOWN_MS,
   HIT_FLASH_MS,
   HIT_FLASH_PEAK,
+  HIT_FLASH_SQUASH,
   HIT_FLASH_TINT,
+  PLAYER_HIT_SHAKE_MS,
+  PLAYER_HIT_SHAKE_INTENSITY,
+  ENEMY_HIT_SHAKE_MS,
+  ENEMY_HIT_SHAKE_INTENSITY,
   ZOMBIE_LUNGE_PX,
   ZOMBIE_LUNGE_MS,
   DEATH_ANIM_FRAMERATE,
@@ -1147,7 +1152,18 @@ export class GameScene extends Phaser.Scene {
       this.killZombie(zombie); // play the death collapse, then remove the corpse
     } else if (dmg > 0) {
       this.flashHit(zombie.sprite); // red flash + flinch on a hit it survived
+      this.cameras.main.shake(ENEMY_HIT_SHAKE_MS, ENEMY_HIT_SHAKE_INTENSITY); // light kick so a connect has punch
     }
+  }
+
+  /** Player took a landed hit: the shared "you're hurt" feedback — the red flash + squash on the
+   * sprite, a firm camera kick, and a `player:hit` event UIScene turns into a red damage vignette round
+   * the screen edges. Deliberately *not* on the starvation drain (a passive tick, not an impact); it
+   * fires from the bite site so getting bitten is unmissable even when you're not watching your feet. */
+  private onPlayerHurt(): void {
+    this.flashHit(this.player);
+    this.cameras.main.shake(PLAYER_HIT_SHAKE_MS, PLAYER_HIT_SHAKE_INTENSITY);
+    this.game.events.emit('player:hit');
   }
 
   /** This sprite's live HitFlash pipeline instance (WebGL only), or null. `getPostPipeline` may hand
@@ -1194,7 +1210,7 @@ export class GameScene extends Phaser.Scene {
         const t = fx.t;
         if (pipe) pipe.flash = t * HIT_FLASH_PEAK;
         // squash: widest+shortest at impact (t=1), easing back to the rest scale (t=0).
-        sprite.setScale(base * (1 + 0.15 * t), base * (1 - 0.12 * t));
+        sprite.setScale(base * (1 + HIT_FLASH_SQUASH * t), base * (1 - HIT_FLASH_SQUASH * 0.8 * t));
         if (isPlayer) this.playerFlash = t;
       },
       onComplete: () => {
@@ -1632,7 +1648,7 @@ export class GameScene extends Phaser.Scene {
             z.lastContactAt = now;
             this.zombieLungeAt(z, this.player.x, this.player.y); // visible attack tell (no attack strip ships)
             const dmg = resolveMeleeAttack(z.def, this.playerStats, UNARMED_BASE_DAMAGE, this.rng);
-            if (dmg > 0) this.flashHit(this.player); // hit reaction only when the bite lands
+            if (dmg > 0) this.onPlayerHurt(); // flash + camera kick + damage vignette when the bite lands
             this.damagePlayer(dmg);
           }
         } else {

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { startGame, applyScenario, emit, step, state } from './harness';
+import { startGame, applyScenario, emit, step, state, captured } from './harness';
 import { oneZombie } from './scenarios';
 
 // Tier-2: the enemy AI + contact damage + Punch paths through the real scene. Damage/hit-chance math
@@ -53,6 +53,8 @@ test('a biting zombie plays an attack lunge and the player flashes on the hit', 
   // landed bite triggered the player's red-flash hit reaction (dodge 0, so the bite always connects).
   expect(s.zombieAttacks).toBeGreaterThan(0);
   expect(s.playerHitFlashes).toBeGreaterThan(0);
+  // A landed bite also emits `player:hit` — the cue UIScene turns into the camera kick + damage vignette.
+  expect(await captured(page, 'player:hit')).toBeTruthy();
 });
 
 test('punching a surviving zombie triggers its hit flash', async ({ page }) => {

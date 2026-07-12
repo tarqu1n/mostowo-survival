@@ -134,16 +134,32 @@ export const CONTACT_DAMAGE_COOLDOWN_MS = 1000;
 
 /**
  * Hit feedback (see render/hitFlashPipeline.ts + GameScene.flashHit). When an actor takes damage it
- * flashes red and does a quick squash "flinch". `HIT_FLASH_MS` is how long the whole reaction lasts;
- * `HIT_FLASH_PEAK` is the max red mix (0..1) at the moment of impact — kept below 1 so it reads as a
- * flash *tint*, not a solid red silhouette. `HIT_FLASH_TINT` is the Canvas-fallback fill colour (no
- * shader). The skeletons ship no attack strip, so a zombie's attack is a coded lunge toward its
- * target: `ZOMBIE_LUNGE_PX` is the reach (world px) and `ZOMBIE_LUNGE_MS` the time for each leg of the
+ * flashes red and does a quick squash "flinch". `HIT_FLASH_MS` is how long the reaction lasts;
+ * `HIT_FLASH_PEAK` is the max red mix (0..1) at impact — near 1 so the hit is unmistakable, a shade
+ * under so a sliver of the sprite's own colour survives. `HIT_FLASH_SQUASH` is how hard the flinch
+ * squashes (fraction of scale: wider by this, shorter by ~0.8× this, at impact). `HIT_FLASH_TINT` is
+ * the Canvas-fallback fill colour (no shader).
+ *
+ * On top of the per-sprite flash, a **camera kick** sells the impact: getting bitten gives a firm
+ * shake (`PLAYER_HIT_SHAKE_*`) plus a red **damage vignette** pulse round the screen edges
+ * (`DAMAGE_VIGNETTE_*`, drawn by UIScene on a `player:hit` event); landing a punch gives a lighter
+ * shake (`ENEMY_HIT_SHAKE_*`). Shake intensity is a fraction of the viewport, durations are ms.
+ *
+ * The skeletons ship no attack strip, so a zombie's attack is a coded lunge toward its target:
+ * `ZOMBIE_LUNGE_PX` is the reach (world px) and `ZOMBIE_LUNGE_MS` the time for each leg of the
  * out-and-back — kept well under the contact cooldown so a lunge always settles before the next bite.
  */
-export const HIT_FLASH_MS = 200;
-export const HIT_FLASH_PEAK = 0.7;
-export const HIT_FLASH_TINT = 0xd21f1f;
+export const HIT_FLASH_MS = 260;
+export const HIT_FLASH_PEAK = 0.9;
+export const HIT_FLASH_SQUASH = 0.28;
+export const HIT_FLASH_TINT = 0xff2a2a;
+export const PLAYER_HIT_SHAKE_MS = 130;
+export const PLAYER_HIT_SHAKE_INTENSITY = 0.012;
+export const ENEMY_HIT_SHAKE_MS = 70;
+export const ENEMY_HIT_SHAKE_INTENSITY = 0.005;
+export const DAMAGE_VIGNETTE_MS = 380;
+export const DAMAGE_VIGNETTE_ALPHA = 0.5;
+export const DAMAGE_VIGNETTE_COLOR = 0xcc1414;
 export const ZOMBIE_LUNGE_PX = 7;
 export const ZOMBIE_LUNGE_MS = 120;
 

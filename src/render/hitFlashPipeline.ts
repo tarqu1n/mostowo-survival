@@ -27,7 +27,7 @@ uniform float flash;
 varying vec2 outTexCoord;
 void main() {
   vec4 c = texture2D(uMainSampler, outTexCoord);
-  vec3 red = vec3(0.9, 0.1, 0.1);
+  vec3 red = vec3(1.0, 0.15, 0.12);
   gl_FragColor = vec4(mix(c.rgb, red, flash * c.a), c.a);
 }
 `;

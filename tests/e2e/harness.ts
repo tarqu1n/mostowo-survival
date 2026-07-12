@@ -51,7 +51,7 @@ export async function startGame(page: Page): Promise<void> {
   await page.evaluate(() => {
     const g = (window as any).game;
     g.__captured = {};
-    for (const ev of ['inspect:show', 'inspect:hide', 'mode:changed', 'zoom:changed', 'camera:followChanged']) {
+    for (const ev of ['inspect:show', 'inspect:hide', 'mode:changed', 'zoom:changed', 'camera:followChanged', 'player:hit']) {
       g.events.on(ev, (payload: unknown) => {
         g.__captured[ev] = payload ?? true;
       });

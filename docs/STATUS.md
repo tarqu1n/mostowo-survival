@@ -157,3 +157,17 @@ re-evaluation is what lets the slow engage the instant a swing starts and releas
 fresh pad input. `debugState` exposes `px`/`py` (world position) so a Tier-2 `combat` scenario can prove
 a mid-swing drive covers ~20% of the ground a free drive does. (Still open on the combat-feel list:
 clearer hit reactions, and non-linear movement — accel/decel — since movement currently feels rigid.)
+
+## Combat feel: hit clarity
+
+Getting hit is now unmissable. The per-sprite reaction is stronger — brighter/longer red flash
+(`HIT_FLASH_PEAK` 0.9, `HIT_FLASH_MS` 260, brighter shader red) and a deeper squash flinch
+(`HIT_FLASH_SQUASH`) on both actors — and it's backed by a **camera kick**: a firm shake when the
+player is bitten (`PLAYER_HIT_SHAKE_*`), a light one when you land a punch (`ENEMY_HIT_SHAKE_*`). The
+big new cue is a **damage vignette**: `render/vignetteTexture.ts` bakes a red radial edge-glow (clear
+centre → red rim) once; UIScene draws it full-viewport at rest-alpha 0 and pulses it on a `player:hit`
+event GameScene emits from the bite site (`onPlayerHurt`) — a peripheral red flash reads far better
+than a tint on the screen-centred, easily-missed player sprite. Kept off the starvation drain (a
+passive tick, not an impact). Tuning: the `HIT_*` / `*_SHAKE_*` / `DAMAGE_VIGNETTE_*` block in
+`config.ts`. A Tier-2 `combat` scenario asserts a landed bite emits `player:hit`; the boot canary bakes
+the vignette clean. (Still open: non-linear movement — accel/decel — since movement still feels rigid.)
