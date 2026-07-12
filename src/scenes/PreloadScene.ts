@@ -6,6 +6,7 @@ import {
   tileImageKey,
   playerAnimKey,
   enemyWalkKey,
+  enemyIdleKey,
   enemyDeathKey,
   iconKey,
   type TileSource,
@@ -95,7 +96,16 @@ export class PreloadScene extends Phaser.Scene {
       for (const state of playerStates) loadStrip(playerAnimKey(state, facing), player[state][facing]);
     });
     loadStrip(enemyWalkKey, enemy.walk);
+    loadStrip(enemyIdleKey, enemy.idle); // 32px Idle bob — its own footprint (Phase B)
     loadStrip(enemyDeathKey, enemy.death);
+
+    // Monster weapon art: one static image per catalogue entry (no anim), keyed like the derived tiles.
+    for (const art of Object.values(enemy.weapons)) {
+      if (art.source.kind === 'image' && !loadedImages.has(art.source.path)) {
+        loadedImages.add(art.source.path);
+        this.load.image(tileImageKey(art.source.path), url(art.source.path));
+      }
+    }
 
     // Item icons: one standalone 32×32 image per ITEMS entry, keyed `icon:<id>`. Placeholder art this
     // slice (plan 008) — the repeatable generated set lands in plan 009. The UI falls back to the

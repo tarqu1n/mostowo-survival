@@ -1,10 +1,35 @@
 # Generic Monster System (AI states + swappable weapons)
 
-> Status: planned — run /execute-plan to begin. **Sequenced AI-first** (Matt's call after the
-> critique): **Phase A** (monster AI FSM — clean, unit-tested, the night-waves prerequisite) lands and
-> is reviewed **before** **Phase B** (weapons + idle bob — visual, eyeball-gated). You can stop after
-> Phase A if priorities shift. Code anchors are from a source sweep on 2026-07-12 — **reconfirm each
-> `file:line` before editing** (they drift).
+> Status: **in progress — Phase A done + committed; Phase B B1–B6 done, only B7 (docs) + deploy left.**
+> Sequenced AI-first (Matt's call after the critique). Code anchors are from a source sweep on
+> 2026-07-12 — **reconfirm each `file:line` before editing** (they drift).
+
+## Session handoff (2026-07-12) — resume here
+
+**Done & COMMITTED to `master` (not pushed — deploy = push, held for the end per Matt):**
+- `ca30c55` — Phase A (A1–A4): monster AI FSM + wiring + tests.
+- `5e5a2d4` — Phase B substrate (B1–B3): data/manifest schema, extracted club/knife art (pre-downscale),
+  pure `weaponTransform`.
+- `a8e4445` — idle bob (32px footprint swap), weapon pin/swing/combat, Phase-B test coverage, the
+  club/knife downscale, + the teardown tween-stop bug fix. All green (`tsc`/`npm test` 128/`npm run
+  smoke`; `monster.spec` 5/5).
+
+**Remaining:**
+1. **B7 (docs)** `[delegate sonnet]` — ASSETS.md pin note, DECISIONS.md (pinning supersedes 010's
+   stamp tool), update 010's header, STATUS.md, CLAUDE.md Status line.
+2. Do **B7**, then set Status → `in review`.
+3. **Deploy** = `git push` to `master` (auto-deploys via GitHub Actions). Matt then **eyeballs**:
+   weapon-in-hand through idle/walk + left-facing mirror; club-vs-knife pace; idle-bob feet-on-tile.
+   Anchors (`tileset.ts` `enemy.walk/idle` `mainHand`), weapon `pivot`, and idle `render.originY 0.95`
+   are **rough placeholders** — expect a tuning pass after the eyeball.
+
+**Gotchas for the next session:**
+- **Live RAF flake:** the game's RAF loop runs until the first `step()`; combat specs spawn the zombie
+  **2 tiles away** (not adjacent) so a pre-`step` bite can't runaway-kill→restart the scene. Keep this.
+- **Intermittent `startGame` 15s boot-timeout** under 5-worker `npm run e2e` (pre-existing infra flake,
+  not weapon code) — passes on re-run / single spec. Confirm a clean full-suite run before deploy.
+- Untracked `plans/012-buildable-campfire.md` + `tests/e2e/menu-start.spec.ts` are **not mine** (another
+  device) — leave out of 011 commits.
 
 ## Critique
 
@@ -311,7 +336,7 @@ scale-swap (critique #3).
     `AttachPoint`/`ActorRender` from `data/tileset` (erased at build) — **zero Phaser imports**. `tsc`
     clean; `npm test` 128 green (+6).
 
-- [ ] **Step B4: Wire the real idle bob (32px footprint swap)** `[inline]`
+- [x] **Step B4: Wire the real idle bob (32px footprint swap)** `[inline]`
   - Load the idle strip: extend `PreloadScene.ts:97-98` to also load `enemy.idle` (its own frameSize).
   - Anim create (`:400-417`): add an `enemyIdleKey` looping anim (frameRate ~6 for a slow bob,
     `repeat:-1`).
@@ -324,8 +349,20 @@ scale-swap (critique #3).
     an eyeball that the feet stay on the same tile).
   - Side effects: enemy render path only. Docs: none. Done when: build clean; an idle monster visibly
     breathes/sways, and its hurtbox/contact tile is provably unchanged by the swap.
+  - Outcome: `PreloadScene` loads `enemy.idle`; create-loop adds a looping `enemyIdleKey` anim
+    (frameRate 6). `updateZombieAnim` rewritten: **calm + stationary → the 4-frame Idle bob** (32px
+    footprint), moving → Run cycle, chasing-but-stalled-in-melee → held Run frame-0 (lunge is the tell).
+    New `setZombieFootprint(z, 'idle'|'walk')` swaps texture/scale/origin/`baseScale` + re-fits the body
+    **only on change**; `sprite.x/y` untouched so no positional jump, and fitActorBody is scale-aware so
+    both footprints yield the SAME ~1-tile world body at the feet (critique #3 — verified: all
+    combat/monster/death e2e still green, tile-based contact unchanged; explicit idle↔walk col/row
+    assertion added in B6). `ZombieUnit.activeStrip` added (init `'walk'`). **Bug fixed:** `killZombie`
+    now resets to the default 64px footprint before the Death collapse — a zombie dying mid-bob would
+    otherwise play Death at scale 2, off-tile. Files: `PreloadScene.ts`, `GameScene.ts`. `tsc`/build/
+    smoke green; e2e 12/12 (combat+monster+death). Idle origin (0.95) is a rough value — deploy eyeball
+    (feet-on-tile + visible bob) still pending.
 
-- [ ] **Step B5: Wire the weapon — pin, swing, combat** `[inline]`
+- [x] **Step B5: Wire the weapon — pin, swing, combat** `[inline]`
   - Instance state: add `weapon?: { id; sprite: Phaser.GameObjects.Sprite; def:
     (typeof MONSTER_WEAPONS)[string]; swingRot: number }` to `ZombieUnit` (`:106`).
   - Spawn/roll (`addZombie` `:1630-1654`): if `EnemyDef.weaponPool` non-empty, pick one (random, or a
@@ -348,13 +385,39 @@ scale-swap (critique #3).
     side-facing rig. Corpse linger unchanged. Docs: none. Done when: build clean; a skeleton holds its
     weapon through idle/walk, mirrors on left-facing, swings on attack; club vs knife differ in pace and
     HP removed per hit.
+  - Outcome: `ZombieUnit.weapon?` (`{id, sprite: Image, def: MonsterWeapon, swingRot}`); `addZombie`
+    rolls from `weaponPool` (or `opts.weaponId`), creates the pinned image (grip-pivot origin, `depth+z`,
+    no body). New `syncZombieWeapon` runs EVERY tick (via `updateZombieAnim`): reads the active strip's
+    frame anchor (`Number(frame.name)`), runs `weaponTransform`, writes pos/flip/angle. `zombieLungeAt`
+    extended with a `weaponSwingTweens`-tracked swing (`swingRot` 0→arc→0 + scale pop; always +arc,
+    weaponTransform mirrors on flipX). Bite (`updateZombies`) now uses the weapon's `damage` as base +
+    gates on its `attackMs` (unarmed → `UNARMED_BASE_DAMAGE`/`CONTACT_DAMAGE_COOLDOWN_MS`). Teardown:
+    `killZombie` destroys the weapon (no loot); `cleanupActorFx`/`resetCombatFx`/`randomiseWorld`/
+    `testResetWorld` all clean the swing tween + weapon image. `PreloadScene` loads the weapon images.
+    Files: `GameScene.ts`, `PreloadScene.ts`. `tsc`/build/smoke green; e2e combat+monster+death 12/12
+    (one boot-timeout flake, passed on re-run). Anchors/pivots rough → **deploy eyeball pending**
+    (weapon-in-hand through idle/walk + mirror + club-vs-knife pace).
 
-- [ ] **Step B6: Phase-B test coverage — scenario + smoke** `[inline]`
+- [x] **Step B6: Phase-B test coverage — scenario + smoke** `[inline]`
   - Extend `debugState` with the equipped `weaponId`. Scenario tests: a **club** spawn removes 2 HP per
     landed bite and a **knife** removes 1 (force the weapon via a scenario override). Run `npm run
     smoke`; fix any 404 (new idle + weapon images, new anim keys).
   - Side effects: test-only + the `debugState` `weaponId` field. Done when: `npm test` + `npm run e2e` +
     `npm run smoke` all green.
+  - Outcome: `ScenarioSpec.zombies` object form + `testApplyScenario` now pass a `weaponId` override;
+    `debugState` gained `zombieWeapons: (string|null)[]` (+ harness `DebugState` mirror synced, which
+    also still needed `zombieModes`/`zombieTiles` from A4/B4). Added 3 `monster.spec` tests: club bite =
+    3 HP, knife = 2 HP (per-bite = damage/`zombieAttacks`); knife out-bites club over a fixed window;
+    plus a critique-#3 drift assertion folded into the patrol test (contact tile never leaves the route
+    across idle↔walk footprint swaps). **Bug fixed (surfaced here):** `resetCombatFx` +
+    `randomiseWorld`/`testResetWorld` cleared the tween maps without STOPPING the tweens, so the yoyo
+    weapon-swing outlived a short step and poked a destroyed weapon → TweenManager crash; now stop-first
+    (+ `cleanupActorFx` in the teardown loops + a `w.sprite.active` guard in the swing). **Test-design
+    note:** combat specs spawn the zombie 2 tiles away (not adjacent), because the live RAF loop runs
+    until the first `step()` and an adjacent chaser could bite the player to death → boot-world restart →
+    0 bites. Files: `GameScene.ts`, `tests/e2e/{monster.spec,harness}.ts`. `tsc`/unit 128/smoke green;
+    `monster.spec` 5/5 + full e2e green **except** an intermittent `startGame` 15s boot-timeout under
+    5-worker load (pre-existing infra flake, not weapon-related — passes on re-run / single-threaded).
 
 - [ ] **Step B7: Docs** `[delegate sonnet]`
   - `docs/ASSETS.md` — short **"Weapon attachment (runtime pinning)"** note: anchors-on-`StripAnim`, one

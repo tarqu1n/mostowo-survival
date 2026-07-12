@@ -62,4 +62,48 @@ test('a patrol-route monster cycles its waypoints', async ({ page }) => {
   const firstAt12 = cols.indexOf(12);
   expect(firstAt12).toBeGreaterThanOrEqual(0);
   expect(cols.slice(firstAt12).some((c) => c <= 10)).toBe(true);
+  // Critique #3 drift check: the Idle-bob footprint swap (32px@2 ↔ 64px Run) fires during every
+  // waypoint pause, but the monster's contact tile never leaves its route — the swap is display-only.
+  expect(cols.every((c) => c >= 10 && c <= 12)).toBe(true);
+});
+
+test('a club bite removes more HP per hit than a knife bite', async ({ page }) => {
+  await startGame(page);
+  // Spawn 2 tiles east (like oneZombie), NOT adjacent: the zombie closes under step()'s control before
+  // biting, so the pre-step() RAF loop can't land — and can't runaway-kill — the player. Every bite
+  // hits (dodge 0) for base + kidZombie strength(1): club 3, knife 2. Measure per-bite as
+  // damage / zombieAttacks (exact per bite, so robust to how many bites land in the window).
+  const MAX_HP = 10;
+  await applyScenario(page, { player: [10, 10], zombies: [{ at: [12, 10], mode: 'chase', weaponId: 'club' }] });
+  expect((await state(page)).zombieWeapons).toEqual(['club']); // the scenario override equipped the club
+  await step(page, 1500); // closes (~0.7s) then lands ≥1 bite; under 2× the club cadence
+  const club = await state(page);
+  expect(club.zombieAttacks).toBeGreaterThan(0);
+  const clubPerBite = (MAX_HP - club.playerHp) / club.zombieAttacks;
+
+  await applyScenario(page, { player: [10, 10], zombies: [{ at: [12, 10], mode: 'chase', weaponId: 'knife' }] });
+  await step(page, 1500);
+  const knife = await state(page);
+  expect(knife.zombieAttacks).toBeGreaterThan(0);
+  const knifePerBite = (MAX_HP - knife.playerHp) / knife.zombieAttacks;
+
+  expect(clubPerBite).toBe(3);
+  expect(knifePerBite).toBe(2);
+  expect(clubPerBite).toBeGreaterThan(knifePerBite);
+});
+
+test('a knife bites more often than a club over the same window (cadence)', async ({ page }) => {
+  await startGame(page);
+  // Spawn 2 tiles east (as above) so the closing walk is under step() control. Over a ~2.5s window of
+  // contact: knife (750ms) lands ~3 bites, club (1500ms) ~2. Count via zombieAttacks (incremented per
+  // bite in zombieLungeAt; applyScenario zeroes it). Neither total kills the 10-HP player.
+  await applyScenario(page, { player: [10, 10], zombies: [{ at: [12, 10], mode: 'chase', weaponId: 'knife' }] });
+  await step(page, 2500);
+  const knifeBites = (await state(page)).zombieAttacks;
+
+  await applyScenario(page, { player: [10, 10], zombies: [{ at: [12, 10], mode: 'chase', weaponId: 'club' }] });
+  await step(page, 2500);
+  const clubBites = (await state(page)).zombieAttacks;
+
+  expect(knifeBites).toBeGreaterThan(clubBites); // shorter cadence → more bites in the same window
 });

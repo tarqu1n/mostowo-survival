@@ -114,8 +114,13 @@ needs to be treated as precious.
 |---|---|---|
 | `_derived/tree_pine.png` | `Environment/Props/Static/Trees/Model_02/Size_03.png` | 3 |
 | `_derived/rock.png` | `Environment/Props/Static/Rocks.png` | 5 |
-| `_derived/weapons/club.png` | `Weapons/Bone/Bone.png` | 1 (bone mace, grip at bottom) |
-| `_derived/weapons/knife.png` | `Weapons/Bone/Bone.png` | 7 (bone dagger, grip at bottom) |
+| `_derived/weapons/club.png` | `Weapons/Bone/Bone.png` | 1 (bone mace, grip at bottom; `sips -Z 40` → 7×40) |
+| `_derived/weapons/knife.png` | `Weapons/Bone/Bone.png` | 7 (bone dagger, grip at bottom; `sips -Z 18` → 4×18) |
+
+> The two bone weapons are extracted big (80/27px) then downscaled to sit proportionately on the
+> ~30px skeleton (club distinctly larger than the knife). They draw at integer scale 1 from these
+> baked sizes — the one exception to "no non-integer scaling" is this one-time downsample bake, not a
+> per-frame draw scale. Regenerate: re-run `extract.py` (idx 1 / 7) then the `sips -Z` above.
 
 The rock is wired as the `rock` tile role (`ACTIVE_TILESET.tiles.rock`), rendering the `rock`
 resource node that yields stone (plan 008). Other multi-object sheets (`Vegetation`, `Resources`,

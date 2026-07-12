@@ -31,6 +31,9 @@ import {
   ENEMY_HIT_SHAKE_INTENSITY,
   ZOMBIE_LUNGE_PX,
   ZOMBIE_LUNGE_MS,
+  WEAPON_SWING_ARC_DEG,
+  WEAPON_SWING_MS,
+  WEAPON_SWING_SCALE_POP,
   MONSTER_CHASE_DROP_RADIUS_PX,
   MONSTER_VEER_BAND_PX,
   MONSTER_VEER_MAX_TILES,
@@ -55,6 +58,7 @@ import { ITEMS } from '../data/items';
 import { NODES } from '../data/nodes';
 import { BUILDABLES } from '../data/buildables';
 import { ENEMIES } from '../data/enemies';
+import { MONSTER_WEAPONS, type MonsterWeapon } from '../data/weapons';
 import type { ResourceNodeDef, CombatantStats, EnemyDef } from '../data/types';
 import { Inventory } from '../systems/Inventory';
 import { worldToTile, tileToWorldCenter, snapToTileCenter, tileKey } from '../systems/grid';
@@ -64,6 +68,7 @@ import { cycleLengthMs, phaseAt, tintAlphaAt, dayCountForTotal, type DayPhase } 
 import { drainHunger, feed, isStarving } from '../systems/needs';
 import { resolveMeleeAttack } from '../systems/combat';
 import { stepMonster, initialMonsterState, type MonsterState, type MonsterMode } from '../systems/monsterAI';
+import { weaponTransform } from '../systems/attachment';
 import { hurtboxContains, hurtboxTiles, DEFAULT_HURTBOX } from '../systems/hurtbox';
 import { bakeGlowTexture } from '../render/glowTexture';
 import { HIT_FLASH_KEY, type HitFlashPipeline } from '../render/hitFlashPipeline';
@@ -74,6 +79,7 @@ import {
   resolveTile,
   playerAnimKey,
   enemyWalkKey,
+  enemyIdleKey,
   enemyDeathKey,
   pickWeighted,
   type Facing,
@@ -125,6 +131,13 @@ export interface ZombieUnit {
   lastContactAt: number;
   path: Cell[];
   pathIndex: number;
+  /** Which render footprint the sprite is currently showing (`walk` 64px vs the `idle` 32px bob) —
+   *  so `updateZombieAnim` only swaps scale/origin/body on an actual state change (see setZombieFootprint). */
+  activeStrip: 'idle' | 'walk';
+  /** The rolled-per-spawn held weapon (Phase B), or undefined = unarmed. `sprite` is a plain image
+   *  (no physics body) pinned to the hand each tick; `def` owns its damage/cadence; `swingRot` is the
+   *  live coded-swing angle (deg) tweened on each bite. */
+  weapon?: { id: string; sprite: Phaser.GameObjects.Image; def: MonsterWeapon; swingRot: number };
 }
 
 /**
@@ -167,7 +180,14 @@ export interface ScenarioSpec {
   bushes?: Array<[number, number]>;
   zombies?: Array<
     | [number, number]
-    | { at: [number, number]; id?: string; patrolRoute?: Array<[number, number]>; mode?: MonsterMode }
+    | {
+        at: [number, number];
+        id?: string;
+        patrolRoute?: Array<[number, number]>;
+        mode?: MonsterMode;
+        /** Force the spawned weapon (else rolled from the enemy's pool) — for deterministic combat specs. */
+        weaponId?: string;
+      }
   >;
   walls?: Array<[number, number]>;
   blueprints?: Array<[number, number]>;
@@ -259,6 +279,9 @@ export class GameScene extends Phaser.Scene {
   // before destroy). `hitFlashOn` is the set of sprites currently carrying the WebGL flash pipeline.
   private readonly hitFlashTweens = new Map<Phaser.GameObjects.Sprite, Phaser.Tweens.Tween>();
   private readonly lungeTweens = new Map<Phaser.GameObjects.Sprite, Phaser.Tweens.Tween>();
+  // Weapon-swing tweens keyed by the WIELDER sprite (so cleanupActorFx(zombieSprite) can stop one
+  // mid-swing before the weapon image is destroyed — the tween pokes the weapon each frame).
+  private readonly weaponSwingTweens = new Map<Phaser.GameObjects.Sprite, Phaser.Tweens.Tween>();
   private readonly hitFlashOn = new Set<Phaser.GameObjects.Sprite>();
   // Zombie sprites out of the AI set but lingering to play their one-shot death collapse before the
   // corpse is removed. Tracked so debugState can report them (proves removal waits for the animation).
@@ -418,6 +441,14 @@ export class GameScene extends Phaser.Scene {
         key: enemyWalkKey,
         frames: this.anims.generateFrameNumbers(enemyWalkKey, { start: 0, end: enemyActor.walk.frames - 1 }),
         frameRate: 10,
+        repeat: -1,
+      });
+    }
+    if (!this.anims.exists(enemyIdleKey)) {
+      this.anims.create({
+        key: enemyIdleKey,
+        frames: this.anims.generateFrameNumbers(enemyIdleKey, { start: 0, end: enemyActor.idle.frames - 1 }),
+        frameRate: 6, // slow, gentle breathing bob
         repeat: -1,
       });
     }
@@ -1292,6 +1323,33 @@ export class GameScene extends Phaser.Scene {
       },
     });
     this.lungeTweens.set(sprite, tween);
+
+    // Coded weapon swing (the pack ships no mob attack strip): rotate the held weapon about its grip
+    // through WEAPON_SWING_ARC_DEG with a small scale pop, yoyo, in step with the body lunge. syncZombieWeapon
+    // adds w.swingRot every tick, so the pinned weapon arcs while still tracking the hand.
+    if (z.weapon) {
+      const w = z.weapon;
+      const baseScale = w.sprite.scale;
+      this.weaponSwingTweens.get(sprite)?.stop();
+      const swing = this.tweens.add({
+        targets: w,
+        swingRot: WEAPON_SWING_ARC_DEG, // always a +arc; weaponTransform mirrors it when the wielder faces left
+        duration: WEAPON_SWING_MS,
+        yoyo: true,
+        ease: 'Quad.easeOut',
+        onUpdate: () => {
+          if (!w.sprite.active) return; // weapon destroyed mid-swing (death/teardown) — don't poke it
+          const p = w.swingRot / WEAPON_SWING_ARC_DEG; // 0→1→0 across the yoyo
+          w.sprite.setScale(baseScale * (1 + (WEAPON_SWING_SCALE_POP - 1) * p));
+        },
+        onComplete: () => {
+          w.swingRot = 0;
+          if (w.sprite.active) w.sprite.setScale(baseScale);
+          this.weaponSwingTweens.delete(sprite);
+        },
+      });
+      this.weaponSwingTweens.set(sprite, swing);
+    }
   }
 
   /** Stop and forget any in-flight hit-flash/lunge tweens for a sprite about to be destroyed — those
@@ -1302,14 +1360,23 @@ export class GameScene extends Phaser.Scene {
     this.hitFlashTweens.delete(sprite);
     this.lungeTweens.get(sprite)?.stop();
     this.lungeTweens.delete(sprite);
+    this.weaponSwingTweens.get(sprite)?.stop(); // the swing tween pokes the weapon image each frame
+    this.weaponSwingTweens.delete(sprite);
     this.hitFlashOn.delete(sprite);
   }
 
   /** Reset all combat-FX bookkeeping to its boot state — called from create() (death-restart) and the
    * scenario reset. The maps/set may hold tweens+sprites from a torn-down run, so drop them wholesale. */
   private resetCombatFx(): void {
+    // Stop before dropping: a cleared map still leaves the tween running in Phaser's TweenManager, and
+    // its onUpdate pokes a sprite the teardown is about to destroy (the yoyo weapon-swing outlives a
+    // short step). Stopping first guarantees no orphaned tween fires on a dead sprite next frame.
+    for (const t of this.hitFlashTweens.values()) t.stop();
+    for (const t of this.lungeTweens.values()) t.stop();
+    for (const t of this.weaponSwingTweens.values()) t.stop();
     this.hitFlashTweens.clear();
     this.lungeTweens.clear();
+    this.weaponSwingTweens.clear();
     this.hitFlashOn.clear();
     this.corpses.clear(); // scene teardown destroys the sprites; drop stale references
     this.playerFlash = 0;
@@ -1328,11 +1395,18 @@ export class GameScene extends Phaser.Scene {
   private killZombie(z: ZombieUnit): void {
     z.alive = false;
     this.zombies = this.zombies.filter((x) => x !== z);
-    this.cleanupActorFx(z.sprite);
+    this.cleanupActorFx(z.sprite); // also stops an in-flight weapon swing before the image goes away
+    if (z.weapon) {
+      z.weapon.sprite.destroy(); // weapon hides on death (no loot/drop — see plan Out of scope)
+      z.weapon = undefined;
+    }
     const sprite = z.sprite;
     sprite.body.setVelocity(0, 0);
     sprite.body.enable = false;
-    sprite.setScale((sprite.getData('baseScale') as number | undefined) ?? 1); // undo any squash mid-flash
+    // Reset to the default 64px footprint before the collapse — undoes any flinch squash AND the 32px
+    // Idle bob's scale:2/origin (dying mid-bob would otherwise play the Death strip double-size, off-tile).
+    const { render } = ACTIVE_TILESET.actors.enemy;
+    sprite.setScale(render.scale).setOrigin(render.originX, render.originY);
     sprite.anims.play(enemyDeathKey); // keeps its current flipX — collapses facing the way it ran
     this.corpses.add(sprite);
     const dur = this.anims.get(enemyDeathKey)?.duration ?? 600;
@@ -1537,7 +1611,7 @@ export class GameScene extends Phaser.Scene {
   private randomiseWorld(): void {
     this.cancelAll(); // drop harvest orders that reference the nodes we're about to destroy
     for (const t of this.trees) t.sprite.destroy();
-    for (const z of this.zombies) z.sprite.destroy();
+    for (const z of this.zombies) { this.cleanupActorFx(z.sprite); z.weapon?.sprite.destroy(); z.sprite.destroy(); }
     this.trees = [];
     this.zombies = [];
 
@@ -1652,10 +1726,11 @@ export class GameScene extends Phaser.Scene {
     enemyId: string,
     col: number,
     row: number,
-    opts?: { patrolRoute?: Cell[]; mode?: MonsterMode },
+    opts?: { patrolRoute?: Cell[]; mode?: MonsterMode; weaponId?: string },
   ): void {
     const def = ENEMIES[enemyId];
-    const { render } = ACTIVE_TILESET.actors.enemy;
+    const enemyActor = ACTIVE_TILESET.actors.enemy;
+    const { render } = enemyActor;
     const sprite = this.add.sprite(tileToWorldCenter(col), tileToWorldCenter(row), enemyWalkKey).setDepth(9);
     sprite.setScale(render.scale).setOrigin(render.originX, render.originY);
     sprite.setData('baseScale', render.scale); // rest scale the flinch squash returns to
@@ -1665,6 +1740,20 @@ export class GameScene extends Phaser.Scene {
     this.fitActorBody(zsprite, render);
     const ai = initialMonsterState(opts?.patrolRoute);
     if (opts?.mode) ai.mode = opts.mode; // scenario override (e.g. spawn already chasing)
+
+    // Roll a held weapon from the enemy's pool (Phase B) — or take a scenario-forced id. The weapon is
+    // a plain image (no physics body); it's pinned to the hand each tick in syncZombieWeapon.
+    const pool = def.weaponPool ?? [];
+    const weaponId = opts?.weaponId ?? (pool.length ? pool[Math.floor(this.rng() * pool.length)] : undefined);
+    let weapon: ZombieUnit['weapon'];
+    const art = weaponId ? enemyActor.weapons[weaponId] : undefined;
+    const stats = weaponId ? MONSTER_WEAPONS[weaponId] : undefined;
+    if (weaponId && art && stats) {
+      const wsprite = this.add.image(sprite.x, sprite.y, resolveTile(art.source).key);
+      wsprite.setOrigin(art.pivot[0], art.pivot[1]).setScale(art.scale ?? 1).setDepth(sprite.depth + art.z);
+      weapon = { id: weaponId, sprite: wsprite, def: stats, swingRot: 0 };
+    }
+
     this.zombies.push({
       id: `zombie-${this.nextZombieId++}`,
       sprite: zsprite,
@@ -1677,7 +1766,10 @@ export class GameScene extends Phaser.Scene {
       lastContactAt: 0,
       path: [],
       pathIndex: 0,
+      activeStrip: 'walk', // addZombie set up the 64px Walk footprint above
+      weapon,
     });
+    if (weapon) this.syncZombieWeapon(this.zombies[this.zombies.length - 1]); // place it in-hand on frame 0
   }
 
   /** Step a zombie toward its next waypoint (mirrors advancePath's approach); true once its
@@ -1701,16 +1793,76 @@ export class GameScene extends Phaser.Scene {
     return false;
   }
 
-  /** Run-cycle while moving (flipped by movement-x — art faces right), idle pose (frame 0) otherwise. */
+  /**
+   * Enemy animation each tick: the Run cycle while moving (flipped by movement-x — art faces right),
+   * the real 4-frame Idle bob when stationary in a calm mode (its own 32px footprint, Phase B), or a
+   * held Run frame-0 pose when stalled in melee while chasing (the lunge is the attack tell — no bob
+   * mid-bite). The footprint (scale/origin/body) is swapped only on a state change (setZombieFootprint).
+   */
   private updateZombieAnim(z: ZombieUnit): void {
-    if (z.sprite.body.velocity.lengthSq() > 1) {
+    const moving = z.sprite.body.velocity.lengthSq() > 1;
+    const calmIdle = !moving && z.ai.mode !== 'chase';
+    this.setZombieFootprint(z, calmIdle ? 'idle' : 'walk');
+
+    if (calmIdle) {
+      z.sprite.anims.play(enemyIdleKey, true); // looping gentle bob
+    } else if (moving) {
       const vx = z.sprite.body.velocity.x;
       if (vx !== 0) z.sprite.setFlipX(vx < 0);
       z.sprite.anims.play(enemyWalkKey, true);
     } else {
       z.sprite.anims.stop();
-      z.sprite.setFrame(0);
+      z.sprite.setFrame(0); // chasing but stalled in melee → hold the Run frame-0 pose
     }
+
+    if (z.weapon) this.syncZombieWeapon(z); // pin the held weapon to this frame's hand anchor
+  }
+
+  /**
+   * Pin the held weapon to the wielder's hand for the CURRENT animation frame — called every tick (not
+   * on `animationupdate`, so the lunge/swing slide between frame changes without the pin going stale).
+   * Reads the active strip's per-frame `mainHand` anchor, runs the pure {@link weaponTransform} with the
+   * live flipX + swing angle, and writes the result onto the weapon image (position/flip/angle). Scale
+   * is owned by the swing tween, so it's untouched here.
+   */
+  private syncZombieWeapon(z: ZombieUnit): void {
+    const w = z.weapon;
+    if (!w) return;
+    const enemy = ACTIVE_TILESET.actors.enemy;
+    const strip = z.activeStrip === 'idle' ? enemy.idle : enemy.walk;
+    const anchors = strip.anchors?.mainHand;
+    if (!anchors || anchors.length === 0) return; // no grip data → leave the weapon where it is
+    const frame = Number(z.sprite.frame.name); // spritesheet frame index (0-based) == anchor index
+    const index = Math.max(0, Math.min(anchors.length - 1, Number.isFinite(frame) ? frame : 0));
+    const t = weaponTransform({
+      anchor: anchors[index],
+      actorRender: enemy.render,
+      stripRender: strip.render,
+      frameW: strip.frameWidth ?? strip.frameSize,
+      frameH: strip.frameSize,
+      flipX: z.sprite.flipX,
+      extraRot: w.swingRot,
+    });
+    w.sprite.setPosition(z.sprite.x + t.x, z.sprite.y + t.y).setFlipX(t.flipX).setAngle(t.rotation);
+  }
+
+  /**
+   * Swap the enemy sprite between its Walk (64px) and Idle (32px) footprints — on an actual change
+   * only. Applies the target strip's render (scale/origin) and re-fits the Arcade body so its WORLD
+   * footprint (a ~1-tile box at the feet) is identical in both states: the display size matches (32px
+   * Idle @scale 2 == 64px Run @scale 1) and the contact tile is unchanged (critique #3). `sprite.x/y`
+   * is untouched, so there's no positional jump — only the drawn pixels reflow around the same anchor.
+   */
+  private setZombieFootprint(z: ZombieUnit, which: 'idle' | 'walk'): void {
+    if (z.activeStrip === which) return;
+    z.activeStrip = which;
+    const enemy = ACTIVE_TILESET.actors.enemy;
+    const render = which === 'idle' ? enemy.idle.render ?? enemy.render : enemy.render;
+    // Base frame of the target strip first, so fitActorBody reads the right frame size below.
+    z.sprite.setTexture(which === 'idle' ? enemyIdleKey : enemyWalkKey, 0);
+    z.sprite.setScale(render.scale).setOrigin(render.originX, render.originY);
+    z.sprite.setData('baseScale', render.scale); // flinch-squash rest scale follows the active footprint
+    this.fitActorBody(z.sprite, render);
   }
 
   /** Per-frame AI tick (pure FSM in systems/monsterAI) + chase/contact-damage for every live zombie.
@@ -1756,10 +1908,14 @@ export class GameScene extends Phaser.Scene {
         );
         if (inContact) {
           z.sprite.body.setVelocity(0, 0);
-          if (now - z.lastContactAt >= CONTACT_DAMAGE_COOLDOWN_MS) {
+          // The equipped weapon sets the base damage + the attack cadence (a knife bites ~2× as often
+          // as a club); an unarmed monster falls back to the shared unarmed damage + contact cooldown.
+          const baseDmg = z.weapon ? z.weapon.def.damage : UNARMED_BASE_DAMAGE;
+          const cooldown = z.weapon ? z.weapon.def.attackMs : CONTACT_DAMAGE_COOLDOWN_MS;
+          if (now - z.lastContactAt >= cooldown) {
             z.lastContactAt = now;
-            this.zombieLungeAt(z, this.player.x, this.player.y); // visible attack tell (no attack strip ships)
-            const dmg = resolveMeleeAttack(z.def, this.playerStats, UNARMED_BASE_DAMAGE, this.rng);
+            this.zombieLungeAt(z, this.player.x, this.player.y); // visible attack tell + weapon swing
+            const dmg = resolveMeleeAttack(z.def, this.playerStats, baseDmg, this.rng);
             if (dmg > 0) this.onPlayerHurt(); // flash + camera kick + damage vignette when the bite lands
             this.damagePlayer(dmg);
           }
@@ -1886,7 +2042,7 @@ export class GameScene extends Phaser.Scene {
    */
   private testResetWorld(): void {
     for (const t of this.trees) t.sprite.destroy();
-    for (const z of this.zombies) z.sprite.destroy();
+    for (const z of this.zombies) { this.cleanupActorFx(z.sprite); z.weapon?.sprite.destroy(); z.sprite.destroy(); }
     for (const s of this.sites) {
       s.visual?.destroy();
       s.rect.destroy();
@@ -1977,7 +2133,7 @@ export class GameScene extends Phaser.Scene {
       const id = Array.isArray(z) ? 'kidZombie' : z.id ?? 'kidZombie';
       const opts = Array.isArray(z)
         ? undefined
-        : { patrolRoute: z.patrolRoute?.map(([c, r]) => ({ col: c, row: r })), mode: z.mode };
+        : { patrolRoute: z.patrolRoute?.map(([c, r]) => ({ col: c, row: r })), mode: z.mode, weaponId: z.weaponId };
       this.addZombie(id, at[0], at[1], opts);
       zombieIds.push(this.zombies[this.zombies.length - 1].id);
     }
@@ -2046,6 +2202,7 @@ export class GameScene extends Phaser.Scene {
     zombies: number;
     zombieModes: MonsterMode[];
     zombieTiles: { col: number; row: number }[];
+    zombieWeapons: (string | null)[];
     corpses: number;
     playerHp: number;
     playerDying: boolean;
@@ -2080,6 +2237,8 @@ export class GameScene extends Phaser.Scene {
       // Live zombie tiles (spec order) — patrol mode never leaves 'patrol', so waypoint cycling is
       // only observable via position; the monster.spec patrol test reads this.
       zombieTiles: this.zombies.filter((z) => z.alive).map((z) => ({ col: z.col, row: z.row })),
+      // Equipped weapon id per live zombie (null = unarmed) — lets a combat spec confirm the rolled/forced weapon.
+      zombieWeapons: this.zombies.filter((z) => z.alive).map((z) => z.weapon?.id ?? null),
       corpses: this.corpses.size,
       playerHp: this.playerHp,
       playerDying: this.playerDying,

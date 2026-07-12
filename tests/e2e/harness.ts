@@ -21,6 +21,7 @@ export interface DebugState {
   zombies: number;
   zombieModes: Array<'idle' | 'wander' | 'patrol' | 'chase'>;
   zombieTiles: Array<{ col: number; row: number }>;
+  zombieWeapons: Array<string | null>;
   corpses: number;
   playerHp: number;
   playerDying: boolean;
