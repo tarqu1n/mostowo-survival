@@ -1,6 +1,8 @@
 # Deterministic Test Harness (Unit Tests + Scenario Setups, Retire the Live-Game Smoke)
 
-> Status: planned — run /critique-plan next, then hand back to Matt before /execute-plan (WORKFLOW.md gates).
+> Status: planned, critiqued (fresh-eyes pass folded in — fixed B1 the `step()` mechanism, B2 the
+> DEV-gate vs server contradiction, + S3/S4/S5/S6/S7/N8/N9). Hand back to Matt before /execute-plan
+> (WORKFLOW.md gates).
 
 ## Summary
 The single 419-line `scripts/smoke.mjs` drives the **whole running game start-to-finish through the
@@ -73,20 +75,24 @@ current smoke:
   reuses the real scene + real systems. Gate it so it never ships as a player-facing surface (see
   Step 4's `__test` namespace + build note).
 - **Determinism seam:** the killer feature is a **fixed-delta step** (`__test.step(ms)`) that advances
-  gameplay by a known amount with the Phaser loop paused — so chop intervals, build progress, contact
-  cooldowns, and (later) day/night all resolve without wall-clock sleeps. This is what removes the
-  flakiness class, not just the current chop poll band-aid.
+  gameplay by a known amount by **stopping the game loop and driving `game.step(t, fixedDelta)`**
+  (which runs each scene's `Systems.step` → Arcade physics → clock → timers → tweens) — so movement,
+  chop intervals, build progress, contact cooldowns, regrow and (later) day/night all resolve without
+  wall-clock sleeps. This is what removes the flakiness class, not the current chop poll band-aid.
+  **NB (critique B1):** a naive `scene.update(t, ms)` pump does *not* do this — physics/clock/timers
+  don't advance from it; Step 4 spells out the correct mechanism.
 
 **Key facts from repo research (anchors to respect):**
 - **No test framework yet:** `package.json` scripts are `dev/build/preview/typecheck/smoke`; devDeps
-  are `playwright typescript vite`. Add `vitest` (+ `jsdom` only if Tier-1 needs it, see below).
-- **Pure vs Phaser-coupled systems:** `src/systems/{pathfind,tasks,combat,grid,stats}.ts` import **no
-  Phaser** → test directly in Node. **`src/systems/Inventory.ts` imports Phaser** (extends
-  `Phaser.Events.EventEmitter`). Importing full `phaser` in Node touches `window`/`document` and needs
-  Vitest's `environment: 'jsdom'`. Prefer the truly-Phaser-free tests as the fast default; put
-  Inventory (and anything Phaser-touching) behind a `jsdom` test-env override, OR decouple its emitter
-  (Phaser's is `eventemitter3`) in a small follow-up — **do not** refactor Inventory as part of this
-  plan unless jsdom proves painful; note it and move on.
+  are `playwright typescript vite`. Add `vitest` and `@playwright/test` (pinned to the same 1.61.x as
+  `playwright`). Aim for **all tests in plain Node** — reach for `jsdom`(+canvas-mock) only if forced.
+- **Pure vs Phaser-coupled systems:** `src/systems/{pathfind,tasks,combat,grid}.ts` import **no
+  Phaser** → test directly in Node. `stats.ts` is runtime-pure too (only a **type-only** import of
+  GameScene interfaces — erased; keep it type-only). **`src/systems/Inventory.ts` imports Phaser** just
+  for `Phaser.Events.EventEmitter` (which *is* `eventemitter3`). Importing full `phaser` in Node runs
+  its canvas feature-detection and needs jsdom + a canvas mock — a known-painful path (critique S5), so
+  the **default is to keep Inventory Node-testable**: alias `phaser`→stub in `vitest.config`, or have
+  Inventory import `eventemitter3` directly. jsdom is the last resort, not the plan.
 - **The world is already deterministic on boot:** `spawnTrees()`
   ([GameScene.ts:826-834](src/scenes/GameScene.ts#L826)) places **fixed** trees at `[5,8] [14,12]
   [8,20]`; `spawnZombies()` ([GameScene.ts:910-912](src/scenes/GameScene.ts#L910)) fixed-spawns
@@ -123,14 +129,16 @@ current smoke:
 ## Steps
 
 - [ ] **Step 1: Add Vitest + the test scripts** `[inline]`
-  - Add `vitest` to `devDependencies`. Add `vitest.config.ts` (reuse Vite resolution; default
-    `environment: 'node'`; a second project/override with `environment: 'jsdom'` for any Phaser-
-    touching test file, e.g. by glob `**/*.jsdom.test.ts`).
+  - Add `vitest` to `devDependencies`. Add `vitest.config.ts` (reuse Vite resolution; `environment:
+    'node'` — the goal is *all* tests run in plain Node, see Step 3's Inventory decision; only add a
+    `jsdom` override glob if a test genuinely can't avoid the DOM). Set **`passWithNoTests: true`**
+    (critique S7 — `vitest run` with zero test files otherwise exits non-zero, breaking this step's
+    done-when and any pre-test CI).
   - `package.json` scripts — support the two-speed loop from the start: `"test": "vitest run"` (full,
     for the wrap-up gate), `"test:watch": "vitest"` (inner loop — reruns only affected tests on save).
     Targeted runs need no extra script (`npx vitest run <name>`, `npx vitest related <files>` work out
     of the box). A `"check": "npm run typecheck && npm run test"` convenience is fine.
-  - Done when: `npm test` runs Vitest with zero failures (empty run OK here); `npm run test:watch`
+  - Done when: `npm test` exits 0 with no test files (`passWithNoTests`); `npm run test:watch`
     watches; `npx vitest run <name>` runs a single file — confirm the selective forms work.
 
 - [ ] **Step 2: Unit-test the Phaser-free pure systems** `[delegate sonnet]` (parallel: A)
@@ -142,41 +150,66 @@ current smoke:
     - `combat.test.ts` — `resolveMeleeAttack`: flat-1 damage, 3 hits kill a maxHp-3 zombie, hit-chance
       edges; contact-cooldown math if it lives here.
     - `grid.test.ts` — `worldToTile`/`tileToWorldCenter`/`snapToTileCenter`/`tileKey` round-trips.
-    - `stats.test.ts` — whatever `stats.ts` exposes (schema/derivations).
+    - `stats.test.ts` — whatever `stats.ts` exposes. Note (critique S6): `stats.ts` uses a **type-only**
+      `import type { TreeNode, BuildSite, ZombieUnit } from '../scenes/GameScene'` — erased at runtime
+      so purity holds, but those interfaces carry Phaser fields, so the test builds partial-mock casts;
+      keep the import type-only (a value import would silently pull Phaser into the Node run).
   - These are the assertions that keep breaking indirectly; make them direct and fast.
   - Done when: `npm test` green; each pure system has meaningful coverage of its current smoke-implied
     behaviour.
 
 - [ ] **Step 3: Unit-test Inventory + data invariants** `[delegate sonnet]` (parallel: A)
-  - `Inventory` needs Phaser → put it in a `*.jsdom.test.ts` (Step 1's jsdom override). Test add/get,
-    the `wood` accounting behind chop-yield and blueprint-spend, and that it emits on change. If
-    importing `phaser` under jsdom is slow/flaky, **stop and flag** the emitter-decouple option rather
-    than fighting it.
+  - `Inventory` extends `Phaser.Events.EventEmitter` ([Inventory.ts:1](src/systems/Inventory.ts#L1)),
+    but that class **is** `eventemitter3`. Critique S5: importing the full `phaser` package under jsdom
+    runs its `Device`/canvas feature-detection at import (touches `document`/`canvas.getContext`) and
+    typically needs `vitest-canvas-mock` — a known-painful path. **Default: keep the Inventory test in
+    plain Node** by removing the full-phaser import from the test path — either alias `phaser` → a stub
+    in `vitest.config.ts`, or (cleanest) have `Inventory` import `eventemitter3` directly instead of via
+    `phaser`. Only fall back to jsdom + canvas-mock if neither is workable. Test add/get, the `wood`
+    accounting behind chop-yield/blueprint-spend, and that it emits on change.
   - Data invariants (pure, node): `src/data/{nodes,buildables,enemies,items,types}` — e.g. every
     buildable's cost items exist, `kidZombie` maxHp/damage match what combat tests assume, node maxHp
     sane. These catch data-edit regressions cheaply.
   - Done when: `npm test` green including the jsdom file; data invariants assert real constraints.
 
 - [ ] **Step 4: Build the scenario-setup + fixed-step API on GameScene** `[inline]`
-  - Add a **test-only** control surface, namespaced so it reads as non-production. Two shapes are
-    acceptable — pick at execute: (a) methods on `GameScene` exposed via
-    `window.game.__test = { applyScenario, step, ... }`, or (b) a `src/debug/testApi.ts` the scene
-    installs. Guard install behind `import.meta.env.DEV` **or** a `?test=1` query flag so it is absent
-    from the normal production bundle (note in `docs/DECISIONS.md`).
+  - Add a **test-only** control surface, namespaced so it reads as non-production: install
+    `window.game.__test = { applyScenario, step, setRng, ... }` (methods on `GameScene`, or a
+    `src/debug/testApi.ts` the scene installs). **Gate purely on `import.meta.env.DEV`** — NOT a
+    `?test=1` runtime flag — so Vite dead-code-eliminates the whole install block from `vite build` and
+    it is genuinely absent from the shipped bundle. *This forces the e2e server to be `vite dev` (where
+    `DEV===true`), which Step 5 must honour* — critique B2: `vite preview` serves the **production**
+    build where `DEV===false`, so a DEV-gated API would be `undefined` under preview and every scenario
+    would fail setup. Do not mix the two guards; they give contradictory guarantees. (Note in
+    `docs/DECISIONS.md`.)
   - `applyScenario(spec)`: reset the world (reuse the `create()` reset block —
     [GameScene.ts:173-197](src/scenes/GameScene.ts#L173)) then deterministically set: player tile +
     facing, inventory contents, mode (`command|combat|inspect`), and place exactly the trees / zombies
     / walls / blueprints the spec lists (own placement — do not lean on `spawnTrees`/`spawnZombies`
     fixtures). Return once the world matches the spec.
-  - `step(ms)`: advance gameplay by a fixed delta with the **Phaser loop paused** (pause in test mode,
-    then pump `scene.update(t, ms)` yourself), so chop intervals (`CHOP_INTERVAL_MS`), build progress
-    (`BUILD_MS`), contact cooldown, and future day/night resolve deterministically — no `waitForTimeout`.
-    Verify pausing + manual-stepping doesn't double-drive physics; if that proves fiddly, the fallback
-    is a bounded poll (like the chop fix already in `smoke.mjs`) — but prefer real stepping.
+  - `setRng(fn)` (critique S3): the scene's combat call sites default to `Math.random` —
+    `resolveMeleeAttack(...)` at [GameScene.ts:757](src/scenes/GameScene.ts#L757) and the zombie
+    contact attack at [GameScene.ts:990](src/scenes/GameScene.ts#L990) pass **no** rng. It's only
+    deterministic today because `kidZombie.dodge` and player `dodge` are both `0` (hitChance clamps to
+    100). Thread an injectable rng from the scene into those calls and let `__test.setRng` (or a
+    `spec.rng`) pin it, so combat scenarios survive any future `dodge > 0`.
+  - `step(ms)` — the determinism seam. **Do NOT call `scene.update()` directly** (critique B1: movement
+    is Arcade-physics velocity integration via `physics.moveTo` at [GameScene.ts:391](src/scenes/GameScene.ts#L391)
+    / [:956](src/scenes/GameScene.ts#L956); the scene clock `this.time.now` gates contact damage/repath
+    at [GameScene.ts:974-990](src/scenes/GameScene.ts#L974); regrow is a `time.delayedCall` at
+    [:899](src/scenes/GameScene.ts#L899) — none of these advance from a manual `scene.update` call, so
+    it would freeze exactly what we need to drive). Instead **stop the game loop** (`game.loop.stop()`)
+    and drive the whole pipeline with a manual monotonic clock: loop `game.step(t, fixedDelta)` with
+    `t += fixedDelta` for `ms/fixedDelta` iterations — this runs each scene's `Systems.step` → Arcade
+    `World.update` → `Clock` → `TweenManager` → render, deterministically. This is the standard Phaser
+    fixed-step technique; chop/build/contact-cooldown/regrow/tweens all advance with zero wall-clock.
+    (No bounded-poll fallback — that reintroduces the flakiness this plan exists to kill.)
   - Extend `debugState()` only if a scenario needs a read it lacks (keep it the one read seam).
-  - Done when: from the browser console, `window.game.__test.applyScenario({player:[3,3], trees:[[5,3]],
-    wood:0})` then repeated `__test.step(CHOP_INTERVAL_MS)` after ordering a chop yields wood
-    deterministically; the API is absent from a plain `npm run build` bundle (grep the output).
+  - Done when: with the app on `vite dev`, `window.game.__test.applyScenario({player:[3,3],
+    trees:[[5,3]], wood:0})` then order a chop and loop `__test.step(fixedDelta)` yields wood
+    deterministically (worker actually walks + chops under the driven loop); a manual `step`-driven
+    zombie closes distance and its contact damage fires; and `grep` of a plain `npm run build` bundle
+    shows **no** `__test` install code.
 
 - [ ] **Step 5: Port the integration/input/render assertions to deterministic scenarios** `[delegate sonnet]`
   - **One independently runnable file per concern** (`tests/e2e/{chop,combat,build,inspect,zoom,...}.spec.ts`)
@@ -184,19 +217,25 @@ current smoke:
     **Recommended: use the Playwright test runner (`@playwright/test`)** rather than extending the
     hand-rolled `smoke.mjs` node script, because it gives per-file selection, `--grep` by test name,
     parallelism, and retries for free (`npx playwright test chop`, `npx playwright test -g "routes around"`).
-    Tradeoff to weigh at execute: one new devDep + a `playwright.config.ts` (set `executablePath` from
-    `SMOKE_CHROMIUM_PATH`, webServer = `vite preview`) vs. keeping raw `playwright` with a manual
-    file-arg. Lean toward the test runner — selective running *is* the goal.
-  - Each spec: load → `applyScenario(...)` → do the ONE action → `step()` if time-based → assert via
-    `debugState()`/inspect state. Port only the **Tier-2** rows: zoom clamp/readout, pan/follow,
+    Add `@playwright/test` **pinned to the same 1.61.x line** as the existing bare `playwright` dep
+    (critique S7 — version drift vs the pre-installed browser). `playwright.config.ts`: `use.launchOptions.executablePath`
+    from `SMOKE_CHROMIUM_PATH`; **`webServer` = `vite dev`, NOT `vite preview`** (critique B2 — the
+    `__test` API is DEV-gated per Step 4, so it exists only under dev); set `webServer.url` to match the
+    dev base path (`vite.config` `base` is `/` in dev, `/mostowo-survival/` only in production — N8);
+    **`retries: 0`** so flakes surface instead of hiding (N9).
+  - Each spec: load → `applyScenario(...)` → do the ONE action → drive `__test.step(...)` if time-based
+    → assert via `debugState()`/inspect state. Port the **Tier-2** rows: zoom clamp/readout, pan/follow,
     input-mode toggles, Inspect panels (zombie/tree/wall/empty), queued-tree **glow attaches**
-    (`outlinedTreeIds`/`pulsingTreeId`), build→wall→pathfinding-on-real-grid, death→restart. No
+    (`outlinedTreeIds`/`pulsingTreeId`), build→wall→pathfinding-on-real-grid, death→restart, **and the
+    timing-sensitive input gestures the tiers would otherwise orphan** (critique S4): long-press-append
+    and hold-drag-paint (`pressStart`/`LONGPRESS_MS` at [GameScene.ts:641](src/scenes/GameScene.ts#L641)/
+    [:673](src/scenes/GameScene.ts#L673)) — now testable deterministically via driven `step`. No
     multi-second walks — place entities adjacent and `step()`.
   - `package.json`: `"e2e": "playwright test"` (full, wrap-up gate). A single scenario is just
-    `npx playwright test <file>` — no extra script needed. Keep honouring the pre-installed Chromium path.
+    `npx playwright test <file>`. Keep honouring the pre-installed Chromium path.
   - Done when: `npx playwright test chop` runs **only** the chop scenario (proves selective running);
-    the full `npm run e2e` passes **repeatably** (≥5× — the bar the current smoke fails); no
-    `waitForTimeout`-based gameplay assertions remain.
+    the full `npm run e2e` passes **repeatably** (≥5×, `retries:0` — the bar the current smoke fails);
+    no `waitForTimeout`-based gameplay assertions remain.
 
 - [ ] **Step 6: Slim `smoke.mjs` to a boot canary + retire the playthrough** `[inline]`
   - Reduce `scripts/smoke.mjs` to: boot, reach `Game`+`UI` active, assert **zero console/page errors**
@@ -220,8 +259,9 @@ current smoke:
     to extend them; the open question is closed.
 
 ## Out of scope
-- Rewriting game systems for testability **beyond** at most decoupling `Inventory`'s emitter (only if
-  jsdom is genuinely painful — otherwise untouched).
+- Rewriting game systems for testability **beyond** the small seams this plan needs: `Inventory`'s
+  emitter import (Step 3) and threading an injectable `rng` into the scene's combat calls (Step 4, S3).
+  No broader refactor.
 - 100% coverage or snapshot/visual-regression testing (the boot screenshot stays eyeball-only).
 - New gameplay, balancing, or content — this is test infrastructure only.
 - Replacing Playwright or changing the deploy pipeline.
