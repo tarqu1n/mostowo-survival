@@ -370,7 +370,18 @@ mechanism fought the code that's actually there.
     while the worker picks in place; chopping a tree still plays the chop swing and mining a rock the
     mine swing.
 
-- [ ] **Step 7: Hunger wiring in GameScene (drain, starvation→health cascade, eat, stats registry)** `[inline]`
+- [x] **Step 7: Hunger wiring in GameScene (drain, starvation→health cascade, eat, stats registry)** `[inline]`
+  - Outcome: `GameScene.ts` — imported `needs` (`drainHunger`/`feed`/`isStarving`) + the HUNGER config
+    consts; added fields `hunger`/`starveElapsed`; seeded `registry.hunger` + `registry.playerStats` in
+    `create()`. Per-frame (next to the clock, above the early-return): drain via `drainHunger`, emit
+    `hunger:changed` only when the rounded value changes; starvation accumulator routes `STARVE_DAMAGE`
+    through `damagePlayer` every `STARVE_DAMAGE_INTERVAL_MS` (bounded while-loop) → reuses combat's
+    `scene.restart()` death path. Added `eat(itemId)` (edibility + `canAfford` guard → `spend` +
+    `feed`; `spend` already fires inventory `'change'`) and an `onNeedsEat` handler on `needs:eat`
+    (registered + torn down). **Also fixed a latent Step 2 gap:** the survival fields
+    (`clockMs`/`dayPhase`/`dayCount`/`hunger`/`starveElapsed`) are now reset in `create()`'s death-restart
+    reset block, so a starvation death restarts cleanly at Day 1 / full hunger (class-field initialisers
+    don't re-run on Phaser's `scene.restart()`). Build + boot green. Drain/starve/eat asserted in Step 9.
   - Fields: `private hunger = HUNGER_MAX`, `private starveElapsed = 0`. Seed `registry.set('hunger',
     HUNGER_MAX)` and `registry.set('playerStats', this.playerStats)` in `create()` (the latter surfaces
     combat's private stats for the Wellbeing rows).

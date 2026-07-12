@@ -22,6 +22,10 @@ import {
   INVENTORY_SLOTS,
   DEFAULT_MAX_STACK,
   PLAYER_HURTBOX,
+  HUNGER_MAX,
+  HUNGER_DRAIN_PER_SEC,
+  STARVE_DAMAGE,
+  STARVE_DAMAGE_INTERVAL_MS,
 } from '../config';
 import { ITEMS } from '../data/items';
 import { NODES } from '../data/nodes';
@@ -33,6 +37,7 @@ import { worldToTile, tileToWorldCenter, snapToTileCenter, tileKey } from '../sy
 import { findPath, reachableAdjacent, type Cell } from '../systems/pathfind';
 import { TaskQueue, type Action } from '../systems/tasks';
 import { cycleLengthMs, phaseAt, tintAlphaAt, dayCountForTotal, type DayPhase } from '../systems/daynight';
+import { drainHunger, feed, isStarving } from '../systems/needs';
 import { resolveMeleeAttack } from '../systems/combat';
 import { hurtboxContains, hurtboxTiles, DEFAULT_HURTBOX } from '../systems/hurtbox';
 import { bakeGlowTexture } from '../render/glowTexture';
@@ -212,6 +217,11 @@ export class GameScene extends Phaser.Scene {
   private dayCount = 1;
   private nightOverlay!: Phaser.GameObjects.Rectangle;
 
+  // Hunger: drains every frame (see update()); at zero the player starves, taking STARVE_DAMAGE every
+  // STARVE_DAMAGE_INTERVAL_MS via combat's damagePlayer. `starveElapsed` is the damage-cadence accumulator.
+  private hunger = HUNGER_MAX;
+  private starveElapsed = 0;
+
   private buildMode = false;
   private walls!: Phaser.Physics.Arcade.StaticGroup;
   private occupied = new Set<string>();
@@ -274,6 +284,13 @@ export class GameScene extends Phaser.Scene {
     this.paintedThisGesture.clear();
     this.lastFacing = { dCol: 0, dRow: 1 };
     this.mode = 'command';
+    // Survival state — reset so a death-restart begins a fresh Day 1 at full hunger (these are plain-data
+    // fields; without an explicit reset they'd carry the dead run's values, e.g. hunger stuck at 0).
+    this.clockMs = 0;
+    this.dayPhase = 'day';
+    this.dayCount = 1;
+    this.hunger = HUNGER_MAX;
+    this.starveElapsed = 0;
 
     this.playerStats = {
       maxHp: PLAYER_MAX_HP,
@@ -286,6 +303,10 @@ export class GameScene extends Phaser.Scene {
       hurtbox: PLAYER_HURTBOX,
     };
     this.playerHp = this.playerStats.maxHp;
+    // Seed survival state onto the registry so UIScene (Wellbeing screen) re-reads it on a scene
+    // restart. playerStats is combat's private stat bag surfaced here for the Wellbeing stat rows.
+    this.registry.set('hunger', this.hunger);
+    this.registry.set('playerStats', this.playerStats);
 
     this.drawGround();
 
@@ -395,6 +416,7 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on('combat:punch', this.punch, this);
     this.game.events.on('mode:combatToggle', this.onCombatToggle, this);
     this.game.events.on('mode:inspectToggle', this.onInspectToggle, this);
+    this.game.events.on('needs:eat', this.onNeedsEat, this);
     this.game.events.on('combat:move', this.onCombatMove, this);
     this.game.events.on('combat:moveEnd', this.onCombatMoveEnd, this);
 
@@ -407,6 +429,7 @@ export class GameScene extends Phaser.Scene {
       this.game.events.off('combat:punch', this.punch, this);
       this.game.events.off('mode:combatToggle', this.onCombatToggle, this);
       this.game.events.off('mode:inspectToggle', this.onInspectToggle, this);
+      this.game.events.off('needs:eat', this.onNeedsEat, this);
       this.game.events.off('combat:move', this.onCombatMove, this);
       this.game.events.off('combat:moveEnd', this.onCombatMoveEnd, this);
     });
@@ -451,6 +474,27 @@ export class GameScene extends Phaser.Scene {
       this.registry.set('dayPhase', phase);
       this.registry.set('dayCount', dayCount);
       this.game.events.emit('time:changed', { phase, dayCount, cycleMs, tNorm: cycleMs / cycleLengthMs() });
+    }
+
+    // Hunger drains every frame too (drainHunger clamps a big refocus delta to [0,max]). Emit only when
+    // the displayed (rounded) value changes. At zero the player starves: STARVE_DAMAGE every
+    // STARVE_DAMAGE_INTERVAL_MS via combat's damagePlayer (the chop-interval accumulator idiom; the
+    // while is bounded since it decrements). A fully-starved player thus loses HP and dies via combat's
+    // scene.restart() death path — after which the create() reset above re-seeds full hunger.
+    const hungerBefore = Math.round(this.hunger);
+    this.hunger = drainHunger(this.hunger, delta, HUNGER_DRAIN_PER_SEC, HUNGER_MAX);
+    if (Math.round(this.hunger) !== hungerBefore) {
+      this.registry.set('hunger', this.hunger);
+      this.game.events.emit('hunger:changed', { hunger: this.hunger, max: HUNGER_MAX });
+    }
+    if (isStarving(this.hunger)) {
+      this.starveElapsed += delta;
+      while (this.starveElapsed >= STARVE_DAMAGE_INTERVAL_MS) {
+        this.starveElapsed -= STARVE_DAMAGE_INTERVAL_MS;
+        this.damagePlayer(STARVE_DAMAGE);
+      }
+    } else {
+      this.starveElapsed = 0;
     }
 
     const action = this.queue.current;
@@ -946,6 +990,26 @@ export class GameScene extends Phaser.Scene {
       console.log('player down — restarting');
       this.scene.restart();
     }
+  }
+
+  /**
+   * Eat one unit of an edible item: spend it from the bag and restore its `nutrition` to hunger.
+   * Returns false (a no-op) if the item isn't edible or none is held. Wired to the `needs:eat` event
+   * the Wellbeing screen (UIScene) emits; `spend` already fires the inventory `'change'` for the HUD.
+   */
+  private eat(itemId: string): boolean {
+    const def = ITEMS[itemId];
+    if (def?.nutrition == null || !this.inv.canAfford({ [itemId]: 1 })) return false;
+    this.inv.spend({ [itemId]: 1 });
+    this.hunger = feed(this.hunger, def.nutrition, HUNGER_MAX);
+    this.registry.set('hunger', this.hunger);
+    this.game.events.emit('hunger:changed', { hunger: this.hunger, max: HUNGER_MAX });
+    return true;
+  }
+
+  /** `needs:eat` handler — the Wellbeing screen taps an edible; forward to `eat`. */
+  private onNeedsEat({ itemId }: { itemId: string }): void {
+    this.eat(itemId);
   }
 
   /** The live zombie whose body (hurtbox, anchored at its feet tile) covers tile (col,row) — so a
