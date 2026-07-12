@@ -15,11 +15,12 @@
 export type Facing = 'down' | 'side' | 'up';
 /**
  * Player animation states: `idle`/`walk` are looping locomotion (velocity-driven); `chop`/`mine`/
- * `punch` are action swings. `chop` (axe) loops while felling a tree; `mine` (overhead pickaxe
- * swing) loops while mining a rock; `punch` (sword thrust) is a one-shot combat swing. All are
- * 3-way directional and share one `playerAnimKey`/render footprint.
+ * `gather`/`punch` are in-place harvest/action states. `chop` (axe) loops while felling a tree;
+ * `mine` (overhead pickaxe swing) loops while mining a rock; `gather` (Collect crouch-pick) loops
+ * while foraging a bush; `punch` (sword thrust) is a one-shot combat swing. All are 3-way directional
+ * and share one `playerAnimKey`/render footprint.
  */
-export type PlayerState = 'idle' | 'walk' | 'chop' | 'mine' | 'punch';
+export type PlayerState = 'idle' | 'walk' | 'chop' | 'mine' | 'gather' | 'punch';
 
 /** A terrain tile: a standalone PNG (load.image) OR frame N of a sheet sliced at TILE_SIZE. */
 export type TileSource =
@@ -59,7 +60,7 @@ export interface TilesetManifest {
   actors: {
     /**
      * Player: one render footprint for all strips; 3-way directional idle + walk (looping
-     * locomotion) plus chop + mine + punch action swings (see `PlayerState` doc).
+     * locomotion) plus chop + mine + gather + punch action swings (see `PlayerState` doc).
      */
     player: {
       render: ActorRender;
@@ -67,6 +68,7 @@ export interface TilesetManifest {
       walk: Record<Facing, StripAnim>;
       chop: Record<Facing, StripAnim>;
       mine: Record<Facing, StripAnim>;
+      gather: Record<Facing, StripAnim>;
       punch: Record<Facing, StripAnim>;
     };
     /** Enemy: single-orientation Run strip (frame 0 doubles as idle); GameScene flips by move-x. */
@@ -113,11 +115,12 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
         side: { path: 'Entities/Characters/Body_A/Animations/Walk_Base/Walk_Side-Sheet.png', frameSize: 64, frames: 6 },
         up: { path: 'Entities/Characters/Body_A/Animations/Walk_Base/Walk_Up-Sheet.png', frameSize: 64, frames: 6 },
       },
-      // Each action maps to the Body_A melee motion that reads right for it: chop = Slice_Base
+      // Each action maps to the Body_A motion that reads right for it: chop = Slice_Base
       // (side-swing axe, fells trees); mine = Crush_Base (overhead smash, reads as a pickaxe on
-      // rock); punch = Pierce_Base (weapon thrust — the character holds a sword, so this is the
-      // combat swing). All 8×64px, 3-way. NB Pierce ships its up strip as `Pierce_Top-Sheet.png`
-      // (not `_Up`) — the manifest lists explicit paths, so the odd name is captured here.
+      // rock); gather = Collect_Base (crouch-and-pick, reads as foraging a bush); punch = Pierce_Base
+      // (weapon thrust — the character holds a sword, so this is the combat swing). All 8×64px, 3-way.
+      // NB Pierce ships its up strip as `Pierce_Top-Sheet.png` (not `_Up`) — the manifest lists
+      // explicit paths, so the odd name is captured here.
       chop: {
         down: { path: 'Entities/Characters/Body_A/Animations/Slice_Base/Slice_Down-Sheet.png', frameSize: 64, frames: 8 },
         side: { path: 'Entities/Characters/Body_A/Animations/Slice_Base/Slice_Side-Sheet.png', frameSize: 64, frames: 8 },
@@ -127,6 +130,11 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
         down: { path: 'Entities/Characters/Body_A/Animations/Crush_Base/Crush_Down-Sheet.png', frameSize: 64, frames: 8 },
         side: { path: 'Entities/Characters/Body_A/Animations/Crush_Base/Crush_Side-Sheet.png', frameSize: 64, frames: 8 },
         up: { path: 'Entities/Characters/Body_A/Animations/Crush_Base/Crush_Up-Sheet.png', frameSize: 64, frames: 8 },
+      },
+      gather: {
+        down: { path: 'Entities/Characters/Body_A/Animations/Collect_Base/Collect_Down-Sheet.png', frameSize: 64, frames: 8 },
+        side: { path: 'Entities/Characters/Body_A/Animations/Collect_Base/Collect_Side-Sheet.png', frameSize: 64, frames: 8 },
+        up: { path: 'Entities/Characters/Body_A/Animations/Collect_Base/Collect_Up-Sheet.png', frameSize: 64, frames: 8 },
       },
       punch: {
         down: { path: 'Entities/Characters/Body_A/Animations/Pierce_Base/Pierce_Down-Sheet.png', frameSize: 64, frames: 8 },

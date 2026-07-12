@@ -197,10 +197,11 @@ export class GameScene extends Phaser.Scene {
   private actionGoal: Cell | null = null; // the tile we're currently pathing to (for re-pathing)
   private chopElapsed = 0;
   // Action-swing anim state: `harvestSwing` is set each frame the worker is harvesting in place —
-  // 'chop' (axe) for a tree, 'mine' (pickaxe) for a rock — and drives that looping swing; null when
-  // not harvesting. `punchLockUntil` is the scene-clock time until which the one-shot punch (sword)
-  // swing owns the sprite (updatePlayerAnim yields to it — see punch()).
-  private harvestSwing: 'chop' | 'mine' | null = null;
+  // 'chop' (axe) for a tree, 'mine' (pickaxe) for a rock, 'gather' (Collect forage) for a bush — and
+  // drives that looping animation; null when not harvesting. `punchLockUntil` is the scene-clock time
+  // until which the one-shot punch (sword) swing owns the sprite (updatePlayerAnim yields to it — see
+  // punch()).
+  private harvestSwing: 'chop' | 'mine' | 'gather' | null = null;
   private punchLockUntil = 0;
 
   // Day/night clock: `clockMs` auto-advances every frame (see update()); `dayPhase`/`dayCount` are the
@@ -301,9 +302,10 @@ export class GameScene extends Phaser.Scene {
     // Player: 3-way directional idle + walk (down/side/up). Each strip is its own texture (key ==
     // anim key, loaded in PreloadScene); side art faces right, GameScene mirrors it with flipX.
     const { player: playerActor, enemy: enemyActor } = ACTIVE_TILESET.actors;
-    // idle/walk loop (velocity-driven locomotion); chop/mine loop while harvesting in place; punch is
-    // a one-shot swing. Action swings run faster (ACTION_ANIM_FRAMERATE) so a hit lands per swing.
-    (['idle', 'walk', 'chop', 'mine', 'punch'] as PlayerState[]).forEach((state) => {
+    // idle/walk loop (velocity-driven locomotion); chop/mine/gather loop while harvesting in place;
+    // punch is a one-shot swing. Chop/mine/punch run faster (ACTION_ANIM_FRAMERATE) so a hit lands per
+    // swing; gather is a calmer forage loop at the locomotion rate.
+    (['idle', 'walk', 'chop', 'mine', 'gather', 'punch'] as PlayerState[]).forEach((state) => {
       const isAction = state === 'chop' || state === 'mine' || state === 'punch';
       (['down', 'side', 'up'] as Facing[]).forEach((facing) => {
         const key = playerAnimKey(state, facing);
@@ -783,9 +785,11 @@ export class GameScene extends Phaser.Scene {
     if (this.advancePath()) {
       this.player.body.setVelocity(0, 0);
       this.faceTile(tree.col, tree.row); // swing toward the node, whatever side we stood on
-      // Standing at the node → updatePlayerAnim plays the matching harvest swing: a rock is mined
-      // (pickaxe), everything else is chopped (axe). See ResourceNodeDef.tile roles.
-      this.harvestSwing = tree.def.tile === 'rock' ? 'mine' : 'chop';
+      // Standing at the node → updatePlayerAnim plays the matching harvest anim: a bush is foraged
+      // (gather/Collect), a rock is mined (pickaxe), everything else is chopped (axe). Bush wins ahead
+      // of the rock/tree split via its `harvestAnim` def flag. See ResourceNodeDef.tile/harvestAnim.
+      this.harvestSwing =
+        tree.def.harvestAnim === 'gather' ? 'gather' : tree.def.tile === 'rock' ? 'mine' : 'chop';
       this.chopElapsed += delta;
       if (this.chopElapsed >= CHOP_INTERVAL_MS) {
         this.chopElapsed = 0;

@@ -328,7 +328,15 @@ mechanism fought the code that's actually there.
     trees), stands adjacent, harvests `berries` into the bag, depletes then regrows; building over a
     bush tile is permitted; `berries.png` loads without a console error.
 
-- [ ] **Step 6: Player gathering animation (`Collect_Base`)** `[inline]`
+- [x] **Step 6: Player gathering animation (`Collect_Base`)** `[inline]`
+  - Outcome: `tileset.ts` — `'gather'` added to `PlayerState`, to the manifest `player` interface, and
+    a `gather` strip block wired to `Collect_Base/Collect_{Down,Side,Up}-Sheet.png` (8×64px, verified on
+    disk). `GameScene.ts` — `harvestSwing` widened to `…|'gather'|null`; `'gather'` added to the
+    anim-create loop (looping `repeat:-1`, kept OUT of `isAction` so it runs at the calm `frameRate 10`);
+    swing selection at the harvest site now picks `gather` for `def.harvestAnim==='gather'` ahead of the
+    rock/tree split (`updatePlayerAnim` unchanged — consumes `harvestSwing`). `PreloadScene.ts` — added
+    `'gather'` to the hardcoded `playerStates` load list (would otherwise silently skip the strips).
+    `npm run build` green; boot canary clean. Gather-plays-on-forage asserted via Step 9's forage scenario.
   > **Anim seam corrected 2026-07-12 (critique Finding 1).** The player no longer uses a `chopping`
   > boolean + 4-state `PlayerState`. In-place harvest anim is now a **`harvestSwing` STATE**
   > (`'chop' | 'mine' | null`, `GameScene.ts:202`, doc `:198-199`), reset each frame (`:416`), selected
