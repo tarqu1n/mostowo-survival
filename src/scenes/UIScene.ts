@@ -10,8 +10,10 @@ import {
   MAX_ZOOM,
   HOTBAR_SLOTS,
   INVENTORY_SLOTS,
+  HUNGER_MAX,
 } from '../config';
 import { ITEMS } from '../data/items';
+import type { CombatantStats } from '../data/types';
 import { BUILDABLES } from '../data/buildables';
 import { iconKey } from '../data/tileset';
 import type { Inventory } from '../systems/Inventory';
@@ -55,6 +57,19 @@ export class UIScene extends Phaser.Scene {
   private inventoryButton!: Button;
   private inventoryPanel!: Panel;
   private inventoryGrid!: SlotGrid;
+
+  // Health & Wellbeing screen (plan 004): a STATUS-toggled Panel with a hunger + health meter, the
+  // player's stat rows, and a tap-to-eat edible list. Only the button + panel go in hudElements — the
+  // panel's bounds cover the edible rows for the world-tap gate (same as the inventory panel).
+  private statusButton!: Button;
+  private wellbeingPanel!: Panel;
+  private hungerBarFg!: Phaser.GameObjects.Rectangle;
+  private hungerLabel!: Phaser.GameObjects.Text;
+  private healthBarFg!: Phaser.GameObjects.Rectangle;
+  private healthLabel!: Phaser.GameObjects.Text;
+  private playerMaxHp = 0;
+  private playerHp = 0; // seeded lazily from the first player:hpChanged (HP isn't on the registry)
+  private eatRows: Array<{ itemId: string; button: Button; nutrition: number }> = [];
 
   // Combat mode: virtual movepad (bottom-right) + Punch button (bottom-left). The movepad is a
   // bespoke joystick (drag tracking below), not a kit widget; the Punch button is a kit Button.
@@ -223,6 +238,17 @@ export class UIScene extends Phaser.Scene {
     arrangeRow([this.modeCombatButton, this.modeInspectButton], { startX: 8, y: 48, width: mbw, gap: 8 });
     this.hudElements.push(this.modeCombatButton, this.modeInspectButton);
 
+    // STATUS — opens the Health & Wellbeing screen. Left column, below the mode row (clear of the
+    // combat movepad/Punch corners and the centre day/night stack).
+    this.statusButton = new Button(this, 8 + mbw / 2, 72, {
+      width: mbw,
+      height: mbh,
+      label: 'STATUS',
+      fontSize: 9,
+      onDown: () => this.toggleWellbeing(),
+    });
+    this.hudElements.push(this.statusButton);
+
     // Combat mode controls — hidden until mode === 'combat' (see onModeChanged). The movepad stays
     // a bespoke joystick; only the Punch button comes from the kit.
     this.movepadBase = this.add
@@ -319,6 +345,9 @@ export class UIScene extends Phaser.Scene {
     this.inventoryPanel.add(this.inventoryGrid);
     this.hudElements.push(this.inventoryPanel);
 
+    // Health & Wellbeing screen (plan 004) — meters + stat rows + edible list.
+    this.buildWellbeingPanel();
+
     // Seed + subscribe: read the shared Inventory's own 'change' directly (no event-bus hop).
     this.refreshInventory();
     this.inv?.on('change', this.refreshInventory, this);
@@ -330,6 +359,8 @@ export class UIScene extends Phaser.Scene {
     this.game.events.on('inspect:show', this.showInspectPanel, this);
     this.game.events.on('inspect:hide', this.hideInspectPanel, this);
     this.game.events.on('time:changed', this.onTimeChanged, this);
+    this.game.events.on('hunger:changed', this.onHungerChanged, this);
+    this.game.events.on('player:hpChanged', this.onPlayerHp, this);
 
     // Teardown so a future scene restart doesn't double-register on stale listeners.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -342,6 +373,8 @@ export class UIScene extends Phaser.Scene {
       this.game.events.off('inspect:show', this.showInspectPanel, this);
       this.game.events.off('inspect:hide', this.hideInspectPanel, this);
       this.game.events.off('time:changed', this.onTimeChanged, this);
+      this.game.events.off('hunger:changed', this.onHungerChanged, this);
+      this.game.events.off('player:hpChanged', this.onPlayerHp, this);
     });
   }
 
@@ -362,6 +395,7 @@ export class UIScene extends Phaser.Scene {
     // Reflect affordability of a wall on the Build button (dim the label when you can't afford it).
     const affordable = (this.inv?.get(ITEMS.wood.id) ?? 0) >= (BUILDABLES.wall.cost.wood ?? 0);
     this.buildButton.label.setAlpha(affordable ? 1 : 0.4);
+    this.refreshEatRows(); // keep the Wellbeing edible counts live with the bag
   }
 
   private toggleInventory(): void {
@@ -372,6 +406,144 @@ export class UIScene extends Phaser.Scene {
     if (open) this.inventoryPanel.show();
     else this.inventoryPanel.hide();
     this.inventoryButton.setToggled(open);
+  }
+
+  // ---- Health & Wellbeing screen -------------------------------------------
+
+  /**
+   * Build the STATUS-toggled Wellbeing Panel: a hunger + health two-rect meter, the player's stat
+   * rows (from the registry's `playerStats`), and a tap-to-eat list of every edible item. Meters are
+   * left-anchored fg rects scaled by value; the edible rows are kit Buttons that emit `needs:eat`.
+   */
+  private buildWellbeingPanel(): void {
+    const W = 220;
+    const H = 384;
+    const halfH = H / 2;
+    const top = (offsetY: number): number => -halfH + offsetY;
+    const BAR_W = 176;
+    const BAR_H = 12;
+
+    this.wellbeingPanel = new Panel(this, BASE_WIDTH / 2, BASE_HEIGHT / 2, {
+      width: W,
+      height: H,
+      depth: 20,
+      dismissible: true,
+      onDismiss: () => this.setWellbeingOpen(false),
+    });
+    this.wellbeingPanel.addText(16, { fontSize: '12px', color: '#e8dcc0' }).setText('HEALTH & WELLBEING');
+
+    // A left-anchored two-rect meter (dark bg + coloured fg scaled by value). Returns the fg rect;
+    // callers set `fg.scaleX = value/max` and re-tint it. Origin (0, 0.5) keeps the left edge fixed.
+    const makeBar = (offsetY: number, colour: number): Phaser.GameObjects.Rectangle => {
+      const bg = this.add.rectangle(0, top(offsetY), BAR_W, BAR_H, 0x2a2a2a).setStrokeStyle(1, 0x000000, 0.5);
+      const fg = this.add.rectangle(-BAR_W / 2, top(offsetY), BAR_W, BAR_H, colour).setOrigin(0, 0.5);
+      this.wellbeingPanel.add([bg, fg]);
+      return fg;
+    };
+
+    this.hungerLabel = this.wellbeingPanel.addText(44, { fontSize: '10px', color: '#e8dcc0' });
+    this.hungerBarFg = makeBar(60, 0xd8a24a);
+    this.healthLabel = this.wellbeingPanel.addText(86, { fontSize: '10px', color: '#e8dcc0' });
+    this.healthBarFg = makeBar(102, 0x4caf50);
+
+    // Player stats — read once from the registry (combat's private stat bag, surfaced by GameScene).
+    const s = this.registry.get('playerStats') as CombatantStats | undefined;
+    const statLine = (label: string, value: number | string): string => `${label.padEnd(9)}${value}`;
+    const statsText = s
+      ? [
+          statLine('Max HP', s.maxHp),
+          statLine('Armour', s.armour),
+          statLine('Speed', s.speed),
+          statLine('Vision', s.vision ?? '-'),
+          statLine('Strength', s.strength),
+          statLine('Dex', s.dex),
+          statLine('Dodge', s.dodge),
+        ].join('\n')
+      : '(stats unavailable)';
+    this.wellbeingPanel.addText(126, { fontSize: '11px', color: '#9a8f74' }).setText('— STATS —');
+    this.wellbeingPanel
+      .addText(140, { fontSize: '10px', color: '#9a8f74', align: 'left' }, 0)
+      .setText(statsText);
+
+    // Seed the health bar: max from playerStats (HP itself isn't on the registry — fill from the first
+    // player:hpChanged), so it starts full until combat reports the live value.
+    this.playerMaxHp = s?.maxHp ?? 0;
+    this.playerHp = this.playerMaxHp;
+    this.updateHealthBar();
+    this.updateHungerBar((this.registry.get('hunger') as number | undefined) ?? HUNGER_MAX);
+
+    // Edible list — one interactive row per item with `nutrition`. The row emits needs:eat (guarded to
+    // count > 0). Rows live inside the panel, so the panel's bounds cover them for the world-tap gate.
+    this.wellbeingPanel.addText(248, { fontSize: '11px', color: '#9a8f74' }).setText('— AVAILABLE TO EAT —');
+    const edibles = Object.values(ITEMS).filter((it) => it.nutrition != null);
+    edibles.forEach((it, i) => {
+      const rowY = top(272 + i * 30);
+      if (this.textures.exists(iconKey(it.id))) {
+        const icon = this.add.image(-BAR_W / 2 + 6, rowY, iconKey(it.id)).setDisplaySize(18, 18);
+        this.wellbeingPanel.add(icon);
+      }
+      const button = new Button(this, 14, rowY, {
+        width: 150,
+        height: 24,
+        label: it.name,
+        fontSize: 10,
+        onDown: () => {
+          if ((this.inv?.get(it.id) ?? 0) > 0) this.game.events.emit('needs:eat', { itemId: it.id });
+        },
+      });
+      this.wellbeingPanel.add(button);
+      this.eatRows.push({ itemId: it.id, button, nutrition: it.nutrition! });
+    });
+  }
+
+  private toggleWellbeing(): void {
+    this.setWellbeingOpen(!this.wellbeingPanel.visible);
+  }
+
+  private setWellbeingOpen(open: boolean): void {
+    if (open) {
+      this.refreshEatRows(); // sync counts before showing
+      this.wellbeingPanel.show();
+    } else {
+      this.wellbeingPanel.hide();
+    }
+    this.statusButton.setToggled(open);
+  }
+
+  /** Scale + tint the hunger bar and update its label. Amber normally, red when near-empty/starving. */
+  private updateHungerBar(hunger: number): void {
+    const ratio = Math.max(0, Math.min(1, hunger / HUNGER_MAX));
+    this.hungerBarFg.scaleX = ratio;
+    this.hungerBarFg.setFillStyle(ratio <= 0.2 ? 0xc0392b : 0xd8a24a);
+    this.hungerLabel.setText(`Hunger  ${Math.round(hunger)}/${HUNGER_MAX}`);
+  }
+
+  /** Scale + tint the health bar and update its label. Green normally, red when low. */
+  private updateHealthBar(): void {
+    const ratio = this.playerMaxHp > 0 ? Math.max(0, Math.min(1, this.playerHp / this.playerMaxHp)) : 1;
+    this.healthBarFg.scaleX = ratio;
+    this.healthBarFg.setFillStyle(ratio <= 0.3 ? 0xc0392b : 0x4caf50);
+    this.healthLabel.setText(`Health  ${this.playerHp}/${this.playerMaxHp}`);
+  }
+
+  /** Refresh each edible row's label (live count + nutrition) and dim rows with no stock. */
+  private refreshEatRows(): void {
+    for (const row of this.eatRows) {
+      const count = this.inv?.get(row.itemId) ?? 0;
+      const name = ITEMS[row.itemId]?.name ?? row.itemId;
+      row.button.setLabel(`${name}  x${count}  +${row.nutrition}`);
+      row.button.setDimmed(count <= 0);
+    }
+  }
+
+  private onHungerChanged({ hunger }: { hunger: number; max: number }): void {
+    this.updateHungerBar(hunger);
+  }
+
+  private onPlayerHp({ hp, maxHp }: { hp: number; maxHp: number }): void {
+    this.playerHp = hp;
+    this.playerMaxHp = maxHp;
+    this.updateHealthBar();
   }
 
   private onBuildMode(active: boolean): void {

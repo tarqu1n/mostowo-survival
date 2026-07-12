@@ -409,7 +409,21 @@ mechanism fought the code that's actually there.
     to 0 ticks `playerHp` down every 2 s and eventually triggers 003's restart; `eat` raises hunger and
     spends one berry.
 
-- [ ] **Step 8: Health & Wellbeing screen (UI-kit `Panel`: meters + stats + "what's available to eat")** `[inline]`
+- [x] **Step 8: Health & Wellbeing screen (UI-kit `Panel`: meters + stats + "what's available to eat")** `[inline]`
+  - Outcome: `UIScene.ts` — added a STATUS button (left column, y72, in `hudElements`) toggling a new
+    dismissible Wellbeing `Panel` (depth 20). Panel body: a two-rect **hunger** meter (amber, red ≤20%,
+    live on `hunger:changed`) and **health** meter (green, red ≤30%, seeded from `playerStats.maxHp`,
+    live on `player:hpChanged`) — fg rects left-anchored via `scaleX`; the 7 **stat rows** read once from
+    `registry.playerStats`; and an **AVAILABLE TO EAT** list (one kit `Button` + icon per edible item,
+    label `Name xN +nut`, dimmed at count 0, taps emit `needs:eat` guarded to count>0, counts refreshed
+    via `refreshEatRows` on inventory `'change'`). Only the STATUS button + panel are in `hudElements`
+    (panel bounds cover the rows for the world-tap gate, like the inventory panel). New `.on`s for
+    `hunger:changed`/`player:hpChanged` torn down in SHUTDOWN. **Verified live** via a Playwright drive
+    (dev server + real UIScene): panel renders correctly (screenshot — meters/stats/eat row all present),
+    and the eat loop works numerically — 30s deterministic drain took hunger 100→88.5 (0.4/s), eating one
+    berry raised it to 100 (capped) and spent one (3→2); bushes render in-world; no console errors. Build
+    green. (Note: `__test.step()` stops the game loop, so post-step screenshots freeze — verified with a
+    no-step render instead.)
   - `UIScene.ts`: add a **STATUS** button (interactive `Button` from the kit, pushed to `hudElements`)
     in a free slot (e.g. near the ITEMS button / left column — avoid the combat movepad + Punch
     corners), toggling a new **Wellbeing `Panel`** (reuse the `Panel` primitive like the inspect/
