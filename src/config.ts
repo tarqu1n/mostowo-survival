@@ -121,6 +121,14 @@ export const PLAYER_HURTBOX: Hurtbox = { width: 1, height: 2 };
 /** Base damage of an unarmed hit — shared by Punch and a zombie's bite via resolveMeleeAttack. */
 export const UNARMED_BASE_DAMAGE = 1;
 
+/**
+ * Attack commitment: while a swing is in progress (the punch-lock window, see GameScene.playPunchSwing)
+ * the player's move speed drops to this fraction of normal, so attacking has weight — you plant and
+ * commit rather than gliding through the swing at full pace. Applied to both movepad and pathfinder
+ * movement via GameScene.effectiveMoveSpeed.
+ */
+export const ATTACK_MOVE_SLOW = 0.2;
+
 /** Minimum time (ms) between a zombie's contact-damage attempts on the player. */
 export const CONTACT_DAMAGE_COOLDOWN_MS = 1000;
 

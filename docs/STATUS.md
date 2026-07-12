@@ -145,3 +145,15 @@ create() + the scenario reset). `debugState` adds `corpses` + `playerDying`; a n
 scenario proves the corpse is gated on the animation, and the existing `death` spec still covers the
 freeze→restart (its `'restarting'` log now lives inside `killPlayer`, so it exercises the new path).
 Tuning: `DEATH_ANIM_FRAMERATE` / `DEATH_HOLD_MS` in `config.ts`.
+
+## Combat feel: attack commitment (move-slow while swinging)
+
+First pass at making combat feel weightier: while a Punch swing is in progress (the punch-lock window)
+the player's move speed drops to `ATTACK_MOVE_SLOW` (20%) of normal, so you plant and commit to the
+swing instead of gliding through it. Implemented via `GameScene.effectiveMoveSpeed()`, applied to both
+the pathfinder (`advancePath`) and the Combat movepad. The movepad only emits on press/drag, so its
+vector is now stored (`combatMoveVec`) and re-applied each frame in `update()` — that per-frame
+re-evaluation is what lets the slow engage the instant a swing starts and release when it ends, with no
+fresh pad input. `debugState` exposes `px`/`py` (world position) so a Tier-2 `combat` scenario can prove
+a mid-swing drive covers ~20% of the ground a free drive does. (Still open on the combat-feel list:
+clearer hit reactions, and non-linear movement — accel/decel — since movement currently feels rigid.)

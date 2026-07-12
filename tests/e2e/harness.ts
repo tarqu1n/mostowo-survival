@@ -16,6 +16,8 @@ export interface DebugState {
   occupied: number;
   pcol: number;
   prow: number;
+  px: number;
+  py: number;
   zombies: number;
   corpses: number;
   playerHp: number;

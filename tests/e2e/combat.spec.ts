@@ -86,6 +86,29 @@ test('a punched-dead zombie leaves a lingering corpse playing its death collapse
   expect((await state(page)).corpses).toBe(1);
 });
 
+test('attacking slows the player — a mid-swing movepad drive covers far less ground', async ({ page }) => {
+  await startGame(page);
+
+  // Baseline: drive east for 300ms at full speed (no swing in progress).
+  await applyScenario(page, { player: [10, 10], mode: 'combat' });
+  const startFull = (await state(page)).px;
+  await emit(page, 'combat:move', { dx: 1, dy: 0 });
+  await step(page, 300);
+  const fullDist = (await state(page)).px - startFull;
+
+  // Same drive, but begin a Punch swing first: the punch-lock window slows movement to ATTACK_MOVE_SLOW.
+  await applyScenario(page, { player: [10, 10], mode: 'combat' });
+  const startSlow = (await state(page)).px;
+  await emit(page, 'combat:punch'); // starts the swing (~400ms lock), so 300ms of the drive is slowed
+  await emit(page, 'combat:move', { dx: 1, dy: 0 });
+  await step(page, 300);
+  const slowDist = (await state(page)).px - startSlow;
+
+  expect(fullDist).toBeGreaterThan(20); // sanity: it really moved at full speed
+  expect(slowDist).toBeGreaterThan(0); // still creeps forward, not frozen
+  expect(slowDist).toBeLessThan(fullDist * 0.35); // ~20% of normal (slack for the punch-lock edge)
+});
+
 test('the movepad drives the player directly, bypassing the pathfinder', async ({ page }) => {
   await startGame(page);
   await applyScenario(page, { player: [10, 10], mode: 'combat' });

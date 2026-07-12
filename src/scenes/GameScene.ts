@@ -19,6 +19,7 @@ import {
   PLAYER_START_SPEED,
   PLAYER_START_VISION,
   UNARMED_BASE_DAMAGE,
+  ATTACK_MOVE_SLOW,
   CONTACT_DAMAGE_COOLDOWN_MS,
   HIT_FLASH_MS,
   HIT_FLASH_PEAK,
@@ -228,6 +229,10 @@ export class GameScene extends Phaser.Scene {
   // punch()).
   private harvestSwing: 'chop' | 'mine' | 'gather' | null = null;
   private punchLockUntil = 0;
+  // Latest Combat-mode movepad vector (analog: |v| ≤ 1). The movepad only emits on press/drag, not per
+  // frame, so update() re-applies velocity from this each frame — that's what lets the attack-slow
+  // (see effectiveMoveSpeed) take hold and release mid-hold without the player needing to nudge the pad.
+  private combatMoveVec = { dx: 0, dy: 0 };
 
   // Combat hit feedback (see flashHit / zombieLungeAt). Actors flash red + squash-flinch on a landed
   // hit, and a zombie lunges toward its target when it bites (no attack strip ships for the skeleton).
@@ -317,6 +322,7 @@ export class GameScene extends Phaser.Scene {
     this.chopElapsed = 0;
     this.harvestSwing = null;
     this.punchLockUntil = 0;
+    this.combatMoveVec = { dx: 0, dy: 0 };
     // Combat-FX state — clear so a death-restart starts clean: the maps/set held tweens+sprites from
     // the dead run (Phaser destroyed them on teardown, so drop the stale references), and `playerDying`
     // must reset or the fresh player would stay frozen from the previous death (see killPlayer/update).
@@ -562,9 +568,15 @@ export class GameScene extends Phaser.Scene {
 
     const action = this.queue.current;
     if (!action) {
-      // Combat mode drives velocity directly via onCombatMove/onCombatMoveEnd — don't stomp it
-      // here every frame just because the (unused, in Combat mode) task queue is empty.
-      if (this.mode !== 'combat') this.player.body.setVelocity(0, 0);
+      // Combat mode drives velocity from the held movepad vector every frame (the pad only emits on
+      // press/drag), scaled by effectiveMoveSpeed so an in-progress swing slows the player — that
+      // re-evaluation each frame is what lets the attack-slow engage/release without a fresh pad input.
+      if (this.mode === 'combat') {
+        const speed = this.effectiveMoveSpeed();
+        this.player.body.setVelocity(this.combatMoveVec.dx * speed, this.combatMoveVec.dy * speed);
+      } else {
+        this.player.body.setVelocity(0, 0);
+      }
       this.updatePlayerAnim();
       this.updateVision();
       this.updateZombies();
@@ -627,8 +639,16 @@ export class GameScene extends Phaser.Scene {
       this.pathIndex += 1;
       return this.pathIndex >= this.path.length;
     }
-    this.physics.moveTo(this.player, wx, wy, this.playerStats.speed);
+    this.physics.moveTo(this.player, wx, wy, this.effectiveMoveSpeed());
     return false;
+  }
+
+  /** The player's current move speed, cut to {@link ATTACK_MOVE_SLOW} of `playerStats.speed` while a
+   * swing is in progress (the punch-lock window) so attacking commits you in place. Drives both the
+   * pathfinder ({@link advancePath}) and the Combat-mode movepad ({@link update}). */
+  private effectiveMoveSpeed(): number {
+    const attacking = this.time.now < this.punchLockUntil;
+    return this.playerStats.speed * (attacking ? ATTACK_MOVE_SLOW : 1);
   }
 
   /**
@@ -1320,10 +1340,11 @@ export class GameScene extends Phaser.Scene {
     this.setMode(this.mode === 'inspect' ? 'command' : 'inspect');
   }
 
-  /** Combat-mode movepad drag: drives the player directly (bypassing the pathfinder/task queue). */
+  /** Combat-mode movepad drag: store the drive vector (applied each frame in update(), scaled by
+   * effectiveMoveSpeed) — this bypasses the pathfinder/task queue. */
   private onCombatMove(vec: { dx: number; dy: number }): void {
     if (this.mode !== 'combat') return;
-    this.player.body.setVelocity(vec.dx * this.playerStats.speed, vec.dy * this.playerStats.speed);
+    this.combatMoveVec = { dx: vec.dx, dy: vec.dy };
     // Facing follows the movepad's dominant axis (cardinal, not diagonal): a near-axis-aligned
     // drag still has a tiny off-axis component, and Math.sign on that noise would otherwise flip
     // facing diagonal — pointing Punch at an empty tile next to a zombie the player is squarely
@@ -1335,6 +1356,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onCombatMoveEnd(): void {
+    this.combatMoveVec = { dx: 0, dy: 0 };
     if (this.mode === 'combat') this.player.body.setVelocity(0, 0);
   }
 
@@ -1748,6 +1770,7 @@ export class GameScene extends Phaser.Scene {
     this.chopElapsed = 0;
     this.harvestSwing = null;
     this.punchLockUntil = 0;
+    this.combatMoveVec = { dx: 0, dy: 0 };
     this.resetCombatFx(); // start each scenario with clean FX counters/flags (see create())
     this.buildMode = false;
     this.queueMarkers = [];
@@ -1876,6 +1899,8 @@ export class GameScene extends Phaser.Scene {
     occupied: number;
     pcol: number;
     prow: number;
+    px: number;
+    py: number;
     zombies: number;
     corpses: number;
     playerHp: number;
@@ -1904,6 +1929,8 @@ export class GameScene extends Phaser.Scene {
       occupied: this.occupied.size,
       pcol: t.col,
       prow: t.row,
+      px: this.player.x,
+      py: this.player.y,
       zombies: this.zombies.filter((z) => z.alive).length,
       corpses: this.corpses.size,
       playerHp: this.playerHp,
