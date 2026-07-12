@@ -814,6 +814,11 @@ export class GameScene extends Phaser.Scene {
       if (!this.pointerOnHud(pointer)) this.updateGhost(pointer);
       return;
     }
+    // Combat mode: the movepad (tracked independently in UIScene) owns all dragging. A world drag
+    // must never fall through to the camera-pan below — steering the movepad drags the thumb off the
+    // small pad, and without this gate that off-pad travel panned the world and broke the follow-lock,
+    // yanking the camera around whenever the player changed direction.
+    if (this.mode === 'combat') return;
     if (!pointer.isDown || this.downOnUI || this.pointerOnHud(pointer)) return;
 
     // Command-mode-only: queue-painting (long-press-drag) issues tap-to-pathfind orders, which
