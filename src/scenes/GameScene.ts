@@ -32,6 +32,7 @@ import { Inventory } from '../systems/Inventory';
 import { worldToTile, tileToWorldCenter, snapToTileCenter, tileKey } from '../systems/grid';
 import { findPath, reachableAdjacent, type Cell } from '../systems/pathfind';
 import { TaskQueue, type Action } from '../systems/tasks';
+import { cycleLengthMs, phaseAt, tintAlphaAt, dayCountForTotal, type DayPhase } from '../systems/daynight';
 import { resolveMeleeAttack } from '../systems/combat';
 import { hurtboxContains, hurtboxTiles, DEFAULT_HURTBOX } from '../systems/hurtbox';
 import { bakeGlowTexture } from '../render/glowTexture';
@@ -202,6 +203,14 @@ export class GameScene extends Phaser.Scene {
   private harvestSwing: 'chop' | 'mine' | null = null;
   private punchLockUntil = 0;
 
+  // Day/night clock: `clockMs` auto-advances every frame (see update()); `dayPhase`/`dayCount` are the
+  // derived, queryable state (also mirrored to the registry + emitted as 'time:changed'). The
+  // `nightOverlay` is a map-sized dark rect whose alpha the clock drives to darken the world at night.
+  private clockMs = 0;
+  private dayPhase: DayPhase = 'day';
+  private dayCount = 1;
+  private nightOverlay!: Phaser.GameObjects.Rectangle;
+
   private buildMode = false;
   private walls!: Phaser.Physics.Arcade.StaticGroup;
   private occupied = new Set<string>();
@@ -347,6 +356,16 @@ export class GameScene extends Phaser.Scene {
     this.add.rectangle(MAP_WIDTH / 2, MAP_HEIGHT / 2, MAP_WIDTH, MAP_HEIGHT, 0x000000, 0.2).setDepth(5).setMask(fogMask);
     this.updateVision();
 
+    // Night overlay — mirrors the fog rect's map size/centre but unmasked (a global dim, not a vision
+    // hole) and at a higher depth (15, above the player at 10) so it darkens actors too. Alpha starts
+    // at 0 (full day) and is driven each frame from the day/night clock (see update()). Non-interactive
+    // (plain rects don't eat pointers) and below UIScene, so the HUD stays bright above it.
+    this.nightOverlay = this.add
+      .rectangle(MAP_WIDTH / 2, MAP_HEIGHT / 2, MAP_WIDTH, MAP_HEIGHT, COLORS.night, 0)
+      .setDepth(15);
+    this.registry.set('dayPhase', 'day');
+    this.registry.set('dayCount', 1);
+
     // Walls: static bodies the player collides with (a backstop; pathing already avoids them).
     this.walls = this.physics.add.staticGroup();
     this.physics.add.collider(this.player, this.walls);
@@ -415,6 +434,23 @@ export class GameScene extends Phaser.Scene {
   override update(_time: number, delta: number): void {
     this.harvestSwing = null; // re-set by runHarvest only while actually harvesting in place
     this.syncGlowTransforms(); // keep queued-tree halos locked to their (possibly animating) trees
+
+    // Survival tick — advance the day/night clock EVERY frame, above the no-action early-return below,
+    // so time passes whether or not a worker task is active. Drives the night-tint alpha; on a
+    // phase/day change, seed the registry (so a scene restart re-reads it) and emit 'time:changed'.
+    this.clockMs += delta;
+    const cycleMs = this.clockMs % cycleLengthMs();
+    this.nightOverlay.setAlpha(tintAlphaAt(cycleMs));
+    const phase = phaseAt(cycleMs);
+    const dayCount = dayCountForTotal(this.clockMs);
+    if (phase !== this.dayPhase || dayCount !== this.dayCount) {
+      this.dayPhase = phase;
+      this.dayCount = dayCount;
+      this.registry.set('dayPhase', phase);
+      this.registry.set('dayCount', dayCount);
+      this.game.events.emit('time:changed', { phase, dayCount, cycleMs, tNorm: cycleMs / cycleLengthMs() });
+    }
+
     const action = this.queue.current;
     if (!action) {
       // Combat mode drives velocity directly via onCombatMove/onCombatMoveEnd — don't stomp it

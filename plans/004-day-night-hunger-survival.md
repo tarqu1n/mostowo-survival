@@ -221,7 +221,15 @@ mechanism fought the code that's actually there.
   - Docs: none (Step 11).
   - Done when: `npm test` green; the pure functions behave at day/night/twilight boundaries.
 
-- [ ] **Step 2: Day/night clock + night tint overlay (GameScene)** `[inline]`
+- [x] **Step 2: Day/night clock + night tint overlay (GameScene)** `[inline]`
+  - Outcome: `GameScene.ts` — imported the daynight system; added fields `clockMs`/`dayPhase`/`dayCount`/
+    `nightOverlay`; built the map-sized unmasked `nightOverlay` at depth 15 after the fog rect (seeds
+    `registry.dayPhase='day'`/`dayCount=1`); hoisted a per-frame survival tick to the TOP of `update()`
+    (above the no-action early-return) that advances `clockMs`, sets `nightOverlay` alpha via
+    `tintAlphaAt`, and on phase/day change updates the fields, seeds the registry, and emits
+    `time:changed { phase, dayCount, cycleMs, tNorm }`. `npm run build` green; boot canary
+    (`smoke`) passed clean (no console errors). Env note: `smoke` needs `SMOKE_CHROMIUM_PATH=
+    /opt/pw-browsers/chromium-1194/chrome-linux/chrome` + a running `npm run preview` in this container.
   - Fields: `private clockMs = 0`, `private dayPhase: DayPhase = 'day'`, `private dayCount = 1`,
     `private nightOverlay!: Phaser.GameObjects.Rectangle`.
   - In `create()`, after the fog overlay (`:346`), build the night rect **mirroring the fog rect's
