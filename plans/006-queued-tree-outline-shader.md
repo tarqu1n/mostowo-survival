@@ -1,7 +1,8 @@
 # Queued-Tree Outline Shader (Custom PostFX Pipeline)
 
 > Status: done — executed 2026-07-12. All steps landed; `npm run typecheck` + `npm run smoke` pass,
-> outline verified by eye at 200% zoom (crisp silhouette, head-of-queue pulses).
+> verified by eye at 200% zoom (head-of-queue pulses). Follow-up: the crisp 1px outline was softened
+> to a **soft glow** on request (same pipeline, distance-field falloff; see docs/DECISIONS.md).
 
 ## Summary
 Replace the tile-sized stroked-rectangle marker used to flag queued harvest targets with a

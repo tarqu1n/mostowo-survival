@@ -14,7 +14,7 @@ render-target. Attach it per-object; each attachment is its own instance, so per
 flag, a phase) can differ between sprites sharing the pipeline.
 
 **The pattern** (reference implementation:
-[src/render/OutlinePipeline.ts](../src/render/OutlinePipeline.ts) — the queued-tree outline):
+[src/render/OutlinePipeline.ts](../src/render/OutlinePipeline.ts) — the queued-tree glow):
 
 1. **Subclass** `Phaser.Renderer.WebGL.Pipelines.PostFXPipeline` with an inline GLSL `fragShader`.
    Add public instance fields for per-attachment state (e.g. `pulse`).
@@ -33,6 +33,10 @@ flag, a phase) can differ between sprites sharing the pipeline.
    old GameObject-based visual for Canvas (the outline falls back to a stroke-only marker rect).
 6. **Crispness:** author thickness/offsets in **render-target texels**, not screen px, so the effect
    scales consistently with nearest-neighbour sampling and doesn't shimmer at fractional zoom.
+7. **Keep the kernel cheap:** per-pixel loops (ring/box samples for glows, blurs) run over the whole
+   FX render-target every frame, per attached sprite. Dozens of taps are fine; ~100 measurably slowed
+   the **headless SwiftShader** render enough to slow-mo the game loop and flake timing-based tests.
+   The queued-tree glow uses 12 directions × 3 radii (36 taps) and still reads soft — start low.
 
 **Testing note:** the headless smoke runs real WebGL, so a shader compile/link error surfaces as a
 console error and fails the zero-error gate — a free compile check. Assert shader-driven state through

@@ -170,8 +170,12 @@ await page.waitForTimeout(100);
 await page.screenshot({ path: `${OUT}-0-fog.png` }); // visual check: vision-radius fog around the player
 
 // 1. Chop the tree at tile (5,8): worker paths adjacent (trees block) + 3 hits → wood 3.
+// Poll for the yield rather than betting on a fixed wall-clock budget — headless frame pacing
+// varies (see docs/DECISIONS.md on making the smoke less timing-fragile).
 await tapWorld(...center(5, 8));
-await page.waitForTimeout(6500);
+await page
+  .waitForFunction(() => (window.game.registry.get('inventory')?.get('wood') ?? 0) >= 3, null, { timeout: 12000 })
+  .catch(() => {});
 const w1 = await wood();
 if (w1 >= 3) ok(`chop → wood ${w1}`);
 else fail(`chop did not yield wood (got ${w1}, expected >= 3)`);

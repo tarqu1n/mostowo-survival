@@ -58,7 +58,7 @@ unchanged); the player has full 3-way directional facing (enemy flips by movemen
 **Post-005 polish:** player **chop** (Slice) + **punch** (Crush) directional action swings; ground
 baked into one `RenderTexture` to kill the fractional-zoom (150%) tile-seam bleed; workers chop/build
 from a resource's **base** tile and **face** the target (`faceTile`, `TREE_BASE_STAND_OFFSETS`).
-Queued trees now wear a **crisp silhouette outline** from a reusable custom WebGL PostFX pipeline
+Queued trees now wear a **soft silhouette glow** from a reusable custom WebGL PostFX pipeline
 (plan 006; `src/render/OutlinePipeline.ts`) — head-of-queue pulses, Canvas degrades to the old marker;
 see [docs/RENDERING.md](docs/RENDERING.md). See
 [docs/DECISIONS.md](docs/DECISIONS.md) (2026-07-12). **Testing direction:** move to isolated,
