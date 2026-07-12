@@ -416,7 +416,9 @@ export class UIScene extends Phaser.Scene {
   private onPlayerHit(): void {
     this.tweens.killTweensOf(this.damageVignette);
     this.damageVignette.setAlpha(DAMAGE_VIGNETTE_ALPHA);
-    this.tweens.add({ targets: this.damageVignette, alpha: 0, duration: DAMAGE_VIGNETTE_MS, ease: 'Quad.easeOut' });
+    // Cubic.easeIn holds near the peak briefly before dropping off, so the flash registers rather than
+    // fading the instant it appears (Quad.easeOut lost most of it in the first ~80ms).
+    this.tweens.add({ targets: this.damageVignette, alpha: 0, duration: DAMAGE_VIGNETTE_MS, ease: 'Cubic.easeIn' });
   }
 
   /** True if (x, y) in game coords lands on a *visible* interactive HUD element. */

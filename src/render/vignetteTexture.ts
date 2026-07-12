@@ -30,9 +30,9 @@ export function bakeVignetteTexture(scene: Phaser.Scene, color: number, w: numbe
   const outer = Math.hypot(cx, cy); // reach the corners
   // Clear through the centre (stops at 0 and 0.6 are transparent), then ramp to solid at the rim, so
   // the red hugs the screen edges and never washes over the play area.
-  const grad = ctx.createRadialGradient(cx, cy, outer * 0.35, cx, cy, outer);
+  const grad = ctx.createRadialGradient(cx, cy, outer * 0.25, cx, cy, outer);
   grad.addColorStop(0, `rgba(${r},${g},${b},0)`);
-  grad.addColorStop(0.6, `rgba(${r},${g},${b},0)`);
+  grad.addColorStop(0.42, `rgba(${r},${g},${b},0)`);
   grad.addColorStop(1, `rgba(${r},${g},${b},1)`);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
