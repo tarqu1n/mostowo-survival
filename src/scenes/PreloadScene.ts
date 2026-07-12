@@ -83,7 +83,7 @@ export class PreloadScene extends Phaser.Scene {
       this.load.spritesheet(key, url(strip.path), { frameWidth: strip.frameSize, frameHeight: strip.frameSize });
     };
     const { player, enemy } = manifest.actors;
-    const playerStates: PlayerState[] = ['idle', 'walk', 'chop', 'punch'];
+    const playerStates: PlayerState[] = ['idle', 'walk', 'chop', 'mine', 'punch'];
     (['down', 'side', 'up'] as Facing[]).forEach((facing) => {
       for (const state of playerStates) loadStrip(playerAnimKey(state, facing), player[state][facing]);
     });

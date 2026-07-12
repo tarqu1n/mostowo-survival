@@ -227,7 +227,7 @@ export class UIScene extends Phaser.Scene {
     this.combatPunchButton = new Button(this, 8 + pbw / 2, BASE_HEIGHT - 8 - pbh / 2, {
       width: pbw,
       height: pbh,
-      label: 'PUNCH',
+      label: 'ATTACK',
       variant: 'danger',
       onDown: () => this.game.events.emit('combat:punch'),
     }).setVisible(false);

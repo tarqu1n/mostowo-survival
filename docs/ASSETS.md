@@ -130,12 +130,16 @@ not repeated here):
 - **Tree:** `_derived/tree_pine.png` (extracted per the pipeline above).
 - **Player:** Body_A Idle/Walk strips × Down/Side/Up (64px frames) — full 3-way directional
   facing; Side art faces right, mirrored `flipX` for left, driven by `lastFacing`.
-- **Player action swings** (added post-005): **chop** = `Slice_Base` (reads as an axe swing, loops
-  while felling in place), **punch** = `Crush_Base` (overhead smash, one-shot per Punch press) —
-  each ×Down/Side/Up, 8×64px. The Body_A rig ships no literal chop/punch strip, so these are the
-  closest melee motions, treated as reskinnable stand-ins. Wired as extra `PlayerState`s
-  (`idle`|`walk`|`chop`|`punch`) sharing the one `playerAnimKey`/render footprint; action swings
-  run at `ACTION_ANIM_FRAMERATE` (config) so a chop lands ≈ once per `CHOP_INTERVAL_MS`.
+- **Player action swings** (added post-005): each maps to the Body_A melee motion that reads right
+  for the job — **chop** = `Slice_Base` (side-swing axe, loops while felling a tree), **mine** =
+  `Crush_Base` (overhead smash → pickaxe on a rock, loops while mining), **punch** = `Pierce_Base`
+  (weapon thrust → the character holds a sword, so it's the combat swing, one-shot per Punch press)
+  — each ×Down/Side/Up, 8×64px. `Pierce` ships its up strip as `Pierce_Top-Sheet.png` (not `_Up`),
+  captured in the manifest's explicit paths. The Body_A rig ships no literal chop/mine/punch strip,
+  so these are the closest motions, treated as reskinnable stand-ins. Wired as `PlayerState`s
+  (`idle`|`walk`|`chop`|`mine`|`punch`) sharing the one `playerAnimKey`/render footprint; action
+  swings run at `ACTION_ANIM_FRAMERATE` (config) so a hit lands ≈ once per `CHOP_INTERVAL_MS`.
+  GameScene picks chop vs mine from the harvested node's `tile` role (rock → mine, else chop).
 - **Enemy** (kid zombie data id, unchanged): Skeleton (Base) `Run/Run-Sheet.png` (64px, 6 frames)
   stands in for the sprite; single-orientation, frame 0 = idle, flips by movement-x only — mob
   sheets in this pack ship no directional variants.
