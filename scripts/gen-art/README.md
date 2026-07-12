@@ -2,7 +2,7 @@
 
 Small CLI wrappers to try **Retro Diffusion** and **PixelLab** — two AI pixel-art generators with
 free tiers — for bespoke/environment sprites, as an alternative/complement to the Gemini pipeline
-already planned in [`docs/ASSETS.md`](../../docs/ASSETS.md#gemini-asset-generation-via-guppi). No
+already planned in [`docs/ASSET-EXPERIMENTS.md`](../../docs/ASSET-EXPERIMENTS.md#gemini-asset-generation-via-guppi). No
 deps: plain Node 22 `fetch` + `fs`, same style as `scripts/smoke.mjs`.
 
 ## Setup

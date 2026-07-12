@@ -241,7 +241,7 @@ tiles/props/recolours + a lighting pass (proven viable by `demo2_camp_night.png`
 into `src/data/tileset.ts`** (evaluation only; still PROPOSED). If it pans out, buy more of Anokolisa's
 paid packs (same grid/conventions). Full index + demos: pack
 [`README.md`](../public/assets/tilesets/pixel-crawler/README.md) and
-[`docs/ASSETS.md`](ASSETS.md#leading-replacement--pixel-crawler-2026-07-11). Zombie pack stays the
+[`docs/ASSETS.md`](ASSETS.md#active-tileset--pixel-crawler-wired-in-plan-005). Zombie pack stays the
 wired-in default until this is committed.
 
 ## 2026-07-11 — [DECIDED] Shared stats via typed adapters, not a class hierarchy

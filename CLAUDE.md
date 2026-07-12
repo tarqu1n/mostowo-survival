@@ -1,84 +1,47 @@
 # Mostowo Survival
 
-A browser-based **pixel-art survival / base-building game**, themed around Mostowo (the
-camping destination this project is named after). Built with **Phaser 3**. Single-player,
-runs entirely in the browser, no backend.
+A browser-based **pixel-art survival / base-building game** (**Phaser 3 + TypeScript + Vite**),
+themed around Mostowo — the camping destination it's named after. Single-player, runs entirely in
+the browser, no backend.
 
-This file is loaded on every turn — keep it a **lean index** and push detail into the
-linked docs. When a decision, preference, or workflow is settled, record it in the repo
-(see below) so any future session on any device can pick up without re-discovering it.
+> **Token budget:** this file loads on every turn — keep it a **lean index**. Push detail into the
+> linked docs and reference it by pointer; don't inline it here.
 
 ## Cross-device / cross-session rule
 
-This project is worked on from **whatever device is to hand** (often mid-journey, on a
-phone or laptop, across many short sessions). Therefore:
+Worked on from **whatever device is to hand** (often on a phone, mid-journey, across many short
+sessions). So **every reusable decision, preference, or workflow goes in the repo**, never only in
+chat — if a future session would waste time rediscovering it, write it down here or in a linked doc.
 
-- **Every reusable decision, preference, or workflow goes in the repo**, never only in chat.
-- Deploy steps, code conventions, and "how do I run this" live in [docs/WORKFLOW.md](docs/WORKFLOW.md).
-- The *why* behind non-obvious choices lives in [docs/DECISIONS.md](docs/DECISIONS.md) (a running log).
-- If you learn something a future session would waste time rediscovering, write it down here or in a linked doc.
+## Build workflow (Hermes dev skills)
 
-## Build workflow (Hermes skills)
+Build using the **Hermes dev skills** (from the `hermes-ai-tooling` repo): `plan-feature` →
+`critique-plan` → `execute-plan`, one step at a time. Wiring, review gates, and the day-to-day loop:
+[docs/WORKFLOW.md](docs/WORKFLOW.md).
 
-We build using the **Hermes dev skills** (from the `hermes-ai-tooling` repo):
+## Architecture map
 
-1. `plan-feature` → write a step-by-step plan into `plans/`.
-2. `critique-plan` → fresh-eyes adversarial review of that plan.
-3. `execute-plan` → carry it out one step at a time.
+Data-driven content · pure systems · decoupled scenes:
 
-See [docs/WORKFLOW.md](docs/WORKFLOW.md) for how these are wired in and the day-to-day dev loop.
+- **`src/data/`** — content as data (`ITEMS`/`NODES`/`BUILDABLES`) + shared schemas (`types.ts`:
+  `BaseStats`/`CombatantStats`/`ObjectStats`; `tileset.ts`: `ACTIVE_TILESET`).
+- **`src/systems/`** — pure, testable logic: `pathfind` (A*), `tasks` (order queue), `grid`,
+  `Inventory`, `combat`.
+- **`src/scenes/`** — Boot → Preload → MainMenu → Game (world) + `UIScene` HUD overlay; comms via
+  `game.events` (`build:*`) + shared `registry`.
+- **`src/ui/`** — Container-based UI kit (`Button`, `Panel`, `arrangeRow/Column/Grid`, `theme`).
+- **`src/render/`** — baked textures (e.g. `glowTexture.ts`), not frame-loop shaders.
+- **`tests/`** — three-tier harness (unit / scenario / boot canary).
+
+Patterns each seam follows: [docs/CONVENTIONS.md](docs/CONVENTIONS.md).
 
 ## Status
 
-Core loop + **worker task system** landed (plans 001–002): tap a tree → the worker **pathfinds** to it
-(A*, routing around walls + trees) → multi-hit chop → wood into a character `Inventory`. Orders **queue**
-(tap = act now / clear; **long-press = append**); **Build** places a passable *blueprint* and the worker
-walks over and **builds it over time** into a solid, blocking wall. **Cancel** clears the queue
-(blueprints survive). Data-driven items/nodes/buildables (`src/data/`), pure systems (`src/systems/`:
-`pathfind`, `tasks`, `grid`, `Inventory`), decoupled `UIScene` HUD. On the **Phaser 3 + TypeScript +
-Vite** mobile-first scaffold (Boot→Preload→MainMenu→Game + UI overlay), GitHub Pages auto-deploy.
-Verified via headless smoke (`npm run smoke`).
+Core loop, worker task system, build/blueprints, basic combat + a first enemy, the Pixel Crawler art
+swap, and a three-tier test harness have all landed. **Full feature/plan history:**
+[docs/STATUS.md](docs/STATUS.md).
 
-**Basic combat landed (plan 003):** a shared `BaseStats`/`CombatantStats`/`ObjectStats` schema
-(`src/data/types.ts`) + pure `systems/combat.ts` resolve melee damage/hit-chance uniformly for
-Punch and enemy attacks. Three mutually-exclusive HUD-toggled input modes — **Command** (today's
-tap-to-pathfind, unchanged), **Combat** (virtual movepad + Punch button, direct real-time control,
-bypasses the pathfinder), **Inspect** (tap any tree/wall/zombie for a stats panel). The first enemy,
-a **kid zombie** (data id `kidZombie`), has minimal idle→chasing AI and contact damage; player HP
-reaching 0 restarts the scene (no save system yet, so "restart" = back to spawn with the world
-reset). The worker/task/pathfinding core is the seam both the zombie's AI and the eventual NPC
-companions plug into.
-
-**Active art swapped to Pixel Crawler (plan 005):** `ACTIVE_TILESET` in `src/data/tileset.ts` is
-now the **Pixel Crawler** pack — the Zombie Apocalypse pack is retired to reference-only under
-`public/assets/`. A Skeleton (Base) mob sprite stands in for the kid zombie (data id/name
-unchanged); the player has full 3-way directional facing (enemy flips by movement-x only). See
-[docs/ASSETS.md](docs/ASSETS.md) and [docs/DECISIONS.md](docs/DECISIONS.md) for the full picture.
-
-**Post-005 polish:** player **chop** (Slice) + **punch** (Crush) directional action swings; ground
-baked into one `RenderTexture` to kill the fractional-zoom (150%) tile-seam bleed; workers chop/build
-from a resource's **base** tile and **face** the target (`faceTile`, `TREE_BASE_STAND_OFFSETS`).
-Queued trees now wear a **soft silhouette glow** — a **baked** halo texture (`src/render/glowTexture.ts`)
-drawn behind the tree, head-of-queue pulses via an alpha tween. This replaced the plan-006 per-frame
-WebGL PostFX pipeline (`OutlinePipeline`, retired): a tree's silhouette is static, so the halo is baked
-once per species instead of shaded every frame — same look on WebGL *and* Canvas (no fallback fork), no
-shader in the frame loop; see [docs/RENDERING.md](docs/RENDERING.md). See
-[docs/DECISIONS.md](docs/DECISIONS.md) (2026-07-12).
-
-**Three-tier test harness landed (plan 007):** the fragile live-game smoke is retired for
-**Tier 1** Vitest unit tests over the pure systems + data (`npm test`, plain Node), **Tier 2**
-deterministic Playwright scenarios (`npm run e2e`) driven by a DEV-only `window.game.__test`
-scenario/fixed-step API on `GameScene` (`applyScenario` builds a known world from a declarative
-spec; `step(ms)` advances gameplay with zero wall-clock), and **Tier 3** a thin boot canary
-(`npm run smoke`). Two-speed dev loop (`npm run test:watch` inner, full sweep at wrap-up) —
-see [docs/WORKFLOW.md](docs/WORKFLOW.md).
-
-**Menu UI stays in Phaser (no DOM overlay), on a small Container-based UI kit** (`src/ui/`:
-`Button`, `Panel`, `arrangeRow/Column/Grid`, shared `theme`). The HUD (`UIScene`) is refactored onto
-it; build inventory/build-menu panels from these primitives. Rationale in
-[docs/DECISIONS.md](docs/DECISIONS.md) (2026-07-12).
-
-Next: survival systems (day/night, hunger) — see [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md) MVP
+**Next:** survival systems (day/night, hunger) — see [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md) MVP
 slice; [docs/DECISIONS.md](docs/DECISIONS.md) for settled vs open.
 
 ## The game in one line
@@ -90,8 +53,11 @@ fortify and defend your base. Pillars: **base building · survival · crafting �
 ## Docs
 
 - [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md) — what the game *is* (premise, day/night loop, enemies, pillars, MVP)
+- [docs/STATUS.md](docs/STATUS.md) — what's **built so far** (feature/plan history)
 - [docs/LORE.md](docs/LORE.md) — intro story + real-Mostowo people/places/stories that theme the game
-- [docs/ASSETS.md](docs/ASSETS.md) — art direction + pipeline (CC0 tilesets, Gemini "Nano Banana" via guppi)
+- [docs/ASSETS.md](docs/ASSETS.md) — art pipeline: active pack, sprite extraction, what's wired, where assets live
+- [docs/ASSET-EXPERIMENTS.md](docs/ASSET-EXPERIMENTS.md) — art R&D log: tileset candidates, AI-gen trials, Gemini pipeline
 - [docs/DECISIONS.md](docs/DECISIONS.md) — decision log (what we chose and why)
 - [docs/RENDERING.md](docs/RENDERING.md) — custom PostFX pipelines + "when to reach for a shader"
-- [docs/WORKFLOW.md](docs/WORKFLOW.md) — run / build / deploy / code conventions
+- [docs/WORKFLOW.md](docs/WORKFLOW.md) — run / build / deploy / test commands + review gates
+- [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — code conventions (data-driven design, scene wiring, input gating, worker tasks)
