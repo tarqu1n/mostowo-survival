@@ -1,0 +1,76 @@
+/* Map Builder editor shell styles (plan 014 step 4) — plain CSS, dark theme, no framework. */
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #14100f;
+  color: #e8e0d8;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+
+#editor-root {
+  height: 100vh;
+}
+
+.editor-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr 280px;
+  height: 100vh;
+}
+
+.editor-pane {
+  overflow: auto;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.editor-pane h2 {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #a99a8c;
+}
+
+.editor-pane--library {
+  background: #1b1614;
+  border-right: 1px solid #2c2420;
+}
+
+.editor-pane--viewport {
+  background: #0e0b0a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.editor-pane--inspector {
+  background: #1b1614;
+  border-left: 1px solid #2c2420;
+}
+
+.editor-placeholder {
+  color: #8a7f76;
+  font-size: 0.9rem;
+}
+
+.editor-viewport-placeholder {
+  color: #554942;
+  border: 1px dashed #3a2f2a;
+  padding: 40px;
+}
+
+/* Apply to any pixel-art image/canvas the editor renders (asset previews, the Phaser viewport). */
+.pixelated {
+  image-rendering: pixelated;
+}

@@ -372,7 +372,7 @@ free values render nearest-neighbour and are the author's aesthetic call.
     the same 6 fixtures — real Python output, not re-derived. Python file left untouched.
     `npm run check` green.
 
-- [ ] **Step 4: Editor entry — React shell, Vite wiring, save middleware** `[delegate sonnet]`
+- [x] **Step 4: Editor entry — React shell, Vite wiring, save middleware** `[delegate sonnet]`
   - Add deps: `react`, `react-dom`, `zustand`; dev-deps: `@vitejs/plugin-react`, `@types/react`,
     `@types/react-dom`.
   - `editor.html` at repo root (Vite serves root `.html` files in dev automatically) →
@@ -406,6 +406,33 @@ free values render nearest-neighbour and are the author's aesthetic call.
     `/__editor/maps/test` and `/__editor/world` writes/reads files and regenerates
     `manifest.json`; a thumb PUT lands in `public/assets/maps/thumbs/`; `npm run build` +
     `npm run smoke` + `npm run check` green.
+  - Outcome: deps resolved cleanly — React 19.2.7 + react-dom 19.2.7 + zustand 5.0.14 (deps),
+    `@vitejs/plugin-react@4.7.0` pinned (latest 5.x/6.x require Vite 7/8, repo is on Vite 6) +
+    `@types/react`/`@types/react-dom` (dev). Created `editor.html` (root, dev-only) →
+    `src/editor/main.tsx` (three-pane placeholder shell, no game/Phaser import) +
+    `src/editor/editor.css` (dark theme, `.pixelated` utility) + `src/editor/api.ts` (typed fetch
+    wrappers). `scripts/vite-editor-api.mjs`: inline Vite plugin, plain Node/fs, implements the 6
+    endpoints; `:id` sanitised to `[a-z0-9-]+` (verified curl path-traversal + bad-id both 400);
+    manifest regen is a hand-kept plain-JS mirror of `generateManifest` (same shape/sort — verified
+    byte-for-byte via a 3-map curl test: ids/maps sorted `aaa-map, test, zzz-map`). `vite.config.ts`
+    switched to the function form of `defineConfig` to gate `editorApiPlugin()` on
+    `command === 'serve'`, added `react()`, and pinned `build.rollupOptions.input: 'index.html'`.
+    `tsconfig.json` +`"jsx": "react-jsx"`. `eslint.config.js`: both `src/**/*.ts`-scoped `files`
+    globs extended to include `src/**/*.tsx` (base `tseslint.configs.recommended` already covered
+    `.tsx`, no change needed there). `package.json`: `"editor": "vite --open /editor.html"` script,
+    lint-staged `*.ts` → `*.{ts,tsx}`. Verified: `npm run build` output has no `editor.html`/React
+    markers in the single `index-*.js` chunk (grepped for `createRoot`/`react-dom`/`__editor`/
+    `EditorShell` — zero hits; bundle size unchanged, ~1.56 MB); `vite dev` serves `/editor.html`
+    (200, React-refresh preamble present); full curl round-trip on maps/world/thumb + manifest
+    regen verified, then `src/data/maps/{test,aaa-map,zzz-map}.map.json` and the thumb PNG deleted
+    and `world.json`/`manifest.json` rewritten back to their committed empty content (zero `git
+    diff`) — no stray test map survives. `npm run smoke` green against the already-built `dist/`.
+    `npm test` (195) and `npm run lint`/`lint:md` green throughout. `npm run typecheck`/
+    `format:check` were red at final check time only in files outside this step's scope
+    (`src/scenes/build/BuildManager.ts`, `src/scenes/GameScene.ts`, `src/systems/base.ts` — a
+    concurrent session's in-flight, uncommitted edit touching `BuildManagerDeps`; confirmed by an
+    earlier clean `npm run typecheck` run before that edit landed, and by `git status` showing
+    those files modified mid-session, not by this step). No files this step owns are implicated.
 
 - [ ] **Step 5: Editor store, history, and the Phaser viewport** `[delegate opus]`
   - `src/editor/store/history.ts` (pure, unit-testable): generic command stack —

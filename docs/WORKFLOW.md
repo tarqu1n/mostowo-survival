@@ -59,6 +59,7 @@ through plan → critique → execute with the gates above). Commits are authore
 ```bash
 npm install       # install deps
 npm run dev       # local dev server with hot reload (Vite)
+npm run editor    # dev-only Map Builder editor (React shell, opens editor.html) — never in the prod build
 npm run build     # typecheck (tsc --noEmit) + static production build -> dist/
 npm run preview   # serve the production build locally (http://localhost:4173/mostowo-survival/)
 npm run typecheck # types only, no build

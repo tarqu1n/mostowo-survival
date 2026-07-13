@@ -7,7 +7,7 @@ import prettier from 'eslint-config-prettier';
 
 const typeCheckedForSrc = tseslint.configs.recommendedTypeChecked.map((config) => ({
   ...config,
-  files: ['src/**/*.ts'],
+  files: ['src/**/*.ts', 'src/**/*.tsx'],
 }));
 
 export default tseslint.config(
@@ -17,7 +17,7 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   ...typeCheckedForSrc,
   {
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
     languageOptions: {
       parserOptions: {
         project: './tsconfig.json',
