@@ -60,6 +60,16 @@ export class ScenePicker {
     return { kind: 'move', col: worldToTile(x), row: worldToTile(y) };
   }
 
+  /** The campfire whose *sprite* is drawn under world point (x,y), if the topmost picked entity is a
+   * campfire (same forgiving raycast as {@link inspectAt} — a foot-tile hit OR an opaque sprite pixel),
+   * else null. Command-mode tap-to-feed keys off this so tapping anywhere on the fire (its flame reaches
+   * a tile or two above its foot tile — it's bottom-anchored + multi-tile) feeds it, not just the exact
+   * foot tile a bare worldToTile would demand. */
+  campfireAt(x: number, y: number): CampfireUnit | null {
+    const pick = this.pickSpriteAt(x, y);
+    return pick?.kind === 'campfire' ? pick.campfire : null;
+  }
+
   // --- Inspect-mode intent ----------------------------------------------------
 
   /** Inspect-mode tap: raycast the sprite drawn under the point (pickSpriteAt already resolves the

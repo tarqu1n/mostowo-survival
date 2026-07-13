@@ -18,7 +18,7 @@ import {
 import { ITEMS } from '../data/items';
 import { NODES } from '../data/nodes';
 import { Inventory } from '../systems/Inventory';
-import { tileKey, worldToTile } from '../systems/grid';
+import { tileKey } from '../systems/grid';
 import { findPath, reachableAdjacent, type Cell } from '../systems/pathfind';
 import { TaskQueue, type Action } from '../systems/tasks';
 import { resolveMeleeAttack } from '../systems/combat';
@@ -305,15 +305,16 @@ export class GameScene extends Phaser.Scene {
       onBuildMove: (pointer) => this.buildManager.updateGhost(pointer),
       getMode: () => this.mode,
       onTap: (pointer) => {
-        // Tap-to-feed: a SHORT tap on a campfire (command mode, wood in the bag) feeds it and issues
-        // NO order. feedAt returns false when there's no fire here or no wood, so a normal tap falls
-        // through to the move/harvest resolution below. onTap is command-mode-only by construction; the
-        // short-tap gate keeps long-press = queue uniform (a held press never feeds).
-        if (
-          pointer.getDuration() < LONGPRESS_MS &&
-          this.campfireManager.feedAt(worldToTile(pointer.worldX), worldToTile(pointer.worldY))
-        )
-          return;
+        // Tap-to-feed: a SHORT tap anywhere on a campfire's sprite (command mode, wood in the bag)
+        // feeds it and issues NO order. Resolve the fire via the forgiving sprite raycast (scenePicker),
+        // NOT a bare worldToTile — the fire is bottom-anchored + multi-tile, so its flame renders above
+        // its foot tile and a foot-tile-only match made natural taps miss (they fell through to "walk at
+        // it"). feedAt returns false when there's no wood, so that still falls through. onTap is
+        // command-mode-only by construction; the short-tap gate keeps long-press = queue uniform.
+        if (pointer.getDuration() < LONGPRESS_MS) {
+          const fire = this.scenePicker.campfireAt(pointer.worldX, pointer.worldY);
+          if (fire && this.campfireManager.feedAt(fire.col, fire.row)) return;
+        }
         const action = this.scenePicker.actionAt(pointer.worldX, pointer.worldY);
         // A tap on a tree queues it: it falls in behind the current job (or starts at once if the
         // worker is idle) instead of interrupting an in-progress harvest — chopping is the loop you

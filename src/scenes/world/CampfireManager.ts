@@ -104,7 +104,25 @@ export class CampfireManager {
     if (!this.deps.spend({ wood: 1 })) return false; // no wood — no-op
     c.fuel = feedFuel(c.fuel, CAMPFIRE_FUEL_PER_WOOD, CAMPFIRE_FUEL_MAX);
     if (!c.lit && isLit(c.fuel)) this.light(c);
+    this.flare(c); // visible confirmation the feed registered — the fire briefly flares up
     return true;
+  }
+
+  /** Brief "flare up" pulse on a fed fire — a quick scale bump that settles back, so a successful
+   *  tap-to-feed reads instantly (fuel is otherwise invisible without opening Inspect). Recomputes the
+   *  rest scale from the def (not the live scale) so rapid feeds mid-tween can't leave it inflated. */
+  private flare(c: CampfireUnit): void {
+    const base = (TILE_SIZE * (BUILDABLES.campfire.tilesTall ?? 1)) / c.sprite.frame.height;
+    this.scene.tweens.killTweensOf(c.sprite);
+    c.sprite.setScale(base);
+    this.scene.tweens.add({
+      targets: c.sprite,
+      scaleX: base * 1.18,
+      scaleY: base * 1.18,
+      duration: 110,
+      yoyo: true,
+      ease: 'Quad.easeOut',
+    });
   }
 
   // --- Light source (read by SurvivalClock + VisionController via the scene) ------
