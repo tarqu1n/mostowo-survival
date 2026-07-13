@@ -21,19 +21,10 @@ import {
   UNARMED_BASE_DAMAGE,
   ATTACK_MOVE_SLOW,
   CONTACT_DAMAGE_COOLDOWN_MS,
-  HIT_FLASH_MS,
-  HIT_FLASH_PEAK,
-  HIT_FLASH_SQUASH,
-  HIT_FLASH_TINT,
   PLAYER_HIT_SHAKE_MS,
   PLAYER_HIT_SHAKE_INTENSITY,
   ENEMY_HIT_SHAKE_MS,
   ENEMY_HIT_SHAKE_INTENSITY,
-  ENEMY_LUNGE_PX,
-  ENEMY_LUNGE_MS,
-  WEAPON_SWING_ARC_DEG,
-  WEAPON_SWING_MS,
-  WEAPON_SWING_SCALE_POP,
   MONSTER_CHASE_DROP_RADIUS_PX,
   MONSTER_VEER_BAND_PX,
   MONSTER_VEER_MAX_TILES,
@@ -77,12 +68,12 @@ import { stepMonster, initialMonsterState, type MonsterMode } from '../systems/m
 import { weaponTransform } from '../systems/attachment';
 import { hurtboxContains, hurtboxTiles, DEFAULT_HURTBOX } from '../systems/hurtbox';
 import { bakeGlowTexture } from '../render/glowTexture';
-import { HIT_FLASH_KEY, type HitFlashPipeline } from '../render/hitFlashPipeline';
 import { treeStats, wallStats, enemyStats } from '../systems/stats';
 import type { UIScene } from './UIScene';
 import { FACING_DELTAS } from '../entities/types';
 import type { TreeNode, BuildSite, EnemyUnit, PointerPick } from '../entities/types';
 import type { ScenarioSpec, ScenarioResult, GameTestApi } from '../entities/testTypes';
+import { CombatFxManager } from './fx/CombatFxManager';
 import {
   ACTIVE_TILESET,
   resolveTile,
@@ -155,26 +146,18 @@ export class GameScene extends Phaser.Scene {
   // (see effectiveMoveSpeed) take hold and release mid-hold without the player needing to nudge the pad.
   private combatMoveVec = { dx: 0, dy: 0 };
 
-  // Combat hit feedback (see flashHit / enemyLungeAt). Actors flash red + squash-flinch on a landed
-  // hit, and an enemy lunges toward its target when it bites (no attack strip ships for the skeleton).
-  // Tweens are tracked per actor sprite so a rapid re-hit restarts cleanly and a killed/destroyed
-  // sprite can be torn down (its tweens target plain objects but poke the sprite, so they must stop
-  // before destroy). `hitFlashOn` is the set of sprites currently carrying the WebGL flash pipeline.
-  private readonly hitFlashTweens = new Map<Phaser.GameObjects.Sprite, Phaser.Tweens.Tween>();
-  private readonly lungeTweens = new Map<Phaser.GameObjects.Sprite, Phaser.Tweens.Tween>();
-  // Weapon-swing tweens keyed by the WIELDER sprite (so cleanupActorFx(enemySprite) can stop one
-  // mid-swing before the weapon image is destroyed — the tween pokes the weapon each frame).
-  private readonly weaponSwingTweens = new Map<Phaser.GameObjects.Sprite, Phaser.Tweens.Tween>();
-  private readonly hitFlashOn = new Set<Phaser.GameObjects.Sprite>();
-  // Enemy sprites out of the AI set but lingering to play their one-shot death collapse before the
-  // corpse is removed. Tracked so debugState can report them (proves removal waits for the animation).
-  private readonly corpses = new Set<Phaser.GameObjects.Sprite>();
-  // Live player flash intensity (0..1) + cumulative FX counters, surfaced via debugState so Tier-2
-  // scenarios can assert hit/attack feedback fired without inspecting the (shader-driven) sprite.
-  private playerFlash = 0;
-  private playerHitFlashes = 0;
-  private enemyHitFlashes = 0;
-  private enemyAttacks = 0;
+  // Combat FX (hit flash, enemy lunge + weapon swing, corpse lingering, the attack-swing lock) — see
+  // src/scenes/fx/CombatFxManager.ts (plan 013 Step 3). A field initializer (cheap — its constructor
+  // only stashes these closures, it doesn't touch any Scene-plugin injection); create() calls
+  // fx.armShutdown() + fx.resetCombatFx() each (re)start — see there for why arming is split out.
+  private readonly fx = new CombatFxManager(this, {
+    getPlayerSprite: () => this.player,
+    getFacing: () => this.facingDir(),
+    getLastFacingDCol: () => this.lastFacing.dCol,
+    setAttackLockUntil: (t) => {
+      this.attackLockUntil = t;
+    },
+  });
   // True from the moment the player's HP hits 0 until the death-anim beat ends and the scene restarts.
   // Freezes the world (see update()) and swallows further damage so a crowd can't re-trigger death.
   private playerDying = false;
@@ -251,10 +234,13 @@ export class GameScene extends Phaser.Scene {
     this.harvestSwing = null;
     this.attackLockUntil = 0;
     this.combatMoveVec = { dx: 0, dy: 0 };
-    // Combat-FX state — clear so a death-restart starts clean: the maps/set held tweens+sprites from
-    // the dead run (Phaser destroyed them on teardown, so drop the stale references), and `playerDying`
-    // must reset or the fresh player would stay frozen from the previous death (see killPlayer/update).
-    this.resetCombatFx();
+    // Combat-FX state — (re-)arm the SHUTDOWN flush (see CombatFxManager.armShutdown) then clear so a
+    // death-restart starts clean: the maps/set held tweens+sprites from the dead run (Phaser destroyed
+    // them on teardown, so drop the stale references), and `playerDying` must reset or the fresh player
+    // would stay frozen from the previous death (see killPlayer/update).
+    this.fx.armShutdown();
+    this.fx.resetCombatFx();
+    this.playerDying = false;
     this.buildMode = false;
     this.sawPointerDown = false; // fields persist across scene.restart(); clear so a press interrupted by death can't resolve post-restart
     this.queueMarkers = [];
@@ -639,16 +625,6 @@ export class GameScene extends Phaser.Scene {
       this.harvestSwing ?? (this.player.body.velocity.lengthSq() > 1 ? 'walk' : 'idle');
     this.player.setFlipX(facing === 'side' && this.lastFacing.dCol < 0);
     this.player.anims.play(playerAnimKey(state, facing), true);
-  }
-
-  /** Play the one-shot attack swing in the current facing and lock updatePlayerAnim out for its
-   * duration (so an attack reads fully even while moving). Re-pressing restarts it. */
-  private playAttackSwing(): void {
-    const facing = this.facingDir();
-    this.player.setFlipX(facing === 'side' && this.lastFacing.dCol < 0);
-    const key = playerAnimKey('attack', facing);
-    this.player.anims.play(key); // no ignoreIfPlaying → a rapid re-press restarts the swing
-    this.attackLockUntil = this.time.now + (this.anims.get(key)?.duration ?? 300);
   }
 
   /** Map `lastFacing` (dCol/dRow) to a directional strip: side when horizontal dominates, else up/down. */
@@ -1151,7 +1127,7 @@ export class GameScene extends Phaser.Scene {
    * tile — but an enemy is hit anywhere its hurtbox reaches it (see enemyAt). Enemies only; trees
    * keep using chop(). */
   private attack(): void {
-    this.playAttackSwing(); // swing on every press, even a whiff, so the input always feels heard
+    this.fx.playAttackSwing(); // swing on every press, even a whiff, so the input always feels heard
     const pt = this.playerTile();
     const col = pt.col + this.lastFacing.dCol;
     const row = pt.row + this.lastFacing.dRow;
@@ -1162,7 +1138,7 @@ export class GameScene extends Phaser.Scene {
     if (enemy.hp <= 0) {
       this.killEnemy(enemy); // play the death collapse, then remove the corpse
     } else if (dmg > 0) {
-      this.flashHit(enemy.sprite); // red flash + flinch on a hit it survived
+      this.fx.flashHit(enemy.sprite); // red flash + flinch on a hit it survived
       this.cameras.main.shake(ENEMY_HIT_SHAKE_MS, ENEMY_HIT_SHAKE_INTENSITY); // light kick so a connect has impact
     }
   }
@@ -1172,173 +1148,9 @@ export class GameScene extends Phaser.Scene {
    * the screen edges. Deliberately *not* on the starvation drain (a passive tick, not an impact); it
    * fires from the bite site so getting bitten is unmissable even when you're not watching your feet. */
   private onPlayerHurt(): void {
-    this.flashHit(this.player);
+    this.fx.flashHit(this.player);
     this.cameras.main.shake(PLAYER_HIT_SHAKE_MS, PLAYER_HIT_SHAKE_INTENSITY);
     this.game.events.emit('player:hit');
-  }
-
-  /** This sprite's live HitFlash pipeline instance (WebGL only), or null. `getPostPipeline` may hand
-   * back a single instance or an array depending on the query — normalise to the first. */
-  private hitPipeline(sprite: Phaser.GameObjects.Sprite): HitFlashPipeline | null {
-    const p = sprite.getPostPipeline(HIT_FLASH_KEY);
-    return ((Array.isArray(p) ? p[0] : p) as HitFlashPipeline | undefined) ?? null;
-  }
-
-  /**
-   * Damage reaction shared by the player and enemies: a red flash (the HitFlash PostFX on WebGL, a
-   * solid fill-tint on Canvas) plus a quick squash "flinch". Both are driven off ONE tween over a
-   * plain `{ t }` object (1 → 0), so the flash intensity and the squash decay in lockstep from the
-   * moment of impact and settle back to rest — no yoyo needed, the impact is instantaneous and the
-   * recovery is the ease-out. The squash animates *scale only*, never position, so it can't fight the
-   * actor's Arcade body (game logic stays keyed to col/row per docs/RENDERING.md). Re-hitting mid-flash
-   * restarts cleanly (the prior tween is stopped, not completed, so it won't tear down the pipeline).
-   */
-  private flashHit(sprite: Phaser.GameObjects.Sprite): void {
-    const isPlayer = sprite === this.player;
-    if (isPlayer) this.playerHitFlashes += 1;
-    else this.enemyHitFlashes += 1;
-
-    const webgl = this.game.renderer.type === Phaser.WEBGL;
-    if (webgl) {
-      if (!this.hitFlashOn.has(sprite)) {
-        sprite.setPostPipeline(HIT_FLASH_KEY);
-        this.hitFlashOn.add(sprite);
-      }
-    } else {
-      sprite.setTintFill(HIT_FLASH_TINT); // Canvas fallback: a plain solid-red fill, cleared on completion
-    }
-    const pipe = webgl ? this.hitPipeline(sprite) : null;
-
-    this.hitFlashTweens.get(sprite)?.stop(); // stop() (not remove()) so the old onComplete never runs
-    const fx = { t: 1 };
-    const tween = this.tweens.add({
-      targets: fx,
-      t: 0,
-      duration: HIT_FLASH_MS,
-      ease: 'Expo.easeOut', // hit hard on impact, fade fast
-      onUpdate: () => {
-        const t = fx.t;
-        if (pipe) pipe.flash = t * HIT_FLASH_PEAK;
-        // Read baseScale LIVE, not captured once: a footprint swap (idle 32px@2 ↔ walk 64px@1,
-        // setEnemyFootprint) can fire mid-flash, and a stale base would stretch the new strip to the
-        // old scale — e.g. the 64px Run drawn at the Idle's scale 2 → the sprite visibly doubles.
-        const base = (sprite.getData('baseScale') as number | undefined) ?? 1;
-        // squash: widest+shortest at impact (t=1), easing back to the rest scale (t=0).
-        sprite.setScale(base * (1 + HIT_FLASH_SQUASH * t), base * (1 - HIT_FLASH_SQUASH * 0.8 * t));
-        if (isPlayer) this.playerFlash = t;
-      },
-      onComplete: () => {
-        this.hitFlashTweens.delete(sprite);
-        const base = (sprite.getData('baseScale') as number | undefined) ?? 1;
-        sprite.setScale(base);
-        if (webgl) {
-          sprite.removePostPipeline(HIT_FLASH_KEY);
-          this.hitFlashOn.delete(sprite);
-        } else {
-          sprite.clearTint();
-        }
-        if (isPlayer) this.playerFlash = 0;
-      },
-    });
-    this.hitFlashTweens.set(sprite, tween);
-  }
-
-  /**
-   * An enemy's attack "tell": a quick out-and-back lunge toward its target. The skeleton sheet ships
-   * no attack strip, so without this a bite is invisible — the enemy just stands on the player. We
-   * move the Arcade **body** (via `body.reset`), not the sprite transform: Arcade writes the body's
-   * position back onto the sprite every step, so a `sprite.x` tween would be stomped each frame. The
-   * lunge only runs during the stationary contact phase (velocity 0, no active path) and snaps back to
-   * the origin on completion, and its total time stays under the contact cooldown so it always settles
-   * before the next bite. Logic (contact, pathing) keys off z.col/z.row, so this stays purely visual.
-   */
-  private enemyLungeAt(z: EnemyUnit, targetX: number, targetY: number): void {
-    this.enemyAttacks += 1;
-    const sprite = z.sprite;
-    if (this.lungeTweens.has(sprite)) return; // already lunging — don't stack
-    const ox = sprite.x;
-    const oy = sprite.y;
-    const dx = targetX - ox;
-    const dy = targetY - oy;
-    const len = Math.hypot(dx, dy) || 1;
-    const ux = (dx / len) * ENEMY_LUNGE_PX;
-    const uy = (dy / len) * ENEMY_LUNGE_PX;
-    if (dx !== 0) sprite.setFlipX(dx < 0); // face the target across the lunge (velocity is 0, so updateEnemyAnim won't reflip)
-
-    const tween = this.tweens.add({
-      targets: { p: 0 },
-      p: 1,
-      duration: ENEMY_LUNGE_MS,
-      yoyo: true, // out to the target, then back
-      ease: 'Quad.easeOut',
-      onUpdate: (_tw, tgt: { p: number }) => sprite.body.reset(ox + ux * tgt.p, oy + uy * tgt.p),
-      onComplete: () => {
-        this.lungeTweens.delete(sprite);
-        sprite.body.reset(ox, oy); // guarantee it lands exactly back home
-      },
-    });
-    this.lungeTweens.set(sprite, tween);
-
-    // Coded weapon swing (the pack ships no mob attack strip): rotate the held weapon about its grip
-    // through WEAPON_SWING_ARC_DEG with a small scale pop, yoyo, in step with the body lunge. syncEnemyAttachments
-    // adds w.swingRot every tick, so the pinned weapon arcs while still tracking the hand.
-    if (z.weapon) {
-      const w = z.weapon;
-      const baseScale = w.sprite.scale;
-      this.weaponSwingTweens.get(sprite)?.stop();
-      const swing = this.tweens.add({
-        targets: w,
-        swingRot: WEAPON_SWING_ARC_DEG, // always a +arc; weaponTransform mirrors it when the wielder faces left
-        duration: WEAPON_SWING_MS,
-        yoyo: true,
-        ease: 'Quad.easeOut',
-        onUpdate: () => {
-          if (!w.sprite.active) return; // weapon destroyed mid-swing (death/teardown) — don't poke it
-          const p = w.swingRot / WEAPON_SWING_ARC_DEG; // 0→1→0 across the yoyo
-          w.sprite.setScale(baseScale * (1 + (WEAPON_SWING_SCALE_POP - 1) * p));
-        },
-        onComplete: () => {
-          w.swingRot = 0;
-          if (w.sprite.active) w.sprite.setScale(baseScale);
-          this.weaponSwingTweens.delete(sprite);
-        },
-      });
-      this.weaponSwingTweens.set(sprite, swing);
-    }
-  }
-
-  /** Stop and forget any in-flight hit-flash/lunge tweens for a sprite about to be destroyed — those
-   * tweens target plain objects but poke the sprite (scale / body.reset), so they'd throw once it's
-   * gone. Called before a killed enemy's sprite is destroyed. */
-  private cleanupActorFx(sprite: Phaser.GameObjects.Sprite): void {
-    this.hitFlashTweens.get(sprite)?.stop();
-    this.hitFlashTweens.delete(sprite);
-    this.lungeTweens.get(sprite)?.stop();
-    this.lungeTweens.delete(sprite);
-    this.weaponSwingTweens.get(sprite)?.stop(); // the swing tween pokes the weapon image each frame
-    this.weaponSwingTweens.delete(sprite);
-    this.hitFlashOn.delete(sprite);
-  }
-
-  /** Reset all combat-FX bookkeeping to its boot state — called from create() (death-restart) and the
-   * scenario reset. The maps/set may hold tweens+sprites from a torn-down run, so drop them wholesale. */
-  private resetCombatFx(): void {
-    // Stop before dropping: a cleared map still leaves the tween running in Phaser's TweenManager, and
-    // its onUpdate pokes a sprite the teardown is about to destroy (the yoyo weapon-swing outlives a
-    // short step). Stopping first guarantees no orphaned tween fires on a dead sprite next frame.
-    for (const t of this.hitFlashTweens.values()) t.stop();
-    for (const t of this.lungeTweens.values()) t.stop();
-    for (const t of this.weaponSwingTweens.values()) t.stop();
-    this.hitFlashTweens.clear();
-    this.lungeTweens.clear();
-    this.weaponSwingTweens.clear();
-    this.hitFlashOn.clear();
-    this.corpses.clear(); // scene teardown destroys the sprites; drop stale references
-    this.playerFlash = 0;
-    this.playerHitFlashes = 0;
-    this.enemyHitFlashes = 0;
-    this.enemyAttacks = 0;
-    this.playerDying = false;
   }
 
   /**
@@ -1350,7 +1162,7 @@ export class GameScene extends Phaser.Scene {
   private killEnemy(z: EnemyUnit): void {
     z.alive = false;
     this.enemies = this.enemies.filter((x) => x !== z);
-    this.cleanupActorFx(z.sprite); // also stops an in-flight weapon swing before the image goes away
+    this.fx.cleanupActorFx(z.sprite); // also stops an in-flight weapon swing before the image goes away
     if (z.weapon) {
       z.weapon.sprite.destroy(); // weapon hides on death (no loot/drop — see plan Out of scope)
       z.weapon = undefined;
@@ -1370,13 +1182,13 @@ export class GameScene extends Phaser.Scene {
     const { render } = ACTIVE_TILESET.actors.enemy;
     sprite.setScale(render.scale).setOrigin(render.originX, render.originY);
     sprite.anims.play(enemyDeathKey); // keeps its current flipX — collapses facing the way it ran
-    this.corpses.add(sprite);
+    this.fx.addCorpse(sprite);
     const dur = this.anims.get(enemyDeathKey)?.duration ?? 600;
     // TEMP: hold the settled final frame for 5 minutes so the death anim can be observed on the corpse
     // (instead of the brief DEATH_HOLD_MS beat). Revisit once the skeleton death look is dialled in.
     const CORPSE_LINGER_MS = 5 * 60_000;
     this.time.delayedCall(dur + CORPSE_LINGER_MS, () => {
-      this.corpses.delete(sprite);
+      this.fx.removeCorpse(sprite);
       sprite.destroy();
     });
   }
@@ -1394,7 +1206,7 @@ export class GameScene extends Phaser.Scene {
     this.cancelAll();
     this.player.body.setVelocity(0, 0);
     this.attackLockUntil = 0;
-    this.cleanupActorFx(this.player);
+    this.fx.cleanupActorFx(this.player);
     const facing = this.facingDir();
     this.player.setScale((this.player.getData('baseScale') as number | undefined) ?? 1);
     this.player.setFlipX(facing === 'side' && this.lastFacing.dCol < 0);
@@ -1607,7 +1419,7 @@ export class GameScene extends Phaser.Scene {
     this.cancelAll(); // drop harvest orders that reference the nodes we're about to destroy
     for (const t of this.trees) t.sprite.destroy();
     for (const z of this.enemies) {
-      this.cleanupActorFx(z.sprite);
+      this.fx.cleanupActorFx(z.sprite);
       z.weapon?.sprite.destroy();
       z.hands?.main.destroy();
       z.hands?.off.destroy();
@@ -1956,7 +1768,7 @@ export class GameScene extends Phaser.Scene {
           const cooldown = z.weapon ? z.weapon.def.attackMs : CONTACT_DAMAGE_COOLDOWN_MS;
           if (now - z.lastContactAt >= cooldown) {
             z.lastContactAt = now;
-            this.enemyLungeAt(z, this.player.x, this.player.y); // visible attack tell + weapon swing
+            this.fx.lungeAt(z, this.player.x, this.player.y); // visible attack tell + weapon swing
             const dmg = resolveMeleeAttack(z.def, this.playerStats, baseDmg, this.rng);
             if (dmg > 0) this.onPlayerHurt(); // flash + camera kick + damage vignette when the bite lands
             this.damagePlayer(dmg);
@@ -2108,7 +1920,7 @@ export class GameScene extends Phaser.Scene {
   private testResetWorld(): void {
     for (const t of this.trees) t.sprite.destroy();
     for (const z of this.enemies) {
-      this.cleanupActorFx(z.sprite);
+      this.fx.cleanupActorFx(z.sprite);
       z.weapon?.sprite.destroy();
       z.hands?.main.destroy();
       z.hands?.off.destroy();
@@ -2137,7 +1949,8 @@ export class GameScene extends Phaser.Scene {
     this.harvestSwing = null;
     this.attackLockUntil = 0;
     this.combatMoveVec = { dx: 0, dy: 0 };
-    this.resetCombatFx(); // start each scenario with clean FX counters/flags (see create())
+    this.fx.resetCombatFx(); // start each scenario with clean FX counters/flags (see create())
+    this.playerDying = false;
     this.buildMode = false;
     this.queueMarkers = [];
     this.outlinedTreeIds.clear();
@@ -2317,13 +2130,13 @@ export class GameScene extends Phaser.Scene {
       enemyTiles: this.enemies.filter((z) => z.alive).map((z) => ({ col: z.col, row: z.row })),
       // Equipped weapon id per live enemy (null = unarmed) — lets a combat spec confirm the rolled/forced weapon.
       enemyWeapons: this.enemies.filter((z) => z.alive).map((z) => z.weapon?.id ?? null),
-      corpses: this.corpses.size,
+      corpses: this.fx.getCorpseCount(),
       playerHp: this.playerHp,
       playerDying: this.playerDying,
-      playerFlash: this.playerFlash,
-      playerHitFlashes: this.playerHitFlashes,
-      enemyHitFlashes: this.enemyHitFlashes,
-      enemyAttacks: this.enemyAttacks,
+      playerFlash: this.fx.getPlayerFlash(),
+      playerHitFlashes: this.fx.getPlayerHitFlashes(),
+      enemyHitFlashes: this.fx.getEnemyHitFlashes(),
+      enemyAttacks: this.fx.getEnemyAttacks(),
       mode: this.mode,
       hunger: this.hunger,
       dayPhase: this.dayPhase,
