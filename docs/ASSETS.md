@@ -116,7 +116,7 @@ needs to be treated as precious.
 |`_derived/rock.png`|`Environment/Props/Static/Rocks.png`|5|
 |`_derived/weapons/club.png`|`Weapons/Bone/Bone.png`|1 (bone mace, grip at bottom; `sips -Z 40` → 7×40)|
 |`_derived/weapons/knife.png`|`Weapons/Bone/Bone.png`|7 (bone dagger, grip at bottom; `sips -Z 18` → 4×18)|
-|`_derived/hand.png`|`Weapons/Hands/Hands.png`|0 (tan fist, 7×7 — the shared hand mitt, see "Weapon attachment" below)|
+|`_derived/hand.png`|`Weapons/Hands/Hands.png`|4 (brown gloved fist, 8×7 — the shared hand mitt; a leather-glove look chosen over the tan idx-0 fist, which read as bare human skin on a skeleton. Sheet has 6 styles × L/R pairs: idx 0/2 tan fist/palm, 4/6 brown fist/palm, 8/10 green orc fist/palm. See "Weapon attachment" below)|
 
 > The two bone weapons are extracted big (80/27px) then downscaled to sit proportionately on the
 > ~30px skeleton (club distinctly larger than the knife). They draw at integer scale 1 from these
