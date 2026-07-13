@@ -36,6 +36,24 @@
       "origin": "self-made"
     },
     {
+      "id": "pixel-crawler/_derived/hand_open.png",
+      "pack": "pixel-crawler",
+      "type": "object",
+      "source": {
+        "kind": "image",
+        "path": "_derived/hand_open.png"
+      },
+      "w": 7,
+      "h": 6,
+      "category": "_derived",
+      "tags": [
+        "derived",
+        "hand",
+        "open"
+      ],
+      "origin": "self-made"
+    },
+    {
       "id": "pixel-crawler/_derived/hand.png",
       "pack": "pixel-crawler",
       "type": "object",

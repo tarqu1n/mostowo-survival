@@ -92,15 +92,27 @@ export interface WeaponArt {
 }
 
 /**
- * The shared hand mitt layered onto the monster. The Base skeleton's own hands are vestigial nubs
- * (crossed-forearm pixels that read as nothing at game scale), so a visible fist from `Weapons/Hands`
- * is pinned to each hand anchor every frame — the SAME image for both, mirrored with the body. The
- * `mainZ`/`offZ` depth offsets (added to the wielder's depth) put the gripping hand OVER the weapon
- * (weapon `z` 1) and the free hand beside the body. A fist doesn't rotate, so there's no `rot` here.
+ * The hands layered onto the monster. The Base skeleton's own hands are vestigial nubs (crossed-forearm
+ * pixels that read as nothing at game scale), so a visible hand from `Weapons/Hands` is pinned to each
+ * anchor every frame. The two hands are DISTINCT so the pair reads as a real left + right rather than
+ * two identical fists: `source` is the free-hand fist (off hand); `mainSource` (when set) is the
+ * weapon-gripping hand — an OPEN grip that wraps the raised weapon — tilted by `mainRot` so it follows
+ * the blade, and `offFlip` mirrors the off-hand fist relative to the body so it's the opposite hand.
+ * The `mainZ`/`offZ` depth offsets (added to the wielder's depth) put the gripping hand OVER the weapon
+ * (weapon `z` 1) and the free hand beside the body.
  */
 export interface HandArt {
+  /** The free (off) hand image — a closed fist. */
   source: TileSource;
-  /** setOrigin as [x,y] fractions — the point pinned to the hand anchor (fist centre). */
+  /** The weapon-gripping (main) hand image, when it differs from the off-hand fist. Defaults to `source`. */
+  mainSource?: TileSource;
+  /** Resting tilt (deg, clockwise) for the main hand so its open grip aligns with the held weapon;
+   *  negated with the body on `flipX`. Default 0. The off-hand fist never rotates. */
+  mainRot?: number;
+  /** Mirror the off-hand fist relative to the body's facing, so the two hands read as a left/right
+   *  pair instead of two of the same. Default false. */
+  offFlip?: boolean;
+  /** setOrigin as [x,y] fractions — the point pinned to the hand anchor (hand centre). */
   pivot: [number, number];
   /** Depth offset for the weapon-gripping (main) hand — drawn in front of the weapon. */
   mainZ: number;
@@ -412,11 +424,16 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
           z: 1,
         },
       },
-      // Visible fist layered on both hands (the Base skeleton's own hands are unreadable nubs). One tan
-      // fist extracted from Weapons/Hands into _derived/hand.png; centred on the anchor, mirrored with
-      // the body. mainZ 2 draws it over the weapon (z 1); offZ 1 sits the free fist beside the body.
+      // Two DISTINCT hands (the skeleton's own are unreadable nubs), so it doesn't read as two identical
+      // fists: off hand = brown gloved fist (_derived/hand.png, Hands.png idx 4), mirrored via offFlip so
+      // it's the opposite hand; main hand = the open grip (_derived/hand_open.png, idx 7) tilted mainRot 14°
+      // to wrap the raised weapon. Both centred on their anchor. mainZ 2 draws the grip over the weapon
+      // (z 1); offZ 1 sits the free fist beside the body.
       hand: {
         source: { kind: 'image', path: '_derived/hand.png' },
+        mainSource: { kind: 'image', path: '_derived/hand_open.png' },
+        mainRot: 14,
+        offFlip: true,
         pivot: [0.5, 0.5],
         mainZ: 2,
         offZ: 1,

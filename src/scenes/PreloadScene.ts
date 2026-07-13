@@ -118,9 +118,12 @@ export class PreloadScene extends Phaser.Scene {
     // loads the texture.
     loadStrip(campfireAnimKey(), manifest.stations.campfire);
 
-    // Monster weapon art + the shared hand mitt: one static image each (no anim), keyed like the
-    // derived tiles. GameScene resolves them via resolveTile(source).
-    for (const src of [...Object.values(enemy.weapons).map((w) => w.source), enemy.hand.source]) {
+    // Monster weapon art + the two hand images (off-hand fist + main-hand open grip): one static image
+    // each (no anim), keyed like the derived tiles. GameScene resolves them via resolveTile(source).
+    const handSources = [enemy.hand.source, enemy.hand.mainSource].filter(
+      (s): s is TileSource => s !== undefined,
+    );
+    for (const src of [...Object.values(enemy.weapons).map((w) => w.source), ...handSources]) {
       if (src.kind === 'image' && !loadedImages.has(src.path)) {
         loadedImages.add(src.path);
         this.load.image(tileImageKey(src.path), url(src.path));

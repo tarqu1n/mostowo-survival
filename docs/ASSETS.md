@@ -116,7 +116,8 @@ needs to be treated as precious.
 |`_derived/rock.png`|`Environment/Props/Static/Rocks.png`|5|
 |`_derived/weapons/club.png`|`Weapons/Bone/Bone.png`|1 (bone mace, grip at bottom; `sips -Z 40` → 7×40)|
 |`_derived/weapons/knife.png`|`Weapons/Bone/Bone.png`|7 (bone dagger, grip at bottom; `sips -Z 18` → 4×18)|
-|`_derived/hand.png`|`Weapons/Hands/Hands.png`|4 (brown gloved fist, 8×7 — the shared hand mitt; a leather-glove look chosen over the tan idx-0 fist, which read as bare human skin on a skeleton. Sheet has 6 styles × L/R pairs: idx 0/2 tan fist/palm, 4/6 brown fist/palm, 8/10 green orc fist/palm. See "Weapon attachment" below)|
+|`_derived/hand.png`|`Weapons/Hands/Hands.png`|4 (brown gloved fist, 8×7 — the **off** hand; a leather-glove look chosen over the tan idx-0 fist, which read as bare human skin on a skeleton. Sheet has 6 styles × L/R pairs: idx 0/2 tan fist/palm, 4/6 brown fist/palm, 8/10 green orc fist/palm. See "Weapon attachment" below)|
+|`_derived/hand_open.png`|`Weapons/Hands/Hands.png`|7 (brown open palm, 7×6 — the **main** (weapon-gripping) hand, distinct from the off-hand fist so the pair isn't two identical hands; tilted 14° in-engine to wrap the raised weapon. See "Weapon attachment" below)|
 
 > The two bone weapons are extracted big (80/27px) then downscaled to sit proportionately on the
 > ~30px skeleton (club distinctly larger than the knife). They draw at integer scale 1 from these
@@ -202,14 +203,17 @@ anchor, so the gripping fist stays put) rather than a sprite animation, since th
 attack strip — see `WEAPON_SWING_*` in `config.ts`.
 
 **Hand layer.** The Base skeleton's own hands are unreadable nubs (crossed-forearm pixels that
-vanish at game scale — the pack's promo art composites visible mitts + weapons on top). So a shared
-fist (`_derived/hand.png`, `actors.enemy.hand`) is pinned to BOTH anchors every tick — the same
-image for both hands, mirrored with the body: `mainHand` grips the weapon (drawn over it via
-`mainZ`), `offHand` is the free fist beside the body (`offZ`). Fists don't rotate (position + flip
-only), so the grip stays steady while the weapon arcs. Both fists render whether or not the mob is
-armed; they're destroyed with the weapon on death (the 96px Death strip carries no anchors). The
-`mainHand` `rot` also leans the resting weapon forward off the skull, so it reads as held-out, not
-held-to-the-face.
+vanish at game scale — the pack's promo art composites visible hands + weapons on top). So two
+**distinct** hands (`actors.enemy.hand`) are pinned to the anchors every tick, so the pair reads as a
+real left + right instead of two identical fists (the bug the single-image version had): the **off
+hand** is the brown gloved fist (`_derived/hand.png`, idx 4), mirrored against the body via `offFlip`
+so it's the opposite hand; the **main hand** is an **open grip** (`mainSource` = `_derived/hand_open.png`,
+idx 7) that wraps the raised weapon, tilted by `mainRot` (14°, negated with the body) to follow the
+blade. `mainHand` grips the weapon (drawn over it via `mainZ`); `offHand` is the free fist beside the
+body (`offZ`). The main hand sits at the SAME anchor as the weapon, so it stays put while the weapon
+arcs about it. Both hands render whether or not the mob is armed; they're destroyed with the weapon on
+death (the 96px Death strip carries no anchors). The `mainHand` anchor `rot` also leans the resting
+weapon forward off the skull, so it reads as held-out, not held-to-the-face.
 
 Weapon **ART** (source image — extracted per the pipeline above, see the `club`/`knife` derived-file
 rows in the manifest table above — plus grip `pivot` and draw `z`) lives in the manifest

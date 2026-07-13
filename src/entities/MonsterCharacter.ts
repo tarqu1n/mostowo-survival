@@ -138,16 +138,18 @@ export class MonsterCharacter extends Character {
       this.weapon = { id: weaponId, sprite: wsprite, def: stats, swingRot: 0 };
     }
 
-    // Both fists — always (the skeleton has hands whether or not it's armed). The gripping hand draws
-    // over the weapon, the free hand beside the body; both pinned each tick in syncAttachments.
+    // Both hands — always (the skeleton has hands whether or not it's armed). The gripping (main) hand
+    // draws over the weapon, the free (off) hand beside the body; both pinned each tick in
+    // syncAttachments. They use DISTINCT images (open grip vs fist) so they don't read as two of the same.
     const handArt = enemyActor.hand;
-    const handKey = resolveTile(handArt.source).key;
-    const mkHand = (z: number) =>
+    const offKey = resolveTile(handArt.source).key;
+    const mainKey = resolveTile(handArt.mainSource ?? handArt.source).key;
+    const mkHand = (key: string, z: number) =>
       scene.add
-        .image(sprite.x, sprite.y, handKey)
+        .image(sprite.x, sprite.y, key)
         .setOrigin(handArt.pivot[0], handArt.pivot[1])
         .setDepth(sprite.depth + z);
-    this.hands = { main: mkHand(handArt.mainZ), off: mkHand(handArt.offZ) };
+    this.hands = { main: mkHand(mainKey, handArt.mainZ), off: mkHand(offKey, handArt.offZ) };
 
     this.syncAttachments(); // place weapon + fists on frame 0
   }
@@ -308,16 +310,25 @@ export class MonsterCharacter extends Character {
           .setFlipX(t.flipX)
           .setAngle(t.rotation);
     }
-    // Fists: a fist doesn't rotate, so pin position + mirror only (angle stays 0). The gripping hand
-    // sits at the SAME anchor as the weapon, so it stays put while the weapon arcs about it.
+    // Hands: pin position + mirror. The main (open grip) hand carries a resting `mainRot` tilt so it
+    // follows the raised weapon (negated with the body, like the weapon); it sits at the SAME anchor as
+    // the weapon, so it stays put while the weapon arcs about it. The off (fist) hand takes `offFlip` to
+    // mirror against the body's facing, so the two hands read as a left/right pair.
     if (this.hands) {
+      const handArt = enemy.hand;
       const m = pin(strip.anchors?.mainHand, 0);
       this.hands.main.setVisible(!!m);
       if (m)
-        this.hands.main.setPosition(this.sprite.x + m.x, this.sprite.y + m.y).setFlipX(m.flipX);
+        this.hands.main
+          .setPosition(this.sprite.x + m.x, this.sprite.y + m.y)
+          .setFlipX(m.flipX)
+          .setAngle(m.flipX ? -(handArt.mainRot ?? 0) : (handArt.mainRot ?? 0));
       const o = pin(strip.anchors?.offHand, 0);
       this.hands.off.setVisible(!!o);
-      if (o) this.hands.off.setPosition(this.sprite.x + o.x, this.sprite.y + o.y).setFlipX(o.flipX);
+      if (o)
+        this.hands.off
+          .setPosition(this.sprite.x + o.x, this.sprite.y + o.y)
+          .setFlipX(handArt.offFlip ? !o.flipX : o.flipX);
     }
   }
 
