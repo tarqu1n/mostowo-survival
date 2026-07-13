@@ -7,6 +7,45 @@ Format: `YYYY-MM-DD — [DECIDED|PROPOSED|OPEN] Title` then a short rationale.
 
 ---
 
+## 2026-07-13 — [DECIDED] GameScene decomposed into an entities layer + scene managers (plan 013); behaviour classes yes, data hierarchy no
+
+`src/scenes/GameScene.ts` (2,448 lines, a third of all source at the plan's start) is now a
+composition root + task loop + spawning/world-gen + mode/inspect glue (1,385 lines). Extracted: a
+shallow `src/entities/` hierarchy (`Character` → `PlayerCharacter`/`MonsterCharacter`, replacing the
+old `EnemyUnit` struct) for actors that genuinely share state + behaviour, plus
+`BuildManager`/`TaskGlowRenderer`/`CombatFxManager`/`PointerInputController`/`scenes/testApi.ts` for
+self-contained scene concerns. **No gameplay change** throughout — the Tier-2 Playwright suite +
+`debugState()` shape (now a named `DebugState` type in `testApi.ts`, not
+`ReturnType<GameScene['debugState']>`) were the behavioural contract; a new `refactor-tripwire` spec
+pins a full snapshot as a standing regression alarm.
+
+**Behaviour classes yes, data hierarchy no** — a conscious *refinement*, not a reversal, of the
+2026-07-11 "shared stats via typed adapters" decision below (now refreshed to its post-rename names):
+entities that truly share behaviour (movement, facing, combat hooks) get the `Character` hierarchy;
+trees/build sites share no behaviour with each other or with `Character`, so they stay plain
+interfaces and `systems/stats.ts`'s adapters remain the inspection seam.
+
+**Advisor rationale (consulted 2026-07-12), adopted as-is:**
+
+- **A plain class owns its sprite, not a `Sprite` subclass** — the footprint≠hurtbox split already
+  means logical position isn't the sprite transform, so subclassing would entangle entity lifetime
+  with the display list and the `debugState()` contract.
+- **Camera merges into `PointerInputController`, not a separate manager** — pinch/pan/follow state
+  IS gesture state; splitting it out would create the chattiest manager↔manager edge.
+- **The task loop stays in `GameScene`** (`order/enqueue/beginCurrent/completeCurrent/runHarvest/
+  runBuild/repath`) — it's the coordination spine touching player movement, inventory, sites and
+  trees; only its *visuals* (glow sprites, queue markers) extracted, as `TaskGlowRenderer`.
+
+**Coupling rules applied to every manager:** scene→manager is a direct method call, never a
+`game.events` round-trip (the bus stays scene↔UIScene only); a manager's constructor takes the scene
+plus a narrow deps object of closures over exactly the state it needs, never raw field access; no
+manager↔manager coupling (the scene mediates); every manager registers `destroy()` on
+`Phaser.Scenes.Events.SHUTDOWN`.
+
+**Tooling adoption:** eslint + prettier + markdownlint-cli2 + husky/lint-staged (plan 013 Step 1)
+landed first, isolated from the refactor's move-diffs, so every later step's commits pass through
+the same hooks — see [STANDARDS.md](STANDARDS.md).
+
 ## 2026-07-12 — [DECIDED] Generic monster AI (pure FSM) + weapons via runtime anchor-pinning — supersedes plan 010's stamp tool for rigid slots (plan 011)
 
 Turned the single-behaviour kid zombie into a data-driven monster, in two parts.
@@ -452,12 +491,13 @@ wired-in default until this is committed.
 ## 2026-07-11 — [DECIDED] Shared stats via typed adapters, not a class hierarchy
 
 `InspectableStats` (the Inspect-mode panel's shape) is produced by small pure adapter functions
-(`treeStats`/`wallStats`/`zombieStats`/`playerCombatStats` in `systems/stats.ts`) that read from
+(`treeStats`/`wallStats`/`enemyStats`/`playerCombatStats` in `systems/stats.ts`) that read from
 each runtime type's existing fields, rather than a shared base class or interface all entities
-must implement. Rationale: trees/walls/zombies/the player already have different runtime shapes
-(`TreeNode`/`BuildSite`/`ZombieUnit`/scene fields) built by different systems; forcing a common
+must implement. Rationale: trees/walls/enemies/the player already have different runtime shapes
+(`TreeNode`/`BuildSite`/`EnemyUnit`/scene fields) built by different systems; forcing a common
 class hierarchy across them would ripple through code that has nothing to do with inspection, for
-a UI concern that only needs a read-only view.
+a UI concern that only needs a read-only view. (Names refreshed 2026-07-13 for the zombie→enemy
+rename; `EnemyUnit` itself later graduated to the `MonsterCharacter` class — see 2026-07-13 above.)
 
 ## 2026-07-11 — [DECIDED] Object inspection scope: trees + walls only, no new placeholder entity
 

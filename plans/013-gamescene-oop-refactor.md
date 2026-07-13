@@ -1,6 +1,6 @@
 # GameScene OOP Refactor (tooling + entities layer + scene decomposition)
 
-> Status: planned — run /critique-plan then /execute-plan to begin.
+> Status: in review
 
 ## Summary
 Two-part hardening pass. **Part one (Step 1):** land the project's code-quality tooling — a coding
@@ -319,7 +319,22 @@ so steps are write-overlapping and strictly sequential, in order.
   - Done when: `npm run check` green; `npm run e2e` green with special attention to `gestures`, `zoom`,
     `follow`, `queue`, `mode` specs; GameScene's `create()` no longer registers raw pointer handlers.
 
-- [ ] **Step 6: `BuildManager` + `TaskGlowRenderer` + TestApi module + `create()` slim + docs** `[delegate sonnet]`
+- [x] **Step 6: `BuildManager` + `TaskGlowRenderer` + TestApi module + `create()` slim + docs** `[delegate sonnet]`
+  - Outcome: delegated (sonnet; first agent died mid-run after authoring the two manager files — a
+    second agent verified + reused them, fixing one bug in the unwired draft: `BuildManager.destroy()`
+    called `reset()` whose `walls.clear()` throws at SHUTDOWN because Arcade tears down first; destroy
+    now only drops the ghost). New: `src/scenes/build/BuildManager.ts` (243), `src/scenes/fx/`
+    `TaskGlowRenderer.ts` (186), `src/scenes/testApi.ts` (362 — exports named `DebugState`;
+    `entities/testTypes.ts` GameScene import re-pointed per Step 2 flag). create() = resetState/
+    buildWorld/wireBus/installTestApi; PointerInputController deps re-pointed only; harness/scenarios/
+    UIScene/stats.ts untouched; debugState key order preserved. Docs batched: CONVENTIONS (entities
+    layer + manager pattern), STANDARDS (entities/ vs scenes/ placement), DECISIONS (2026-07-13
+    entry incl. critique #5 rename refresh), STATUS, CLAUDE.md. GameScene 1,743 → 1,385 lines — misses the
+    "well under 1,000" target; everything the plan names is extracted, the remainder is what the plan
+    says stays (task loop, spawning, combat glue) — further cuts would be new scope. check green;
+    e2e 38/38 (agent ×2 + orchestrator ×1); tripwire ×3; smoke + build pass (one smoke flake =
+    pre-existing menu-start flake vs the stale :4173 preview). Pre-existing noted: randomiseWorld
+    never resets nextTreeId/nextEnemyId (cosmetic id growth).
   - `src/scenes/build/BuildManager.ts`: move `buildMode`, `walls`, `occupied`, `sites`, `siteTiles`,
     `ghost`, `nextSiteId` and methods `toggleBuild`, `siteById`, `siteAt`, `tilePlaceable`,
     `updateGhost`, `placeOrEnqueueBuild`, `createBlueprint`, `finishSite`. Scene task loop calls it

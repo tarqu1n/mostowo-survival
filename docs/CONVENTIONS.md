@@ -55,4 +55,22 @@ _To be firmed up as we go. Starting position:_
   resolution and scale up. Actors render at native `render.scale = 1` and camera zoom is integer-only
   (both required for crisp nearest-neighbour — see [RENDERING.md](RENDERING.md)); size the world/props to
   the actor, never fractionally down-scale an actor to fit.
+- **Entities layer (`src/entities/`, plan 013).** Actors that genuinely share state + behaviour are
+  plain classes that _own_ their sprite — deliberately NOT `Phaser.GameObjects.Sprite` subclasses, so
+  entity lifetime never entangles with the display list: `Character` (abstract — sprite, stats, hp,
+  facing, path) → `PlayerCharacter` / `MonsterCharacter`. The hierarchy **stops there** — trees/build
+  sites share no behaviour with each other or with `Character`, so they stay plain interfaces + typed
+  stat adapters (`systems/stats.ts`), not a forced class tree (see [DECISIONS.md](DECISIONS.md),
+  2026-07-11 and 2026-07-13: behaviour classes yes, data hierarchy no). Decision/effect split
+  preserved: a pure system (`monsterAI`, `attachment`) _decides_; the entity _executes_ (e.g.
+  `MonsterCharacter.update` runs the FSM's decision, never re-derives it).
+- **Manager pattern (`src/scenes/{build,fx,input}/`, `src/scenes/testApi.ts`, plan 013).**
+  Self-contained scene concerns (build placement, queue-glow rendering, combat FX, pointer/camera
+  gestures, the DEV test API) extract into managers, not a growing GameScene: scene→manager is always
+  a **direct method call**, never a `game.events` round-trip (the bus stays reserved for
+  scene↔UIScene); a manager's constructor takes the scene plus a **narrow deps object of closures**
+  over exactly the scene state/methods it needs, never raw field access; there is **no
+  manager↔manager coupling** — if two managers need each other's data, the scene mediates. Every
+  manager registers its own `destroy()` on `Phaser.Scenes.Events.SHUTDOWN` (tween Maps/Sets are the
+  known restart-leak hazard). `GameScene` stays the composition root and keeps the task-execution loop.
 - Keep functions small; name for the domain (resource, node, recipe, stockpile), not the framework.

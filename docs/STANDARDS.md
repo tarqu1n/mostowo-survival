@@ -55,6 +55,14 @@ rules that STRIP them — trailing spaces, repeat blanks, tight table pipes — 
 - **Data modules:** lowercase plural nouns for content tables (`items.ts`, `nodes.ts`,
   `buildables.ts`, `enemies.ts`, `weapons.ts`) + `types.ts` (shared schemas) and `tileset.ts`
   (`ACTIVE_TILESET`).
+- **`entities/` vs `scenes/` submodule placement (plan 013):** a class that owns domain state (hp,
+  stats, AI, path) plus the sprite rendering it — no scene-plugin dependency beyond construction —
+  belongs in `src/entities/` (`Character.ts`, `PlayerCharacter.ts`, `MonsterCharacter.ts`,
+  `types.ts`, `testTypes.ts`). A class that needs the scene itself for GameObjects/tweens/physics/
+  input at call time (presentation or placement, not domain state) is a **manager** and belongs
+  under a `src/scenes/<concern>/` submodule named for what it does (`build/BuildManager.ts`,
+  `fx/CombatFxManager.ts`, `fx/TaskGlowRenderer.ts`, `input/PointerInputController.ts`); DEV-only
+  scene-facade modules (`testApi.ts`) sit directly under `src/scenes/`, not a submodule of one.
 - **Cross-scene events** (`game.events`): `'namespace:action'` string, lowerCamelCase action, e.g.
   `build:toggle`, `combat:attack`, `mode:combatToggle`, `debug:randomise`, `zoom:delta`,
   `tasks:cancel`. Namespaces group by subsystem (`build`, `camera`, `combat`, `debug`, `hunger`,

@@ -27,6 +27,7 @@ Data-driven content · pure systems · decoupled scenes:
   `BaseStats`/`CombatantStats`/`ObjectStats`; `tileset.ts`: `ACTIVE_TILESET`).
 - **`src/systems/`** — pure, testable logic: `pathfind` (A*), `tasks` (order queue), `grid`,
   `Inventory`, `combat`.
+- **`src/entities/`** — actor classes owning their sprite (`Character` → `PlayerCharacter`/`MonsterCharacter`).
 - **`src/scenes/`** — Boot → Preload → MainMenu → Game (world) + `UIScene` HUD overlay; comms via
   `game.events` (`build:*`) + shared `registry`.
 - **`src/ui/`** — Container-based UI kit (`Button`, `Panel`, `arrangeRow/Column/Grid`, `theme`).

@@ -1,14 +1,16 @@
 /**
  * The DEV-only test-contract types: the declarative scenario spec + result, and the `window.game.__test`
  * surface shape. Moved verbatim out of `scenes/GameScene.ts` (plan 013 Step 2) — names/shapes
- * unchanged. Consumed by `GameScene` (which implements/installs `GameTestApi`) and by the Tier-2
- * Playwright harness (`tests/e2e/harness.ts`, `tests/e2e/scenarios.ts`).
+ * unchanged. `GameTestApi.state()` returns `DebugState` (plan 013 Step 6 — the serializer moved to
+ * `scenes/testApi.ts`, which now installs `GameTestApi` on GameScene's behalf). Consumed by
+ * `GameScene.installTestApi()` and by the Tier-2 Playwright harness (`tests/e2e/harness.ts`,
+ * `tests/e2e/scenarios.ts`).
  */
 
 import type { DayPhase } from '../systems/daynight';
 import type { MonsterMode } from '../systems/monsterAI';
 import type { Action } from '../systems/tasks';
-import type { GameScene } from '../scenes/GameScene';
+import type { DebugState } from '../scenes/testApi';
 import type { FacingSpec } from './types';
 
 /**
@@ -62,7 +64,7 @@ export interface GameTestApi {
   applyScenario(spec: ScenarioSpec): ScenarioResult;
   step(ms: number): void;
   setRng(fn: () => number): void;
-  state(): ReturnType<GameScene['debugState']>;
+  state(): DebugState;
   order(a: Action): void;
   enqueue(a: Action): void;
   inspect(col: number, row: number): void;

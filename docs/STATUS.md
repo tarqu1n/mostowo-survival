@@ -189,3 +189,12 @@ coded swing tween since the pack ships no mob attack strip. Also wired the pack'
 bob (32px canvas, its own render footprint), so a calm, stationary zombie no longer freeze-frames on
 Run frame 0. See [ASSETS.md](ASSETS.md#weapon-attachment-runtime-pinning-plan-011) and
 [DECISIONS.md](DECISIONS.md) — this supersedes plan 010's anchor-stamp tool for rigid attachments.
+
+## GameScene OOP refactor + tooling (plan 013)
+
+`GameScene.ts` (2,448 lines) is decomposed into a `src/entities/` actor hierarchy (`Character` →
+`PlayerCharacter`/`MonsterCharacter`) and scene managers (`BuildManager`, `TaskGlowRenderer`,
+`CombatFxManager`, `PointerInputController`, `scenes/testApi.ts`) — a composition root + task loop +
+spawning/world-gen + mode/inspect glue remain (1,385 lines); no gameplay change, pinned by a new
+`refactor-tripwire` Tier-2 spec. Landed alongside the project's first lint/format/markdownlint +
+pre-commit hook tooling. See [DECISIONS.md](DECISIONS.md) (2026-07-13).

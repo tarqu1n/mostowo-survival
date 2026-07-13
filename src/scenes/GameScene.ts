@@ -32,7 +32,7 @@ import { BUILDABLES } from '../data/buildables';
 import { ENEMIES } from '../data/enemies';
 import type { ResourceNodeDef } from '../data/types';
 import { Inventory } from '../systems/Inventory';
-import { worldToTile, tileToWorldCenter, snapToTileCenter, tileKey } from '../systems/grid';
+import { worldToTile, tileToWorldCenter, tileKey } from '../systems/grid';
 import { findPath, reachableAdjacent, type Cell } from '../systems/pathfind';
 import { TaskQueue, type Action } from '../systems/tasks';
 import {
@@ -44,14 +44,11 @@ import {
 } from '../systems/daynight';
 import { drainHunger, feed, isStarving } from '../systems/needs';
 import { resolveMeleeAttack } from '../systems/combat';
-import type { MonsterMode } from '../systems/monsterAI';
 import { hurtboxContains, hurtboxTiles, DEFAULT_HURTBOX } from '../systems/hurtbox';
-import { bakeGlowTexture } from '../render/glowTexture';
 import { treeStats, wallStats, enemyStats } from '../systems/stats';
 import type { UIScene } from './UIScene';
-import { FACING_DELTAS } from '../entities/types';
-import type { TreeNode, BuildSite, PointerPick } from '../entities/types';
-import type { ScenarioSpec, ScenarioResult, GameTestApi } from '../entities/testTypes';
+import type { TreeNode, PointerPick } from '../entities/types';
+import type { GameTestApi } from '../entities/testTypes';
 import type { CharacterSprite } from '../entities/Character';
 import { PlayerCharacter } from '../entities/PlayerCharacter';
 import {
@@ -61,6 +58,9 @@ import {
 } from '../entities/MonsterCharacter';
 import { CombatFxManager } from './fx/CombatFxManager';
 import { PointerInputController } from './input/PointerInputController';
+import { BuildManager } from './build/BuildManager';
+import { TaskGlowRenderer } from './fx/TaskGlowRenderer';
+import { TestApi } from './testApi';
 import {
   ACTIVE_TILESET,
   resolveTile,
@@ -72,10 +72,6 @@ import {
   type Facing,
   type PlayerState,
 } from '../data/tileset';
-
-/** Queued-node glow reach on screen (px). Converted to source texels per species so the baked halo
- *  reads the same regardless of a sprite's source resolution — see refreshQueueHighlights. */
-const GLOW_SCREEN_PX = 5;
 
 /**
  * World scene: the worker task system. The player unit pathfinds around obstacles (walls + live
@@ -100,9 +96,6 @@ export class GameScene extends Phaser.Scene {
   // resolveMeleeAttack call site so the DEV-only test API can pin it — combat scenarios then stay
   // deterministic even if a future enemy/player gains dodge > 0 (today both are 0). See plan 007 S3.
   private rng: () => number = Math.random;
-  // Monotonic clock for the DEV-only fixed-step seam (__test.step); seeded from this.time.now on
-  // first use so driven steps never jump the scene clock backwards. See testStep().
-  private testClock = 0;
 
   // Input mode: Command (default tap-to-pathfind, unchanged), Combat (movepad drives the player
   // directly, bypassing the pathfinder), Inspect (tap shows a stats panel — Step 7). Mutually
@@ -154,13 +147,11 @@ export class GameScene extends Phaser.Scene {
   private hunger = HUNGER_MAX;
   private starveElapsed = 0;
 
-  private buildMode = false;
-  private walls!: Phaser.Physics.Arcade.StaticGroup;
-  private occupied = new Set<string>();
-  private sites: BuildSite[] = [];
-  private siteTiles = new Set<string>();
-  private ghost!: Phaser.GameObjects.Rectangle;
-  private nextSiteId = 0;
+  // Build placement (plan 013 Step 6) — see src/scenes/build/BuildManager.ts. Constructed fresh in
+  // buildWorld() each (re)start (its constructor builds real GameObjects + a physics collider against
+  // the just-constructed player, same reasoning as `pointerInput` below); wires its own SHUTDOWN
+  // teardown directly.
+  private buildManager!: BuildManager;
 
   private ui!: UIScene;
   // Pointer gestures (tap/long-press-paint/pan/pinch) + the camera they drive (zoom, follow-lock) —
@@ -172,10 +163,9 @@ export class GameScene extends Phaser.Scene {
     cols: Math.floor(MAP_WIDTH / TILE_SIZE),
     rows: Math.floor(MAP_HEIGHT / TILE_SIZE),
   };
-  private queueMarkers: Phaser.GameObjects.Rectangle[] = []; // yellow pips over queued move tiles
-  private outlinedTreeIds = new Set<string>(); // trees currently showing a queued-glow sprite
-  private glowSprites = new Map<string, Phaser.GameObjects.Image>(); // treeId → its baked glow halo image
-  private glowPulse?: Phaser.Tweens.Tween; // breathing alpha tween on the head-of-queue glow
+  // Queue/glow presentation (plan 013 Step 6) — see src/scenes/fx/TaskGlowRenderer.ts. Constructed
+  // fresh in buildWorld() each (re)start; wires its own SHUTDOWN teardown directly.
+  private taskGlowRenderer!: TaskGlowRenderer;
   // Fog of war (see create() + updateVision()) — fogShape is never rendered directly, just the
   // vision-radius mask's shape source, redrawn each frame to track the character.
   private fogShape!: Phaser.GameObjects.Graphics;
@@ -185,19 +175,26 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
-    // Reset all mutable world/queue state — create() reruns on a death-restart (see
-    // damagePlayer()), and Phaser reuses this same Scene instance rather than reconstructing it,
-    // so plain-data fields (unlike this.add.*-owned GameObjects, which the scene teardown already
-    // destroys) need an explicit reset here or they'd accumulate across restarts.
+    this.resetState();
+    this.buildWorld();
+    this.wireBus();
+    this.installTestApi();
+  }
+
+  /**
+   * Reset all mutable world/queue state — create() reruns on a death-restart (see killPlayer), and
+   * Phaser reuses this same Scene instance rather than reconstructing it, so plain-data fields (unlike
+   * this.add.*-owned GameObjects, which the scene teardown already destroys) need an explicit reset
+   * here or they'd accumulate across restarts. Build/queue-glow state needs no reset here: BuildManager
+   * and TaskGlowRenderer are reconstructed fresh in buildWorld() below, each wiring its own SHUTDOWN
+   * teardown for the outgoing instance.
+   */
+  private resetState(): void {
     this.queue.clear();
     this.trees = [];
     this.nextTreeId = 0;
     this.enemies = [];
     this.nextEnemyId = 0;
-    this.sites = [];
-    this.siteTiles.clear();
-    this.occupied.clear();
-    this.nextSiteId = 0;
     this.actionGoal = null;
     this.chopElapsed = 0;
     this.harvestSwing = null;
@@ -208,11 +205,6 @@ export class GameScene extends Phaser.Scene {
     // dying) needs no reset here — a fresh PlayerCharacter is constructed below each (re)start.
     this.fx.armShutdown();
     this.fx.resetCombatFx();
-    this.buildMode = false;
-    this.queueMarkers = [];
-    this.outlinedTreeIds.clear();
-    this.glowSprites.clear(); // scene teardown destroys the GameObjects; drop our stale references
-    this.glowPulse = undefined;
     this.mode = 'command';
     // Survival state — reset so a death-restart begins a fresh Day 1 at full hunger (these are plain-data
     // fields; without an explicit reset they'd carry the dead run's values, e.g. hunger stuck at 0).
@@ -225,7 +217,17 @@ export class GameScene extends Phaser.Scene {
     // Seed survival state onto the registry so UIScene (Wellbeing screen) re-reads it on a scene
     // restart (playerStats follows below, once the fresh PlayerCharacter has built its stat bag).
     this.registry.set('hunger', this.hunger);
+  }
 
+  /**
+   * Build this (re)start's world: ground, shared inventory, resource nodes + the first enemy pack,
+   * player + enemy animations, the player character, the build/queue-glow/pointer managers, the
+   * camera + fog-of-war + night overlay, and the HUD overlay scene. Order matters in a couple of
+   * places (called out inline): the player must exist before BuildManager's collider, and both
+   * managers before UIScene launch (hudHitTest closes over `this.ui`, assigned at the very end, but
+   * that's only read from a later pointer event, never during this method).
+   */
+  private buildWorld(): void {
     this.drawGround();
 
     // Shared character inventory — stored in the registry so the UIScene reads the same instance.
@@ -304,6 +306,33 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('playerStats', this.playerChar.stats);
     this.physics.world.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
 
+    // Build placement (plan 013 Step 6) — constructed fresh each (re)start; its constructor wires a
+    // physics collider against the player sprite just constructed above, and its own SHUTDOWN
+    // teardown. See BuildManagerDeps for why each closure below is narrowed the way it is.
+    this.buildManager = new BuildManager(this, {
+      getPlayerSprite: () => this.player,
+      playerTile: () => this.playerChar.tile(),
+      isBlocked: (col, row) => this.isBlocked(col, row),
+      hasBlockingTree: (col, row) =>
+        this.trees.some((t) => t.alive && t.def.blocksPath && t.col === col && t.row === row),
+      dims: () => this.gridDims,
+      canAffordWall: () => this.inv.canAfford(BUILDABLES.wall.cost),
+      spendWallCost: () => this.inv.spend(BUILDABLES.wall.cost),
+      enqueueBuild: (siteId) => this.enqueue({ kind: 'build', siteId }),
+      repath: () => this.repath(),
+    });
+
+    // Queue/glow presentation (plan 013 Step 6) — pure presentation over the queue, so it has no
+    // GameObjects to build at construction time; kept beside BuildManager for locality (both are
+    // "world state managers" wired at the same point in create()).
+    this.taskGlowRenderer = new TaskGlowRenderer(this, {
+      queueActions: () => this.queue.all(),
+      treeById: (id) => this.treeById(id),
+      allSites: () => this.buildManager.allSites(),
+      siteById: (id) => this.buildManager.siteById(id),
+      nodeScale: (sprite, def) => this.nodeScale(sprite, def),
+    });
+
     // Gesture + camera controller (plan 013 Step 5) — constructed fresh each (re)start; wires its own
     // pointer listeners and tears them down on SHUTDOWN itself (see the class doc). hudHitTest closes
     // over `this.ui`, assigned further below once UIScene is launched — safe, since no pointer event
@@ -312,12 +341,12 @@ export class GameScene extends Phaser.Scene {
     this.pointerInput = new PointerInputController(this, {
       hudHitTest: (x, y) => this.ui.hudHitTest(x, y),
       getPlayerSprite: () => this.player,
-      isBuildMode: () => this.buildMode,
+      isBuildMode: () => this.buildManager.buildMode,
       onBuildDown: (pointer) => {
-        this.updateGhost(pointer);
-        this.placeOrEnqueueBuild(pointer);
+        this.buildManager.updateGhost(pointer);
+        this.buildManager.placeOrEnqueueBuild(pointer);
       },
-      onBuildMove: (pointer) => this.updateGhost(pointer),
+      onBuildMove: (pointer) => this.buildManager.updateGhost(pointer),
       getMode: () => this.mode,
       onTap: (pointer) => {
         const action = this.actionAt(pointer.worldX, pointer.worldY);
@@ -374,24 +403,19 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('dayPhase', 'day');
     this.registry.set('dayCount', 1);
 
-    // Walls: static bodies the player collides with (a backstop; pathing already avoids them).
-    this.walls = this.physics.add.staticGroup();
-    this.physics.add.collider(this.player, this.walls);
-
-    // Build ghost — hidden until build mode; recoloured valid/invalid as it tracks the tapped tile.
-    this.ghost = this.add
-      .rectangle(0, 0, TILE_SIZE, TILE_SIZE, COLORS.ghostValid, 0.5)
-      .setVisible(false)
-      .setDepth(6);
-
     // HUD overlay runs alongside this scene; grab its instance for the UI-tap guard. UIScene
     // itself isn't restarted on a death-restart (only 'Game' is), so re-emit mode:changed here to
     // resync its mode-toggle/movepad visuals in case death happened mid-Combat/Inspect mode.
     this.scene.launch('UI');
     this.ui = this.scene.get('UI') as UIScene;
     this.game.events.emit('mode:changed', this.mode);
+  }
 
-    this.game.events.on('build:toggle', this.toggleBuild, this);
+  /** Wire every `game.events` scene↔UIScene listener + its matching SHUTDOWN teardown (the same 12
+   *  listeners create() always registered — build/zoom/camera route to the managers that now own
+   *  those methods), then push the first queue-highlight refresh. */
+  private wireBus(): void {
+    this.game.events.on('build:toggle', this.buildManager.toggleBuild, this.buildManager);
     this.game.events.on('tasks:cancel', this.cancelAll, this);
     this.game.events.on('debug:randomise', this.randomiseWorld, this); // dev menu: scatter nodes + enemies
     this.game.events.on('debug:toggleTime', this.toggleDayNight, this); // dev menu: flip day/night
@@ -405,7 +429,7 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on('combat:moveEnd', this.onCombatMoveEnd, this);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.game.events.off('build:toggle', this.toggleBuild, this);
+      this.game.events.off('build:toggle', this.buildManager.toggleBuild, this.buildManager);
       this.game.events.off('tasks:cancel', this.cancelAll, this);
       this.game.events.off('debug:randomise', this.randomiseWorld, this);
       this.game.events.off('debug:toggleTime', this.toggleDayNight, this);
@@ -420,30 +444,97 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.emitTasks();
+  }
 
-    // DEV-only test surface (plan 007). Gated on import.meta.env.DEV so `vite build` strips this
-    // whole block — the shipped production bundle has no `__test` install and window.game.__test is
-    // undefined there. The e2e runner therefore serves `vite dev`, where DEV === true.
-    if (import.meta.env.DEV) {
-      const api: GameTestApi = {
-        applyScenario: (spec) => this.testApplyScenario(spec),
-        step: (ms) => this.testStep(ms),
-        setRng: (fn) => {
-          this.rng = fn;
-        },
-        state: () => this.debugState(),
-        order: (a) => this.order(a),
-        enqueue: (a) => this.enqueue(a),
-        inspect: (c, r) => this.testInspect(c, r),
-        blocked: (c, r) => this.isTileBlocked(c, r),
-      };
-      (this.game as unknown as { __test?: GameTestApi }).__test = api;
-    }
+  /**
+   * DEV-only: build the {@link TestApi} facade + install `window.game.__test` (plan 007; plan 013
+   * Step 6 — the ~220 lines of scenario/debug logic now live in src/scenes/testApi.ts, reached
+   * through the narrow `TestApiDeps` facade so GameScene's own private fields never widen). Gated on
+   * import.meta.env.DEV so `vite build` dead-code-eliminates this whole block — the production bundle
+   * installs no `__test` and `window.game.__test` is undefined there. The e2e runner therefore serves
+   * `vite dev`, where DEV === true.
+   */
+  private installTestApi(): void {
+    if (!import.meta.env.DEV) return;
+    const testApi = new TestApi(this, {
+      buildManager: this.buildManager,
+      taskGlowRenderer: this.taskGlowRenderer,
+      fx: this.fx,
+      pointerInput: this.pointerInput,
+      playerChar: this.playerChar,
+      queue: this.queue,
+      inv: this.inv,
+      nightOverlay: this.nightOverlay,
+      gridDims: this.gridDims,
+      getPlayerSprite: () => this.player,
+      trees: () => this.trees,
+      enemies: () => this.enemies,
+      treeById: (id) => this.treeById(id),
+      addNode: (def, col, row) => this.addNode(def, col, row),
+      addEnemy: (id, col, row, opts) => this.addEnemy(id, col, row, opts),
+      resetTreesAndEnemies: () => this.resetTreesAndEnemies(),
+      clearActionGoal: () => {
+        this.actionGoal = null;
+      },
+      setChopElapsed: (v) => {
+        this.chopElapsed = v;
+      },
+      setHarvestSwing: (v) => {
+        this.harvestSwing = v;
+      },
+      setCombatMoveVec: (v) => {
+        this.combatMoveVec = v;
+      },
+      getMode: () => this.mode,
+      setModeAndEmit: (m) => {
+        this.mode = m;
+        this.game.events.emit('mode:changed', this.mode);
+      },
+      setRng: (fn) => {
+        this.rng = fn;
+      },
+      getClockMs: () => this.clockMs,
+      setClockMs: (v) => {
+        this.clockMs = v;
+      },
+      getDayPhase: () => this.dayPhase,
+      setDayPhase: (v) => {
+        this.dayPhase = v;
+      },
+      getDayCount: () => this.dayCount,
+      setDayCount: (v) => {
+        this.dayCount = v;
+      },
+      getHunger: () => this.hunger,
+      setHunger: (v) => {
+        this.hunger = v;
+      },
+      setStarveElapsed: (v) => {
+        this.starveElapsed = v;
+      },
+      updateVision: () => this.updateVision(),
+      emitTasks: () => this.emitTasks(),
+      inspectAt: (x, y) => this.inspectAt(x, y),
+      isBlocked: (col, row) => this.isBlocked(col, row),
+    });
+    const api: GameTestApi = {
+      applyScenario: (spec) => testApi.applyScenario(spec),
+      step: (ms) => testApi.step(ms),
+      setRng: (fn) => {
+        this.rng = fn;
+      },
+      state: () => testApi.debugState(),
+      order: (a) => this.order(a),
+      enqueue: (a) => this.enqueue(a),
+      inspect: (c, r) => testApi.inspect(c, r),
+      blocked: (c, r) => testApi.isTileBlocked(c, r),
+    };
+    (this.game as unknown as { __test?: GameTestApi }).__test = api;
   }
 
   override update(_time: number, delta: number): void {
     this.harvestSwing = null; // re-set by runHarvest only while actually harvesting in place
-    this.syncGlowTransforms(); // keep queued-tree halos locked to their (possibly animating) trees
+    this.taskGlowRenderer.syncGlowTransforms(); // keep queued-tree halos locked to their (possibly animating) trees
 
     // Player is collapsing: freeze the world on the death anim (which advances on its own via Phaser's
     // anim system) until the scheduled scene.restart() fires. No clock/hunger tick, no input, no AI —
@@ -534,7 +625,7 @@ export class GameScene extends Phaser.Scene {
    * blueprints and non-blocking nodes (bushes, `def.blocksPath === false`) are passable.
    */
   private readonly isBlocked = (col: number, row: number): boolean =>
-    this.occupied.has(tileKey(col, row)) ||
+    this.buildManager.isOccupied(col, row) ||
     this.trees.some((t) => t.alive && t.def.blocksPath && t.col === col && t.row === row);
 
   /** Path the worker toward `goal`; returns false if unreachable (`null` path). `[]` = already there. */
@@ -599,7 +690,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     // build
-    const site = this.siteById(a.siteId);
+    const site = this.buildManager.siteById(a.siteId);
     if (!site || site.done) return this.completeCurrent();
     const stand = reachableAdjacent(
       this.playerChar.tile(),
@@ -662,123 +753,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private emitTasks(): void {
-    this.refreshQueueHighlights();
+    this.taskGlowRenderer.refreshQueueHighlights();
     this.game.events.emit('tasks:changed', {
       current: this.queue.current?.kind ?? null,
       pending: this.queue.pending,
     });
-  }
-
-  /** Outline every queued target in yellow (trees to harvest, sites to build) + pip queued move tiles. */
-  private refreshQueueHighlights(): void {
-    for (const s of this.sites) s.rect.isStroked = false;
-    for (const m of this.queueMarkers) m.destroy();
-    this.queueMarkers = [];
-    // Tear down last refresh's glow halos + their pulse tween; we rebuild them below for the live
-    // queue. This runs only on queue changes (a tap/long-press), never per frame — so recreating the
-    // handful of glow sprites is cheap, unlike the old per-frame PostFX pass this replaced.
-    this.glowPulse?.remove();
-    this.glowPulse = undefined;
-    for (const g of this.glowSprites.values()) {
-      this.tweens.killTweensOf(g); // drop any live pulse/chop-bounce tween before destroying its target
-      g.destroy();
-    }
-    this.glowSprites.clear();
-    this.outlinedTreeIds.clear();
-
-    // The head-of-queue harvest (first alive tree in queue order) pulses; the rest are static.
-    const headId = this.headHarvestTreeId();
-
-    for (const a of this.queue.all()) {
-      if (a.kind === 'harvest') {
-        const tree = this.treeById(a.treeId);
-        if (tree?.alive) {
-          this.addTreeGlow(tree, tree.id === headId);
-          this.outlinedTreeIds.add(tree.id);
-        }
-      } else if (a.kind === 'build') {
-        const site = this.siteById(a.siteId);
-        if (site && !site.done) site.rect.setStrokeStyle(2, COLORS.queued, 1);
-      } else {
-        this.queueMarkers.push(
-          this.add
-            .rectangle(
-              tileToWorldCenter(a.col),
-              tileToWorldCenter(a.row),
-              6,
-              6,
-              COLORS.queued,
-              0.85,
-            )
-            .setDepth(4),
-        );
-      }
-    }
-  }
-
-  /**
-   * Draw a queued tree's soft silhouette glow: a baked halo texture (generated once per species, see
-   * src/render/glowTexture.ts) placed behind the tree, aligned to the same origin + scale. `pulse`
-   * (the head of queue) breathes via an alpha tween; the rest hold a static glow. Replaces the old
-   * per-frame OutlineFX PostFX — no shader runs in the frame loop.
-   */
-  private addTreeGlow(tree: TreeNode, pulse: boolean): void {
-    const radius = Phaser.Math.Clamp(
-      Math.round(GLOW_SCREEN_PX / this.nodeScale(tree.sprite, tree.def)),
-      2,
-      16,
-    );
-    const glow = bakeGlowTexture(this, tree.sprite.texture.key, COLORS.queued, radius);
-    // Align the padded halo canvas onto the tree: its content sits `pad` texels in from every edge,
-    // so the tree's display origin shifts by `pad` and the scale matches.
-    const img = this.add
-      .image(tree.sprite.x, tree.sprite.y, glow.key)
-      .setDisplayOrigin(
-        tree.sprite.displayOriginX + glow.pad,
-        tree.sprite.displayOriginY + glow.pad,
-      )
-      .setScale(tree.sprite.scaleX, tree.sprite.scaleY)
-      .setDepth(tree.sprite.depth - 0.5); // between the ground (0) and the tree (1)
-    this.glowSprites.set(tree.id, img);
-    if (pulse) {
-      img.setAlpha(0.65);
-      this.glowPulse = this.tweens.add({
-        targets: img,
-        alpha: 1,
-        duration: 620,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.InOut',
-      });
-    }
-  }
-
-  /**
-   * Keep each queued tree's glow halo locked onto its tree. The glow is a sibling GameObject that
-   * shares the tree's origin (the trunk base), so mirroring position/scale/rotation reproduces any
-   * visual animation the tree plays — chop bounce, walk-past sway, fall — about the same pivot,
-   * without every animation having to know the glow exists. Runs only for currently-glowing trees (a
-   * handful), so the per-frame cost is trivial (nothing like the old per-frame PostFX pass).
-   *
-   * Keep tree *logic* (targeting, pathfinding, occupancy) keyed off `col`/`row`, never the animated
-   * sprite transform — a sway or a mid-fall lean must not move the tree's logical tile.
-   */
-  private syncGlowTransforms(): void {
-    for (const [id, glow] of this.glowSprites) {
-      const s = this.treeById(id)?.sprite;
-      if (!s) continue;
-      glow.setPosition(s.x, s.y);
-      glow.setScale(s.scaleX, s.scaleY);
-      glow.rotation = s.rotation;
-    }
-  }
-
-  /** The tree the worker will chop next: first `harvest` in queue order whose tree is still alive. */
-  private headHarvestTreeId(): string | null {
-    for (const a of this.queue.all()) {
-      if (a.kind === 'harvest' && this.treeById(a.treeId)?.alive) return a.treeId;
-    }
-    return null;
   }
 
   // --- Harvest / build executors ------------------------------------------
@@ -810,7 +789,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private runBuild(a: Extract<Action, { kind: 'build' }>, delta: number): void {
-    const site = this.siteById(a.siteId);
+    const site = this.buildManager.siteById(a.siteId);
     if (!site || site.done) return this.completeCurrent();
     if (this.playerChar.advancePath()) {
       this.player.body.setVelocity(0, 0);
@@ -818,7 +797,7 @@ export class GameScene extends Phaser.Scene {
       site.progress += delta;
       site.rect.setAlpha(0.35 + 0.55 * Math.min(1, site.progress / BUILD_MS));
       if (site.progress >= BUILD_MS) {
-        this.finishSite(site);
+        this.buildManager.finishSite(site);
         this.completeCurrent();
       }
     }
@@ -1046,7 +1025,7 @@ export class GameScene extends Phaser.Scene {
       if ((t.col === col && t.row === row) || this.alphaHit(t.sprite, x, y))
         consider(t.sprite, { kind: 'tree', tree: t });
     }
-    for (const s of this.sites) {
+    for (const s of this.buildManager.allSites()) {
       // An unbuilt blueprint is a plain rectangle (no texture) — its filled tile IS its shape, so an
       // on-tile hit is a cover; a finished wall has a sprite, so alpha-test it like any other node.
       const obj = s.visual ?? s.rect;
@@ -1145,6 +1124,25 @@ export class GameScene extends Phaser.Scene {
     return (TILE_SIZE * def.tilesTall) / sprite.frame.height;
   }
 
+  /** Destroy every tree/enemy GameObject and reset their arrays + id counters — the shared preamble
+   *  of a full world reset (used by the DEV-only scenario reset via TestApiDeps.resetTreesAndEnemies;
+   *  mirrors randomiseWorld's own inline copy below, which keeps the id counters running since a
+   *  dev-menu scatter has no need for ids restarting at 0). */
+  private resetTreesAndEnemies(): void {
+    for (const t of this.trees) t.sprite.destroy();
+    for (const z of this.enemies) {
+      this.fx.cleanupActorFx(z.sprite);
+      z.weapon?.sprite.destroy();
+      z.hands?.main.destroy();
+      z.hands?.off.destroy();
+      z.sprite.destroy();
+    }
+    this.trees = [];
+    this.nextTreeId = 0;
+    this.enemies = [];
+    this.nextEnemyId = 0;
+  }
+
   /**
    * Dev menu: clear the scattered world — every resource node and enemy — then scatter a fresh
    * random batch on empty tiles: a mix of trees/rocks/bushes (trees weighted so wood stays plentiful)
@@ -1174,7 +1172,12 @@ export class GameScene extends Phaser.Scene {
         const col = Math.floor(Math.random() * this.gridDims.cols);
         const row = Math.floor(Math.random() * this.gridDims.rows);
         const key = tileKey(col, row);
-        if (used.has(key) || this.occupied.has(key) || this.siteTiles.has(key)) continue;
+        if (
+          used.has(key) ||
+          this.buildManager.isOccupied(col, row) ||
+          this.buildManager.hasSiteTile(col, row)
+        )
+          continue;
         if (Math.max(Math.abs(col - pt.col), Math.abs(row - pt.row)) < minPlayerDist) continue;
         used.add(key);
         return { col, row };
@@ -1310,366 +1313,6 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  // --- Building ------------------------------------------------------------
-
-  private toggleBuild(): void {
-    this.buildMode = !this.buildMode;
-    if (!this.buildMode) this.ghost.setVisible(false);
-    this.game.events.emit('build:modeChanged', this.buildMode);
-  }
-
-  private siteById(id: string): BuildSite | undefined {
-    return this.sites.find((s) => s.id === id);
-  }
-
-  private siteAt(col: number, row: number): BuildSite | undefined {
-    return this.sites.find((s) => !s.done && s.col === col && s.row === row);
-  }
-
-  /** True if a wall can be blueprinted here: in bounds, empty, off live blocking nodes, and reachable. */
-  private tilePlaceable(col: number, row: number): boolean {
-    const key = tileKey(col, row);
-    if (col < 0 || row < 0 || col >= this.gridDims.cols || row >= this.gridDims.rows) return false;
-    if (this.occupied.has(key) || this.siteTiles.has(key)) return false;
-    // Only blocking nodes (trees/rocks) veto placement — a non-blocking bush can be built over.
-    if (this.trees.some((t) => t.alive && t.def.blocksPath && t.col === col && t.row === row))
-      return false;
-    // Must have a tile the worker can stand on to build it (Finding 4 — no stranded blueprints).
-    return (
-      reachableAdjacent(this.playerChar.tile(), { col, row }, this.isBlocked, this.gridDims) !==
-      null
-    );
-  }
-
-  private updateGhost(pointer: Phaser.Input.Pointer): void {
-    const col = worldToTile(pointer.worldX);
-    const row = worldToTile(pointer.worldY);
-    const ok = this.tilePlaceable(col, row) && this.inv.canAfford(BUILDABLES.wall.cost);
-    this.ghost
-      .setPosition(snapToTileCenter(pointer.worldX), snapToTileCenter(pointer.worldY))
-      .setFillStyle(ok ? COLORS.ghostValid : COLORS.ghostInvalid, 0.5)
-      .setVisible(true);
-  }
-
-  private placeOrEnqueueBuild(pointer: Phaser.Input.Pointer): void {
-    const col = worldToTile(pointer.worldX);
-    const row = worldToTile(pointer.worldY);
-
-    // Tapping an existing un-built blueprint re-enqueues its build (Cancel is non-destructive).
-    const existing = this.siteAt(col, row);
-    if (existing) {
-      this.enqueue({ kind: 'build', siteId: existing.id });
-      return;
-    }
-
-    if (!this.tilePlaceable(col, row)) return;
-    if (!this.inv.spend(BUILDABLES.wall.cost)) return; // unaffordable — no-op
-
-    const site = this.createBlueprint(col, row);
-    this.enqueue({ kind: 'build', siteId: site.id });
-  }
-
-  /** Add a passable, unbuilt blueprint at a tile and register its occupancy (shared by real build
-   * placement and the DEV-only scenario API). Does NOT spend wood or enqueue — callers do that. */
-  private createBlueprint(col: number, row: number): BuildSite {
-    const key = tileKey(col, row);
-    const rect = this.add
-      .rectangle(
-        tileToWorldCenter(col),
-        tileToWorldCenter(row),
-        TILE_SIZE,
-        TILE_SIZE,
-        COLORS.blueprint,
-        0.35,
-      )
-      .setDepth(1);
-    const site: BuildSite = {
-      id: `site-${this.nextSiteId++}`,
-      col,
-      row,
-      rect,
-      visual: null,
-      progress: 0,
-      done: false,
-    };
-    this.sites.push(site);
-    this.siteTiles.add(key);
-    return site;
-  }
-
-  /** Complete a blueprint into a solid, blocking wall (materialises on the worker-vacated tile). */
-  private finishSite(site: BuildSite): void {
-    site.done = true;
-    // Physics body stays on the (now-hidden) rect; the pack's wall sprite renders on top of it.
-    site.rect.setAlpha(0);
-    const wall = resolveTile(ACTIVE_TILESET.tiles.wall);
-    site.visual = this.add.image(site.rect.x, site.rect.y, wall.key, wall.frame).setDepth(1);
-    this.walls.add(site.rect);
-    const body = site.rect.body as Phaser.Physics.Arcade.StaticBody;
-    body.setSize(TILE_SIZE, TILE_SIZE);
-    body.updateFromGameObject();
-    this.occupied.add(tileKey(site.col, site.row));
-    this.repath();
-  }
-
-  // --- DEV-only scenario / fixed-step test API (plan 007) -------------------
-  //
-  // These build a known world and drive the game deterministically. The `window.game.__test`
-  // install that exposes them is DEV-gated in create() so `vite build` dead-code-eliminates it —
-  // the methods below ship (unreachable) but the player-facing surface never does. NB the seam only
-  // exists under `vite dev` (import.meta.env.DEV === true), which the e2e runner must serve from.
-
-  /**
-   * Reset the live world to empty — destroy every tree/enemy/site/marker GameObject and clear all
-   * the plain-data queue/occupancy state, mirroring create()'s reset block (which assumes a fresh
-   * scene with nothing to destroy). Zeroes inventory + player HP. Called by testApplyScenario before
-   * it places the spec's entities, so a scenario never inherits the boot fixtures or a prior run.
-   */
-  private testResetWorld(): void {
-    for (const t of this.trees) t.sprite.destroy();
-    for (const z of this.enemies) {
-      this.fx.cleanupActorFx(z.sprite);
-      z.weapon?.sprite.destroy();
-      z.hands?.main.destroy();
-      z.hands?.off.destroy();
-      z.sprite.destroy();
-    }
-    for (const s of this.sites) {
-      s.visual?.destroy();
-      s.rect.destroy();
-    }
-    for (const m of this.queueMarkers) m.destroy();
-    this.walls.clear(false, false); // drop the (now-destroyed) wall-rect refs; children handled above
-
-    this.queue.clear();
-    this.trees = [];
-    this.nextTreeId = 0;
-    this.enemies = [];
-    this.nextEnemyId = 0;
-    this.sites = [];
-    this.siteTiles.clear();
-    this.occupied.clear();
-    this.nextSiteId = 0;
-    this.playerChar.path = [];
-    this.playerChar.pathIndex = 0;
-    this.actionGoal = null;
-    this.chopElapsed = 0;
-    this.harvestSwing = null;
-    this.playerChar.attackLockUntil = 0;
-    this.combatMoveVec = { dx: 0, dy: 0 };
-    this.fx.resetCombatFx(); // start each scenario with clean FX counters/flags (see create())
-    this.playerChar.dying = false;
-    this.buildMode = false;
-    this.queueMarkers = [];
-    this.outlinedTreeIds.clear();
-    this.pointerInput.clearPaintedTiles();
-    this.rng = Math.random;
-
-    // Reset survival state so a scenario never inherits a prior run's clock/hunger (testApplyScenario
-    // may then re-seed via spec.clockMs/startPhase/hunger). Mirrors create()'s death-restart reset.
-    this.clockMs = 0;
-    this.dayPhase = 'day';
-    this.dayCount = 1;
-    this.hunger = HUNGER_MAX;
-    this.starveElapsed = 0;
-
-    // Zero the shared Inventory in place (keep the same instance so UIScene's 'change' binding holds).
-    const snap = this.inv.snapshot();
-    if (Object.keys(snap).length) this.inv.spend(snap);
-
-    this.playerChar.hp = this.playerChar.stats.maxHp;
-    this.game.events.emit('player:hpChanged', {
-      hp: this.playerChar.hp,
-      maxHp: this.playerChar.stats.maxHp,
-    });
-  }
-
-  /** Construct the world declared by `spec` (see {@link ScenarioSpec}) and return the placed ids. */
-  private testApplyScenario(spec: ScenarioSpec): ScenarioResult {
-    this.testResetWorld();
-
-    const [pcol, prow] = spec.player ?? [
-      Math.floor(this.gridDims.cols / 2),
-      Math.floor(this.gridDims.rows / 2),
-    ];
-    this.player.body.reset(tileToWorldCenter(pcol), tileToWorldCenter(prow));
-    this.player.body.setVelocity(0, 0);
-    this.playerChar.lastFacing = spec.facing
-      ? { ...FACING_DELTAS[spec.facing] }
-      : { dCol: 0, dRow: 1 };
-
-    this.mode = spec.mode ?? 'command';
-    this.game.events.emit('mode:changed', this.mode);
-
-    const inv = spec.inventory ?? (spec.wood != null ? { wood: spec.wood } : {});
-    for (const [id, n] of Object.entries(inv)) if (n > 0) this.inv.add(id, n);
-
-    const treeIds: string[] = [];
-    for (const [c, r] of spec.trees ?? []) {
-      this.addNode(NODES.tree, c, r);
-      treeIds.push(this.trees[this.trees.length - 1].id);
-    }
-
-    const rockIds: string[] = [];
-    for (const [c, r] of spec.rocks ?? []) {
-      this.addNode(NODES.rock, c, r);
-      rockIds.push(this.trees[this.trees.length - 1].id);
-    }
-
-    const bushIds: string[] = [];
-    for (const [c, r] of spec.bushes ?? []) {
-      this.addNode(NODES.berryBush, c, r);
-      bushIds.push(this.trees[this.trees.length - 1].id);
-    }
-
-    for (const [c, r] of spec.walls ?? []) this.finishSite(this.createBlueprint(c, r));
-
-    const siteIds: string[] = [];
-    for (const [c, r] of spec.blueprints ?? []) siteIds.push(this.createBlueprint(c, r).id);
-
-    const enemyIds: string[] = [];
-    for (const z of spec.enemies ?? []) {
-      const at = Array.isArray(z) ? z : z.at;
-      const id = Array.isArray(z) ? 'kidZombie' : (z.id ?? 'kidZombie');
-      const opts = Array.isArray(z)
-        ? undefined
-        : {
-            patrolRoute: z.patrolRoute?.map(([c, r]) => ({ col: c, row: r })),
-            mode: z.mode,
-            weaponId: z.weaponId,
-          };
-      this.addEnemy(id, at[0], at[1], opts);
-      enemyIds.push(this.enemies[this.enemies.length - 1].id);
-    }
-
-    if (spec.rng) this.rng = spec.rng;
-
-    // Seed survival state (plan 004). clockMs wins over startPhase; both drive the derived phase/day
-    // + the night-overlay alpha so a pre-step debugState() reflects the seed (update() reconciles the
-    // rest on the first driven step). hunger is clamped into [0, HUNGER_MAX].
-    if (spec.clockMs != null) this.clockMs = spec.clockMs;
-    else if (spec.startPhase != null) this.clockMs = spec.startPhase === 'night' ? DAY_MS : 0;
-    if (spec.clockMs != null || spec.startPhase != null) {
-      const cycleMs = this.clockMs % cycleLengthMs();
-      this.dayPhase = phaseAt(cycleMs);
-      this.dayCount = dayCountForTotal(this.clockMs);
-      this.nightOverlay.setAlpha(tintAlphaAt(cycleMs));
-      this.registry.set('dayPhase', this.dayPhase);
-      this.registry.set('dayCount', this.dayCount);
-    }
-    if (spec.hunger != null) {
-      this.hunger = Math.max(0, Math.min(HUNGER_MAX, spec.hunger));
-      this.registry.set('hunger', this.hunger);
-    }
-
-    this.updateVision();
-    this.emitTasks();
-    return { treeIds, rockIds, bushIds, enemyIds, siteIds };
-  }
-
-  /**
-   * Advance gameplay by `ms` in fixed 1/60s slices, deterministically. Stops the RAF game loop and
-   * drives `game.step(clock, fixedDelta)` itself — this runs each scene's update → Arcade physics →
-   * clock → tweens → timers, so movement/chop/build/contact-cooldown/regrow all resolve with zero
-   * wall-clock (a manual `scene.update()` would NOT advance physics/clock/timers — see plan 007 B1).
-   */
-  private testStep(ms: number): void {
-    const fixed = 1000 / 60;
-    if (this.game.loop.running) this.game.loop.stop();
-    if (this.testClock === 0) this.testClock = this.time.now;
-    const steps = Math.max(1, Math.round(ms / fixed));
-    for (let i = 0; i < steps; i++) {
-      this.testClock += fixed;
-      this.game.step(this.testClock, fixed);
-    }
-  }
-
-  /** Inspect the entity at a tile (drives the same panel path as an Inspect-mode tap). */
-  private testInspect(col: number, row: number): void {
-    this.inspectAt(tileToWorldCenter(col), tileToWorldCenter(row));
-  }
-
-  // --- Debug (headless smoke test reads this) ------------------------------
-
-  /** State snapshot for the smoke test. */
-  debugState(): {
-    currentKind: string | null;
-    pending: number;
-    pathLen: number;
-    sites: number;
-    buildMode: boolean;
-    occupied: number;
-    pcol: number;
-    prow: number;
-    px: number;
-    py: number;
-    enemies: number;
-    enemyModes: MonsterMode[];
-    enemyTiles: { col: number; row: number }[];
-    enemyWeapons: (string | null)[];
-    corpses: number;
-    playerHp: number;
-    playerDying: boolean;
-    playerFlash: number;
-    playerHitFlashes: number;
-    enemyHitFlashes: number;
-    enemyAttacks: number;
-    mode: 'command' | 'combat' | 'inspect';
-    hunger: number;
-    dayPhase: DayPhase;
-    dayCount: number;
-    clockMs: number;
-    nightAlpha: number;
-    outlinedTreeIds: string[];
-    pulsingTreeId: string | null;
-    queuedTreeIds: string[];
-  } {
-    const t = this.playerChar.tile();
-    return {
-      currentKind: this.queue.current?.kind ?? null,
-      pending: this.queue.pending,
-      pathLen: Math.max(0, this.playerChar.path.length - this.playerChar.pathIndex),
-      sites: this.sites.length,
-      buildMode: this.buildMode,
-      occupied: this.occupied.size,
-      pcol: t.col,
-      prow: t.row,
-      px: this.player.x,
-      py: this.player.y,
-      enemies: this.enemies.filter((z) => z.alive).length,
-      enemyModes: this.enemies.filter((z) => z.alive).map((z) => z.ai.mode),
-      // Live enemy tiles (spec order) — patrol mode never leaves 'patrol', so waypoint cycling is
-      // only observable via position; the monster.spec patrol test reads this.
-      enemyTiles: this.enemies.filter((z) => z.alive).map((z) => ({ col: z.col, row: z.row })),
-      // Equipped weapon id per live enemy (null = unarmed) — lets a combat spec confirm the rolled/forced weapon.
-      enemyWeapons: this.enemies.filter((z) => z.alive).map((z) => z.weapon?.id ?? null),
-      corpses: this.fx.getCorpseCount(),
-      playerHp: this.playerChar.hp,
-      playerDying: this.playerChar.dying,
-      playerFlash: this.fx.getPlayerFlash(),
-      playerHitFlashes: this.fx.getPlayerHitFlashes(),
-      enemyHitFlashes: this.fx.getEnemyHitFlashes(),
-      enemyAttacks: this.fx.getEnemyAttacks(),
-      mode: this.mode,
-      hunger: this.hunger,
-      dayPhase: this.dayPhase,
-      dayCount: this.dayCount,
-      clockMs: this.clockMs,
-      nightAlpha: this.nightOverlay.alpha,
-      outlinedTreeIds: [...this.outlinedTreeIds],
-      pulsingTreeId: this.headHarvestTreeId(),
-      queuedTreeIds: this.queue
-        .all()
-        .filter((a): a is Extract<Action, { kind: 'harvest' }> => a.kind === 'harvest')
-        .map((a) => a.treeId),
-    };
-  }
-
-  /** True if the tile is currently a pathfinding obstacle (test helper). */
-  isTileBlocked(col: number, row: number): boolean {
-    return this.isBlocked(col, row);
-  }
-
   // --- Rendering -----------------------------------------------------------
 
   /**
@@ -1717,7 +1360,6 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Redraw the vision-radius mask shape at the character's current position. */
   /** Redraws the vision-radius mask shape, and hides/shows dynamic actors by distance to it —
    * unlike static world content (dimmed by the terrain fog above), an actor outside vision is
    * fully invisible. Only the player exists to apply this to today; the same one-line check is
