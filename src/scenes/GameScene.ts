@@ -58,8 +58,8 @@ import { ITEMS } from '../data/items';
 import { NODES } from '../data/nodes';
 import { BUILDABLES } from '../data/buildables';
 import { ENEMIES } from '../data/enemies';
-import { MONSTER_WEAPONS, type MonsterWeapon } from '../data/weapons';
-import type { ResourceNodeDef, CombatantStats, EnemyDef } from '../data/types';
+import { MONSTER_WEAPONS } from '../data/weapons';
+import type { ResourceNodeDef, CombatantStats } from '../data/types';
 import { Inventory } from '../systems/Inventory';
 import { worldToTile, tileToWorldCenter, snapToTileCenter, tileKey } from '../systems/grid';
 import { findPath, reachableAdjacent, type Cell } from '../systems/pathfind';
@@ -73,18 +73,16 @@ import {
 } from '../systems/daynight';
 import { drainHunger, feed, isStarving } from '../systems/needs';
 import { resolveMeleeAttack } from '../systems/combat';
-import {
-  stepMonster,
-  initialMonsterState,
-  type MonsterState,
-  type MonsterMode,
-} from '../systems/monsterAI';
+import { stepMonster, initialMonsterState, type MonsterMode } from '../systems/monsterAI';
 import { weaponTransform } from '../systems/attachment';
 import { hurtboxContains, hurtboxTiles, DEFAULT_HURTBOX } from '../systems/hurtbox';
 import { bakeGlowTexture } from '../render/glowTexture';
 import { HIT_FLASH_KEY, type HitFlashPipeline } from '../render/hitFlashPipeline';
 import { treeStats, wallStats, enemyStats } from '../systems/stats';
 import type { UIScene } from './UIScene';
+import { FACING_DELTAS } from '../entities/types';
+import type { TreeNode, BuildSite, EnemyUnit, PointerPick } from '../entities/types';
+import type { ScenarioSpec, ScenarioResult, GameTestApi } from '../entities/testTypes';
 import {
   ACTIVE_TILESET,
   resolveTile,
@@ -102,137 +100,6 @@ import {
 /** Queued-node glow reach on screen (px). Converted to source texels per species so the baked halo
  *  reads the same regardless of a sprite's source resolution — see refreshQueueHighlights. */
 const GLOW_SCREEN_PX = 5;
-
-/** A live/stump resource node instance in the world (tree sprite + its data + state). */
-export interface TreeNode {
-  id: string;
-  sprite: Phaser.GameObjects.Image;
-  def: ResourceNodeDef;
-  hp: number;
-  alive: boolean;
-  col: number;
-  row: number;
-}
-
-/**
- * A placed-but-not-yet-built wall: a passable blueprint the worker builds on site over time.
- * `rect` stays the physics/collision + blueprint-progress visual throughout; once built it's
- * hidden and `visual` (the wall sprite) is shown on top instead.
- */
-export interface BuildSite {
-  id: string;
-  col: number;
-  row: number;
-  rect: Phaser.GameObjects.Rectangle;
-  visual: Phaser.GameObjects.Image | null;
-  progress: number;
-  done: boolean;
-}
-
-/** A live enemy instance in the world — driven by the pure FSM in systems/monsterAI (plans 003, 011). */
-export interface EnemyUnit {
-  id: string;
-  sprite: Phaser.GameObjects.Sprite & { body: Phaser.Physics.Arcade.Body };
-  def: EnemyDef;
-  hp: number;
-  alive: boolean;
-  col: number;
-  row: number;
-  /** Persisted AI state — read+returned by stepMonster each tick (repath timing lives inside it). */
-  ai: MonsterState;
-  lastContactAt: number;
-  path: Cell[];
-  pathIndex: number;
-  /** Which render footprint the sprite is currently showing (`walk` 64px vs the `idle` 32px bob) —
-   *  so `updateEnemyAnim` only swaps scale/origin/body on an actual state change (see setEnemyFootprint). */
-  activeStrip: 'idle' | 'walk';
-  /** The rolled-per-spawn held weapon (Phase B), or undefined = unarmed. `sprite` is a plain image
-   *  (no physics body) pinned to the hand each tick; `def` owns its damage/cadence; `swingRot` is the
-   *  live coded-swing angle (deg) tweened on each bite. */
-  weapon?: { id: string; sprite: Phaser.GameObjects.Image; def: MonsterWeapon; swingRot: number };
-  /** The two visible fists layered on the skeleton (its own hands are unreadable nubs). Always present,
-   *  armed or not: `main` pins to the mainHand anchor (grips the weapon, drawn over it), `off` to the
-   *  offHand anchor (free). Plain images, no physics; pinned each tick in syncEnemyAttachments. */
-  hands?: { main: Phaser.GameObjects.Image; off: Phaser.GameObjects.Image };
-}
-
-/**
- * What a pointer "raycast" landed on: the specific world entity whose *rendered sprite* is drawn
- * under the point (see {@link GameScene.pickSpriteAt}). `null` (the absence of a pick) means empty
- * ground — no interactive sprite there — and the caller falls back to a plain move-to-tile.
- */
-export type PointerPick =
-  | { kind: 'tree'; tree: TreeNode }
-  | { kind: 'enemy'; enemy: EnemyUnit }
-  | { kind: 'site'; site: BuildSite };
-
-/** Cardinal facing shorthand for {@link ScenarioSpec}, mapped to `lastFacing` deltas below. */
-export type FacingSpec = 'up' | 'down' | 'left' | 'right';
-
-const FACING_DELTAS: Record<FacingSpec, { dCol: number; dRow: number }> = {
-  up: { dCol: 0, dRow: -1 },
-  down: { dCol: 0, dRow: 1 },
-  left: { dCol: -1, dRow: 0 },
-  right: { dCol: 1, dRow: 0 },
-};
-
-/**
- * Declarative world spec for the test-only scenario API (plan 007). Every field is optional so a
- * test constructs only what it needs (`{ player:[3,3], trees:[[5,3]] }`). Coordinates are tile
- * (col,row). `enemies` entries default to `kidZombie`; `walls` are built solid, `blueprints`
- * passable-and-unbuilt. `rng`/`wood` pin combat + inventory determinism. `hunger`/`clockMs`/
- * `startPhase` seed the survival state (plan 004) so day/night + hunger scenarios start at a known
- * point (`clockMs` wins over `startPhase`; `startPhase:'night'` = start of night, i.e. `clockMs=DAY_MS`).
- * `bushes` are forageable, non-blocking berry bushes. See __test.applyScenario.
- */
-export interface ScenarioSpec {
-  player?: [number, number];
-  facing?: FacingSpec;
-  mode?: 'command' | 'combat' | 'inspect';
-  wood?: number;
-  inventory?: Record<string, number>;
-  trees?: Array<[number, number]>;
-  rocks?: Array<[number, number]>;
-  bushes?: Array<[number, number]>;
-  enemies?: Array<
-    | [number, number]
-    | {
-        at: [number, number];
-        id?: string;
-        patrolRoute?: Array<[number, number]>;
-        mode?: MonsterMode;
-        /** Force the spawned weapon (else rolled from the enemy's pool) — for deterministic combat specs. */
-        weaponId?: string;
-      }
-  >;
-  walls?: Array<[number, number]>;
-  blueprints?: Array<[number, number]>;
-  rng?: () => number;
-  hunger?: number;
-  clockMs?: number;
-  startPhase?: DayPhase;
-}
-
-/** Ids of the entities {@link ScenarioSpec} placed, in spec order, so a test can reference them. */
-export interface ScenarioResult {
-  treeIds: string[];
-  rockIds: string[];
-  bushIds: string[];
-  enemyIds: string[];
-  siteIds: string[];
-}
-
-/** The DEV-only debug surface installed at `window.game.__test` (see GameScene.create). */
-export interface GameTestApi {
-  applyScenario(spec: ScenarioSpec): ScenarioResult;
-  step(ms: number): void;
-  setRng(fn: () => number): void;
-  state(): ReturnType<GameScene['debugState']>;
-  order(a: Action): void;
-  enqueue(a: Action): void;
-  inspect(col: number, row: number): void;
-  blocked(col: number, row: number): boolean;
-}
 
 /**
  * World scene: the worker task system. The player unit pathfinds around obstacles (walls + live

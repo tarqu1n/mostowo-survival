@@ -1,4 +1,4 @@
-import type { ScenarioSpec } from '../../src/scenes/GameScene';
+import type { ScenarioSpec } from '../../src/entities/testTypes';
 
 /**
  * Named fixture builders for shared world shapes (plan 007). Each returns a declarative

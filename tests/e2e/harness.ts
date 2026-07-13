@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import type { Action } from '../../src/systems/tasks';
-import type { ScenarioSpec, ScenarioResult } from '../../src/scenes/GameScene';
+import type { ScenarioSpec, ScenarioResult } from '../../src/entities/testTypes';
 
 // Thin Playwright-side wrappers over the DEV-only `window.game.__test` seam (plan 007). All the
 // game-facing work happens inside `page.evaluate` (page context); these just marshal args/results.

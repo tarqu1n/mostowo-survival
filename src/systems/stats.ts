@@ -6,7 +6,7 @@
 
 import { BUILDABLES } from '../data/buildables';
 import type { CombatantStats, InspectableStats } from '../data/types';
-import type { TreeNode, BuildSite, EnemyUnit } from '../scenes/GameScene';
+import type { TreeNode, BuildSite, EnemyUnit } from '../entities/types';
 
 export function treeStats(node: TreeNode): InspectableStats {
   return { name: 'Tree', maxHp: node.def.maxHp, currentHp: node.hp };
