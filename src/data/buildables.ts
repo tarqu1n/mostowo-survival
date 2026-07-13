@@ -17,8 +17,8 @@ export const BUILDABLES: Record<string, BuildableDef> = {
     speed: 0,
   },
   // Base-only light source; always burning once built, drains fuel continuously (see
-  // config.CAMPFIRE_FUEL_* — plan 012 Context & decisions). Renders as a 3-tile-tall animated
-  // sprite, bottom-anchored like a tall ResourceNodeDef.
+  // config.CAMPFIRE_FUEL_* — plan 012 Context & decisions). Renders as a 2-tile-tall animated
+  // sprite (log base + flames), bottom-anchored like a tall ResourceNodeDef.
   campfire: {
     id: 'campfire',
     name: 'Campfire',
@@ -32,7 +32,7 @@ export const BUILDABLES: Record<string, BuildableDef> = {
     blocksPath: true,
     behavior: 'campfire', // live/simulated — routed to CampfireManager on completion (see finishSite)
     animKey: 'campfire',
-    tilesTall: 3,
+    tilesTall: 2, // 32×32 bonfire art renders native at 2 tiles (no upscale); bottom-anchored
     originY: 1,
   },
 };

@@ -424,13 +424,14 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
     },
   },
   stations: {
-    // Fire_01-Sheet.png is 128×48 = 4 frames of 32w×48h — a non-square cell, so frameWidth must be set
-    // explicitly (a bare frameSize:32 would clip each flame to a 32×32 square, losing the top). The
-    // vertical Bonfire.png in the same folder isn't a horizontal strip and can't be sliced this way.
+    // Bonfire_05-Sheet.png is 128×32 = 4 frames of 32×32 — the *full* campfire (log base + flames),
+    // unlike Fire_0x-Sheet.png which is flames only (no base — it looked like a floating fire). The
+    // Bonfire_01..08 sheets are 4-frame campfires of increasing flame intensity (01 ≈ embers →
+    // 08 ≈ biggest); bump the digit to change how fierce the fire reads. (09/10 are a different,
+    // boxed forge structure — not a campfire.) Square cell, so a bare frameSize:32 slices it right.
     campfire: {
-      path: 'Environment/Structures/Stations/Bonfire/Fire_01-Sheet.png',
-      frameWidth: 32,
-      frameSize: 48,
+      path: 'Environment/Structures/Stations/Bonfire/Bonfire_05-Sheet.png',
+      frameSize: 32,
       frames: 4,
     },
   },

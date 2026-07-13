@@ -1,7 +1,8 @@
 # Buildable Campfire (+ generalised build system)
 
-> Status: in review — all 9 steps executed 2026-07-13 (post-013/015 architecture). Build clean, unit
-> 216/216, e2e green (incl. new campfire specs + refactor-tripwire), palette + seams verified live.
+> Status: deployed — all 9 steps executed 2026-07-13 (post-013/015 architecture) + an advisor-reviewed
+> buildable-runtime de-ossification pass. Build clean, unit 216/216, e2e green; committed (56e6862) and
+> deployed to GitHub Pages. Awaiting live playtest feedback.
 
 ## Summary
 Add the **campfire** — the first placeable structure beyond the wall — and, in the process,

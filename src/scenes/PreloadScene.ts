@@ -113,9 +113,9 @@ export class PreloadScene extends Phaser.Scene {
     loadStrip(enemyIdleKey, enemy.idle); // 32px Idle bob — its own footprint (Phase B)
     loadStrip(enemyDeathKey, enemy.death);
 
-    // Stations: the campfire's looping fire strip (128×48 = 4 frames of 32w×48h — frameWidth 32 keeps
-    // the taller 48px-tall cells from being clipped to a square). Registered as a Phaser anim later
-    // (registerActorAnims), not here — this just loads the texture.
+    // Stations: the campfire's looping bonfire strip (128×32 = 4 frames of 32×32 — the full campfire,
+    // log base + flames). Registered as a Phaser anim later (registerActorAnims), not here — this just
+    // loads the texture.
     loadStrip(campfireAnimKey(), manifest.stations.campfire);
 
     // Monster weapon art + the shared hand mitt: one static image each (no anim), keyed like the
