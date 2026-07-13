@@ -254,3 +254,301 @@ button.is-active {
 .pixelated {
   image-rendering: pixelated;
 }
+
+/* ---- Library panel (step 6) ---- */
+
+.lib-search {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  color: #e8e0d8;
+  background: #0e0b0a;
+  border: 1px solid #3a2f2a;
+  border-radius: 4px;
+  padding: 5px 8px;
+  margin-bottom: 10px;
+}
+
+.lib-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 40vh;
+  overflow: auto;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #2c2420;
+}
+
+.lib-tree-item {
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  padding: 3px 6px;
+  font-size: 0.8rem;
+  color: #c9bcae;
+}
+
+.lib-tree-item:hover:not(:disabled) {
+  background: #2c2420;
+}
+
+.lib-tree-item.is-active {
+  background: #5a4632;
+  color: #f4ecd8;
+}
+
+.lib-tree-pack {
+  margin-bottom: 4px;
+}
+
+.lib-tree-pack-name {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #6a5d54;
+  margin: 6px 0 2px;
+}
+
+.lib-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lib-tile-sheet-name {
+  font-size: 0.75rem;
+  color: #a99a8c;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lib-frame-grid {
+  display: grid;
+  gap: 1px;
+  overflow: auto;
+  max-height: 260px;
+  background: #0e0b0a;
+  padding: 2px;
+  border-radius: 3px;
+}
+
+.lib-frame {
+  position: relative;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: none;
+  line-height: 0;
+}
+
+.lib-frame.is-active {
+  border-color: #f0d890;
+}
+
+.lib-frame-swatch {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.lib-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px;
+}
+
+.lib-card.is-active {
+  border-color: #f0d890;
+  background: #2c2420;
+}
+
+.lib-card--missing {
+  color: #e07a6a;
+  font-size: 0.75rem;
+}
+
+.lib-card-swatch {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  image-rendering: pixelated;
+  background-color: #0e0b0a;
+  border-radius: 2px;
+}
+
+.lib-card-label {
+  flex: 1;
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lib-heart {
+  flex: none;
+  position: absolute;
+  top: 0;
+  right: 1px;
+  font-size: 0.7rem;
+  color: #6a5d54;
+  cursor: pointer;
+}
+
+.lib-card .lib-heart {
+  position: static;
+  padding: 0 2px;
+}
+
+.lib-heart.is-fav {
+  color: #e0708a;
+}
+
+/* ---- Layers panel (step 6) ---- */
+
+.layers-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.layers-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px;
+  border-radius: 4px;
+}
+
+.layers-item.is-active {
+  background: #2c2420;
+}
+
+.layers-item button {
+  padding: 2px 6px;
+  font-size: 0.75rem;
+}
+
+.layers-eye {
+  flex: none;
+}
+
+.layers-name {
+  flex: 1;
+  text-align: left;
+  background: none;
+  border: none;
+  color: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layers-rename-input {
+  flex: 1;
+  font: inherit;
+  color: #e8e0d8;
+  background: #0e0b0a;
+  border: 1px solid #3a2f2a;
+  border-radius: 3px;
+  padding: 2px 4px;
+  min-width: 0;
+}
+
+.layers-overhead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.7rem;
+  color: #a99a8c;
+}
+
+/* ---- Snap toggle (step 7) ---- */
+
+.editor-snap-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+/* ---- Inspector panel (step 7) ---- */
+
+.editor-pane-divider {
+  border: none;
+  border-top: 1px solid #2c2420;
+  margin: 14px 0;
+}
+
+.insp-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.insp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.8rem;
+  color: #a99a8c;
+}
+
+.insp-field input,
+.insp-field select {
+  font: inherit;
+  color: #e8e0d8;
+  background: #0e0b0a;
+  border: 1px solid #3a2f2a;
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+
+.insp-field-row {
+  display: flex;
+  gap: 8px;
+}
+
+.insp-field-row .insp-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.insp-checkboxes {
+  align-items: center;
+  font-size: 0.8rem;
+  color: #c9bcae;
+}
+
+.insp-checkboxes label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.insp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.insp-actions button {
+  font-size: 0.78rem;
+  padding: 4px 8px;
+}

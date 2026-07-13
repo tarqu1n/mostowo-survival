@@ -493,7 +493,7 @@ free values render nearest-neighbour and are the author's aesthetic call.
     machine-verified — needs a human at `npm run editor`. Painting/dirty-chunk narrowing is stubbed
     for step 6 (`onDocEdited` full-rebakes with a seam comment).
 
-- [ ] **Step 6: Asset library panel + tile painting** `[delegate sonnet]`
+- [x] **Step 6: Asset library panel + tile painting** `[delegate sonnet]`
   - `src/editor/panels/LibraryPanel.tsx`: loads `asset-catalog.json`; pack + category tree,
     text search over id/tags, favourites (per active zone — heart toggle writes into
     `zones.defs[activeZone].favourites`; a "Favourites" pseudo-category shows them; with no
@@ -517,8 +517,31 @@ free values render nearest-neighbour and are the author's aesthetic call.
     stroke, save→reopen preserves everything; painting refuses void cells; palette in saved JSON
     is append-only across repeated edits (verify by diffing two consecutive saves);
     `npm run check` green.
+  - Outcome: `meta.favourites?: string[]` added to `MapMeta` (last field, parsed only when present,
+    omitted from serialization when absent so old maps round-trip byte-identical) + 3 tests in
+    `mapFormat.test.ts` (now 32). New pure, Phaser/React-free `src/editor/paintOps.ts` (`floodFill`,
+    `rectCells`, `lineCells` Bresenham, `cellsToChanges`, `findOrAppendPaletteIndex` — append-only,
+    never renumbers; generic over `cells[]`+dims+`isInside` so step 8 reuses it) + 23 tests. Store
+    (`editorStore.ts`) gained paint actions (`paintLine`/`eraseLine`/`fillFrom`/`paintRectArea`),
+    layer actions (`addLayer`/`renameLayer`/`deleteLayer`/`moveLayer`/`toggleLayerOverhead`/
+    `toggleLayerVisibility`), `toggleFavourite`, catalog wiring (`setCatalog` + real `EditorCatalog`
+    type), `armedObjectAsset` (step-7 stub), and `pendingDirty`/`consumePendingDirty` for narrow
+    rebakes; +20 store tests. `EditorScene.ts` wires pointer paint (brush=coalesced stroke, eraser,
+    fill, rect w/ live preview outline), consumes `pendingDirty` to rebake only touched chunks
+    (full-rebake fallback for undo/redo/reorder), and hides layers via editor-only `hiddenLayerIds`
+    (NOT map data). New `src/editor/catalog.ts` (types + fetch), `panels/LibraryPanel.tsx` (pack→
+    flat-category tree, id/tag search, per-frame tile grid via CSS `background-position`, Favourites
+    pseudo-category), `panels/LayersPanel.tsx` (top-first list, CRUD/reorder/overhead/eye), wired
+    into `EditorApp.tsx` + a pan/brush/eraser/fill/rect tool strip in `Toolbar.tsx` + `editor.css`.
+    Deviations: strip/object library previews are whole-image "contain" swatches (per-frame crops
+    are step-7 object work); undo/redo deliberately does NOT bump `mapEpoch` (avoids camera reset) —
+    reorder needs no special case because RT depth tracks array position, so the full per-chunk
+    rebake fixes it. `npm run check` green (262 tests). NOT machine-verified (no React/DOM harness in
+    this repo, per step 5): the live visual/interactive experience — needs a human at `npm run
+    editor`. Palette-append-only + save→reopen data path WAS verified programmatically via the real
+    dev middleware (two consecutive saves: palette grew append-only, earlier indices unchanged).
 
-- [ ] **Step 7: Scenery objects — place, transform, stack; portals** `[delegate sonnet]`
+- [x] **Step 7: Scenery objects — place, transform, stack; portals** `[delegate sonnet]`
   - Placement: with an object asset armed, click in viewport places a `decor` object at pointer
     (snap-to-tile-centre toggle in toolbar, default ON via `snapToTileCenter` from
     `src/systems/grid.ts`; hold Alt = free px). Auto-id `decor_NNNN` (scan existing ids for max).
@@ -540,6 +563,40 @@ free values render nearest-neighbour and are the author's aesthetic call.
   - Done when: place two decor objects overlapping, reorder their stacking, rotate one 90° and
     free-rotate another, place a `node:tree` and a portal; placement on void is refused;
     save→reopen preserves all; undo walks every operation back; `npm run check` green.
+  - Outcome: implemented entirely within `src/editor/`. New: `objectOps.ts` (pure
+    `objectFootprintCells`/`footprintIsValid` mirroring mapFormat's PRIVATE footprint logic — can't
+    import it, editing mapFormat is out of scope — plus `nextObjectId` `<prefix>_NNNN` auto-id) +
+    `__tests__/objectOps.test.ts` (11); `panels/InspectorPanel.tsx` (per-kind numeric fields +
+    rotate±90 / flip H·V / bring-forward / send-back / duplicate / delete buttons; free rotation &
+    float scale via the fields); `PortalDialog.tsx` (name + facing modal opened after a valid portal
+    rect-drag); `store/__tests__/editorStoreObjects.test.ts` (19, incl. the full done-when scenario).
+    Modified: `store/editorStore.ts` (`EditorTool` +`'place'`/`'portal'`; new
+    `armedNodeRef`/`snapToTileCenter`/`pendingPortalRect`; a `reconcileSelection` helper wired into
+    `applyCommand`/`undo`/`redo` so `selectedObjectIds` never dangles; 12 object actions —
+    place/create-portal/translate/delete/duplicate/update{Decor,Node,Portal}/rotate/flip/bumpDepth —
+    all void-gated via `footprintIsValid` and routed through the history stack); `EditorScene.ts`
+    (object hit-test + selection-outline Graphics; select-tool click/shift-click/drag with
+    live-preview → commit-and-validate on pointer-up → snap-back if the move lands on void; place-tool
+    click places armed decor (snap default, Alt = free px) or node at col/row; portal tool
+    rect-drag → `pendingPortalRect`; placed nodes render as their real tile-role sprite matching
+    `ResourceNodeManager.addNode` sizing/origin, marker fallback); `Toolbar.tsx` (Select/Place/Portal
+    buttons — Place disabled until armed — + a Snap checkbox); `EditorApp.tsx` (Delete/Backspace →
+    `deleteObjects` with the same INPUT/TEXTAREA/SELECT guard as undo/redo; Inspector wired ABOVE
+    Layers; PortalDialog rendered from `pendingPortalRect`); `panels/LibraryPanel.tsx` (a "Nodes"
+    pseudo-category listing `NODES` with real tile-role previews; arming a decor/node switches to the
+    Place tool, mirroring pickTile→Brush); `editor.css` (snap-toggle + inspector styles). Deviations:
+    placement auto-selects the new object; duplicate offsets one tile but stacks at the original
+    position if the offset would land on void; nodes aren't favouritable (favourites are catalog-asset
+    ids, a different id space); drag follows the pointer continuously and snaps only on commit.
+    Verified: 292/292 vitest (incl. 30 new step-7 tests), the done-when data-path scenario green
+    (two overlapping decor placed, depth reordered, one 90° + one free-rotated, `node:'tree'` + portal
+    added, `serializeMap`→`parseMap` round-trips byte-identical + passes void-consistency, a void
+    placement refused, undo unwinds to empty), eslint `src/editor` 0 errors (5 sanctioned
+    unbound-method warnings), prettier clean, `tsc --noEmit` zero errors under `src/editor/**`. NOT
+    machine-verified (no React/DOM harness, per steps 5/6): the live click-through at `npm run editor`.
+    ⚠ `npm run check` aggregate typecheck is RED **only** on `src/scenes/{GameScene,fx/TaskGlowRenderer}.ts`
+    — a concurrent session's in-flight plan-016 `'refuel'` task work, outside this step's scope and
+    untouched here.
 
 - [ ] **Step 8: Shape, walkability + zones painting** `[delegate sonnet]`
   - Generalise the step-6 paint pipeline over a "target grid" (tile layer / walkability / zones /

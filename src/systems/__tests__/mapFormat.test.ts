@@ -44,6 +44,7 @@ interface RawFixture {
     width: number;
     height: number;
     tileSize: number;
+    favourites?: string[];
   };
   shape?: { cells: number[] };
   palette: Array<{
@@ -263,6 +264,42 @@ describe('parseMap', () => {
     expect(map.shape).toBeUndefined();
     expect(isInside(map, 2, 2)).toBe(true);
   });
+
+  describe('meta.favourites', () => {
+    it('round-trips a map WITH meta.favourites', () => {
+      const raw = withRaw((r) => {
+        r.meta.favourites = ['pixel-crawler/Environment/Tilesets/Floors_Tiles.png#252'];
+      });
+      const map = parseMap(raw);
+      expect(map.meta.favourites).toEqual([
+        'pixel-crawler/Environment/Tilesets/Floors_Tiles.png#252',
+      ]);
+      const json = serializeMap(map);
+      const parsedJson = JSON.parse(json) as { meta: { favourites?: string[] } };
+      expect(parsedJson.meta.favourites).toEqual(map.meta.favourites);
+      const reparsed = parseMap(JSON.parse(json));
+      expect(reparsed).toEqual(map);
+    });
+
+    it('round-trips a map WITHOUT meta.favourites, serializing without the key', () => {
+      const map = parseMap(validRaw()); // the base fixture never sets favourites
+      expect(map.meta.favourites).toBeUndefined();
+      const json = serializeMap(map);
+      const parsedJson = JSON.parse(json) as { meta: object };
+      expect(Object.prototype.hasOwnProperty.call(parsedJson.meta, 'favourites')).toBe(false);
+      const reparsed = parseMap(JSON.parse(json));
+      expect(reparsed.meta.favourites).toBeUndefined();
+      expect(reparsed).toEqual(map);
+    });
+
+    it('rejects a non-array meta.favourites', () => {
+      const raw = withRaw((r) => {
+        // @ts-expect-error deliberately invalid for the test
+        r.meta.favourites = 'not-an-array';
+      });
+      expect(() => parseMap(raw)).toThrow(/favourites/);
+    });
+  });
 });
 
 describe('migrateMap', () => {
@@ -283,6 +320,7 @@ describe('createEmptyMap', () => {
     const map = createEmptyMap('blank', 'Blank', 4, 5);
     expect(() => parseMap(JSON.parse(serializeMap(map)))).not.toThrow();
     expect(map.shape).toBeUndefined();
+    expect(map.meta.favourites).toBeUndefined();
     expect(map.palette).toEqual([null]);
     expect(map.layers).toHaveLength(1);
     expect(map.layers[0].cells).toHaveLength(20);

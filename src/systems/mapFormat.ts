@@ -27,6 +27,11 @@ export interface MapMeta {
   width: number;
   height: number;
   tileSize: number;
+  /** Map-level favourited catalog asset ids (editor Library "Favourites" pseudo-category) used when
+   *  no zone is active. Optional and always LAST in this interface / every `MapMeta` constructor so
+   *  serialized key order stays stable; omitted entirely (not `[]`) on maps that never favourited
+   *  anything, so old maps round-trip byte-identical. */
+  favourites?: string[];
 }
 
 /** Per-tile inside/void mask, `width*height` row-major. Absent on `MapFile` ⇒ all-inside. */
@@ -273,6 +278,14 @@ function parseMeta(value: unknown, path: string): MapMeta {
   const height = expectInt(obj.height, `${path}.height`);
   if (width <= 0) fail(`${path}.width must be > 0`);
   if (height <= 0) fail(`${path}.height must be > 0`);
+  // favourites is optional — read only if present, and omit the key entirely when absent so maps
+  // without it serialize unchanged (JSON.stringify drops `undefined` fields).
+  const favourites =
+    obj.favourites === undefined
+      ? undefined
+      : expectArray(obj.favourites, `${path}.favourites`).map((f, i) =>
+          expectString(f, `${path}.favourites[${i}]`),
+        );
   return {
     schemaVersion: 1,
     id: expectString(obj.id, `${path}.id`),
@@ -280,6 +293,7 @@ function parseMeta(value: unknown, path: string): MapMeta {
     width,
     height,
     tileSize: expectInt(obj.tileSize, `${path}.tileSize`),
+    ...(favourites === undefined ? {} : { favourites }),
   };
 }
 
