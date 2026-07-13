@@ -1,7 +1,7 @@
 # Gemini Item-Icon Generation Pipeline
 
-> Status: planned — split out of plan 008 (critique finding #3). Depends on 008 landing first (item
-> catalogue with `icon` paths + committed placeholder PNGs). Run /critique-plan then /execute-plan.
+> Status: in review — pipeline built (Step 1) + real icons generated & verified (Step 2). Both steps
+> committed locally to `master` (plan-009 files only; push held pending concurrent plan-014 WIP).
 
 ## Summary
 
@@ -45,7 +45,21 @@ on 008's placeholders, so this can run whenever the key is reachable.
 
 ## Steps
 
-- [ ] **Step 1: Build the pipeline (script + prompt manifest + docs)** `[inline]`
+- [x] **Step 1: Build the pipeline (script + prompt manifest + docs)** `[inline]`
+  - Outcome: Added `scripts/gen-icons/` — `prompts.py` (shared `STYLE_PREAMBLE` + `SUBJECTS`
+    manifest for `wood`/`stone`/`berries`; adding an item = one line), `generate.py` (compose →
+    Gemini POST via stdlib `urllib` → raw scratch → PIL key-out/square-crop/downscale-to-32×32 →
+    icons; flags `--dry-run`/`--only`/`--raw-only`/`--tolerance`/`--resample`/`--quantise`), and a
+    `README.md` mirroring `gen-art`. `.gitignore` now covers `scripts/.gen-icons/`. Docs updated:
+    `docs/ASSETS.md` new "Item icons" section, `docs/ASSET-EXPERIMENTS.md` Gemini section promoted
+    to the real pipeline. Acceptance check ✓: `--dry-run` prints all 3 composed prompts, no API
+    call; unknown-id and missing-key paths both error cleanly with no spend.
+  - **Deviations:** (1) item set is `wood`/`stone`/`berries` (008 shipped 3 icon'd items, not just
+    wood+stone) — per the plan's "only current ITEMS" rule. (2) Downscale defaults to `lanczos`
+    (area-average, reads cleaner going 1024→32) with `--resample nearest` still available, rather
+    than nearest-by-default as the plan text said. (3) Used stdlib `urllib` not `requests` (zero
+    extra dep, works cross-machine). **Commit deferred to check-in:** working tree has concurrent
+    plan-014 (map-builder) WIP, incl. shared edits to `docs/ASSETS.md` — commit only plan-009 files.
   - New `scripts/gen-icons/`:
     - `prompts.py` (or `prompts.json`) — a **shared style preamble** (dark-grotty-but-funny; single centred
       item; flat/solid keyable background; chunky readable silhouette; limited palette; slight top-down 3/4
@@ -71,7 +85,21 @@ on 008's placeholders, so this can run whenever the key is reachable.
   - Done when: `python3 scripts/gen-icons/generate.py --dry-run` prints the composed per-item prompts; docs
     updated; `.gitignore` covers the raw scratch dir. Commit + push (tooling only, safe on green).
 
-- [ ] **Step 2: Generate real icons (gated on key) + verify** `[inline]` — **review checkpoint**
+- [x] **Step 2: Generate real icons (gated on key) + verify** `[inline]` — **review checkpoint**
+  - Outcome: Key pulled from guppi (`/home/guppi/house-helper/.env`) over Tailscale (SSH user
+    `guppi`) straight into a local gitignored `.env`, value never echoed. Ran
+    `generate.py` → generated + post-processed real 32×32 icons for `wood`/`stone`/`berries`
+    (raw ~1024px in gitignored `scripts/.gen-icons/raw/`). Eyeballed at 6× and at in-game slot
+    scale (drove items in via `__test.applyScenario` on the dev build, screenshotted the populated
+    hotbar) — all three read well, consistent set, backgrounds fully keyed (fringe-pixel check: 0/0/
+    negligible). Verify sweep: `npm run build` clean; `npm run smoke` PASSED (game booted, Game+UI
+    active, **0 console/page errors** = icons loaded clean). Docs: `docs/ASSETS.md` "Origins" note +
+    berries-bush note updated; `docs/STATUS.md` new plan-009 block; `.env.example` gained a
+    documented `GEMINI_API_KEY=` line. Placeholder→real: `public/assets/icons/{wood,stone,berries}.png`
+    overwritten with generated art.
+  - **Note:** background keyer handles a non-flat (vignetted) chroma bg fine at default tolerance 45;
+    default downscale is `lanczos`. Commit again scoped to plan-009 files only (concurrent plan-014
+    WIP still growing in the tree).
   - **Precondition:** `GEMINI_API_KEY` reachable this session (Matt confirms Tailscale up / provides the
     key) **and** the agent proxy allows `generativelanguage.googleapis.com` (check
     `$HTTPS_PROXY/__agentproxy/status` if a call is blocked). If either is missing, **stop here** and hand

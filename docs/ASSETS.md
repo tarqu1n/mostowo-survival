@@ -167,10 +167,11 @@ not repeated here):
   skeleton uses its single-orientation `Death-Sheet.png` (above). Both are one-shot (`repeat: 0`) at a
   slower `DEATH_ANIM_FRAMERATE` so they read as a fall, not a twitch.
 
-**Berry bush + berries are placeholder art (plan 004), not Pixel Crawler frames:**
-`icons/berries.png` + `_derived/bush.png` are baked by `scripts/placeholder-art.mjs` (same
-coloured-rect-placeholder pattern as plan 008's item icons) — real art for both rides the plan 009
-Gemini pipeline later.
+**Berry *bush* is still placeholder art (plan 004), not a Pixel Crawler frame:**
+`_derived/bush.png` is baked by `scripts/placeholder-art.mjs` (same coloured-rect-placeholder
+pattern as plan 008's item icons). The **`berries` item icon is now real** — Gemini-generated via
+the plan 009 pipeline (see "Item icons" below). The bush is a world prop, not an item icon, so it's
+out of scope for `scripts/gen-icons/` and still awaits the environment-art path.
 
 Manifest schema reshaped to roles: a `TileSource` union (`{kind:'image'}` standalone PNGs,
 `{kind:'sheetFrame'}` indexed frames of a 16px-sliced sheet) plus `StripAnim`/`ActorRender` for
@@ -262,8 +263,9 @@ missing). They're generated from prompts, not hand-drawn:
   `GEMINI_API_KEY`** (LAN-only, via Tailscale), so it's a run-when-reachable step, not part of the
   build — the game stays green on whatever icons are committed.
 
-> **Origins:** *(record which icons are Gemini-generated vs still placeholder as they land — the
-> prompt manifest is the reproducible source for the generated ones.)*
+> **Origins:** `wood`, `stone`, `berries` are all **Gemini-generated** (plan 009,
+> `gemini-2.5-flash-image`) via `scripts/gen-icons/` — regenerate/tweak from `prompts.py`, the
+> reproducible source. No item icons remain as plan-008 placeholders.
 
 ## Where assets live
 

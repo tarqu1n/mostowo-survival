@@ -91,6 +91,20 @@ is injected (`maxStackOf`), so the pure system stays data-agnostic and plain-Nod
 Harvesting into a **full bag blocks and aborts the order** (guarded in both `beginCurrent` and
 `runHarvest`) so the worker never swings forever on a node it can't fell.
 
+## Item-icon generation pipeline (plan 009)
+
+The plan-008 placeholder item icons are now **real art**. `scripts/gen-icons/` generates them with
+Gemini (`gemini-2.5-flash-image`) from a **shared style preamble + per-item prompt manifest**
+(`prompts.py` — adding an item is one line), then PIL post-processes each: key out the flat
+chroma-key background → square-crop → downscale to **32×32** → optional palette quantise.
+`wood`/`stone`/`berries` are generated + committed and render in the hotbar/inventory grid.
+Generation is **gated on `GEMINI_API_KEY`** (LAN-only, pulled over Tailscale) and decoupled from the
+build — raw ~1024px generations are gitignored scratch, only the processed 32×32 PNGs are committed,
+and the game falls back to the item `color` rect if an icon is ever missing (so it always ships
+green). `--dry-run` composes prompts with no key/spend. Pipeline + "how to add an item":
+[ASSETS.md](ASSETS.md#item-icons-gemini-pipeline-plan-009) /
+[ASSET-EXPERIMENTS.md](ASSET-EXPERIMENTS.md#gemini-asset-generation-via-guppi).
+
 **Stone is a real resource:** the tree/node machinery is generalised (`woodItemId/woodPerHit` →
 `yieldItemId/yieldPerHit`, plus per-species render fields so a rock isn't sized/anchored like a pine),
 and a **rock node** (`NODES.rock`, grey boulder extracted from the pack's `Rocks` sheet) yields
