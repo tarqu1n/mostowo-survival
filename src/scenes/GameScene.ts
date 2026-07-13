@@ -8,13 +8,7 @@ import {
   ACTION_ANIM_FRAMERATE,
   LONGPRESS_MS,
   BUILD_MS,
-  DRAG_PX,
-  RENDER_SCALE,
   COLORS,
-  MIN_ZOOM,
-  MAX_ZOOM,
-  DEFAULT_ZOOM,
-  ZOOM_STORAGE_KEY,
   PLAYER_START_VISION,
   UNARMED_BASE_DAMAGE,
   PLAYER_HIT_SHAKE_MS,
@@ -66,6 +60,7 @@ import {
   type MonsterTickEnv,
 } from '../entities/MonsterCharacter';
 import { CombatFxManager } from './fx/CombatFxManager';
+import { PointerInputController } from './input/PointerInputController';
 import {
   ACTIVE_TILESET,
   resolveTile,
@@ -168,27 +163,19 @@ export class GameScene extends Phaser.Scene {
   private nextSiteId = 0;
 
   private ui!: UIScene;
-  private userZoom = DEFAULT_ZOOM; // the user-facing zoom level (100/200/300%); camera scale is this × RENDER_SCALE
+  // Pointer gestures (tap/long-press-paint/pan/pinch) + the camera they drive (zoom, follow-lock) —
+  // see src/scenes/input/PointerInputController.ts (plan 013 Step 5). Constructed fresh in create()
+  // (it wires its own input.on(...) listeners there and tears them down on SHUTDOWN itself), so unlike
+  // `fx` above it is NOT a field initializer — see the controller's class doc for why that's fine here.
+  private pointerInput!: PointerInputController;
   private gridDims = {
     cols: Math.floor(MAP_WIDTH / TILE_SIZE),
     rows: Math.floor(MAP_HEIGHT / TILE_SIZE),
   };
-  private downScreen = new Phaser.Math.Vector2(); // pointerdown position in screen/base-canvas px
-  private downOnUI = false;
-  private sawPointerDown = false; // this scene observed the press; guards against a leaked pointerup (see onPointerUp)
-  private pressStart = 0; // scene-clock time of the current pointer press (for hold detection)
-  private queuePainting = false; // once a hold crosses LONGPRESS_MS, dragging paints queue orders
-  private paintedThisGesture = new Set<string>(); // tile keys already queued in the current gesture
   private queueMarkers: Phaser.GameObjects.Rectangle[] = []; // yellow pips over queued move tiles
   private outlinedTreeIds = new Set<string>(); // trees currently showing a queued-glow sprite
   private glowSprites = new Map<string, Phaser.GameObjects.Image>(); // treeId → its baked glow halo image
   private glowPulse?: Phaser.Tweens.Tween; // breathing alpha tween on the head-of-queue glow
-  private pinching = false; // a second pointer went down — the gesture is a pinch-zoom, not a tap
-  private pinchDist = 0; // previous frame's inter-pointer distance, for the zoom delta ratio
-  private isPanning = false; // this gesture dragged the camera rather than issuing an order
-  private lastPanX = 0; // previous frame's screen-space pointer position, for the pan delta
-  private lastPanY = 0;
-  private following = true; // camera auto-follows the player until a manual pan breaks the lock
   // Fog of war (see create() + updateVision()) — fogShape is never rendered directly, just the
   // vision-radius mask's shape source, redrawn each frame to track the character.
   private fogShape!: Phaser.GameObjects.Graphics;
@@ -222,12 +209,10 @@ export class GameScene extends Phaser.Scene {
     this.fx.armShutdown();
     this.fx.resetCombatFx();
     this.buildMode = false;
-    this.sawPointerDown = false; // fields persist across scene.restart(); clear so a press interrupted by death can't resolve post-restart
     this.queueMarkers = [];
     this.outlinedTreeIds.clear();
     this.glowSprites.clear(); // scene teardown destroys the GameObjects; drop our stale references
     this.glowPulse = undefined;
-    this.paintedThisGesture.clear();
     this.mode = 'command';
     // Survival state — reset so a death-restart begins a fresh Day 1 at full hunger (these are plain-data
     // fields; without an explicit reset they'd carry the dead run's values, e.g. hunger stuck at 0).
@@ -319,6 +304,36 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('playerStats', this.playerChar.stats);
     this.physics.world.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
 
+    // Gesture + camera controller (plan 013 Step 5) — constructed fresh each (re)start; wires its own
+    // pointer listeners and tears them down on SHUTDOWN itself (see the class doc). hudHitTest closes
+    // over `this.ui`, assigned further below once UIScene is launched — safe, since no pointer event
+    // can fire before create() returns. Build placement and mode dispatch are NOT gesture mechanics —
+    // they route back through these deps callbacks (see PointerInputDeps).
+    this.pointerInput = new PointerInputController(this, {
+      hudHitTest: (x, y) => this.ui.hudHitTest(x, y),
+      getPlayerSprite: () => this.player,
+      isBuildMode: () => this.buildMode,
+      onBuildDown: (pointer) => {
+        this.updateGhost(pointer);
+        this.placeOrEnqueueBuild(pointer);
+      },
+      onBuildMove: (pointer) => this.updateGhost(pointer),
+      getMode: () => this.mode,
+      onTap: (pointer) => {
+        const action = this.actionAt(pointer.worldX, pointer.worldY);
+        // A tap on a tree queues it: it falls in behind the current job (or starts at once if the
+        // worker is idle) instead of interrupting an in-progress harvest — chopping is the loop you
+        // batch up, so tapping tree after tree should build a chop list, not keep re-targeting. A tap
+        // on the ground still redirects the worker now (act-now move); a held-still long-press queues
+        // either kind.
+        if (action.kind === 'harvest' || pointer.getDuration() >= LONGPRESS_MS)
+          this.enqueue(action);
+        else this.order(action); // quick tap on the ground = move now
+      },
+      onPaint: (pointer) => this.enqueue(this.actionAt(pointer.worldX, pointer.worldY)),
+      onInspect: (pointer) => this.inspectAt(pointer.worldX, pointer.worldY),
+    });
+
     // Camera follows the player. The map is larger than the viewport at every zoom, so the camera
     // always has scroll room and tracks the player. Instant (no lerp smoothing): this is a precision
     // tap-to-target game, so the camera should never lag behind where the player actually is.
@@ -328,7 +343,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.centerOn(this.player.x, this.player.y);
     this.registry.set('following', true);
     this.cameras.main.startFollow(this.player, true);
-    this.setZoom(this.loadStoredZoom());
+    this.pointerInput.setZoom(this.pointerInput.loadStoredZoom());
 
     // Fog of war: a semi-transparent overlay (inverted geometry mask — a hole at the vision
     // radius) dims static world content (ground/trees/walls, depths 0-4) but sits below the ghost
@@ -376,17 +391,12 @@ export class GameScene extends Phaser.Scene {
     this.ui = this.scene.get('UI') as UIScene;
     this.game.events.emit('mode:changed', this.mode);
 
-    // One unified pointer gate (down + up).
-    this.input.on('pointerdown', this.onPointerDown, this);
-    this.input.on('pointermove', this.onPointerMove, this);
-    this.input.on('pointerup', this.onPointerUp, this);
-
     this.game.events.on('build:toggle', this.toggleBuild, this);
     this.game.events.on('tasks:cancel', this.cancelAll, this);
     this.game.events.on('debug:randomise', this.randomiseWorld, this); // dev menu: scatter nodes + enemies
     this.game.events.on('debug:toggleTime', this.toggleDayNight, this); // dev menu: flip day/night
-    this.game.events.on('zoom:delta', this.adjustZoom, this);
-    this.game.events.on('camera:center', this.centerOnPlayer, this);
+    this.game.events.on('zoom:delta', this.pointerInput.adjustZoom, this.pointerInput);
+    this.game.events.on('camera:center', this.pointerInput.centerOnPlayer, this.pointerInput);
     this.game.events.on('combat:attack', this.attack, this);
     this.game.events.on('mode:combatToggle', this.onCombatToggle, this);
     this.game.events.on('mode:inspectToggle', this.onInspectToggle, this);
@@ -399,8 +409,8 @@ export class GameScene extends Phaser.Scene {
       this.game.events.off('tasks:cancel', this.cancelAll, this);
       this.game.events.off('debug:randomise', this.randomiseWorld, this);
       this.game.events.off('debug:toggleTime', this.toggleDayNight, this);
-      this.game.events.off('zoom:delta', this.adjustZoom, this);
-      this.game.events.off('camera:center', this.centerOnPlayer, this);
+      this.game.events.off('zoom:delta', this.pointerInput.adjustZoom, this.pointerInput);
+      this.game.events.off('camera:center', this.pointerInput.centerOnPlayer, this.pointerInput);
       this.game.events.off('combat:attack', this.attack, this);
       this.game.events.off('mode:combatToggle', this.onCombatToggle, this);
       this.game.events.off('mode:inspectToggle', this.onInspectToggle, this);
@@ -815,128 +825,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   // --- Input gate ----------------------------------------------------------
-
-  /** HUD hit-test in design space. Raw pointer coords live in the device-scaled backing store, but
-   * the HUD is authored in BASE_WIDTH×BASE_HEIGHT units — divide by RENDER_SCALE to line them up. */
-  private pointerOnHud(pointer: Phaser.Input.Pointer): boolean {
-    return this.ui.hudHitTest(pointer.x / RENDER_SCALE, pointer.y / RENDER_SCALE);
-  }
-
-  private onPointerDown(pointer: Phaser.Input.Pointer): void {
-    if (this.activePointerCount() >= 2) {
-      // A second finger just landed — this gesture is a pinch, not a tap. Abandon anything the
-      // first finger started (build ghost / queue-paint / pan) so they don't fight over the input.
-      this.pinching = true;
-      this.pinchDist = this.pointerDistance();
-      this.queuePainting = false;
-      this.isPanning = false;
-      return;
-    }
-    this.sawPointerDown = true; // a genuine press this scene owns — its paired pointerup may now resolve
-    this.downOnUI = this.pointerOnHud(pointer);
-    if (this.downOnUI) return; // HUD owns this tap
-    this.downScreen.set(pointer.x, pointer.y);
-    this.lastPanX = pointer.x;
-    this.lastPanY = pointer.y;
-    this.isPanning = false;
-    this.pressStart = this.time.now;
-    this.queuePainting = false;
-    this.paintedThisGesture.clear();
-    if (this.buildMode) {
-      this.updateGhost(pointer);
-      this.placeOrEnqueueBuild(pointer);
-    }
-  }
-
-  private onPointerMove(pointer: Phaser.Input.Pointer): void {
-    if (this.pinching) {
-      if (this.activePointerCount() < 2) return; // one finger already lifted — wait for pointerup
-      const dist = this.pointerDistance();
-      if (this.pinchDist > 0) this.setZoom(this.userZoom * (dist / this.pinchDist));
-      this.pinchDist = dist;
-      return;
-    }
-    if (this.buildMode) {
-      if (!this.pointerOnHud(pointer)) this.updateGhost(pointer);
-      return;
-    }
-    // Combat mode: the movepad (tracked independently in UIScene) owns all dragging. A world drag
-    // must never fall through to the camera-pan below — steering the movepad drags the thumb off the
-    // small pad, and without this gate that off-pad travel panned the world and broke the follow-lock,
-    // yanking the camera around whenever the player changed direction.
-    if (this.mode === 'combat') return;
-    if (!pointer.isDown || this.downOnUI || this.pointerOnHud(pointer)) return;
-
-    // Command-mode-only: queue-painting (long-press-drag) issues tap-to-pathfind orders, which
-    // would fight Combat mode's direct movepad control and has no meaning in Inspect mode.
-    if (this.mode === 'command') {
-      if (this.queuePainting) {
-        this.paintQueueAt(pointer);
-        return;
-      }
-      // A press held roughly still past the long-press threshold enters queue-paint mode (unchanged
-      // behaviour); a press that starts dragging *first* pans the camera instead — see onPointerUp.
-      if (!this.isPanning && this.time.now - this.pressStart >= LONGPRESS_MS) {
-        this.queuePainting = true;
-        this.paintQueueAt(pointer);
-        return;
-      }
-    }
-
-    // downScreen and pointer are backing-store px (device-scaled); DRAG_PX is a design-space distance.
-    if (
-      !this.isPanning &&
-      Phaser.Math.Distance.Between(this.downScreen.x, this.downScreen.y, pointer.x, pointer.y) >
-        DRAG_PX * RENDER_SCALE
-    ) {
-      this.isPanning = true;
-      this.setFollowing(false); // manual pan always breaks the follow-lock
-    }
-    if (this.isPanning) {
-      const cam = this.cameras.main;
-      cam.scrollX -= (pointer.x - this.lastPanX) / cam.zoom;
-      cam.scrollY -= (pointer.y - this.lastPanY) / cam.zoom;
-    }
-    this.lastPanX = pointer.x;
-    this.lastPanY = pointer.y;
-  }
-
-  private onPointerUp(pointer: Phaser.Input.Pointer): void {
-    if (this.pinching) {
-      if (this.activePointerCount() < 2) this.pinching = false; // both fingers up — gesture over
-      return; // a pinch never resolves as a tap, however many fingers are still down
-    }
-    // A pointerup with no matching pointerdown seen by this scene is a foreign/leaked event: MainMenu
-    // starts the Game scene on pointerdown, so the paired release lands on this freshly-created scene
-    // and would otherwise resolve as a stray move order on the map. Never act on it. (Reset so a second
-    // leaked release also no-ops.)
-    if (!this.sawPointerDown) return;
-    this.sawPointerDown = false;
-    if (this.buildMode || this.downOnUI || this.pointerOnHud(pointer)) return;
-    if (this.queuePainting) {
-      this.queuePainting = false; // the drag already queued its targets
-      return;
-    }
-    if (this.isPanning) {
-      this.isPanning = false; // the drag panned the camera — never resolves as a tap
-      return;
-    }
-    // Inspect mode shows a stats panel instead of issuing a command; Combat mode drives the
-    // player via the movepad, not taps. Both skip the Command-mode tree/move fallthrough below.
-    if (this.mode === 'inspect') {
-      this.inspectAt(pointer.worldX, pointer.worldY);
-      return;
-    }
-    if (this.mode !== 'command') return;
-
-    const action = this.actionAt(pointer.worldX, pointer.worldY);
-    // A tap on a tree queues it: it falls in behind the current job (or starts at once if the worker
-    // is idle) instead of interrupting an in-progress harvest — chopping is the loop you batch up, so
-    // tapping tree after tree should build a chop list, not keep re-targeting. A tap on the ground
-    // still redirects the worker now (act-now move); a held-still long-press queues either kind.
-    if (action.kind === 'harvest' || pointer.getDuration() >= LONGPRESS_MS) this.enqueue(action);
-    else this.order(action); // quick tap on the ground = move now
-  }
+  //
+  // Gesture recognition (tap/long-press-paint/pan/pinch) + the camera it drives live in
+  // PointerInputController (plan 013 Step 5) — it resolves mechanics and calls back into onTap/
+  // onPaint/onInspect (below, via the deps passed at construction in create()) for the mode-dependent
+  // intent. Build-mode placement (isBuildMode/onBuildDown/onBuildMove deps) stays here too.
 
   /** The order implied by a world point: harvest the live tree whose sprite is drawn under it (see
    * pickSpriteAt — the raycast, not the foot tile), else move to that tile. A pick that isn't a tree
@@ -945,14 +838,6 @@ export class GameScene extends Phaser.Scene {
     const pick = this.pickSpriteAt(x, y);
     if (pick?.kind === 'tree') return { kind: 'harvest', treeId: pick.tree.id };
     return { kind: 'move', col: worldToTile(x), row: worldToTile(y) };
-  }
-
-  /** Append the target under the pointer to the queue, once per tile per paint gesture. */
-  private paintQueueAt(pointer: Phaser.Input.Pointer): void {
-    const key = tileKey(worldToTile(pointer.worldX), worldToTile(pointer.worldY));
-    if (this.paintedThisGesture.has(key)) return;
-    this.paintedThisGesture.add(key);
-    this.enqueue(this.actionAt(pointer.worldX, pointer.worldY));
   }
 
   // --- Combat ----------------------------------------------------------------
@@ -1577,7 +1462,7 @@ export class GameScene extends Phaser.Scene {
     this.buildMode = false;
     this.queueMarkers = [];
     this.outlinedTreeIds.clear();
-    this.paintedThisGesture.clear();
+    this.pointerInput.clearPaintedTiles();
     this.rng = Math.random;
 
     // Reset survival state so a scenario never inherits a prior run's clock/hunger (testApplyScenario
@@ -1832,65 +1717,6 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  // --- Camera zoom -----------------------------------------------------------
-
-  /** Best-effort read of a persisted zoom preference; falls back to the default. */
-  private loadStoredZoom(): number {
-    try {
-      const stored = Number(localStorage.getItem(ZOOM_STORAGE_KEY));
-      if (stored) return stored;
-    } catch {
-      // Private browsing / storage disabled — fall back silently.
-    }
-    return DEFAULT_ZOOM;
-  }
-
-  /** Apply + persist a zoom level, clamped to [MIN_ZOOM, MAX_ZOOM]. Also mirrored onto the
-   * registry (for UIScene's initial readout — see UIScene.create) and broadcast for live updates. */
-  private setZoom(z: number): void {
-    // Snap to an integer level: pixel-art sprites only stay crisp at integer camera scale (see
-    // config.ts ZOOM_STEP). This gates *every* zoom source — buttons, pinch, restored preference.
-    const clamped = Phaser.Math.Clamp(Math.round(z), MIN_ZOOM, MAX_ZOOM);
-    this.userZoom = clamped;
-    // Camera scale = the user's (integer) zoom × the device render scale, so the world is drawn at
-    // device density (a crisp ~1:1 final upscale, no seams) while the user still zooms in integer
-    // steps. Everything else — the registry mirror, persistence, the HUD %readout — is the *user* zoom.
-    this.cameras.main.setZoom(clamped * RENDER_SCALE);
-    this.registry.set('zoom', clamped);
-    try {
-      localStorage.setItem(ZOOM_STORAGE_KEY, String(clamped));
-    } catch {
-      // Private browsing / storage disabled — the zoom still applies, just won't persist.
-    }
-    this.game.events.emit('zoom:changed', clamped);
-  }
-
-  private adjustZoom(delta: number): void {
-    this.setZoom(this.userZoom + delta);
-  }
-
-  // --- Camera pan / follow-lock -----------------------------------------------
-
-  /** Engage/disengage camera auto-follow. Mirrored onto the registry (UIScene's initial button
-   * colour) and broadcast for live updates, matching the zoom-state pattern above. */
-  private setFollowing(on: boolean): void {
-    if (this.following === on) return;
-    this.following = on;
-    this.registry.set('following', on);
-    if (on) {
-      this.cameras.main.startFollow(this.player, true);
-      this.cameras.main.centerOn(this.player.x, this.player.y);
-    } else {
-      this.cameras.main.stopFollow();
-    }
-    this.game.events.emit('camera:followChanged', on);
-  }
-
-  /** HUD "FOLLOW" button: snap back to the player and re-engage the follow-lock. */
-  private centerOnPlayer(): void {
-    this.setFollowing(true);
-  }
-
   /** Redraw the vision-radius mask shape at the character's current position. */
   /** Redraws the vision-radius mask shape, and hides/shows dynamic actors by distance to it —
    * unlike static world content (dimmed by the terrain fog above), an actor outside vision is
@@ -1912,20 +1738,6 @@ export class GameScene extends Phaser.Scene {
     return (
       Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) <=
       (this.playerChar.stats.vision ?? PLAYER_START_VISION)
-    );
-  }
-
-  /** How many of the tracked pointers (see BootScene's addPointer) are currently held down. */
-  private activePointerCount(): number {
-    return [this.input.pointer1, this.input.pointer2].filter((p) => p.isDown).length;
-  }
-
-  private pointerDistance(): number {
-    return Phaser.Math.Distance.Between(
-      this.input.pointer1.x,
-      this.input.pointer1.y,
-      this.input.pointer2.x,
-      this.input.pointer2.y,
     );
   }
 }

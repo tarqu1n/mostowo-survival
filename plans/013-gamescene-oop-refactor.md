@@ -286,7 +286,20 @@ so steps are write-overlapping and strictly sequential, in order.
     player-anim/facing/enemy-execution methods left; `grep -n "EnemyUnit" src | grep -v entities` is
     empty (or only the deliberate alias).
 
-- [ ] **Step 5: Extract `PointerInputController` (gestures + camera)** `[delegate sonnet]`
+- [x] **Step 5: Extract `PointerInputController` (gestures + camera)** `[delegate sonnet]`
+  - Outcome: delegated (sonnet). New `src/scenes/input/PointerInputController.ts` (298 lines) owns the
+    13 gesture/camera fields + onPointerDown/Move/Up, paintQueueAt, pointer helpers, and
+    loadStoredZoom/setZoom/adjustZoom/setFollowing/centerOnPlayer. Deps callbacks: hudHitTest,
+    getPlayerSprite, isBuildMode/onBuildDown/onBuildMove, getMode, onTap/onPaint/onInspect (build +
+    mode dispatch stay scene-side). GameScene 1,931 → 1,743 lines; create() registers no raw pointer
+    handlers; zoom:delta/camera:center listeners re-point to controller; registry/bus names unchanged.
+    Deviations: constructed fresh in create() (no armShutdown split — input/events already wired by
+    then), which also fixes a latent stale-`following`-field quirk across death-restarts; new
+    clearPaintedTiles() for testResetWorld. check green; e2e 38/38; build pass; tripwire ×3 (agent) +
+    ×3 solo + combo ×3 (orchestrator). Verified pre-existing (not this step): tripwire contact-bite
+    flake under parallel spec load — failing fields are bite-cadence only (enemyAttacks/
+    playerHitFlashes/playerHp), matching the Step 3 note; testStep-seeds-from-time.now fix remains a
+    follow-up candidate.
   - Create `src/scenes/input/PointerInputController.ts`. Move verbatim from GameScene: the 16 gesture
     fields (`downScreen`, `downOnUI`, `sawPointerDown`, `pressStart`, `queuePainting`,
     `paintedThisGesture`, `pinching`, `pinchDist`, `isPanning`, `lastPanX/Y`, `following`, …) and
