@@ -255,6 +255,16 @@ export const CAMPFIRE_FUEL_MAX = 120;
 export const CAMPFIRE_FUEL_BURN_PER_SEC = 1;
 export const CAMPFIRE_FUEL_PER_WOOD = 30;
 
+/**
+ * Refuel-as-worker-order tuning (plan 016). Tapping a fire queues a `refuel` order: the worker walks
+ * adjacent and feeds one wood per `CAMPFIRE_FEED_INTERVAL_MS` (an empty fire tops up in ~4s / 4 wood),
+ * stopping when a full wood no longer fits or the bag runs dry. `CAMPFIRE_LIGHT_MIN_FRAC` is the light
+ * radius at near-empty as a fraction of the full radius — the disc lerps `MIN_FRAC..1` with fuel, so a
+ * dying fire's lit hole shrinks (full = the buildable's `light` tiles, near-empty ≈ 40% of that).
+ */
+export const CAMPFIRE_FEED_INTERVAL_MS = 1000;
+export const CAMPFIRE_LIGHT_MIN_FRAC = 0.4;
+
 /** Semantic colour palette (dark & grotty). Expand as the art identity firms up. */
 export const COLORS = {
   background: 0x14100f,

@@ -2,6 +2,7 @@ import type { Action } from '../../systems/tasks';
 import { worldToTile } from '../../systems/grid';
 import { hurtboxContains, DEFAULT_HURTBOX } from '../../systems/hurtbox';
 import { treeStats, wallStats, enemyStats, campfireStats } from '../../systems/stats';
+import { BUILDABLES } from '../../data/buildables';
 import type { PointerPick, TreeNode, BuildSite, CampfireUnit } from '../../entities/types';
 import type { MonsterCharacter } from '../../entities/MonsterCharacter';
 import type { GameScene } from '../GameScene';
@@ -51,23 +52,16 @@ export class ScenePicker {
 
   // --- Command-mode intent ---------------------------------------------------
 
-  /** The order implied by a world point: harvest the live tree whose sprite is drawn under it (see
-   * pickSpriteAt — the raycast, not the foot tile), else move to that tile. A pick that isn't a tree
-   * (an enemy, a blueprint — neither is a Command-mode harvest target) also falls through to move. */
+  /** The order implied by a world point: harvest the live tree whose sprite is drawn under it, refuel
+   * the campfire under it (a queued worker order — walk over and tend it, plan 016), else move to that
+   * tile. Resolved off pickSpriteAt (the raycast, not the foot tile). A pick that's neither a tree nor
+   * a campfire (an enemy, a blueprint) falls through to move. Because a campfire always resolves to
+   * refuel here, tapping the fire can never fall through to a move onto its blocking tile. */
   actionAt(x: number, y: number): Action {
     const pick = this.pickSpriteAt(x, y);
     if (pick?.kind === 'tree') return { kind: 'harvest', treeId: pick.tree.id };
+    if (pick?.kind === 'campfire') return { kind: 'refuel', campfireId: pick.campfire.id };
     return { kind: 'move', col: worldToTile(x), row: worldToTile(y) };
-  }
-
-  /** The campfire whose *sprite* is drawn under world point (x,y), if the topmost picked entity is a
-   * campfire (same forgiving raycast as {@link inspectAt} — a foot-tile hit OR an opaque sprite pixel),
-   * else null. Command-mode tap-to-feed keys off this so tapping anywhere on the fire (its flame reaches
-   * a tile or two above its foot tile — it's bottom-anchored + multi-tile) feeds it, not just the exact
-   * foot tile a bare worldToTile would demand. */
-  campfireAt(x: number, y: number): CampfireUnit | null {
-    const pick = this.pickSpriteAt(x, y);
-    return pick?.kind === 'campfire' ? pick.campfire : null;
   }
 
   // --- Inspect-mode intent ----------------------------------------------------
@@ -139,8 +133,14 @@ export class ScenePicker {
     }
     // A built campfire's fire sprite is created after (and over) its now-hidden site rect, so it wins
     // the pick tie-break by draw order — inspecting a built fire yields the campfire, not its site.
+    // Hit-test its whole `tilesTall` tile column (foot tile + the tiles the bottom-anchored flame rises
+    // into), NOT just an opaque sprite pixel: the flame sheet swaps by fuel (plan 016) and its low-fuel
+    // ember frames have a tiny opaque region, so an alpha-only test would flicker-miss and fall through
+    // to a move onto the fire's blocking tile. The column keeps the fire reliably tappable at any fuel.
+    const fireTilesTall = BUILDABLES.campfire.tilesTall ?? 1;
     for (const c of this.deps.campfires()) {
-      if ((c.col === col && c.row === row) || this.alphaHit(c.sprite, x, y))
+      const inColumn = col === c.col && row <= c.row && row > c.row - fireTilesTall;
+      if (inColumn || this.alphaHit(c.sprite, x, y))
         consider(c.sprite, { kind: 'campfire', campfire: c });
     }
     return best ? (best as { pick: PointerPick }).pick : null;

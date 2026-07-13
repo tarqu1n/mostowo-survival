@@ -305,23 +305,15 @@ export class GameScene extends Phaser.Scene {
       onBuildMove: (pointer) => this.buildManager.updateGhost(pointer),
       getMode: () => this.mode,
       onTap: (pointer) => {
-        // Tap-to-feed: a SHORT tap anywhere on a campfire's sprite (command mode, wood in the bag)
-        // feeds it and issues NO order. Resolve the fire via the forgiving sprite raycast (scenePicker),
-        // NOT a bare worldToTile — the fire is bottom-anchored + multi-tile, so its flame renders above
-        // its foot tile and a foot-tile-only match made natural taps miss (they fell through to "walk at
-        // it"). feedAt returns false when there's no wood, so that still falls through. onTap is
-        // command-mode-only by construction; the short-tap gate keeps long-press = queue uniform.
-        if (pointer.getDuration() < LONGPRESS_MS) {
-          const fire = this.scenePicker.campfireAt(pointer.worldX, pointer.worldY);
-          if (fire && this.campfireManager.feedAt(fire.col, fire.row)) return;
-        }
         const action = this.scenePicker.actionAt(pointer.worldX, pointer.worldY);
-        // A tap on a tree queues it: it falls in behind the current job (or starts at once if the
-        // worker is idle) instead of interrupting an in-progress harvest — chopping is the loop you
-        // batch up, so tapping tree after tree should build a chop list, not keep re-targeting. A tap
-        // on the ground still redirects the worker now (act-now move); a held-still long-press queues
-        // either kind.
-        if (action.kind === 'harvest' || pointer.getDuration() >= LONGPRESS_MS)
+        // A tap on a tree or a campfire queues a job (harvest / refuel): it falls in behind the current
+        // work (or starts at once if the worker is idle) instead of interrupting an in-progress job —
+        // harvesting/tending are loops you batch up, so tapping target after target should build a work
+        // list, not keep re-targeting. A tap on the ground still redirects the worker now (act-now
+        // move); a held-still long-press queues either kind. Because a campfire always resolves to a
+        // refuel action (never a move — see ScenePicker.actionAt), tapping the fire can no longer walk
+        // the worker into its blocking tile.
+        if (action.kind === 'harvest' || action.kind === 'refuel' || pointer.getDuration() >= LONGPRESS_MS)
           this.enqueue(action);
         else this.order(action); // quick tap on the ground = move now
       },
@@ -544,6 +536,9 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'build':
         this.runBuild(action, delta);
+        break;
+      case 'refuel':
+        this.runRefuel(action, delta);
         break;
     }
     this.playerChar.updateAnim(this.harvestSwing);

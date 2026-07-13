@@ -4,11 +4,13 @@ import {
   CAMPFIRE_FUEL_MAX,
   CAMPFIRE_FUEL_BURN_PER_SEC,
   CAMPFIRE_FUEL_PER_WOOD,
+  CAMPFIRE_LIGHT_MIN_FRAC,
+  COLORS,
 } from '../../config';
 import { tileToWorldCenter } from '../../systems/grid';
 import { BUILDABLES } from '../../data/buildables';
-import { campfireAnimKey } from '../../data/tileset';
-import { drainFuel, feedFuel, isLit } from '../../systems/campfire';
+import { campfireLevelKey, campfireLevelCount } from '../../data/tileset';
+import { drainFuel, feedFuel, isLit, fuelLevel, lightFrac } from '../../systems/campfire';
 import type { CampfireUnit, BuildSite } from '../../entities/types';
 import type { GameScene } from '../GameScene';
 
@@ -31,10 +33,13 @@ export interface CampfireManagerDeps {
  * from `BuildManager.finishSite` via the scene-mediated `materialiseBuildable` dep — BuildManager
  * still owns the site rect + its occupancy/collision body, this manager owns only the visual + fuel).
  *
- * Per-frame {@link tick} drains fuel and flips lit/unlit (dimming the sprite when spent);
- * {@link feedAt} is the command-mode tap-to-feed. {@link lightSources} is the single light source the
- * scene hands to BOTH SurvivalClock (night-overlay mask holes) and VisionController (fog reveal) — no
- * manager↔manager edge; the scene mediates.
+ * Per-frame {@link tick} drains fuel, flips lit/unlit (dimming the sprite when spent), and steps the
+ * flame through its intensity levels so it visibly grows/shrinks with fuel (plan 016). {@link feedOne}
+ * is the single fuel/sprite write path — the GameScene `refuel` worker order feeds one wood per tick
+ * through it (walk-adjacent-then-tend, like harvesting), and the DEV {@link feedAt} test seam delegates
+ * to it. {@link lightSources} is the single light source the scene hands to BOTH SurvivalClock
+ * (night-overlay mask holes) and VisionController (fog reveal) — no manager↔manager edge; the scene
+ * mediates — and its radius now lerps with fuel too.
  *
  * Constructed fresh in `buildWorld()` each (re)start, alongside the other world managers.
  *
@@ -63,13 +68,14 @@ export class CampfireManager {
    *  fire sprite (mirrors ResourceNodeManager's node scale/anchor) that starts full and lit. */
   materialise(site: BuildSite): void {
     const def = BUILDABLES[site.buildableId];
+    const level = fuelLevel(CAMPFIRE_FUEL_MAX, CAMPFIRE_FUEL_MAX, campfireLevelCount()); // full → fiercest
     const sprite = this.scene.add
-      .sprite(tileToWorldCenter(site.col), tileToWorldCenter(site.row), campfireAnimKey())
+      .sprite(tileToWorldCenter(site.col), tileToWorldCenter(site.row), campfireLevelKey(level))
       .setDepth(1);
     sprite
       .setScale((TILE_SIZE * (def.tilesTall ?? 1)) / sprite.frame.height)
       .setOrigin(0.5, def.originY ?? 1);
-    sprite.play(campfireAnimKey());
+    sprite.play(campfireLevelKey(level));
     this.campfires.push({
       id: `campfire-${this.nextId++}`,
       col: site.col,
@@ -77,35 +83,57 @@ export class CampfireManager {
       sprite,
       fuel: CAMPFIRE_FUEL_MAX,
       lit: true,
+      level,
     });
   }
 
   // --- Per-frame tick ------------------------------------------------------------
 
-  /** Drain every campfire's fuel and flip its lit state on a zero-crossing: on lit→unlit stop the
-   *  flame + dim it (ash-grey), on unlit→lit resume. Called every frame (above the scene's no-action
+  /** Drain every campfire's fuel and reflect it visually: flip lit on a zero-crossing (lit→unlit stops
+   *  the flame + dims it ash-grey; unlit→lit resumes), and while lit, step the flame down through the
+   *  intensity levels as fuel crosses each bucket. Called every frame (above the scene's no-action
    *  early-return) so fuel drains whether or not a worker task is active. */
   tick(delta: number): void {
     for (const c of this.campfires) {
       c.fuel = drainFuel(c.fuel, delta, CAMPFIRE_FUEL_BURN_PER_SEC);
       if (c.lit && !isLit(c.fuel)) this.douse(c);
       else if (!c.lit && isLit(c.fuel)) this.light(c);
+      else if (c.lit) this.syncLevel(c); // still lit — grow/shrink the flame to match fuel
     }
   }
 
   // --- Tap-to-feed ---------------------------------------------------------------
 
-  /** Command-mode tap-to-feed: if a campfire sits on this tile and the bag has wood, spend one wood,
-   *  top up its fuel, and relight it if it was out. Returns whether a feed happened (the scene uses
-   *  this to suppress the move/harvest order the same tap would otherwise issue). */
+  /** Feed the campfire on this tile one wood, if one is there (the DEV test seam + a tile-addressed
+   *  delegate). Returns whether a feed happened. */
   feedAt(col: number, row: number): boolean {
     const c = this.campfireAt(col, row);
-    if (!c) return false;
+    return c ? this.feedOne(c) : false;
+  }
+
+  /** Feed one wood into `c`: spend it (false/no-op if the bag is empty), top the tank up, relight if
+   *  it was out — or grow the flame a bucket if already lit — and flare. This is the single fuel/sprite
+   *  write path: the refuel worker order calls it once per feed interval and the test seam routes
+   *  through it too, so there is no parallel "instant feed" logic to drift from the real one. */
+  feedOne(c: CampfireUnit): boolean {
     if (!this.deps.spend({ wood: 1 })) return false; // no wood — no-op
     c.fuel = feedFuel(c.fuel, CAMPFIRE_FUEL_PER_WOOD, CAMPFIRE_FUEL_MAX);
     if (!c.lit && isLit(c.fuel)) this.light(c);
+    else this.syncLevel(c);
     this.flare(c); // visible confirmation the feed registered — the fire briefly flares up
     return true;
+  }
+
+  /** Brief red "can't feed" blink for a refuel that can't proceed (bag empty, or the fire's already
+   *  topped up). Distinct from {@link flare} (the success bump) so an aborted refuel reads as a refusal
+   *  rather than a dead tap; restores the real tint after (none if lit, ash-grey if out). */
+  flashNoFuel(c: CampfireUnit): void {
+    c.sprite.setTint(COLORS.ghostInvalid);
+    this.scene.time.delayedCall(160, () => {
+      if (!c.sprite.active) return; // torn down by a scenario reset before the blink cleared
+      if (c.lit) c.sprite.clearTint();
+      else c.sprite.setTint(0x555555);
+    });
   }
 
   /** Brief "flare up" pulse on a fed fire — a quick scale bump that settles back, so a successful
@@ -133,10 +161,15 @@ export class CampfireManager {
    *  the same scene closure without either consumer changing — see docs/DECISIONS.md). One disc per LIT
    *  campfire; radius = the buildable's `light` (tiles) × TILE_SIZE, centred on the fire's base tile. */
   lightSources(): readonly { x: number; y: number; radius: number }[] {
-    const radius = (BUILDABLES.campfire.light ?? 0) * TILE_SIZE;
-    return this.campfires
-      .filter((c) => c.lit)
-      .map((c) => ({ x: tileToWorldCenter(c.col), y: tileToWorldCenter(c.row), radius }));
+    const base = (BUILDABLES.campfire.light ?? 0) * TILE_SIZE;
+    return this.campfires.filter((c) => c.lit).map((c) => ({
+      x: tileToWorldCenter(c.col),
+      y: tileToWorldCenter(c.row),
+      // Radius lerps MIN_FRAC..1 with fuel — a dying fire's lit hole shrinks (plan 016). Read per
+      // frame by SurvivalClock + VisionController, so it animates for free; fog reveal is one-way so a
+      // shrinking radius never un-reveals ground already seen this frame.
+      radius: base * lightFrac(c.fuel, CAMPFIRE_FUEL_MAX, CAMPFIRE_LIGHT_MIN_FRAC),
+    }));
   }
 
   /** True if world point (x,y) is within any lit campfire's light radius (the reveal predicate). */
@@ -157,6 +190,12 @@ export class CampfireManager {
     return this.campfires.find((c) => c.col === col && c.row === row);
   }
 
+  /** Look up a campfire by id (undefined once gone) — the refuel worker order re-resolves through this
+   *  each frame so the executor tolerates a fire that's destroyed mid-order (future destructible fires). */
+  campfireById(id: string): CampfireUnit | undefined {
+    return this.campfires.find((c) => c.id === id);
+  }
+
   // --- Reset / teardown ----------------------------------------------------------
 
   /** Douse: stop the flame + dim it ash-grey. */
@@ -166,11 +205,24 @@ export class CampfireManager {
     c.sprite.setTint(0x555555);
   }
 
-  /** Light/relight: clear the dim tint + resume the flame loop. */
+  /** Light/relight: clear the dim tint + resume the flame loop at the level matching current fuel. */
   private light(c: CampfireUnit): void {
     c.lit = true;
     c.sprite.clearTint();
-    c.sprite.play(campfireAnimKey(), true);
+    c.level = fuelLevel(c.fuel, CAMPFIRE_FUEL_MAX, campfireLevelCount());
+    c.sprite.play(campfireLevelKey(c.level), true);
+  }
+
+  /** Swap the played flame sheet to the level matching current fuel, if it changed — preserving the
+   *  flicker phase (all levels share the 4-frame cadence) so the loop doesn't visibly restart on a
+   *  swap. Only meaningful while lit (the caller gates on that). */
+  private syncLevel(c: CampfireUnit): void {
+    const level = fuelLevel(c.fuel, CAMPFIRE_FUEL_MAX, campfireLevelCount());
+    if (level === c.level) return;
+    c.level = level;
+    const progress = c.sprite.anims.getProgress();
+    c.sprite.play(campfireLevelKey(level), true);
+    c.sprite.anims.setProgress(progress);
   }
 
   /**

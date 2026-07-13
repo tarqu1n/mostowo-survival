@@ -6,7 +6,8 @@ import {
   enemyWalkKey,
   enemyIdleKey,
   enemyDeathKey,
-  campfireAnimKey,
+  campfireLevelKey,
+  campfireLevelCount,
   type Facing,
   type PlayerState,
 } from '../../data/tileset';
@@ -80,14 +81,17 @@ export function registerActorAnims(scene: Phaser.Scene): void {
       repeat: 0,
     });
   }
-  // Campfire (station): a looping flame flicker. Registered here alongside the actors so every
-  // anims.create lives in one guarded place (plan 012); key + frame count come from the manifest.
-  if (!scene.anims.exists(campfireAnimKey())) {
+  // Campfire (station): one looping flame flicker per intensity level (plan 016 — CampfireManager
+  // swaps the played level by fuel). Registered here alongside the actors so every anims.create lives
+  // in one guarded place; keys + frame count come from the manifest. All levels share the frame count.
+  const campfireFrames = ACTIVE_TILESET.stations.campfire.frames;
+  for (let n = 1; n <= campfireLevelCount(); n++) {
+    if (scene.anims.exists(campfireLevelKey(n))) continue;
     scene.anims.create({
-      key: campfireAnimKey(),
-      frames: scene.anims.generateFrameNumbers(campfireAnimKey(), {
+      key: campfireLevelKey(n),
+      frames: scene.anims.generateFrameNumbers(campfireLevelKey(n), {
         start: 0,
-        end: ACTIVE_TILESET.stations.campfire.frames - 1,
+        end: campfireFrames - 1,
       }),
       frameRate: 8, // steady flame flicker
       repeat: -1,

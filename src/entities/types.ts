@@ -41,7 +41,8 @@ export interface BuildSite {
 /**
  * A built campfire in the world: its animated fire sprite plus fuel/lit state. Owned by
  * CampfireManager, the sole writer of the sprite's anim/tint (and its sole destroyer). `fuel` drains
- * every frame; `lit` mirrors `fuel > 0` and drives the light it casts + its dim-out when spent.
+ * every frame; `lit` mirrors `fuel > 0` and drives the light it casts + its dim-out when spent;
+ * `level` is the flame-intensity sheet currently played (1..levels), swapped as fuel crosses buckets.
  */
 export interface CampfireUnit {
   id: string;
@@ -50,6 +51,8 @@ export interface CampfireUnit {
   sprite: Phaser.GameObjects.Sprite;
   fuel: number;
   lit: boolean;
+  /** Current flame-intensity level (1..campfireLevelCount()) — CampfireManager render state. */
+  level: number;
 }
 
 /**

@@ -70,6 +70,24 @@ export interface StripAnim {
   render?: ActorRender;
 }
 
+/**
+ * A station animation authored at several discrete intensity levels (plan 016). The campfire ships as
+ * `Bonfire_01..08-Sheet.png` — 8 sheets of the *same* fire from faint embers (1) to a roaring blaze
+ * (8). All levels share `frameSize`/`frames`/`frameWidth`; each level's sheet path comes from
+ * `pathTemplate` with `{n}` replaced by the zero-padded level. CampfireManager swaps the played level
+ * by a fuel bucket, so the visible flame grows/shrinks with fuel (see {@link campfireLevelStrip}).
+ */
+export interface StationLevels {
+  /** Sheet path with `{n}` — replaced by the 2-digit level `01..levels` (see campfireLevelStrip). */
+  pathTemplate: string;
+  /** Number of intensity levels (sheets); level 1 = faintest, `levels` = fiercest. */
+  levels: number;
+  frameSize: number;
+  frames: number;
+  /** Cell width in px when the frame isn't square; defaults to `frameSize`. */
+  frameWidth?: number;
+}
+
 /** Display scale + origin so a padded actor canvas (e.g. 64px) sits right on a 16px tile. */
 export interface ActorRender {
   scale: number;
@@ -158,11 +176,12 @@ export interface TilesetManifest {
   };
   /**
    * Placeable-station animations, keyed by station role — separate from `actors` since these aren't
-   * characters. Today just the campfire's looping fire strip (see `data/buildables.ts`'s `campfire`
-   * entry, whose `animKey` must match `campfireAnimKey()`).
+   * characters. Today just the campfire, authored at several fuel-intensity levels (see
+   * {@link StationLevels}); `data/buildables.ts`'s `campfire.animKey` stays truthy to route through
+   * the animated-buildable branch, but the played key is a per-level `campfireLevelKey(n)`.
    */
   stations: {
-    campfire: StripAnim;
+    campfire: StationLevels;
   };
 }
 
@@ -412,8 +431,9 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
           z: 1,
         },
       },
-      // Visible fist layered on both hands (the Base skeleton's own hands are unreadable nubs). One tan
-      // fist extracted from Weapons/Hands into _derived/hand.png; centred on the anchor, mirrored with
+      // Visible fist layered on both hands (the Base skeleton's own hands are unreadable nubs). One
+      // brown gloved fist (Hands.png idx 4) extracted into _derived/hand.png — a leather-glove look
+      // that reads less like bare human skin than the tan idx-0 fist did; centred on the anchor, mirrored with
       // the body. mainZ 2 draws it over the weapon (z 1); offZ 1 sits the free fist beside the body.
       hand: {
         source: { kind: 'image', path: '_derived/hand.png' },
@@ -424,13 +444,14 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
     },
   },
   stations: {
-    // Bonfire_05-Sheet.png is 128×32 = 4 frames of 32×32 — the *full* campfire (log base + flames),
-    // unlike Fire_0x-Sheet.png which is flames only (no base — it looked like a floating fire). The
-    // Bonfire_01..08 sheets are 4-frame campfires of increasing flame intensity (01 ≈ embers →
-    // 08 ≈ biggest); bump the digit to change how fierce the fire reads. (09/10 are a different,
-    // boxed forge structure — not a campfire.) Square cell, so a bare frameSize:32 slices it right.
+    // Bonfire_01..08-Sheet.png are the *full* campfire (log base + flames — unlike Fire_0x-Sheet.png,
+    // which is flames only and looked like a floating fire), each 128×32 = 4 frames of 32×32, at
+    // rising flame intensity (01 ≈ embers → 08 ≈ roaring). CampfireManager plays the level matching the
+    // fire's fuel, so the flame grows/shrinks as it burns (plan 016). (09/10 are a different, boxed
+    // forge structure — not a campfire, hence levels:8.) Square cell, so a bare frameSize:32 slices it.
     campfire: {
-      path: 'Environment/Structures/Stations/Bonfire/Bonfire_05-Sheet.png',
+      pathTemplate: 'Environment/Structures/Stations/Bonfire/Bonfire_{n}-Sheet.png',
+      levels: 8,
       frameSize: 32,
       frames: 4,
     },
@@ -471,11 +492,29 @@ export const enemyIdleKey = 'enemy-idle';
 /** Texture/anim key for the enemy Death strip (one-shot collapse on kill). */
 export const enemyDeathKey = 'enemy-death';
 
+/** Number of campfire intensity levels available (see `stations.campfire`). */
+export const campfireLevelCount = (): number => ACTIVE_TILESET.stations.campfire.levels;
+
 /**
- * Texture/anim key for the campfire's looping fire strip (see `stations.campfire` above). Must match
- * the `animKey: 'campfire'` on the `campfire` entry in `data/buildables.ts`.
+ * Texture/anim key for campfire intensity level `n` (1..{@link campfireLevelCount}). CampfireManager
+ * picks `n` from a fuel bucket and plays this key; PreloadScene/actorAnims register one per level.
  */
-export const campfireAnimKey = (): string => 'campfire';
+export const campfireLevelKey = (n: number): string => `campfire-${n}`;
+
+/**
+ * The {@link StripAnim} for campfire intensity level `n` — resolves the shared level shape against
+ * `stations.campfire.pathTemplate` (`{n}` → zero-padded level). Loaded/registered under
+ * {@link campfireLevelKey}`(n)`.
+ */
+export const campfireLevelStrip = (n: number): StripAnim => {
+  const s = ACTIVE_TILESET.stations.campfire;
+  return {
+    path: s.pathTemplate.replace('{n}', String(n).padStart(2, '0')),
+    frameSize: s.frameSize,
+    frames: s.frames,
+    frameWidth: s.frameWidth,
+  };
+};
 
 /** Texture key for an item's icon image (loaded from `public/assets/icons/<icon>`). */
 export const iconKey = (id: string): string => `icon:${id}`;
