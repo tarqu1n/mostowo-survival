@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { TILE_SIZE } from '../config';
 import { useEditorStore } from './store/editorStore';
 import { Toolbar } from './Toolbar';
@@ -29,12 +29,63 @@ const NUDGE_DIRS: Record<string, { x: number; y: number }> = {
   ArrowDown: { x: 0, y: 1 },
 };
 
+const LIBRARY_WIDTH_KEY = 'mostowo-editor-library-width';
+const LIBRARY_WIDTH_DEFAULT = 240;
+const LIBRARY_WIDTH_MIN = 180;
+const LIBRARY_WIDTH_MAX = 560;
+
+function loadLibraryWidth(): number {
+  const raw = Number(localStorage.getItem(LIBRARY_WIDTH_KEY));
+  if (!Number.isFinite(raw) || raw <= 0) return LIBRARY_WIDTH_DEFAULT;
+  return Math.min(LIBRARY_WIDTH_MAX, Math.max(LIBRARY_WIDTH_MIN, raw));
+}
+
 export function EditorApp() {
   const tabs = useEditorStore((s) => s.tabs);
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const map = useEditorStore((s) => s.map);
   const pendingPortalRect = useEditorStore((s) => s.pendingPortalRect);
   const { toast, showToast } = useToast();
+
+  const [libraryWidth, setLibraryWidth] = useState(loadLibraryWidth);
+  const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const [isResizingLibrary, setIsResizingLibrary] = useState(false);
+
+  // Drag-resize for the Library pane (left sidebar). Tracks pointermove/up on window rather than the
+  // handle itself, so the drag keeps following the cursor even once it leaves the thin handle strip.
+  const onLibraryResizeStart = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      resizeRef.current = { startX: e.clientX, startWidth: libraryWidth };
+      setIsResizingLibrary(true);
+    },
+    [libraryWidth],
+  );
+
+  useEffect(() => {
+    if (!isResizingLibrary) return;
+    const onMove = (e: PointerEvent) => {
+      const r = resizeRef.current;
+      if (!r) return;
+      const next = r.startWidth + (e.clientX - r.startX);
+      setLibraryWidth(Math.min(LIBRARY_WIDTH_MAX, Math.max(LIBRARY_WIDTH_MIN, next)));
+    };
+    const onUp = () => {
+      resizeRef.current = null;
+      setIsResizingLibrary(false);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [isResizingLibrary]);
+
+  useEffect(() => {
+    localStorage.setItem(LIBRARY_WIDTH_KEY, String(libraryWidth));
+  }, [libraryWidth]);
 
   // Ctrl/Cmd+Z = undo, Shift+Ctrl/Cmd+Z = redo, Delete/Backspace = remove the selected object(s),
   // arrow keys = nudge the selection. Ignored while typing in a dialog/Inspector field (the SAME
@@ -89,10 +140,20 @@ export function EditorApp() {
   return (
     <div className="editor-shell">
       <Toolbar showToast={showToast} />
-      <div className="editor-body">
+      <div
+        className="editor-body"
+        style={{ gridTemplateColumns: `${libraryWidth}px 6px 1fr 280px` }}
+      >
         <aside className="editor-pane editor-pane--library">
           <LibraryPanel />
         </aside>
+        <div
+          className={`editor-resize-handle ${isResizingLibrary ? 'is-dragging' : ''}`}
+          onPointerDown={onLibraryResizeStart}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize Library panel"
+        />
         <main className="editor-pane editor-pane--viewport">
           <div className="editor-tab-strip" role="tablist">
             {tabs.map((tab) => {

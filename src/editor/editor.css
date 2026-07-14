@@ -56,9 +56,22 @@ button.is-active {
 
 .editor-body {
   display: grid;
-  grid-template-columns: 240px 1fr 280px;
+  /* Library column width is set inline (drag-resizable, plan-less quick add); the 6px column next to
+     it is the drag handle. */
+  grid-template-columns: 240px 6px 1fr 280px;
   flex: 1;
   min-height: 0; /* let the viewport pane shrink instead of overflowing the shell */
+}
+
+.editor-resize-handle {
+  cursor: col-resize;
+  background: transparent;
+  touch-action: none;
+}
+
+.editor-resize-handle:hover,
+.editor-resize-handle.is-dragging {
+  background: #5a4632;
 }
 
 .editor-toolbar {
