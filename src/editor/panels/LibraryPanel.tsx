@@ -1,4 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { TILE_SIZE } from '../../config';
 import { NODES } from '../../data/nodes';
 import { ACTIVE_TILESET } from '../../data/tileset';
@@ -17,6 +25,10 @@ import {
   DECOR_ANIM_DEFAULT_FPS,
   type ArmedObjectAsset,
 } from '../store/editorStore';
+import { Button } from '../ui/button';
+import { Slider } from '../ui/slider';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
+import { cn } from '../lib/utils';
 
 /**
  * Library panel (plan 014 steps 6-7b) — loads the generated asset catalog, browses it by pack/category
@@ -64,6 +76,70 @@ const NODES_CATEGORY = '__nodes__';
  *  `Furniture.png` (800×864) to something that fits the Library pane; hotspots scale down with it so
  *  they still land on the right sprite. Sheets already smaller than this render at native size. */
 const ATLAS_PREVIEW_MAX_PX = 240;
+
+/* Shared utility strings for the repeated Library shapes (plan 020 Step 4). Extracting them keeps the
+ * per-item JSX terse and gives every card/label/swatch one definition to change. */
+const libLabelClass = 'flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[0.75rem]';
+const libSwatchClass =
+  'pixelated h-10 w-10 flex-none rounded-[2px] bg-inset bg-contain bg-center bg-no-repeat';
+/** `.lib-card`: a full-width row (swatch · label · heart); `is-active` gets the gold ring + surface bg. */
+const libCardClass = (active: boolean): string =>
+  cn(
+    'flex w-full items-center gap-2 rounded-md border border-transparent p-1 text-left',
+    active && 'border-gold-light bg-surface',
+  );
+
+/** A left-aligned tree/nav row (`.lib-tree-item`) as a ghost Button; active rows get the brown fill. */
+function TreeItem({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      className={cn(
+        'h-auto w-full justify-start whitespace-normal rounded-[3px] px-1.5 py-[3px] text-left text-[0.8rem] font-normal',
+        active ? 'bg-active text-fg-bright hover:bg-active' : 'text-fg-muted hover:bg-surface',
+      )}
+      onClick={onClick}
+    >
+      {children}
+    </Button>
+  );
+}
+
+/** The favourite heart (`.lib-heart`): pink when favourited, else muted. `className` sets placement —
+ *  absolute in a frame swatch, static in a card row. Click is stopped so it never arms/paints the card. */
+function FavHeart({
+  fav,
+  onToggle,
+  className,
+}: {
+  fav: boolean;
+  onToggle: () => void;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        'flex-none cursor-pointer text-[0.7rem]',
+        fav ? 'text-pink' : 'text-border-muted',
+        className,
+      )}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+    >
+      {fav ? '♥' : '♡'}
+    </span>
+  );
+}
 
 export function LibraryPanel() {
   // The catalog lives in the store (plan 017 step 3): the object-editor tab's Apply refetches it via
@@ -176,69 +252,80 @@ export function LibraryPanel() {
   }
 
   return (
+    // The shadcn Tooltips on the sparse chrome controls (zoom +/−, reclassify cog) are powered by the
+    // single TooltipProvider mounted at the EditorApp root (plan 020 Step 5).
     <>
-      <h2>Library</h2>
+      <h2 className="mb-2 text-[0.85rem] uppercase tracking-[0.04em] text-fg-dim">Library</h2>
       <input
-        className="lib-search"
+        className="mb-2.5 w-full rounded-md border border-border bg-inset px-2 py-[5px] text-fg"
         type="search"
         placeholder="Search id or tag…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
-      {error && <p className="editor-error-text">Catalog failed to load: {error}</p>}
-      {!catalog && !error && <p className="editor-placeholder">Loading catalog…</p>}
+      {error && (
+        <p className="mb-2 -mt-1 text-[0.8rem] text-danger">Catalog failed to load: {error}</p>
+      )}
+      {!catalog && !error && <p className="text-[0.9rem] text-muted-2">Loading catalog…</p>}
       {catalog && (
         <>
           {searchLower.length === 0 && (
-            <nav className="lib-tree">
-              <button
-                className={`lib-tree-item ${selectedCategory === FAVOURITES ? 'is-active' : ''}`}
+            // Plain overflow div, NOT shadcn ScrollArea: this list is bounded by `max-height` inside
+            // an auto-height flow, and Radix ScrollArea's viewport only bounds against a DEFINITE-height
+            // ancestor — with just a max-height it doesn't cap, so the list overran the pane. (Convention:
+            // ScrollArea suits a fixed/flex-bounded container; a max-height region in normal flow stays a
+            // plain `overflow-auto` div.)
+            <nav className="mb-2.5 flex max-h-[40vh] flex-col gap-0.5 overflow-auto border-b border-surface pb-2">
+              <TreeItem
+                active={selectedCategory === FAVOURITES}
                 onClick={() => {
                   setSelectedPack(null);
                   setSelectedCategory(FAVOURITES);
                 }}
               >
                 ♥ Favourites ({favourites.length})
-              </button>
-              <button
-                className={`lib-tree-item ${selectedCategory === NODES_CATEGORY ? 'is-active' : ''}`}
+              </TreeItem>
+              <TreeItem
+                active={selectedCategory === NODES_CATEGORY}
                 onClick={() => {
                   setSelectedPack(null);
                   setSelectedCategory(NODES_CATEGORY);
                 }}
               >
                 🌲 Nodes
-              </button>
+              </TreeItem>
               {catalog.packs.map((pack) => (
-                <div key={pack.id} className="lib-tree-pack">
-                  <div className="lib-tree-pack-name">{pack.name}</div>
+                <div key={pack.id} className="mb-1">
+                  <div className="mt-1.5 mb-0.5 text-[0.7rem] uppercase tracking-[0.03em] text-border-muted">
+                    {pack.name}
+                  </div>
                   {(categoriesByPack.get(pack.id) ?? []).map((category) => (
-                    <button
+                    <TreeItem
                       key={category}
-                      className={`lib-tree-item ${
-                        selectedPack === pack.id && selectedCategory === category ? 'is-active' : ''
-                      }`}
+                      active={selectedPack === pack.id && selectedCategory === category}
                       onClick={() => {
                         setSelectedPack(pack.id);
                         setSelectedCategory(category);
                       }}
                     >
                       {category}
-                    </button>
+                    </TreeItem>
                   ))}
                 </div>
               ))}
             </nav>
           )}
 
-          <div className="lib-results">
+          <div className="flex flex-col gap-2.5">
             {searchLower.length === 0 && selectedCategory === null && (
-              <p className="editor-placeholder">Pick a category, or search above.</p>
+              <p className="text-[0.9rem] text-muted-2">Pick a category, or search above.</p>
             )}
 
             {showingFavourites &&
               (favourites.length === 0 ? (
-                <p className="editor-placeholder">No favourites yet — click a ♡ to add one.</p>
+                <p className="text-[0.9rem] text-muted-2">
+                  No favourites yet — click a ♡ to add one.
+                </p>
               ) : (
                 favourites.map((favId) => (
                   <FavouriteItem
@@ -311,7 +398,7 @@ export function LibraryPanel() {
               })}
 
             {searchLower.length > 0 && visibleAssets.length === 0 && (
-              <p className="editor-placeholder">No matches.</p>
+              <p className="text-[0.9rem] text-muted-2">No matches.</p>
             )}
           </div>
         </>
@@ -344,13 +431,17 @@ function TileFrameGrid({
   const bgSize = `${cols * PREVIEW_PX}px ${nativeRows * PREVIEW_PX}px`;
 
   return (
-    <div className="lib-tile-sheet" style={{ position: 'relative' }}>
+    <div className="relative">
       <AssetReclassify asset={asset} />
-      <div className="lib-tile-sheet-name" title={asset.id}>
+      <div
+        className="mb-1 overflow-hidden text-ellipsis whitespace-nowrap text-[0.75rem] text-fg-dim"
+        title={asset.id}
+      >
         {asset.id.split('/').pop()}
       </div>
       <div
-        className="lib-frame-grid"
+        className="grid max-h-[260px] gap-px overflow-auto rounded-[3px] bg-inset p-0.5"
+        // gridTemplateColumns is computed from the catalog's own tile geometry — stays inline.
         style={{ gridTemplateColumns: `repeat(${cols}, ${PREVIEW_PX}px)` }}
       >
         {Array.from({ length: frames }, (_, frame) => {
@@ -361,12 +452,16 @@ function TileFrameGrid({
           return (
             <button
               key={frame}
-              className={`lib-frame ${brushAsset === frameId ? 'is-active' : ''}`}
+              className={cn(
+                'relative rounded-[2px] border border-transparent bg-transparent p-0 leading-[0]',
+                brushAsset === frameId && 'border-gold-light',
+              )}
               title={`frame ${frame}`}
               onClick={() => onPick(frameId)}
             >
               <span
-                className="lib-frame-swatch pixelated"
+                className="pixelated block"
+                // Per-frame sprite crop — backgroundImage/Position/Size are computed, so inline.
                 style={{
                   width: PREVIEW_PX,
                   height: PREVIEW_PX,
@@ -375,15 +470,11 @@ function TileFrameGrid({
                   backgroundSize: bgSize,
                 }}
               />
-              <span
-                className={`lib-heart ${isFav ? 'is-fav' : ''}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleFavourite(frameId);
-                }}
-              >
-                {isFav ? '♥' : '♡'}
-              </span>
+              <FavHeart
+                fav={isFav}
+                onToggle={() => onToggleFavourite(frameId)}
+                className="absolute top-0 right-px"
+              />
             </button>
           );
         })}
@@ -416,9 +507,9 @@ function NodeCard({
 }) {
   const url = nodePreviewUrl(def);
   return (
-    <button className={`lib-card ${isArmed ? 'is-active' : ''}`} title={def.id} onClick={onArm}>
-      <span className="lib-card-swatch pixelated" style={{ backgroundImage: `url(${url})` }} />
-      <span className="lib-card-label">{def.name}</span>
+    <button className={libCardClass(isArmed)} title={def.id} onClick={onArm}>
+      <span className={libSwatchClass} style={{ backgroundImage: `url(${url})` }} />
+      <span className={libLabelClass}>{def.name}</span>
     </button>
   );
 }
@@ -446,19 +537,11 @@ function AssetCard({
   const url = tilesetAssetUrl(asset.pack, path);
   const label = asset.id.split('/').pop() ?? asset.id;
   return (
-    <div style={{ position: 'relative' }}>
-      <button className={`lib-card ${isArmed ? 'is-active' : ''}`} title={asset.id} onClick={onArm}>
-        <span className="lib-card-swatch pixelated" style={{ backgroundImage: `url(${url})` }} />
-        <span className="lib-card-label">{label}</span>
-        <span
-          className={`lib-heart ${isFavourite ? 'is-fav' : ''}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleFavourite();
-          }}
-        >
-          {isFavourite ? '♥' : '♡'}
-        </span>
+    <div className="relative">
+      <button className={libCardClass(isArmed)} title={asset.id} onClick={onArm}>
+        <span className={libSwatchClass} style={{ backgroundImage: `url(${url})` }} />
+        <span className={libLabelClass}>{label}</span>
+        <FavHeart fav={isFavourite} onToggle={onToggleFavourite} className="static px-0.5" />
       </button>
       <AssetReclassify asset={asset} />
     </div>
@@ -498,11 +581,9 @@ function FavouriteItem({
 
   if (!resolved) {
     return (
-      <div className="lib-card lib-card--missing" title={favId}>
-        <span className="lib-card-label">missing: {favId}</span>
-        <span className="lib-heart is-fav" onClick={() => onToggleFavourite(favId)}>
-          ♥
-        </span>
+      <div className={cn(libCardClass(false), 'text-danger')} title={favId}>
+        <span className={libLabelClass}>missing: {favId}</span>
+        <FavHeart fav onToggle={() => onToggleFavourite(favId)} className="static px-0.5" />
       </div>
     );
   }
@@ -517,12 +598,16 @@ function FavouriteItem({
     const url = tilesetAssetUrl(asset.pack, path);
     return (
       <button
-        className={`lib-frame ${brushAsset === favId ? 'is-active' : ''}`}
+        className={cn(
+          'relative rounded-[2px] border border-transparent bg-transparent p-0 leading-[0]',
+          brushAsset === favId && 'border-gold-light',
+        )}
         title={favId}
         onClick={() => onPickTile(favId)}
       >
         <span
-          className="lib-frame-swatch pixelated"
+          className="pixelated block"
+          // Per-frame sprite crop — computed background props stay inline.
           style={{
             width: PREVIEW_PX,
             height: PREVIEW_PX,
@@ -531,15 +616,11 @@ function FavouriteItem({
             backgroundSize: `${cols * PREVIEW_PX}px ${nativeRows * PREVIEW_PX}px`,
           }}
         />
-        <span
-          className="lib-heart is-fav"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleFavourite(favId);
-          }}
-        >
-          ♥
-        </span>
+        <FavHeart
+          fav
+          onToggle={() => onToggleFavourite(favId)}
+          className="absolute top-0 right-px"
+        />
       </button>
     );
   }
@@ -714,43 +795,67 @@ function AtlasSheetPicker({
   }
 
   return (
-    <div className="lib-tile-sheet" style={{ position: 'relative' }}>
-      <div className="lib-tile-sheet-name" title={asset.id}>
+    <div className="relative">
+      <div
+        className="mb-1 overflow-hidden text-ellipsis whitespace-nowrap text-[0.75rem] text-fg-dim"
+        title={asset.id}
+      >
         {asset.id.split('/').pop()}
       </div>
-      <AssetReclassify asset={asset} />
-      <div className="lib-atlas-zoom">
-        <button
-          type="button"
-          className="lib-atlas-zoom-btn"
-          title="Zoom out"
-          disabled={zoom <= ATLAS_ZOOM_MIN}
-          onClick={() => setZoom((z) => clampZoom(z - ATLAS_ZOOM_STEP))}
-        >
-          −
-        </button>
-        <input
-          type="range"
+      {/* Zoom-row controls all share a 22px height so the row keeps ONE baseline, and the whole row is
+          budgeted to ~200px because the Library column is a fixed 240px — every control size below is
+          picked to fit that budget with the cog on the end. */}
+      <div className="mb-1.5 flex items-center gap-1.5">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-xs"
+              className="size-[22px] shrink-0"
+              disabled={zoom <= ATLAS_ZOOM_MIN}
+              onClick={() => setZoom((z) => clampZoom(z - ATLAS_ZOOM_STEP))}
+            >
+              −
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Zoom out</TooltipContent>
+        </Tooltip>
+        <Slider
+          className="w-[78px] shrink-0"
           min={ATLAS_ZOOM_MIN}
           max={ATLAS_ZOOM_MAX}
           step={ATLAS_ZOOM_STEP}
-          value={zoom}
+          value={[zoom]}
           aria-label="Atlas zoom"
-          onChange={(e) => setZoom(clampZoom(Number(e.target.value)))}
+          onValueChange={([v]) => setZoom(clampZoom(v))}
         />
-        <button
-          type="button"
-          className="lib-atlas-zoom-btn"
-          title="Zoom in"
-          disabled={zoom >= ATLAS_ZOOM_MAX}
-          onClick={() => setZoom((z) => clampZoom(z + ATLAS_ZOOM_STEP))}
-        >
-          +
-        </button>
-        <span className="lib-atlas-zoom-val">{zoom}×</span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-xs"
+              className="size-[22px] shrink-0"
+              disabled={zoom >= ATLAS_ZOOM_MAX}
+              onClick={() => setZoom((z) => clampZoom(z + ATLAS_ZOOM_STEP))}
+            >
+              +
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Zoom in</TooltipContent>
+        </Tooltip>
+        <span className="min-w-6 flex-none text-right text-[0.7rem] text-fg-dim">{zoom}×</span>
+        <AssetReclassify asset={asset} inline />
       </div>
+      {/* Plain overflow div, NOT shadcn ScrollArea: this viewport's scroll offset is driven imperatively
+          through `viewportRef` — cursor-anchored wheel-zoom re-anchoring (layout effect), space/middle-
+          drag panning that reads & writes scrollLeft/scrollTop, and a non-passive native wheel listener.
+          Radix ScrollArea owns its internal viewport node and doesn't expose that ref, so it can't host
+          this logic. (Convention: ScrollArea is for simple overflow; keep a plain div for ref-driven
+          imperative scroll/pan/zoom.) */}
       <div
-        className="lib-atlas-viewport"
+        className="max-h-[320px] overflow-auto rounded-[3px] bg-inset"
         ref={viewportRef}
         onPointerEnter={() => {
           hoveringRef.current = true;
@@ -760,9 +865,12 @@ function AtlasSheetPicker({
         }}
       >
         <div
-          className={`lib-atlas-canvas pixelated ${spaceHeld ? 'is-pan-ready' : ''} ${
-            isPanning ? 'is-panning' : ''
-          }`}
+          className={cn(
+            'pixelated relative overflow-hidden rounded-[3px] bg-inset bg-no-repeat',
+            spaceHeld && 'cursor-grab',
+            isPanning && 'cursor-grabbing',
+          )}
+          // Sheet image + its scaled render size are computed — stay inline.
           style={{
             width: dispW,
             height: dispH,
@@ -783,8 +891,14 @@ function AtlasSheetPicker({
             return (
               <button
                 key={region.key}
-                className={`lib-atlas-hotspot ${isArmed ? 'is-active' : ''}`}
+                className={cn(
+                  'absolute m-0 rounded-[2px] border p-0',
+                  isArmed
+                    ? 'border-selection bg-[rgba(95,208,255,0.28)]'
+                    : 'border-[rgba(240,216,144,0.35)] bg-[rgba(240,216,144,0.08)] hover:border-[rgba(240,216,144,0.85)] hover:bg-[rgba(240,216,144,0.22)]',
+                )}
                 title={`${region.w}×${region.h} @ (${region.x},${region.y})`}
+                // Hotspot rect is computed from region geometry × scale — stays inline.
                 style={{
                   left: region.x * scale,
                   top: region.y * scale,
@@ -812,9 +926,14 @@ function AtlasSheetPicker({
  * percentage `0% → 100%` travel — the earlier approach — under-shifts by `(frames-1)/frames` of a
  * frame each step because of CSS's percentage-position formula, which showed two half-frames sliding
  * sideways instead of a clean flip.) The travel distance is handed to the shared keyframe via the
- * `--strip-travel` custom property, since @keyframes can't read component values. Clicking arms the
- * animated decor; placement stamps a fixed default `fps` (`DECOR_ANIM_DEFAULT_FPS`), never edited here
- * (critique #6).
+ * `--strip-travel` custom property, since @keyframes can't read component values.
+ *
+ * This single-horizontal-row `steps()` math is only correct for a classic one-row, every-cell-played
+ * strip (plan 017 step 6 decouples grid geometry from the played set via `omit`): a multi-row grid or
+ * a strip with omitted cells falls back to a static first-frame swatch (`canAnimateInline` below)
+ * instead of animating something visually wrong — the true animated preview for those lives in the
+ * object-editor tab (step 6.5). Clicking arms the animated decor, carrying `omit` through when present;
+ * placement stamps a fixed default `fps` (`DECOR_ANIM_DEFAULT_FPS`), never edited here (critique #6).
  */
 function AnimatedStripPicker({
   asset,
@@ -832,31 +951,55 @@ function AnimatedStripPicker({
   const dispH = Math.round(asset.frameHeight * scale);
   const label = asset.id.split('/').pop() ?? asset.id;
 
-  const swatchStyle: CSSProperties & Record<'--strip-travel', string> = {
-    width: dispW,
-    height: dispH,
-    backgroundImage: `url(${url})`,
-    backgroundSize: `${asset.frames * dispW}px ${dispH}px`,
-    animationDuration: `${asset.frames / DECOR_ANIM_DEFAULT_FPS}s`,
-    animationTimingFunction: `steps(${asset.frames})`,
-    '--strip-travel': `${-asset.frames * dispW}px`,
-  };
+  const cols = Math.max(1, Math.round(asset.w / asset.frameWidth));
+  const rows = Math.max(1, Math.round(asset.h / asset.frameHeight));
+  const omit = asset.omit ?? [];
+  // The only geometry this swatch's single-row steps() math can honestly animate: one row, no
+  // skipped cells. Anything else (a >1-row grid, or a row with an omitted cell) gets a static
+  // first-frame swatch instead — see doc comment above.
+  const canAnimateInline = rows === 1 && omit.length === 0;
+
+  // The full animation is set inline (not via a CSS class): the keyframe `lib-strip-play` lives in
+  // editor.css, but its duration/timing/travel all depend on the strip's frame count, so name +
+  // iteration go here alongside them rather than in a utility. `--strip-travel` feeds the keyframe.
+  const swatchStyle: CSSProperties & Partial<Record<'--strip-travel', string>> = canAnimateInline
+    ? {
+        width: dispW,
+        height: dispH,
+        backgroundImage: `url(${url})`,
+        backgroundSize: `${asset.frames * dispW}px ${dispH}px`,
+        animationName: 'lib-strip-play',
+        animationIterationCount: 'infinite',
+        animationDuration: `${asset.frames / DECOR_ANIM_DEFAULT_FPS}s`,
+        animationTimingFunction: `steps(${asset.frames})`,
+        '--strip-travel': `${-asset.frames * dispW}px`,
+      }
+    : {
+        // Static first-frame swatch: crop cell 0 (top-left) out of the full grid, no animation.
+        width: dispW,
+        height: dispH,
+        backgroundImage: `url(${url})`,
+        backgroundSize: `${cols * dispW}px ${rows * dispH}px`,
+        backgroundPosition: '0px 0px',
+      };
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="relative">
       <button
-        className={`lib-card lib-strip-anim ${isArmed ? 'is-active' : ''}`}
+        // `.lib-strip-anim` was column layout on the card — flex-col/items-start override libCardClass.
+        className={cn(libCardClass(isArmed), 'flex-col items-start')}
         title={asset.id}
         onClick={() =>
           onArm(asset.id, {
             frameWidth: asset.frameWidth,
             frameHeight: asset.frameHeight,
             frames: asset.frames,
+            ...(omit.length ? { omit } : {}),
           })
         }
       >
-        <span className="lib-strip-swatch pixelated" style={swatchStyle} />
-        <span className="lib-card-label">{label}</span>
+        <span className="pixelated mb-1 block bg-no-repeat" style={swatchStyle} />
+        <span className={libLabelClass}>{label}</span>
       </button>
       <AssetReclassify asset={asset} />
     </div>
@@ -868,33 +1011,44 @@ function AnimatedStripPicker({
  * every `TileFrameGrid`/`AssetCard`/`AtlasSheetPicker`/`AnimatedStripPicker`. Clicking it opens the
  * asset's full-size object-editor TAB (`openObjectTab`) instead of the old cramped popover, so the
  * type/frame-grid reclassify controls (a placeholder in step 2, fleshed out in step 3) get the room
- * to render a correct preview. Rendered as a SIBLING of its caller's arm-button via an absolutely
- * positioned wrapper (see `AssetCard`'s doc) — callers drop `<AssetReclassify asset={…} />` inside any
- * `position:relative` container and it self-anchors to the top-right corner. Clicks are
- * `stopPropagation`'d so opening the tab never also arms/paints the underlying card.
+ * to render a correct preview. Two placements: the default self-anchors to the top-right corner of any
+ * `position:relative` card wrapper (see `AssetCard`'s doc); `inline` (used by `AtlasSheetPicker`, which
+ * already has a zoom toolbar row to sit in) drops the absolute positioning and renders as a normal flex
+ * item at the end of that row instead. Clicks are `stopPropagation`'d so opening the tab never also
+ * arms/paints the underlying card.
  */
-function AssetReclassify({ asset }: { asset: CatalogAsset }) {
+function AssetReclassify({ asset, inline = false }: { asset: CatalogAsset; inline?: boolean }) {
   function open(): void {
     useEditorStore.getState().openObjectTab(asset.id);
   }
   return (
-    <span
-      className="lib-reclassify"
-      role="button"
-      tabIndex={0}
-      title="Reclassify: force type / frame grid"
-      onClick={(e) => {
-        e.stopPropagation();
-        open();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          open();
-        }
-      }}
-    >
-      ⚙
-    </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          // Flex-centered square (not a bare font-size bump) so the ⚙ — which sits off-centre in its
+          // own em-box — lands dead-centre. `inline` (atlas zoom row) drops the corner anchoring and
+          // matches the row's 22px baseline; default self-anchors to the card's top-right corner.
+          className={cn(
+            'z-[5] flex cursor-pointer items-center justify-center rounded-md border border-border bg-inset leading-none text-muted-2 hover:border-active hover:text-gold',
+            inline ? 'size-[22px] text-[14px]' : 'absolute top-0.5 right-0.5 size-5 text-[12px]',
+          )}
+          role="button"
+          tabIndex={0}
+          onClick={(e) => {
+            e.stopPropagation();
+            open();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              open();
+            }
+          }}
+        >
+          ⚙
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Reclassify: force type / frame grid</TooltipContent>
+    </Tooltip>
   );
 }

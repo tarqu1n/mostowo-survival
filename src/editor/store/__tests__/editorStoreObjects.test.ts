@@ -357,6 +357,14 @@ describe('editorStore objects: placeDecor region/anim (plan 014 step 7b)', () =>
     expect(obj.region).toBeUndefined();
   });
 
+  it('placeDecor threads an armed anim.omit through verbatim onto the placed decor (plan 017 step 6.6)', () => {
+    const anim = { frameWidth: 32, frameHeight: 32, frames: 22, omit: [21] };
+    const ok = useEditorStore.getState().placeDecor(STRIP_ASSET, 40, 56, undefined, anim);
+    expect(ok).toBe(true);
+    const obj = useEditorStore.getState().map!.objects[0] as DecorObject;
+    expect(obj.anim).toEqual({ ...anim, fps: DECOR_ANIM_DEFAULT_FPS });
+  });
+
   it('placeDecor with neither region nor anim omits both keys (unchanged step-7 behaviour)', () => {
     useEditorStore.getState().placeDecor(DECOR_ASSET, 16, 16);
     const obj = useEditorStore.getState().map!.objects[0] as DecorObject;

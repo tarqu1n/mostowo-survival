@@ -1,5 +1,7 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { editorApiPlugin } from './scripts/vite-editor-api.mjs';
 
 // GitHub Pages serves a project site under /<repo>/, so assets must resolve there in production.
@@ -9,6 +11,12 @@ const base =
 
 export default defineConfig(({ command }) => ({
   base,
+  resolve: {
+    // `@/*` → `src/*`. Must stay in sync with tsconfig.json and vitest.config.ts.
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
   build: {
     target: 'es2020',
     sourcemap: true,
@@ -20,6 +28,9 @@ export default defineConfig(({ command }) => ({
   },
   plugins: [
     react(),
+    // Tailwind v4 (editor-only). Only src/editor/editor.css does `@import "tailwindcss"`, and only
+    // editor.html imports that CSS — so the game page (index.html) never receives Tailwind preflight.
+    tailwindcss(),
     // Map Builder editor save API (`/__editor/...`) — dev-server only; harmless to instantiate
     // during a build since it only implements `configureServer` (never invoked outside `vite dev`),
     // but gated here anyway to keep intent explicit.

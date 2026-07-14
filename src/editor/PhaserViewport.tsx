@@ -32,5 +32,5 @@ export function PhaserViewport() {
     };
   }, []);
 
-  return <div ref={hostRef} className="editor-viewport-host pixelated" />;
+  return <div ref={hostRef} className="w-full h-full pixelated" />;
 }

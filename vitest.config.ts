@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 // Tier-1 unit tests (plan 007). Goal: EVERY unit test runs in plain Node — the pure systems
@@ -6,9 +7,15 @@ import { defineConfig } from 'vitest/config';
 // package (whose canvas feature-detection would force jsdom + a canvas mock). Reuses Vite's
 // resolution/tsconfig. `passWithNoTests` so `vitest run` exits 0 before any test file exists.
 export default defineConfig({
+  resolve: {
+    // `@/*` → `src/*`. Must stay in sync with vite.config.ts and tsconfig.json.
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
   test: {
     environment: 'node',
     passWithNoTests: true,
-    include: ['src/**/*.test.ts', 'src/**/__tests__/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'src/**/__tests__/**/*.test.ts', 'scripts/**/*.test.mjs'],
   },
 });

@@ -1,9 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { tilesetAssetUrl } from '../textureLoading';
 import type { CatalogAsset, CatalogAssetType } from '../catalog';
 import { loadCatalog } from '../catalogSource';
-import { applyReclassify, reclassifyGrid, seedFrames, seedRows, suggestGrids } from '../reclassify';
+import { putAssetOverride, putAssetRegions } from '../api';
+import {
+  applyReclassify,
+  assetRelPath,
+  reclassifyGrid,
+  seedCols,
+  seedOmit,
+  seedRows,
+  suggestGrids,
+} from '../reclassify';
+import { detectRegionAt, sanitiseClientRegions, seedRegions, sliceBox, type Box } from '../regions';
 import { useEditorStore } from '../store/editorStore';
+import { Button } from '../ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Slider } from '../ui/slider';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
+import { cn } from '../lib/utils';
 
 /**
  * Object-editor tab (plan 017 step 3) — the full-size reclassify surface opened from the Library's ⚙
@@ -17,10 +32,21 @@ import { useEditorStore } from '../store/editorStore';
  * wrong because it assumes a single horizontal row; here each frame `i` is cropped at
  * `col = i % cols`, `row = floor(i / cols)` (see `reclassify.ts`), so a 2×2 shows as a real 2×2.
  *
- * Draft `type`/`frames`/`rows` are LOCAL React state (an uncommitted form) — canonical truth is
+ * Draft `type`/`cols`/`rows`/`omit` are LOCAL React state (an uncommitted form) — canonical truth is
  * server-side `pack.json`, surfaced by the post-Apply catalog refetch. On Apply we PUT the override,
  * refetch the catalog into the store (which updates the Library live too), and re-seed the draft from
  * the freshly-resolved catalog entry.
+ *
+ * The tab body is type-conditional (plan 017 step 4): a DRAFT type of `object` swaps the frame-grid
+ * preview for a `RegionsEditor` (below) — an editable overlay of `pack.json` `regions` boxes on a
+ * zoomable sheet (draw / select+delete / move+resize / grid-slice) that writes the whole region list
+ * through `putAssetRegions`. `strip`/`tile` keep the step-3 frame-grid preview.
+ *
+ * NOTE on tab-panel visibility (plan 020 Step 10): this component owns none — `EditorApp.tsx`'s central
+ * tab strip mounts every tab's panel at once and hides inactive ones with `invisible pointer-events-none`
+ * (never `hidden`/display:none, which would collapse the Scale.RESIZE Phaser canvas in the Map tab to
+ * 0×0). This file only ever renders while it's some tab's content; it doesn't do any showing/hiding of
+ * its own.
  */
 export function ObjectEditorTab({ assetId }: { assetId: string }) {
   const catalog = useEditorStore((s) => s.catalog);
@@ -29,12 +55,12 @@ export function ObjectEditorTab({ assetId }: { assetId: string }) {
 
   if (!asset) {
     return (
-      <div className="editor-object-tab">
-        <h2 className="editor-object-tab-title">{filename}</h2>
-        <p className="editor-error-text">
+      <div className={objTabClass}>
+        <h2 className={objTitleClass}>{filename}</h2>
+        <p className="-mt-1 mb-2 text-[0.8rem] text-danger">
           This asset is no longer in the catalog — it may have been removed or renamed on disk.
         </p>
-        <p className="editor-object-tab-id">{assetId}</p>
+        <p className={objIdClass}>{assetId}</p>
       </div>
     );
   }
@@ -47,36 +73,103 @@ export function ObjectEditorTab({ assetId }: { assetId: string }) {
 const SHEET_MAX = 280;
 const FRAME_TARGET = 72;
 
+/* Shared class strings for the repeated object-editor/regions-editor shapes (plan 020 Step 10). */
+const objTabClass = 'h-full w-full overflow-auto p-4 px-[18px]';
+const objTitleClass = 'mb-3 text-base text-fg-bright';
+const objIdClass = 'break-all text-[0.78rem] text-muted-2';
+const objInputClass = 'rounded-md border border-border bg-inset px-2 py-1 text-fg';
+const objActionsClass = 'flex gap-2 border-t border-surface pt-1';
+
+/** `.editor-object-frame`: a per-frame click-to-omit swatch button reset to a bare pixel crop, with an
+ *  omitted cell dimmed + desaturated + crossed out with a diagonal double-gradient (`after:`), matching
+ *  the old `.is-omitted::after`. */
+const objFrameClass = (omitted: boolean): string =>
+  cn(
+    'relative block cursor-pointer border border-border bg-inset-2 bg-no-repeat p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-gold',
+    omitted &&
+      "border-danger opacity-40 grayscale-[80%] after:absolute after:inset-0 after:content-[''] after:bg-[linear-gradient(to_top_right,transparent_46%,var(--color-danger)_46%,var(--color-danger)_54%,transparent_54%),linear-gradient(to_bottom_right,transparent_46%,var(--color-danger)_46%,var(--color-danger)_54%,transparent_54%)]",
+  );
+
+/** A labelled control row (`.editor-object-field`): a small dim caption above the input/select. */
+function ObjField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[0.72rem] text-muted-2">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+/** The shared error/warnings blocks under either form (`.editor-object-error`/`.editor-object-warnings`). */
+function FormError({ message }: { message: string }) {
+  return <p className="text-[0.8rem] text-danger">{message}</p>;
+}
+function FormWarnings({ warnings }: { warnings: string[] }) {
+  if (warnings.length === 0) return null;
+  return (
+    <div className="flex max-h-24 flex-col gap-0.5 overflow-y-auto text-[0.72rem] text-muted-2">
+      {warnings.slice(0, 6).map((w, i) => (
+        <div key={i}>{w}</div>
+      ))}
+    </div>
+  );
+}
+
 /** The reclassify form — only rendered with a resolved `asset`, so its hooks never sit behind the
  *  missing-asset branch above. */
 function ObjectEditorForm({ asset }: { asset: CatalogAsset }) {
   const [type, setType] = useState<CatalogAssetType>(asset.type);
-  const [frames, setFrames] = useState(() => seedFrames(asset));
+  const [cols, setCols] = useState(() => seedCols(asset));
   const [rows, setRows] = useState(() => seedRows(asset));
+  const [omit, setOmit] = useState<number[]>(() => seedOmit(asset));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
 
   // Re-seed the draft whenever the underlying catalog entry actually changes VALUE (after our own Apply
-  // regenerates it, or another surface reclassifies it). Deps are the resolved grid values, NOT `asset`
-  // identity, so a same-value refetch (the Library's mount fetch) never clobbers an in-progress edit;
-  // the mount double-seed (identical to the useState initialisers) is harmless. This repo's eslint
-  // doesn't run react-hooks/exhaustive-deps, so there's no lint either way.
+  // regenerates it, or another surface reclassifies it). Deps are the resolved grid values (cols now
+  // recovered from `frameWidth`, plus an `omit` signature), NOT `asset` identity, so a same-value
+  // refetch (the Library's mount fetch) never clobbers an in-progress edit; the mount double-seed
+  // (identical to the useState initialisers) is harmless. This repo's eslint doesn't run
+  // react-hooks/exhaustive-deps, so there's no lint either way.
   useEffect(() => {
     setType(asset.type);
-    setFrames(seedFrames(asset));
+    setCols(seedCols(asset));
     setRows(seedRows(asset));
+    setOmit(seedOmit(asset));
     setWarnings([]);
     setErr(null);
-  }, [asset.type, asset.frames, asset.frameHeight]);
+  }, [asset.type, asset.frames, asset.frameWidth, asset.frameHeight, (asset.omit ?? []).join(',')]);
 
   const relPath = asset.id.slice(asset.pack.length + 1);
   const sheetUrl = tilesetAssetUrl(
     asset.pack,
     asset.source.kind === 'sheetFrame' ? asset.source.sheet : asset.source.path,
   );
-  const grid = reclassifyGrid(asset, type, frames, rows);
+  // `cells` = total grid cells (`cols*rows` = the geometry-mode `frames`). `omitInRange` drops any
+  // stale omit index that a later cols/rows shrink pushed out of bounds, so a shrunk-then-Applied grid
+  // can never PUT an out-of-range omit; it's the omit we thread everywhere (grid, preview, Apply).
+  const cells = cols * rows;
+  const omitInRange = omit.filter((i) => Number.isInteger(cells) && i >= 0 && i < cells);
+  const grid = reclassifyGrid(asset, type, cols, rows, omitInRange);
   const isStrip = type === 'strip';
+  const isObject = type === 'object';
+
+  // Set a grid dimension and prune any omit index the new geometry no longer contains, so a later grow
+  // can't resurrect a stale omission at a cell the user never intended.
+  const changeCols = (v: number): void => {
+    const next = Math.max(1, Math.round(Number(v) || 1));
+    setCols(next);
+    setOmit((o) => o.filter((i) => i < next * rows));
+  };
+  const changeRows = (v: number): void => {
+    const next = Math.max(1, Math.round(Number(v) || 1));
+    setRows(next);
+    setOmit((o) => o.filter((i) => i < cols * next));
+  };
+  const toggleOmit = (i: number): void => {
+    setOmit((o) => (o.includes(i) ? o.filter((x) => x !== i) : [...o, i].sort((a, b) => a - b)));
+  };
 
   // Whole-sheet preview scale (fits SHEET_MAX; upscales tiny sheets, downscales big ones).
   const sheetScale = SHEET_MAX / Math.max(asset.w, asset.h);
@@ -95,7 +188,7 @@ function ObjectEditorForm({ asset }: { asset: CatalogAsset }) {
     setBusy(true);
     setErr(null);
     try {
-      const result = await applyReclassify(asset, type, frames, rows);
+      const result = await applyReclassify(asset, type, cols, rows, omitInRange);
       setWarnings(result.warnings);
       // Refetch → setCatalog: updates the store (this tab re-derives its `asset`, the re-seed effect
       // fires) and the Library panel in one shot.
@@ -108,153 +201,182 @@ function ObjectEditorForm({ asset }: { asset: CatalogAsset }) {
   }
 
   return (
-    <div className="editor-object-tab">
-      <h2 className="editor-object-tab-title">{filenameOf(asset)}</h2>
-      <p className="editor-object-tab-id">
+    <div className={objTabClass}>
+      <h2 className={objTitleClass}>{filenameOf(asset)}</h2>
+      <p className={objIdClass}>
         {relPath} · {asset.w}×{asset.h}
       </p>
 
-      <div className="editor-object-form">
-        <div className="editor-object-controls">
-          <label className="editor-object-field">
-            <span className="editor-object-field-label">Type</span>
-            <select value={type} onChange={(e) => setType(e.target.value as CatalogAssetType)}>
-              <option value="tile">tile</option>
-              <option value="strip">strip</option>
-              <option value="object">object</option>
-            </select>
-          </label>
+      <div className="mt-4 flex flex-col gap-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <ObjField label="Type">
+            <Select value={type} onValueChange={(v) => setType(v as CatalogAssetType)}>
+              <SelectTrigger size="sm" className="w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tile">tile</SelectItem>
+                <SelectItem value="strip">Animated strip</SelectItem>
+                <SelectItem value="object">object</SelectItem>
+              </SelectContent>
+            </Select>
+          </ObjField>
 
           {isStrip && (
             <>
-              <label className="editor-object-field">
-                <span className="editor-object-field-label">Frames</span>
+              <ObjField label="Columns">
                 <input
                   type="number"
                   min={1}
-                  value={frames}
-                  onChange={(e) => setFrames(Math.max(1, Math.round(Number(e.target.value) || 1)))}
+                  value={cols}
+                  className={cn(objInputClass, 'w-20')}
+                  onChange={(e) => changeCols(Number(e.target.value))}
                 />
-              </label>
-              <label className="editor-object-field">
-                <span className="editor-object-field-label">Rows</span>
+              </ObjField>
+              <ObjField label="Rows">
                 <input
                   type="number"
                   min={1}
                   value={rows}
-                  onChange={(e) => setRows(Math.max(1, Math.round(Number(e.target.value) || 1)))}
+                  className={cn(objInputClass, 'w-20')}
+                  onChange={(e) => changeRows(Number(e.target.value))}
                 />
-              </label>
+              </ObjField>
             </>
           )}
         </div>
 
-        {isStrip && (
-          <div className="editor-object-chips">
-            {suggestGrids(asset.w, asset.h).map((s) => (
-              <button
-                key={`${s.rows}x${s.cols}`}
-                type="button"
-                className="editor-object-chip"
-                title={`${asset.w / s.cols}×${asset.h / s.rows} per frame`}
-                onClick={() => {
-                  setFrames(s.frames);
-                  setRows(s.rows);
-                }}
-              >
-                {s.cols}×{s.rows}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* type:object → the Regions editor (plan 017 step 4); strip/tile keep the step-3 frame-grid
+            preview. Branches on the DRAFT type, so picking `object` in the dropdown makes the sheet's
+            regions editable even for an asset currently classified strip/tile (Save also forces the
+            `object` type override in that case). */}
+        {isObject ? (
+          <RegionsEditor asset={asset} sheetUrl={sheetUrl} />
+        ) : (
+          <>
+            {isStrip && (
+              <div className="flex flex-wrap gap-1.5">
+                {suggestGrids(asset.w, asset.h).map((s) => (
+                  <Button
+                    key={`${s.rows}x${s.cols}`}
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    title={`${asset.w / s.cols}×${asset.h / s.rows} per frame`}
+                    onClick={() => {
+                      setCols(s.cols);
+                      setRows(s.rows);
+                      setOmit([]);
+                    }}
+                  >
+                    {s.cols}×{s.rows}
+                  </Button>
+                ))}
+              </div>
+            )}
 
-        {isStrip && !grid.valid && (
-          <p className="editor-object-error">
-            frames ({frames}) must divide evenly by rows ({rows}), and both frame dimensions must
-            divide the sheet ({asset.w}×{asset.h}) into whole pixels.
-          </p>
-        )}
+            {isStrip && !grid.valid && (
+              <FormError
+                message={`columns (${cols}) and rows (${rows}) must divide the sheet (${asset.w}×${asset.h}) into whole pixels, and at least one cell must play.`}
+              />
+            )}
 
-        <div className="editor-object-previews">
-          {/* Whole-sheet preview with a live grid overlay (strip only) — recomputed every render
-              straight from the current frames/rows, so it tracks keystrokes with no debounce. */}
-          <figure className="editor-object-preview">
-            <figcaption>Sheet</figcaption>
-            <div
-              className="editor-object-sheet pixelated"
-              style={{
-                width: sheetW,
-                height: sheetH,
-                backgroundImage: `url(${sheetUrl})`,
-                backgroundSize: '100% 100%',
-              }}
-            >
-              {isStrip && grid.valid && grid.cols !== undefined && (
+            <div className="flex flex-wrap items-start gap-7">
+              {/* Whole-sheet preview with a live grid overlay (strip only) — recomputed every render
+                  straight from the current cols/rows, so it tracks keystrokes with no debounce. */}
+              <figure className="flex flex-col gap-1.5">
+                <figcaption className="text-[0.72rem] text-muted-2">Sheet</figcaption>
                 <div
-                  className="editor-object-grid-overlay"
+                  className="pixelated relative border border-border bg-no-repeat"
+                  // Sheet render size + image are computed from the asset's own dims — stays inline.
                   style={{
-                    gridTemplateColumns: `repeat(${grid.cols}, 1fr)`,
-                    gridTemplateRows: `repeat(${rows}, 1fr)`,
+                    width: sheetW,
+                    height: sheetH,
+                    backgroundImage: `url(${sheetUrl})`,
+                    backgroundSize: '100% 100%',
                   }}
                 >
-                  {Array.from({ length: grid.cols * rows }, (_, i) => (
-                    <span key={i} className="editor-object-grid-cell" />
-                  ))}
+                  {isStrip && grid.valid && grid.cols !== undefined && (
+                    <div
+                      className="absolute inset-0 grid"
+                      // Grid overlay tracks the live cols/rows draft — computed, stays inline.
+                      style={{
+                        gridTemplateColumns: `repeat(${grid.cols}, 1fr)`,
+                        gridTemplateRows: `repeat(${rows}, 1fr)`,
+                      }}
+                    >
+                      {Array.from({ length: grid.cols * rows }, (_, i) => (
+                        <span key={i} className="border border-gold opacity-85" />
+                      ))}
+                    </div>
+                  )}
                 </div>
+              </figure>
+
+              {/* The fix — a CORRECTLY cropped per-frame preview, now doubling as the click-to-omit
+                  grid (plan 017 step 6.5). Every one of the `cells` grid cells is rendered (not just
+                  the played ones), each cropped at `col = i % cols`, `row = floor(i / cols)`; a 2×2
+                  sheet reads as a real 2×2, not a squished single row. Clicking a cell toggles its
+                  membership of `omit` — an omitted cell dims + crosses out and drops from the played
+                  set. Strip-only + valid-grid-only (a non-integer grid or an all-omitted grid shows
+                  the error instead, since `grid.valid` now also requires ≥1 played frame). */}
+              {isStrip && grid.valid && grid.cols !== undefined && (
+                <figure className="flex flex-col gap-1.5">
+                  <figcaption className="text-[0.72rem] text-muted-2">
+                    Frames ({grid.played.length} played / {cells} cells · {grid.cols}×{rows})
+                  </figcaption>
+                  <div className="flex max-w-[340px] flex-wrap gap-1.5">
+                    {Array.from({ length: grid.frames ?? cells }, (_, i) => {
+                      const col = i % grid.cols!;
+                      const row = Math.floor(i / grid.cols!);
+                      const omitted = omitInRange.includes(i);
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          className={objFrameClass(omitted)}
+                          title={
+                            omitted
+                              ? `frame ${i} (omitted — click to include)`
+                              : `frame ${i} (click to omit)`
+                          }
+                          aria-label={
+                            omitted
+                              ? `frame ${i} (omitted — click to include)`
+                              : `frame ${i} (click to omit)`
+                          }
+                          aria-pressed={omitted}
+                          onClick={() => toggleOmit(i)}
+                          style={{
+                            // Per-frame crop rect is computed from grid geometry × frame scale — inline.
+                            width: cellW,
+                            height: cellH,
+                            backgroundImage: `url(${sheetUrl})`,
+                            backgroundSize: `${grid.cols! * cellW}px ${rows * cellH}px`,
+                            backgroundPosition: `-${col * cellW}px -${row * cellH}px`,
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                </figure>
               )}
             </div>
-          </figure>
 
-          {/* The fix — a CORRECTLY cropped per-frame preview. Each frame `i` is cropped at
-              `col = i % cols`, `row = floor(i / cols)`; a 2×2 sheet reads as a real 2×2, not a
-              squished single row. Strip-only + valid-grid-only. */}
-          {isStrip && grid.valid && grid.cols !== undefined && (
-            <figure className="editor-object-preview">
-              <figcaption>
-                Frames ({frames} · {grid.cols}×{rows})
-              </figcaption>
-              <div className="editor-object-frames">
-                {Array.from({ length: frames }, (_, i) => {
-                  const col = i % grid.cols!;
-                  const row = Math.floor(i / grid.cols!);
-                  return (
-                    <span
-                      key={i}
-                      className="editor-object-frame pixelated"
-                      title={`frame ${i}`}
-                      style={{
-                        width: cellW,
-                        height: cellH,
-                        backgroundImage: `url(${sheetUrl})`,
-                        backgroundSize: `${grid.cols! * cellW}px ${rows * cellH}px`,
-                        backgroundPosition: `-${col * cellW}px -${row * cellH}px`,
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            </figure>
-          )}
-        </div>
+            {err && <FormError message={err} />}
+            <FormWarnings warnings={warnings} />
 
-        {err && <p className="editor-object-error">{err}</p>}
-        {warnings.length > 0 && (
-          <div className="editor-object-warnings">
-            {warnings.slice(0, 6).map((w, i) => (
-              <div key={i}>{w}</div>
-            ))}
-          </div>
+            <div className={objActionsClass}>
+              <Button
+                type="button"
+                disabled={busy || (isStrip && !grid.valid)}
+                onClick={() => void commit()}
+              >
+                {busy ? 'Applying…' : 'Apply'}
+              </Button>
+            </div>
+          </>
         )}
-
-        <div className="editor-object-actions">
-          <button
-            type="button"
-            disabled={busy || (isStrip && !grid.valid)}
-            onClick={() => void commit()}
-          >
-            {busy ? 'Applying…' : 'Apply'}
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -263,4 +385,625 @@ function ObjectEditorForm({ asset }: { asset: CatalogAsset }) {
 /** An asset's display filename (last path segment of its id). */
 function filenameOf(asset: CatalogAsset): string {
   return asset.id.split('/').pop() ?? asset.id;
+}
+
+/* ---- Regions editor (plan 017 step 4) ---- */
+
+/** Fallback fit target for the editable sheet (before the 1–8× zoom multiplier), used only until the
+ *  viewport's real size is measured (see `viewBox` below). Bigger than the Library's atlas picker
+ *  (240) — the tab has the room, and region editing wants pixels to grab. */
+const REGION_SHEET_FALLBACK = 480;
+const REGION_ZOOM_MIN = 1;
+const REGION_ZOOM_MAX = 8;
+const REGION_ZOOM_STEP = 0.5;
+const clampRegionZoom = (z: number): number =>
+  Math.min(
+    REGION_ZOOM_MAX,
+    Math.max(REGION_ZOOM_MIN, Math.round(z / REGION_ZOOM_STEP) * REGION_ZOOM_STEP),
+  );
+
+type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+const HANDLES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+
+/** Static per-handle position + resize-cursor classes for `.editor-region-handle.h-*` — none of this is
+ *  data-dependent, so it's a lookup of utility strings rather than inline style. */
+const HANDLE_POS: Record<Handle, string> = {
+  nw: 'left-0 top-0 cursor-nwse-resize',
+  n: 'left-1/2 top-0 cursor-ns-resize',
+  ne: 'left-full top-0 cursor-nesw-resize',
+  e: 'left-full top-1/2 cursor-ew-resize',
+  se: 'left-full top-full cursor-nwse-resize',
+  s: 'left-1/2 top-full cursor-ns-resize',
+  sw: 'left-0 top-full cursor-nesw-resize',
+  w: 'left-0 top-1/2 cursor-ew-resize',
+};
+
+/** A live pointer-drag on the canvas: drawing a new box from an anchor, moving an existing one, or
+ *  resizing one from a specific handle. `index` is the box being manipulated. */
+type Drag =
+  | { mode: 'draw'; index: number; ax: number; ay: number }
+  | { mode: 'move'; index: number; px: number; py: number; orig: Box }
+  | { mode: 'resize'; index: number; handle: Handle; orig: Box }
+  | { mode: 'pan'; startX: number; startY: number; startLeft: number; startTop: number };
+
+const clampN = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
+
+/** Box spanning two anchor points (draw), normalised so w/h are non-negative. */
+function normRect(ax: number, ay: number, bx: number, by: number): Box {
+  return { x: Math.min(ax, bx), y: Math.min(ay, by), w: Math.abs(bx - ax), h: Math.abs(by - ay) };
+}
+
+/** New box from dragging `handle` to sheet-point (sx,sy), keeping the opposite edge(s) fixed and
+ *  clamped in-bounds with a 1px minimum on the moving edge. */
+function resizeBox(orig: Box, handle: Handle, sx: number, sy: number, w: number, h: number): Box {
+  let left = orig.x;
+  let right = orig.x + orig.w;
+  let top = orig.y;
+  let bottom = orig.y + orig.h;
+  if (handle === 'nw' || handle === 'w' || handle === 'sw') left = clampN(sx, 0, right - 1);
+  if (handle === 'ne' || handle === 'e' || handle === 'se') right = clampN(sx, left + 1, w);
+  if (handle === 'nw' || handle === 'n' || handle === 'ne') top = clampN(sy, 0, bottom - 1);
+  if (handle === 'sw' || handle === 's' || handle === 'se') bottom = clampN(sy, top + 1, h);
+  return { x: left, y: top, w: right - left, h: bottom - top };
+}
+
+/**
+ * The `type:object` tab body — an editable overlay of `pack.json` `regions` boxes on a zoomable full
+ * sheet, folded into the object-editor tab (plan 017 step 4). Boxes seed from the asset's current
+ * catalog regions (or one whole-sheet box if it has none). Interactions: DOUBLE-CLICK a sprite to
+ * auto-detect a tight box around it (client-side flood-fill, see `detectRegionAt`), DRAW (drag empty
+ * sheet), SELECT+DELETE (click a box → live x/y/w/h + ✕/Delete), MOVE (drag body) + RESIZE (8 handles),
+ * and GRID-SLICE (cols×rows → replace one box with an even grid — one action splits a merged crop row).
+ * Save writes the whole list through `putAssetRegions` (+ a `type:object` override first if the sheet
+ * isn't already an object) then the shared `loadCatalog` refetch, so the Library and this tab re-derive
+ * from one fresh fetch. Reset writes an empty list = clears the override = auto-detection. The
+ * scale/positioning math mirrors the Library's `AtlasSheetPicker` (deliberately not shared — the
+ * pointer editing diverges enough that a focused copy is cleaner than a forced abstraction).
+ */
+function RegionsEditor({ asset, sheetUrl }: { asset: CatalogAsset; sheetUrl: string }) {
+  const [boxes, setBoxes] = useState<Box[]>(() => seedRegions(asset));
+  const [selected, setSelected] = useState<number | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [viewBox, setViewBox] = useState({ w: REGION_SHEET_FALLBACK, h: REGION_SHEET_FALLBACK });
+  const [sliceCols, setSliceCols] = useState(2);
+  const [sliceRows, setSliceRows] = useState(1);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
+
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  const [isPanning, setIsPanning] = useState(false);
+  const hoveringRef = useRef(false);
+
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<Drag | null>(null);
+  const boxesRef = useRef(boxes);
+  const pendingAnchor = useRef<{ cx: number; cy: number; ox: number; oy: number } | null>(null);
+  // Decoded alpha channel of the sheet (row-major, one byte/pixel) for double-click auto-detect —
+  // populated async once the PNG loads; null until then (a double-click before it's ready no-ops).
+  const alphaRef = useRef<{ data: Uint8Array; w: number; h: number } | null>(null);
+
+  useEffect(() => {
+    boxesRef.current = boxes;
+  }, [boxes]);
+
+  // Decode the sheet to an offscreen canvas and cache its alpha channel so double-click detection reads
+  // pixels without a server round-trip. Same-origin (Vite serves `/assets/…`), so the canvas isn't
+  // tainted and `getImageData` is allowed. Re-runs only when the sheet URL changes.
+  useEffect(() => {
+    let cancelled = false;
+    alphaRef.current = null;
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0);
+      const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const alpha = new Uint8Array(canvas.width * canvas.height);
+      for (let i = 0; i < alpha.length; i++) alpha[i] = data[i * 4 + 3];
+      alphaRef.current = { data: alpha, w: canvas.width, h: canvas.height };
+    };
+    img.src = sheetUrl;
+    return () => {
+      cancelled = true;
+    };
+  }, [sheetUrl]);
+
+  // Re-seed boxes whenever the catalog's regions for this asset change VALUE (after our own Save's
+  // refetch, or another surface's edit). Keyed on a stable signature, NOT `asset` identity, so a
+  // same-value refetch (the Library's mount fetch) never clobbers an in-progress edit — same guard as
+  // the outer form's re-seed effect.
+  const regionsSig = JSON.stringify(asset.regions ?? null);
+  useEffect(() => {
+    setBoxes(seedRegions(asset));
+    setSelected(null);
+    setErr(null);
+    setWarnings([]);
+  }, [regionsSig]);
+
+  // Fit the sheet to however much room the viewport actually has (the tab can be resized, and this
+  // pane no longer lives in a small fixed-size popover) rather than a hardcoded pixel target.
+  useLayoutEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const update = () => setViewBox({ w: el.clientWidth, h: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const fitScale = Math.min(1, viewBox.w / asset.w, viewBox.h / asset.h);
+  const scale = fitScale * zoom;
+  const dispW = Math.round(asset.w * scale);
+  const dispH = Math.round(asset.h * scale);
+
+  // Cursor-anchored wheel zoom (mirrors AtlasSheetPicker): keep the content point under the cursor
+  // stationary across the zoom, and use a native non-passive listener so `preventDefault` can stop the
+  // viewport's own scroll.
+  useLayoutEffect(() => {
+    const el = viewportRef.current;
+    const a = pendingAnchor.current;
+    if (!el || !a) return;
+    el.scrollLeft = a.cx * scale - a.ox;
+    el.scrollTop = a.cy * scale - a.oy;
+    pendingAnchor.current = null;
+  }, [scale]);
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const ox = e.clientX - rect.left;
+      const oy = e.clientY - rect.top;
+      pendingAnchor.current = {
+        cx: (el.scrollLeft + ox) / scale,
+        cy: (el.scrollTop + oy) / scale,
+        ox,
+        oy,
+      };
+      setZoom((z) => clampRegionZoom(z + (e.deltaY < 0 ? REGION_ZOOM_STEP : -REGION_ZOOM_STEP)));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [scale]);
+
+  // Hold Space to pan (middle-mouse-drag works too, unconditionally — see onCanvasPointerDown). Gated
+  // on `hoveringRef` (set by the viewport's pointer enter/leave below) rather than global focus: every
+  // object-editor tab stays mounted for the app's lifetime and is only hidden via CSS `visibility`
+  // (see EditorApp.tsx), so an ungated listener would steal the spacebar from whichever tab is actually
+  // visible.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent): void {
+      if (e.code !== 'Space' || e.repeat || !hoveringRef.current) return;
+      e.preventDefault();
+      setSpaceHeld(true);
+    }
+    function onKeyUp(e: KeyboardEvent): void {
+      if (e.code === 'Space') setSpaceHeld(false);
+    }
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, []);
+
+  function toSheet(e: React.PointerEvent): { sx: number; sy: number } {
+    const rect = canvasRef.current!.getBoundingClientRect();
+    return {
+      sx: Math.round(clampN((e.clientX - rect.left) / scale, 0, asset.w)),
+      sy: Math.round(clampN((e.clientY - rect.top) / scale, 0, asset.h)),
+    };
+  }
+
+  function capture(e: React.PointerEvent): void {
+    canvasRef.current?.setPointerCapture(e.pointerId);
+    canvasRef.current?.focus();
+  }
+
+  /** Middle mouse (any target) or left+Space starts a pan instead of the usual draw/move/resize —
+   *  checked ahead of those so it works whether the drag starts on empty sheet, a box, or a handle. */
+  function isPanTrigger(e: React.PointerEvent): boolean {
+    return e.button === 1 || (e.button === 0 && spaceHeld);
+  }
+
+  function startPan(e: React.PointerEvent): void {
+    e.preventDefault();
+    const el = viewportRef.current;
+    dragRef.current = {
+      mode: 'pan',
+      startX: e.clientX,
+      startY: e.clientY,
+      startLeft: el?.scrollLeft ?? 0,
+      startTop: el?.scrollTop ?? 0,
+    };
+    setIsPanning(true);
+    capture(e);
+  }
+
+  function onCanvasPointerDown(e: React.PointerEvent): void {
+    if (isPanTrigger(e)) {
+      startPan(e);
+      return;
+    }
+    if (e.button !== 0) return;
+    const { sx, sy } = toSheet(e);
+    const index = boxes.length;
+    setBoxes((bs) => [...bs, { x: sx, y: sy, w: 0, h: 0 }]);
+    setSelected(index);
+    dragRef.current = { mode: 'draw', index, ax: sx, ay: sy };
+    capture(e);
+  }
+
+  function onBoxPointerDown(e: React.PointerEvent, i: number): void {
+    if (isPanTrigger(e)) return; // let it bubble to onCanvasPointerDown to start the pan
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    const { sx, sy } = toSheet(e);
+    setSelected(i);
+    dragRef.current = { mode: 'move', index: i, px: sx, py: sy, orig: boxes[i] };
+    capture(e);
+  }
+
+  function onHandlePointerDown(e: React.PointerEvent, i: number, handle: Handle): void {
+    if (isPanTrigger(e)) return; // let it bubble to onCanvasPointerDown to start the pan
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    setSelected(i);
+    dragRef.current = { mode: 'resize', index: i, handle, orig: boxes[i] };
+    capture(e);
+  }
+
+  function onCanvasPointerMove(e: React.PointerEvent): void {
+    const d = dragRef.current;
+    if (!d) return;
+    if (d.mode === 'pan') {
+      const el = viewportRef.current;
+      if (el) {
+        el.scrollLeft = d.startLeft - (e.clientX - d.startX);
+        el.scrollTop = d.startTop - (e.clientY - d.startY);
+      }
+      return;
+    }
+    const { sx, sy } = toSheet(e);
+    setBoxes((bs) =>
+      bs.map((b, i) => {
+        if (i !== d.index) return b;
+        if (d.mode === 'draw') return normRect(d.ax, d.ay, sx, sy);
+        if (d.mode === 'move') {
+          return {
+            x: clampN(d.orig.x + (sx - d.px), 0, asset.w - d.orig.w),
+            y: clampN(d.orig.y + (sy - d.py), 0, asset.h - d.orig.h),
+            w: d.orig.w,
+            h: d.orig.h,
+          };
+        }
+        return resizeBox(d.orig, d.handle, sx, sy, asset.w, asset.h);
+      }),
+    );
+  }
+
+  function onCanvasPointerUp(e: React.PointerEvent): void {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d) return;
+    if (canvasRef.current?.hasPointerCapture(e.pointerId)) {
+      canvasRef.current.releasePointerCapture(e.pointerId);
+    }
+    if (d.mode === 'pan') {
+      setIsPanning(false);
+      return;
+    }
+    // A draw that never grew (a bare click on empty sheet) leaves a degenerate box — drop it, which
+    // makes an empty click read as "deselect".
+    if (d.mode === 'draw') {
+      const b = boxesRef.current[d.index];
+      if (b && (b.w < 1 || b.h < 1)) {
+        setBoxes((bs) => bs.filter((_, i) => i !== d.index));
+        setSelected((sel) => (sel === d.index ? null : sel));
+      }
+    }
+  }
+
+  // Double-click a sprite → flood-fill its opaque blob (tight: gap:0, no bridging into touching
+  // neighbours — see `detectRegionAt`) and add the box as a new selected region. Catches sprites the
+  // batch pass drops or over-merges: it only cares what's under the click. No-op on a miss (empty space
+  // beyond the seed radius) or before the alpha channel has decoded. The two stray degenerate boxes the
+  // underlying click/click cycle draws are already dropped by `onCanvasPointerUp`, so this only ever
+  // appends the detected box.
+  function onCanvasDoubleClick(e: React.MouseEvent): void {
+    const a = alphaRef.current;
+    if (!a) return;
+    e.preventDefault();
+    const rect = canvasRef.current!.getBoundingClientRect();
+    const px = Math.floor(clampN((e.clientX - rect.left) / scale, 0, a.w - 1));
+    const py = Math.floor(clampN((e.clientY - rect.top) / scale, 0, a.h - 1));
+    const box = detectRegionAt(a.data, a.w, a.h, px, py);
+    if (!box) return;
+    let idx = 0;
+    setBoxes((bs) => {
+      idx = bs.length;
+      return [...bs, box];
+    });
+    setSelected(idx);
+  }
+
+  function onCanvasKeyDown(e: React.KeyboardEvent): void {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selected !== null) {
+      e.preventDefault();
+      deleteSelected();
+    }
+  }
+
+  function deleteSelected(): void {
+    if (selected === null) return;
+    setBoxes((bs) => bs.filter((_, i) => i !== selected));
+    setSelected(null);
+  }
+
+  function gridSlice(): void {
+    if (selected === null) return;
+    const target = boxes[selected];
+    if (!target) return;
+    const cells = sliceBox(target, sliceCols, sliceRows);
+    setBoxes((bs) => [...bs.filter((_, i) => i !== selected), ...cells]);
+    setSelected(null);
+  }
+
+  function updateSelected(field: keyof Box, raw: string): void {
+    if (selected === null) return;
+    const v = Math.max(0, Math.round(Number(raw) || 0));
+    setBoxes((bs) =>
+      bs.map((b, i) => {
+        if (i !== selected) return b;
+        const next = { ...b, [field]: v };
+        next.x = clampN(next.x, 0, asset.w - 1);
+        next.y = clampN(next.y, 0, asset.h - 1);
+        next.w = clampN(next.w, 1, asset.w - next.x);
+        next.h = clampN(next.h, 1, asset.h - next.y);
+        return next;
+      }),
+    );
+  }
+
+  async function save(): Promise<void> {
+    setBusy(true);
+    setErr(null);
+    try {
+      const clean = sanitiseClientRegions(boxes, asset.w, asset.h);
+      const relPath = assetRelPath(asset);
+      // Regions only take effect on an `object`-classified sheet — if the user switched the dropdown
+      // to `object` on a strip/tile asset, force that classification first (separate serialised regen).
+      if (asset.type !== 'object') {
+        await putAssetOverride(asset.pack, relPath, { type: 'object' });
+      }
+      const result = await putAssetRegions(asset.pack, relPath, clean);
+      setWarnings(result.warnings);
+      await loadCatalog();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reset(): Promise<void> {
+    setBusy(true);
+    setErr(null);
+    try {
+      // Empty list deletes the override server-side → the sheet falls back to auto-detection.
+      const result = await putAssetRegions(asset.pack, assetRelPath(asset), []);
+      setWarnings(result.warnings);
+      await loadCatalog();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const selectedBox = selected !== null ? boxes[selected] : null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
+        <span className="text-[0.78rem] text-fg-dim">
+          {boxes.length} region{boxes.length === 1 ? '' : 's'}
+        </span>
+        <div className="flex max-w-[220px] flex-none items-center gap-1.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-xs"
+                className="size-[22px] shrink-0"
+                disabled={zoom <= REGION_ZOOM_MIN}
+                onClick={() => setZoom((z) => clampRegionZoom(z - REGION_ZOOM_STEP))}
+              >
+                −
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Zoom out</TooltipContent>
+          </Tooltip>
+          <Slider
+            className="w-[78px] shrink-0"
+            min={REGION_ZOOM_MIN}
+            max={REGION_ZOOM_MAX}
+            step={REGION_ZOOM_STEP}
+            value={[zoom]}
+            aria-label="Region editor zoom"
+            onValueChange={([v]) => setZoom(clampRegionZoom(v))}
+          />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-xs"
+                className="size-[22px] shrink-0"
+                disabled={zoom >= REGION_ZOOM_MAX}
+                onClick={() => setZoom((z) => clampRegionZoom(z + REGION_ZOOM_STEP))}
+              >
+                +
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Zoom in</TooltipContent>
+          </Tooltip>
+          <span className="min-w-6 flex-none text-right text-[0.7rem] text-fg-dim">{zoom}×</span>
+        </div>
+        {!selectedBox && (
+          <p className="grow shrink basis-[260px] text-right text-[0.78rem] leading-[1.4] text-muted-2">
+            Double-click a sprite to auto-detect a box around it. Drag on the sheet to draw one by
+            hand. Click a box to select it (then move, resize its handles, grid-slice, or Delete).
+            Middle-mouse-drag or hold Space and drag to pan when zoomed in.
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-start gap-4">
+        <div
+          className="h-[74vh] max-h-[74vh] min-w-[280px] grow shrink basis-[420px] overflow-auto rounded-[3px] bg-inset"
+          ref={viewportRef}
+          onPointerEnter={() => {
+            hoveringRef.current = true;
+          }}
+          onPointerLeave={() => {
+            hoveringRef.current = false;
+          }}
+        >
+          <div
+            ref={canvasRef}
+            className={cn(
+              'pixelated relative cursor-crosshair overflow-hidden rounded-[3px] bg-inset bg-no-repeat outline-none touch-none',
+              spaceHeld && 'cursor-grab',
+              isPanning && 'cursor-grabbing',
+            )}
+            tabIndex={0}
+            // Sheet image + its scaled render size are computed — stay inline.
+            style={{
+              width: dispW,
+              height: dispH,
+              backgroundImage: `url(${sheetUrl})`,
+              backgroundSize: `${dispW}px ${dispH}px`,
+            }}
+            onPointerDown={onCanvasPointerDown}
+            onPointerMove={onCanvasPointerMove}
+            onPointerUp={onCanvasPointerUp}
+            onDoubleClick={onCanvasDoubleClick}
+            onKeyDown={onCanvasKeyDown}
+          >
+            {boxes.map((b, i) => (
+              <div
+                key={i}
+                className={cn(
+                  'absolute cursor-move border border-gold-light/55 bg-gold-light/6 hover:border-gold-light/90',
+                  i === selected && 'border-selection bg-selection/16',
+                )}
+                // Box rect is computed from stored sheet-space coords × scale — stays inline.
+                style={{
+                  left: b.x * scale,
+                  top: b.y * scale,
+                  width: Math.max(2, b.w * scale),
+                  height: Math.max(2, b.h * scale),
+                }}
+                onPointerDown={(e) => onBoxPointerDown(e, i)}
+              >
+                {i === selected &&
+                  HANDLES.map((hd) => (
+                    <span
+                      key={hd}
+                      className={cn(
+                        'absolute -mt-[5px] -ml-[5px] size-[9px] rounded-[2px] border border-inset bg-selection',
+                        HANDLE_POS[hd],
+                      )}
+                      onPointerDown={(e) => onHandlePointerDown(e, i, hd)}
+                    />
+                  ))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {selectedBox && (
+          <div className="flex min-w-[180px] max-w-[260px] grow shrink basis-[200px] flex-col gap-3">
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-2">
+                {(['x', 'y', 'w', 'h'] as const).map((f) => (
+                  <ObjField key={f} label={f}>
+                    <input
+                      type="number"
+                      min={f === 'w' || f === 'h' ? 1 : 0}
+                      value={selectedBox[f]}
+                      className={cn(objInputClass, 'w-full')}
+                      onChange={(e) => updateSelected(f, e.target.value)}
+                    />
+                  </ObjField>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                className="self-start"
+                onClick={deleteSelected}
+              >
+                ✕ Delete box
+              </Button>
+              <div className="flex flex-col gap-1">
+                <span className="text-[0.72rem] text-muted-2">Grid-slice into</span>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min={1}
+                    aria-label="Columns"
+                    value={sliceCols}
+                    className={cn(objInputClass, 'w-[52px] px-1.5')}
+                    onChange={(e) =>
+                      setSliceCols(Math.max(1, Math.round(Number(e.target.value) || 1)))
+                    }
+                  />
+                  <span>×</span>
+                  <input
+                    type="number"
+                    min={1}
+                    aria-label="Rows"
+                    value={sliceRows}
+                    className={cn(objInputClass, 'w-[52px] px-1.5')}
+                    onChange={(e) =>
+                      setSliceRows(Math.max(1, Math.round(Number(e.target.value) || 1)))
+                    }
+                  />
+                  <Button type="button" size="sm" onClick={gridSlice}>
+                    Slice
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {err && <FormError message={err} />}
+      <FormWarnings warnings={warnings} />
+
+      <div className={objActionsClass}>
+        <Button type="button" disabled={busy} onClick={() => void save()}>
+          {busy ? 'Saving…' : 'Save regions'}
+        </Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={() => void reset()}>
+          Reset to auto-detect
+        </Button>
+      </div>
+    </div>
+  );
 }

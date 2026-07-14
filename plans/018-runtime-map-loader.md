@@ -1,6 +1,6 @@
 # Runtime Map Loader (L0 — boot into one authored map)
 
-> Status: in review
+> Status: deployed
 > Follow-up: **L1 adjacent-ring streaming is split into [plan 019](019-l1-map-streaming.md)** (per
 > critique #3) — run this plan first, ship it, then 019 once a second map is placed.
 

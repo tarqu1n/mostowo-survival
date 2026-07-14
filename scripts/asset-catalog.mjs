@@ -11,14 +11,29 @@
  * `pack.json` shape:
  *   { id, name, author, sourceUrl, licence, tileSize,
  *     rules: { tile: string[], strip: string[], selfMade: string[] },   // glob patterns, see `globToRegExp`
- *     overrides: { [relativePath]: Partial<Asset> & { type?, rows? } }, // exact-path escape hatch —
- *                                                                       // `type` forces classification
- *                                                                       // (consulted BEFORE the type
- *                                                                       // branches below, plan 014 step
- *                                                                       // 7c), `rows` (default 1) turns a
- *                                                                       // strip's `frames` into a grid —
- *                                                                       // both consumed here, never
- *                                                                       // written to the emitted asset
+ *     overrides: { [relativePath]: Partial<Asset> & { type?, rows?, cols?, omit? } }, // exact-path
+ *                                                                       // escape hatch — `type` forces
+ *                                                                       // classification (consulted
+ *                                                                       // BEFORE the type branches
+ *                                                                       // below, plan 014 step 7c);
+ *                                                                       // for a strip, `cols` (plan
+ *                                                                       // 018 step 6.1) switches to
+ *                                                                       // GEOMETRY mode — cols x rows
+ *                                                                       // (rows default 1) grid cells,
+ *                                                                       // with `omit` (cell indices,
+ *                                                                       // row-major, 0..cols*rows-1)
+ *                                                                       // naming any blank cells to
+ *                                                                       // skip; omitting `cols` falls
+ *                                                                       // back to LEGACY mode, where
+ *                                                                       // `rows` (default 1) turns a
+ *                                                                       // strip's `frames` into a grid.
+ *                                                                       // `type`/`rows`/`cols` are
+ *                                                                       // consumed here, never written
+ *                                                                       // to the emitted asset; `omit`
+ *                                                                       // IS written (sanitised, only
+ *                                                                       // when non-empty) — everything
+ *                                                                       // else in the override applies
+ *                                                                       // verbatim
  *     exclude: string[],                                                // glob patterns, dropped entirely
  *     regionParams: { [relativePath]: Partial<DetectionParams> },       // consumed by gen_regions.py, not here
  *     regions: { [relativePath]: Array<{x,y,w,h}> } }                   // consumed by gen_regions.py, not here
@@ -45,6 +60,7 @@ import {
   existsSync,
 } from 'node:fs';
 import { join, dirname, relative, extname, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const ROOT = join(import.meta.dirname, '..');
 const TILESETS_DIR = join(ROOT, 'public/assets/tilesets');
@@ -140,15 +156,55 @@ function listPngs(root, dir = root, out = []) {
 // 1 AND `w` a whole multiple of `h`, i.e. square frames) — anything else (a grid, or non-square
 // single-row frames) needs an explicit `frames` override in pack.json (don't guess); unresolved
 // strips fall back to treating the whole sheet as one unsliced frame and warn, same as any grid whose
-// dimensions don't divide evenly. */
-function stripFrameDims(w, h, relPath, framesOverride, rowsOverride, warnings) {
+// dimensions don't divide evenly.
+//
+// Plan 018 step 6.1 — GEOMETRY mode (`colsOverride` given): grid geometry is decoupled from the
+// played-frame set, so a sheet whose grid has blank cells (e.g. Alchemy_Table_01-Sheet.png, a 2x11
+// grid = 22 cells but only 21 real frames — the trailing cell is blank) can still be authored: `cols`
+// x `rows` (rows default 1) gives the total cell count (`frames = cols*rows`, no longer author-able
+// via `framesOverride` in this mode — it's derived from the grid alone), and `omit` names the cell
+// indices (row-major, `0..frames-1`) that are blank and should be skipped when playing. LEGACY mode
+// (`colsOverride` absent) is the untouched pre-6.1 behaviour above, for backward compatibility with
+// every existing `{frames, rows?}` override — it never has an `omit`. */
+export function stripFrameDims(
+  w,
+  h,
+  relPath,
+  framesOverride,
+  rowsOverride,
+  colsOverride,
+  omitOverride,
+  warnings,
+) {
   const rows = rowsOverride ?? 1;
+
+  if (colsOverride !== undefined) {
+    // Geometry mode: cols x rows is the grid, full stop — frames is derived, never authored.
+    const cols = colsOverride;
+    const frames = cols * rows;
+    const frameWidth = w / cols;
+    const frameHeight = h / rows;
+    if (![frameWidth, frameHeight].every(Number.isInteger)) {
+      warnings.push(
+        `${relPath}: strip ${w}x${h} with cols=${cols} rows=${rows} (from pack.json override) ` +
+          `gives a non-integer grid (frameWidth=${frameWidth}, frameHeight=${frameHeight}) ` +
+          `-> check the override, falling back to 1 unsliced frame`,
+      );
+      return { frameWidth: w, frameHeight: h, frames: 1, omit: [] };
+    }
+    const omit = Array.from(
+      new Set((omitOverride ?? []).filter((i) => Number.isInteger(i) && i >= 0 && i < frames)),
+    ).sort((a, b) => a - b);
+    return { frameWidth, frameHeight, frames, omit };
+  }
+
+  // Legacy mode — unchanged from pre-6.1, byte-identical for every existing override.
   const unresolved = () => {
     warnings.push(
       `${relPath}: strip ${w}x${h} isn't a whole multiple of its own height (non-square frames) ` +
         `and has no 'frames' override in pack.json -> treating as 1 unsliced frame`,
     );
-    return { frameWidth: w, frameHeight: h, frames: 1 };
+    return { frameWidth: w, frameHeight: h, frames: 1, omit: [] };
   };
 
   let frames = framesOverride;
@@ -169,9 +225,9 @@ function stripFrameDims(w, h, relPath, framesOverride, rowsOverride, warnings) {
         `gives a non-integer grid (frameHeight=${frameHeight}, cols=${cols}, frameWidth=${frameWidth}) ` +
         `-> check the override, falling back to 1 unsliced frame`,
     );
-    return { frameWidth: w, frameHeight: h, frames: 1 };
+    return { frameWidth: w, frameHeight: h, frames: 1, omit: [] };
   }
-  return { frameWidth, frameHeight, frames };
+  return { frameWidth, frameHeight, frames, omit: [] };
 }
 
 function buildAsset(pack, relPath, warnings) {
@@ -215,29 +271,38 @@ function buildAsset(pack, relPath, warnings) {
     }
     asset.frames = Math.floor(cols) * Math.floor(rows);
   } else if (type === 'strip') {
-    // `frames`/`rows` come from the override (checked here, ahead of the generic override-merge
-    // below, since the grid math NEEDS them up front).
-    const { frameWidth, frameHeight, frames } = stripFrameDims(
+    // `frames`/`rows`/`cols`/`omit` come from the override (checked here, ahead of the generic
+    // override-merge below, since the grid math NEEDS them up front).
+    const { frameWidth, frameHeight, frames, omit } = stripFrameDims(
       w,
       h,
       relPath,
       override?.frames,
       override?.rows,
+      override?.cols,
+      override?.omit,
       warnings,
     );
     asset.frameWidth = frameWidth;
     asset.frameHeight = frameHeight;
     asset.frames = frames;
+    // Only set when non-empty — writing `omit: []` for every strip would leak a new key into (and
+    // change) the committed catalog for every existing strip asset, breaking byte-identical regen.
+    if (omit.length > 0) asset.omit = omit;
   }
 
   if (override) {
-    // `type`/`rows` are classification directives consumed above, not literal `CatalogAsset`
-    // fields — merging them in verbatim would leak an undocumented `rows` key into the committed
-    // catalog (and a redundant-but-harmless `type`, already resolved above). Strip them before the
-    // generic merge; everything else in the override (e.g. `frames`) still applies normally.
+    // `type`/`rows`/`cols` are classification directives consumed above, not literal `CatalogAsset`
+    // fields — merging them in verbatim would leak an undocumented key into the committed catalog
+    // (and a redundant-but-harmless `type`, already resolved above). `omit` is likewise consumed
+    // above (into `stripFrameDims`'s *sanitised* output, already set on `asset` when non-empty) —
+    // the raw unsanitised patch value must never overwrite that. Strip all four before the generic
+    // merge; everything else in the override (e.g. `frames`) still applies normally.
     const patch = { ...override };
     delete patch.type;
     delete patch.rows;
+    delete patch.cols;
+    delete patch.omit;
     asset = { ...asset, ...patch };
   }
   return asset;
@@ -367,6 +432,21 @@ function assertValidCatalog(catalog) {
         throw new Error(`asset ${a.id} (strip) missing frameWidth/frameHeight`);
       }
     }
+    if (a.omit !== undefined) {
+      if (a.type !== 'strip') throw new Error(`asset ${a.id} has omit but isn't type 'strip'`);
+      if (!Array.isArray(a.omit)) throw new Error(`asset ${a.id} omit must be an array`);
+      const seenOmit = new Set();
+      for (const i of a.omit) {
+        if (!Number.isInteger(i) || i < 0 || i >= a.frames) {
+          throw new Error(`asset ${a.id} omit has an out-of-range index ${i}`);
+        }
+        if (seenOmit.has(i)) throw new Error(`asset ${a.id} omit has duplicate index ${i}`);
+        seenOmit.add(i);
+      }
+      if (a.frames - a.omit.length < 1) {
+        throw new Error(`asset ${a.id} omit removes every frame (must play at least one)`);
+      }
+    }
     if (a.regions !== undefined) {
       if (a.type !== 'object') throw new Error(`asset ${a.id} has regions but isn't type 'object'`);
       if (!Array.isArray(a.regions) || a.regions.length < 2) {
@@ -419,4 +499,6 @@ function main() {
   );
 }
 
-main();
+// Guard so importing this module (e.g. from a test) is side-effect-free — `argv[1]` is only the
+// script path when actually run via `node scripts/asset-catalog.mjs` / `npm run assets:catalog`.
+if (process.argv[1] === fileURLToPath(import.meta.url)) main();

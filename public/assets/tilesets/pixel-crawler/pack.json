@@ -43,7 +43,50 @@
     },
     "Environment/Structures/Stations/Furnace/Bricks_01-Sheet.png": {
       "frames": 4,
+      "rows": 2,
+      "type": "strip",
+      "cols": 2
+    },
+    "Environment/Structures/Stations/Furnace/Bricks_03-Sheet.png": {
+      "type": "strip",
+      "frames": 4,
       "rows": 2
+    },
+    "Environment/Structures/Stations/Furnace/Bricks_02-Sheet.png": {
+      "type": "strip",
+      "frames": 4,
+      "rows": 2
+    },
+    "Environment/Structures/Stations/Furnace/Iron_01-Sheet.png": {
+      "type": "strip",
+      "frames": 4,
+      "rows": 2
+    },
+    "Environment/Structures/Stations/Sawmill/Level_3-Sheet.png": {
+      "type": "strip",
+      "frames": 8,
+      "rows": 1
+    },
+    "Environment/Structures/Stations/Alchemy/Alchemy_Table_03-Sheet.png": {
+      "type": "strip",
+      "rows": 5,
+      "cols": 5,
+      "omit": [
+        22,
+        23,
+        24
+      ]
+    },
+    "Environment/Structures/Stations/Alchemy/Alchemy_Table_02-Sheet.png": {
+      "type": "strip",
+      "rows": 5,
+      "cols": 11,
+      "omit": [
+        51,
+        52,
+        53,
+        54
+      ]
     }
   },
   "exclude": [],

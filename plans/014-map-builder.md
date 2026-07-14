@@ -1,6 +1,21 @@
 # Map Builder
 
-> Status: planned — run /execute-plan to begin.
+> Status: in progress — Steps 1–7c done (see their Outcome notes below); Steps 8 and 10 are
+> unaffected by anything since and still stand as written.
+>
+> **Steps 9, 11, 12 updated 2026-07-14** in light of plans 017–019, landed after this plan was
+> written (see the update note inside each step for detail):
+> - **Step 9** rebuilds on [plan 017](017-editor-tabbed-central-pane.md)'s tab-strip architecture
+>   (which removed the `view: 'map'|'world'` toolbar toggle this step was originally written
+>   against) and is now a hard prerequisite for plan 019, not just a nice-to-have.
+> - **Step 11 is superseded** by [plan 018](018-runtime-map-loader.md) (L0, deployed) for its core
+>   scope, with real divergences (no `?map=` param, no procedural fallback — deleted) and real gaps
+>   (`zoneAt`, the world-integrity test, `MapConnections`) still open; multi-map consumption is
+>   [plan 019](019-l1-map-streaming.md) (planned).
+> - **Step 12** needs re-targeting at the actual `test.map.json` (not `test-camp.map.json`) and its
+>   content-authoring work is now gated by two concrete external blockers named in 018/019 (the
+>   `HUNGER_LETHAL` stopgap and 019's second-placed-map prerequisite), not just a leisurely
+>   feature-exercise pass. Some of its doc updates already landed piecemeal via 018.
 
 ## Summary
 
@@ -943,7 +958,19 @@ free values render nearest-neighbour and are the author's aesthetic call.
     shape/collision/zone edits; `npm run check` green.
 
 - [ ] **Step 9: World view tab + neighbour ghost strips** `[delegate sonnet]`
-  - **World view** (`view: 'world'` — switch from step 5's toolbar): loads `world.json`
+  - **Update (plan 017 landed):** the `view: 'map'|'world'` toolbar toggle this step was written
+    against no longer exists — plan 017 replaced it with a tab-strip architecture and already
+    created a permanent, non-closable `world` tab (`editorStore.ts`'s `EditorTab` union); today
+    `EditorApp.tsx` renders it as a placeholder `<div>World view — coming in step 9.</div>`
+    (`EditorApp.tsx:223`). This step is now "build a
+    `tabs/WorldViewTab.tsx` that replaces that placeholder," following the object-editor tab's
+    pattern (mounted `position:absolute; inset:0` inside `.editor-tab-panels`, visibility-toggled
+    via `.is-hidden`, never `display:none` — see plan 017 step 2) — there is no separate view-switch
+    action to build; the tab strip is already the sole switcher. **Priority:** this step is now a
+    hard prerequisite for [plan 019](019-l1-map-streaming.md) (L1 map streaming) — `world.json`'s
+    `placements` array is still `[]`, and 019 cannot be verified end-to-end without at least the
+    start map plus one authored neighbour placed adjacent to it via this UI.
+  - **World view**: loads `world.json`
     (`GET /__editor/world`) + all map files; renders every placed map at its origin on a global
     grid — baked thumbnail of its tile layers (reuse the chunked bake at low zoom) clipped to its
     shape mask, plus name label. Unplaced maps sit in a side tray; dragging one onto the grid
@@ -997,6 +1024,34 @@ free values render nearest-neighbour and are the author's aesthetic call.
     JSON; a fresh open re-edits the same terrain seamlessly; `npm run check` green.
 
 - [ ] **Step 11: Game loads authored maps** `[inline]`
+  - **Update — superseded by [plan 018](018-runtime-map-loader.md) (deployed) for its core scope,
+    with real divergences and real gaps left open.** Do not re-execute this step as originally
+    written below — treat it as the historical spec, and pick up only the outstanding items.
+    - **Landed (018):** a lazy registry exists at `src/systems/mapRuntime.ts` — **not**
+      `src/data/maps/index.ts` as specced below (018's own "PATH DRIFT" note: the schema lives in
+      `src/systems/mapFormat.ts`/`worldLayout.ts`). Eager `MANIFEST`/`WORLD`, lazy
+      `loadMapFile(id)` via `import.meta.glob`, `originOf(id)`. Ground bakes via
+      `groundRenderer.drawMapLayers` (mirrors `EditorScene.bakeChunk`); `ResourceNodeManager.loadNodes`
+      hydrates `kind:'node'` objects; the new `DecorManager` renders `kind:'decor'` (region-cropped +
+      animated, matching the editor); `mapWalkability.mapBlocks` composites map walkability + void
+      into `isBlocked` alongside existing obstacle sources; dims/camera/physics bounds derive from
+      `map.meta`, not `MAP_WIDTH`/`MAP_HEIGHT` (both consts, plus the fixed `BASE_ZONE`, were deleted
+      in 018's Step A12 after a live-verify checkpoint). Portals parse-and-hold, no transition wiring.
+      Live-verified at `npm run dev` (Playwright screenshot checkpoint), not just unit-tested.
+    - **Diverges from the design below — accept it, don't fight it:** no `?map=<id>` query param and
+      no dev-menu "LOAD MAP" button (018 hardcoded a single `START_MAP_ID` constant instead — a
+      deliberate L0 scope cut); and **no procedural fallback was preserved** — the "else current
+      procedural world unchanged" behaviour below was explicitly removed (018 Step A12 deleted
+      `drawGround`/`spawnTrees`/the `MAP_WIDTH`/`MAP_HEIGHT`/`BASE_ZONE` consts as a one-way door
+      after its checkpoint passed). The game always boots into the one authored map now.
+    - **Still genuinely outstanding** (not done by 018 or 019): `zoneAt(col,row)` (zones have no
+      runtime read path yet); the Tier-1 world-integrity test (`src/data/maps/__tests__/world.test.ts`);
+      the `MapConnections` placeholder type; two tracked-not-fixed regressions from 018
+      (`tests/e2e/survival-hunger.spec.ts`'s starve-HP assertion fails while `HUNGER_LETHAL=false`,
+      and `scripts/smoke.mjs` has a click-timing race against the now-async `PreloadScene.create()`).
+    - **Multi-map consumption** (global-coord `isBlocked`, streaming load/evict) is
+      [plan 019](019-l1-map-streaming.md)'s scope — planned, not executed, blocked on plan 014 step 9
+      landing a second real placement in `world.json`.
   - `src/data/maps/index.ts` — the **lazy registry** (advisor round 3): eagerly import ONLY
     `manifest.json` (→ `parseManifest`) and `world.json` (→ `parseWorldLayout`); map files load
     via `import.meta.glob('./maps/*.map.json')` per-map code-split chunks behind
@@ -1050,6 +1105,24 @@ free values render nearest-neighbour and are the author's aesthetic call.
     world; e2e + smoke + `npm run check` green.
 
 - [ ] **Step 12: Author the test maps, write docs, record decisions** `[inline]`
+  - **Update:** the map this step should exercise already exists as `src/data/maps/test.map.json`
+    (not `test-camp.map.json` as named below) — retarget to it rather than authoring a fresh file,
+    unless there's a reason to keep both. Content-authoring here is no longer just a leisurely
+    feature-exercise pass; it's now blocking two concrete things named by later plans:
+    1. **Plan 018's Phase-A content ship gate:** `test.map.json` currently has **zero** `node`
+       objects, so the temporary `HUNGER_LETHAL=false` stopgap in `config.ts` can't be flipped back
+       on (or removed) until this step authors real trees/rocks/a food source into it.
+    2. **Plan 019's placement prerequisite:** `world.json`'s `placements` is still `[]`; 019 (L1
+       streaming) cannot be verified end-to-end without at least `test.map.json` plus one authored
+       neighbour placed adjacent to it — i.e. this step's "author `test-forest`, interlock shapes,
+       place both" work below.
+    Also, some of this step's doc updates already landed piecemeal via plan 018 — don't redo them:
+    `docs/STATUS.md` already has a plan-018 row (add a plan-014 row alongside it, don't duplicate),
+    `src/data/maps/README.md` was already rewritten to describe runtime consumption, and CLAUDE.md's
+    `src/scenes` architecture-map line was already updated to mention `mapRuntime.ts`. Still
+    genuinely outstanding: `docs/EDITOR.md` doesn't exist yet; `docs/DECISIONS.md`'s map-editor
+    entry (~L563) is still `[OPEN]`, not moved to `[DECIDED]`; CLAUDE.md's docs index doesn't list
+    `docs/EDITOR.md` yet.
   - Using the editor, author `src/data/maps/test-camp.map.json` exercising every feature: an
     irregular (non-rectangular) shape, tiles from ≥2 different sheets on ≥2 layers (one
     overhead), a terrain-brush patch, ≥3 decor objects (one rotated, one scaled, two stacked; **one

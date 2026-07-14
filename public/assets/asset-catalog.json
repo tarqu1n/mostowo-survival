@@ -7675,10 +7675,10 @@
           "h": 7
         },
         {
-          "key": "2_352",
-          "x": 2,
+          "key": "17_352",
+          "x": 17,
           "y": 352,
-          "w": 78,
+          "w": 63,
           "h": 32
         },
         {
@@ -7687,6 +7687,13 @@
           "y": 356,
           "w": 7,
           "h": 7
+        },
+        {
+          "key": "2_370",
+          "x": 2,
+          "y": 370,
+          "w": 12,
+          "h": 14
         },
         {
           "key": "580_372",
@@ -8095,9 +8102,15 @@
         "table"
       ],
       "origin": "pack",
-      "frameWidth": 528,
-      "frameHeight": 320,
-      "frames": 1
+      "frameWidth": 48,
+      "frameHeight": 64,
+      "frames": 55,
+      "omit": [
+        51,
+        52,
+        53,
+        54
+      ]
     },
     {
       "id": "pixel-crawler/Environment/Structures/Stations/Alchemy/Alchemy_Table_03-Sheet.png",
@@ -8120,9 +8133,14 @@
         "table"
       ],
       "origin": "pack",
-      "frameWidth": 400,
-      "frameHeight": 400,
-      "frames": 1
+      "frameWidth": 80,
+      "frameHeight": 80,
+      "frames": 25,
+      "omit": [
+        22,
+        23,
+        24
+      ]
     },
     {
       "id": "pixel-crawler/Environment/Structures/Stations/Anvil/Anvil_01-Sheet.png",
@@ -9264,9 +9282,9 @@
         "structures"
       ],
       "origin": "pack",
-      "frameWidth": 96,
-      "frameHeight": 128,
-      "frames": 1
+      "frameWidth": 48,
+      "frameHeight": 64,
+      "frames": 4
     },
     {
       "id": "pixel-crawler/Environment/Structures/Stations/Furnace/Bricks_03-Sheet.png",
@@ -9289,9 +9307,9 @@
         "structures"
       ],
       "origin": "pack",
-      "frameWidth": 96,
-      "frameHeight": 128,
-      "frames": 1
+      "frameWidth": 48,
+      "frameHeight": 64,
+      "frames": 4
     },
     {
       "id": "pixel-crawler/Environment/Structures/Stations/Furnace/Furnace.png",
@@ -9440,9 +9458,9 @@
         "structures"
       ],
       "origin": "pack",
-      "frameWidth": 64,
-      "frameHeight": 96,
-      "frames": 1
+      "frameWidth": 32,
+      "frameHeight": 48,
+      "frames": 4
     },
     {
       "id": "pixel-crawler/Environment/Structures/Stations/Furnace/Iron_02-Sheet.png",
@@ -9700,9 +9718,9 @@
         "structures"
       ],
       "origin": "pack",
-      "frameWidth": 896,
+      "frameWidth": 112,
       "frameHeight": 640,
-      "frames": 1
+      "frames": 8
     },
     {
       "id": "pixel-crawler/Environment/Structures/Stations/Workbench/Workbench.png",

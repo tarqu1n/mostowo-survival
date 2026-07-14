@@ -120,15 +120,25 @@ export interface DecorRegion {
 
 /** Animation-strip playback for a decor instance — deliberately the same shape
  *  `Phaser.Loader.LoaderPlugin.spritesheet(key, url, { frameWidth, frameHeight })` consumes
- *  directly, plus `frames`/`fps` for `anims.create`. Ints, all `> 0`. Mutually exclusive with
- *  `region` (see `DecorRegion` doc) — a decor object is a static crop OR an animated strip, never
- *  both. Sourced from the matching `CatalogAsset`'s `frameWidth`/`frameHeight`/`frames` (a `strip`
- *  asset) plus an editor-chosen `fps`. */
+ *  directly, plus `frames`/`fps` for `anims.create`. `frameWidth`/`frameHeight`/`frames`/`fps` are
+ *  ints, all `> 0`. Mutually exclusive with `region` (see `DecorRegion` doc) — a decor object is a
+ *  static crop OR an animated strip, never both. Sourced from the matching `CatalogAsset`'s
+ *  `frameWidth`/`frameHeight`/`frames` (a `strip` asset) plus an editor-chosen `fps`.
+ *
+ *  Grid geometry is decoupled from the played-frame set (plan 017 step 6.3): `frames` is the TOTAL
+ *  number of grid cells the sheet slices into (`cols*rows`), NOT the animation length; `omit` lists
+ *  the row-major cell indices (`0..frames-1`) to SKIP. The played set is therefore `[0..frames-1]`
+ *  minus `omit`, ascending. `omit` is absent (never `[]`) when nothing is skipped — matching the
+ *  other optional-omitted-when-absent fields (`meta.favourites`, `region`) and, crucially, keeping
+ *  a strip authored before this change (equivalent to `start:0 → end:frames-1`) byte-identical on
+ *  round-trip. Motivating case: a 2-col×11-row sheet = 22 cells whose blank 22nd cell (`omit:[21]`)
+ *  is dropped → 21 played frames. `omit` is always LAST so legacy key order is preserved. */
 export interface DecorAnim {
   frameWidth: number;
   frameHeight: number;
   frames: number;
   fps: number;
+  omit?: number[];
 }
 
 export interface DecorObject {
@@ -470,7 +480,31 @@ function parseDecorAnim(value: unknown, path: string): DecorAnim {
   if (frameHeight <= 0) fail(`${path}.frameHeight must be > 0`);
   if (frames <= 0) fail(`${path}.frames must be > 0`);
   if (fps <= 0) fail(`${path}.fps must be > 0`);
-  return { frameWidth, frameHeight, frames, fps };
+  // omit is optional and read only when present, so the key is never added when absent — that's
+  // what keeps a strip authored before plan 017 step 6.3 byte-identical on round-trip. When present:
+  // an array of unique non-negative ints, each a valid cell index (`< frames`). Its members are the
+  // row-major grid cells to SKIP; the played set is `[0..frames-1]` minus omit (see DecorAnim doc).
+  let omit: number[] | undefined;
+  if (obj.omit !== undefined) {
+    const arr = expectArray(obj.omit, `${path}.omit`);
+    omit = arr.map((v, i) => {
+      const n = expectInt(v, `${path}.omit[${i}]`);
+      if (n < 0) fail(`${path}.omit[${i}] must be >= 0 (got ${n})`);
+      if (n >= frames) fail(`${path}.omit[${i}] ${n} must be < frames (${frames})`);
+      return n;
+    });
+    if (new Set(omit).size !== omit.length) {
+      fail(`${path}.omit must not contain duplicate indices`);
+    }
+    // Defensive guard (mirrors the 6.2 server sanitiser): the played set must have >= 1 frame. An
+    // anim whose omit skips EVERY cell would hand Phaser's generateFrameNumbers an empty list and
+    // crash it at draw time.
+    if (frames - omit.length < 1) {
+      fail(`${path}.omit skips every frame — at least one played frame is required`);
+    }
+  }
+  // omit LAST so a legacy anim's field order ({frameWidth, frameHeight, frames, fps}) is preserved.
+  return { frameWidth, frameHeight, frames, fps, ...(omit !== undefined ? { omit } : {}) };
 }
 
 const PORTAL_FACINGS: ReadonlySet<string> = new Set(['up', 'down', 'left', 'right']);

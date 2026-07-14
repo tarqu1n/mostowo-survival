@@ -34,6 +34,9 @@ Data-driven content · pure systems · decoupled scenes:
   scene managers (`world/` = the state-owning world subsystems, e.g. `ResourceNodeManager`/`EnemyManager`).
 - **`src/ui/`** — Container-based UI kit (`Button`, `Panel`, `arrangeRow/Column/Grid`, `theme`).
 - **`src/render/`** — baked textures (e.g. `glowTexture.ts`), not frame-loop shaders.
+- **`src/editor/`** — dev-only Map Builder (`editor.html`), styled with **Tailwind v4 + shadcn/ui**
+  (canonical palette as `@theme` tokens in `editor.css`); excluded from the prod build — the game
+  page never loads Tailwind.
 - **`tests/`** — three-tier harness (unit / scenario / boot canary).
 
 Patterns each seam follows: [docs/CONVENTIONS.md](docs/CONVENTIONS.md).

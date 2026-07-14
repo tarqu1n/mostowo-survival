@@ -13,6 +13,7 @@
  *   PUT  /__editor/world           -> writes body to world.json, regens manifest
  *   PUT  /__editor/maps/:id/thumb  -> writes PNG body to public/assets/maps/thumbs/<id>.png
  *   PUT  /__editor/asset-override  -> patches a pack.json asset override, reruns the asset pipeline
+ *   PUT  /__editor/asset-regions   -> replaces a pack.json regions list, reruns the asset pipeline
  *
  * Deliberately dumb: no `parseMap`/`parseWorldLayout` here — the editor validates client-side
  * before every PUT (plan 014 step 4). It DOES sanitise `:id` against path traversal
@@ -25,7 +26,11 @@
  * it patches `<pack>/pack.json`'s `overrides[relPath]` (merged into any existing entry, never
  * replaced wholesale) then reruns BOTH generators, in order, as child processes —
  * `gen_regions.py` first (asset-catalog.mjs's `mergeRegions` FATALs on a sidecar that's gone stale
- * relative to a just-changed `pack.json`, so the order matters), then `assets:catalog`. Fixed argv
+ * relative to a just-changed `pack.json`, so the order matters), then `assets:catalog`. Since plan
+ * 017 step 6, a `type:'strip'` patch also understands `cols`/`omit` (geometry mode: `frames` is
+ * derived as `cols*rows` by the catalog builder, not authored; `omit` lists cell indices to skip)
+ * alongside the legacy `frames`/`rows` fields — see `sanitiseOverridePatch` below for the exact
+ * validation. Fixed argv
  * arrays, no shell (`execFile`, never `exec`) — the request body only ever supplies a pack id/relative
  * path/patch, sanitised below, never a literal command. Concurrent PUTs are serialized through
  * `enqueueRegen` (a simple in-flight promise queue) so two overlapping reclassifies can't race two
@@ -34,8 +39,26 @@
  * degrade: the response tells the caller to finish the regen with the two documented commands
  * (`python3 scripts/pixel-crawler/gen_regions.py && npm run assets:catalog`) rather than silently
  * leaving a stale catalog.
+ *
+ * `/__editor/asset-regions` (plan 017 step 4) is the in-editor Regions editor's backend: it REPLACES
+ * `<pack>/pack.json`'s `regions[relPath]` with the caller's complete hand-authored sprite list
+ * (whole-list, not a merge — an empty array DELETES the key, restoring auto-detection), then reruns
+ * the same serialised `gen_regions.py` + `assets:catalog` pipeline with the identical python3-ENOENT
+ * graceful degrade. `sanitiseRegions` rejects a list unless every rect is integer, `x>=0/y>=0/w>0/h>0`
+ * AND in-bounds of the sheet PNG (its width/height read straight off the IHDR chunk by `readPngSize`,
+ * mirroring `asset-catalog.mjs` — NEVER importing that module, which runs its whole build on import),
+ * so a bad box can't reach `pack.json`. Deliberately does NOT touch the separate `regionParams` key.
  */
-import { mkdirSync, readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
+import {
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  readdirSync,
+  existsSync,
+  openSync,
+  readSync,
+  closeSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 
@@ -62,9 +85,18 @@ function sanitiseRelPath(relPath) {
 }
 
 /** Narrows an untrusted PUT body's `patch` down to exactly the fields `pack.json` `overrides`
- *  entries understand (plan 014 step 7c: `type`/`frames`/`rows`) — returns `null` on anything else,
- *  so a malformed/unexpected field can never reach the written `pack.json`. */
-function sanitiseOverridePatch(patch) {
+ *  entries understand (plan 014 step 7c: `type`/`frames`/`rows`; plan 017 step 6: `cols`/`omit` for
+ *  `type:'strip'` geometry mode) — returns `null` on anything else, so a malformed/unexpected field
+ *  can never reach the written `pack.json`. `frames`/`rows` (legacy strip mode, unchanged) and
+ *  `cols`/`omit` (geometry mode) are each validated independently — a client is expected to send one
+ *  shape or the other, never both, and the catalog builder (`asset-catalog.mjs`) ignores `frames`
+ *  when `cols` is present, so this function doesn't try to reconcile them. `cols` is the strip's
+ *  column count (`frameWidth = w/cols`); `omit` (only accepted alongside `cols`) is an array of
+ *  cell indices, row-major `0..cols*rows-1` (rows defaulting to 1), to drop from the played frame
+ *  set — rejected if any index is out of range, or if it would omit every cell (played count must
+ *  stay `>= 1`). The array itself is passed through unsanitised beyond int/range checks; dedupe/sort
+ *  is the catalog builder's job (plan 017 step 6.1). */
+export function sanitiseOverridePatch(patch) {
   if (typeof patch !== 'object' || patch === null || Array.isArray(patch)) return null;
   const out = {};
   if (patch.type !== undefined) {
@@ -79,7 +111,63 @@ function sanitiseOverridePatch(patch) {
     if (!Number.isInteger(patch.rows) || patch.rows < 1) return null;
     out.rows = patch.rows;
   }
+  if (patch.cols !== undefined) {
+    if (!Number.isInteger(patch.cols) || patch.cols < 1) return null;
+    out.cols = patch.cols;
+  }
+  if (patch.omit !== undefined) {
+    if (patch.cols === undefined) return null;
+    if (!Array.isArray(patch.omit) || !patch.omit.every((i) => Number.isInteger(i) && i >= 0)) {
+      return null;
+    }
+    out.omit = patch.omit;
+  }
+  if (patch.cols !== undefined && patch.omit !== undefined) {
+    const cells = patch.cols * (patch.rows ?? 1);
+    if (patch.omit.some((i) => i >= cells)) return null;
+    if (cells - new Set(patch.omit).size < 1) return null;
+  }
   if (Object.keys(out).length === 0) return null;
+  return out;
+}
+
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+/** Reads a PNG's pixel dimensions straight off its IHDR chunk (the first 24 bytes: 8-byte signature,
+ *  then the IHDR length/type/width/height), the same way `scripts/asset-catalog.mjs`'s `readPngSize`
+ *  does — WITHOUT importing that module (it runs its entire catalog build on import). Throws on a
+ *  short read or a bad signature so a non-PNG / truncated file can't yield a bogus bound. */
+function readPngSize(pngPath) {
+  const fd = openSync(pngPath, 'r');
+  try {
+    const header = Buffer.alloc(24);
+    const read = readSync(fd, header, 0, 24, 0);
+    if (read < 24 || !header.subarray(0, 8).equals(PNG_SIGNATURE)) {
+      throw new Error(`not a PNG: ${pngPath}`);
+    }
+    return { width: header.readUInt32BE(16), height: header.readUInt32BE(20) };
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/** Narrows an untrusted PUT body's `regions` down to a clean array of bare `{x,y,w,h}` integer rects
+ *  (plan 017 step 4) — mirrors `sanitiseOverridePatch`'s all-or-nothing posture: returns `null` if the
+ *  input isn't an array, or ANY rect is non-integer, has `x<0/y<0/w<1/h<1`, or falls outside the
+ *  `sheetW`×`sheetH` sheet — so a malformed/out-of-bounds box can never reach the written `pack.json`.
+ *  Reads only x/y/w/h (ignoring any stray keys like the catalog's `key`). An empty array is VALID
+ *  (the caller uses it to delete the override). */
+function sanitiseRegions(regions, sheetW, sheetH) {
+  if (!Array.isArray(regions)) return null;
+  const out = [];
+  for (const r of regions) {
+    if (typeof r !== 'object' || r === null || Array.isArray(r)) return null;
+    const { x, y, w, h } = r;
+    if (![x, y, w, h].every(Number.isInteger)) return null;
+    if (x < 0 || y < 0 || w < 1 || h < 1) return null;
+    if (x + w > sheetW || y + h > sheetH) return null;
+    out.push({ x, y, w, h });
+  }
   return out;
 }
 
@@ -292,6 +380,68 @@ export function editorApiPlugin() {
             // below (including python3 ENOENT) is reported to the caller as the documented
             // graceful degrade (see module doc), never rolled back: the override the author just
             // set is real, only the regen needs finishing by hand.
+            const result = await enqueueRegen(root);
+            if (!result.ok) {
+              sendJson(res, 502, { error: result.error, warnings: result.warnings });
+              return;
+            }
+            sendJson(res, 200, { ok: true, warnings: result.warnings });
+            return;
+          }
+
+          if (path === '/__editor/asset-regions' && req.method === 'PUT') {
+            let payload;
+            try {
+              payload = JSON.parse((await readBody(req)).toString('utf8'));
+            } catch {
+              sendJson(res, 400, { error: 'invalid JSON body' });
+              return;
+            }
+            const packId = sanitisePackId(payload?.packId);
+            const relPath = sanitiseRelPath(payload?.relPath);
+            if (!packId || !relPath || !Array.isArray(payload?.regions)) {
+              sendJson(res, 400, { error: 'invalid packId/relPath/regions' });
+              return;
+            }
+            const packJsonPath = join(tilesetsDir, packId, 'pack.json');
+            if (!existsSync(packJsonPath)) {
+              sendJson(res, 404, { error: `pack "${packId}" not found` });
+              return;
+            }
+            const pngPath = join(tilesetsDir, packId, relPath);
+            if (!existsSync(pngPath)) {
+              sendJson(res, 404, { error: `sheet "${relPath}" not found in pack "${packId}"` });
+              return;
+            }
+            let sheet;
+            try {
+              sheet = readPngSize(pngPath);
+            } catch (e) {
+              sendJson(res, 400, { error: `could not read sheet PNG: ${e.message}` });
+              return;
+            }
+            const regions = sanitiseRegions(payload.regions, sheet.width, sheet.height);
+            if (regions === null) {
+              sendJson(res, 400, {
+                error: `invalid regions — each must be an integer {x,y,w,h} with x/y>=0, w/h>0, in-bounds of ${sheet.width}×${sheet.height}`,
+              });
+              return;
+            }
+
+            const pack = JSON.parse(readFileSync(packJsonPath, 'utf8'));
+            pack.regions = pack.regions ?? {};
+            // Whole-list replace (NOT a merge): the caller sends the complete hand-authored list. An
+            // empty list deletes the key so the sheet falls back to connected-component detection.
+            if (regions.length === 0) {
+              delete pack.regions[relPath];
+            } else {
+              pack.regions[relPath] = regions;
+            }
+            writeFileSync(packJsonPath, `${JSON.stringify(pack, null, 2)}\n`);
+
+            // As with /__editor/asset-override: the pack.json write above is already durable, so a
+            // generator failure below (incl. python3 ENOENT) is reported as the documented graceful
+            // degrade, never rolled back — only the regen needs finishing by hand.
             const result = await enqueueRegen(root);
             if (!result.ok) {
               sendJson(res, 502, { error: result.error, warnings: result.warnings });

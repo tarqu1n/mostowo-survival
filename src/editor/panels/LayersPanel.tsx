@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useEditorStore } from '../store/editorStore';
+import { Button } from '../ui/button';
+import { cn } from '../lib/utils';
 
 /**
  * Layers panel (plan 014 step 6) — lists the open map's tile layers, select/add/rename/delete/
@@ -14,6 +16,11 @@ import { useEditorStore } from '../store/editorStore';
  * Re-render note: see `LibraryPanel`'s module doc — `map` is mutated in place, so this subscribes to
  * `docRevision`/`mapEpoch` only as re-render triggers and reads `map` fresh via `getState()`.
  */
+
+/** Shared heading treatment for this pane (plan 020 step 8) — reproduces the old `.editor-pane h2`
+ *  uppercase/tracking/dim-colour look, which was dropped along with the shared rule (see LibraryPanel). */
+const headingClass = 'mb-2 text-[0.85rem] uppercase tracking-[0.04em] text-fg-dim';
+
 export function LayersPanel() {
   const activeLayerId = useEditorStore((s) => s.activeLayerId);
   const hiddenLayerIds = useEditorStore((s) => s.hiddenLayerIds);
@@ -28,8 +35,8 @@ export function LayersPanel() {
   if (!map) {
     return (
       <>
-        <h2>Layers</h2>
-        <p className="editor-placeholder">No map open.</p>
+        <h2 className={headingClass}>Layers</h2>
+        <p className="text-[0.9rem] text-muted-2">No map open.</p>
       </>
     );
   }
@@ -44,27 +51,37 @@ export function LayersPanel() {
 
   return (
     <>
-      <h2>Layers</h2>
-      <button onClick={() => useEditorStore.getState().addLayer()}>+ Add layer</button>
-      <ul className="layers-list">
+      <h2 className={headingClass}>Layers</h2>
+      <Button size="sm" onClick={() => useEditorStore.getState().addLayer()}>
+        + Add layer
+      </Button>
+      <ul className="mt-2.5 flex list-none flex-col gap-0.5 p-0">
         {[...layers].reverse().map((layer) => {
           const index = layers.indexOf(layer);
           const isActive = layer.id === activeLayerId;
           const isHidden = hiddenLayerIds.includes(layer.id);
           const isRenaming = renamingId === layer.id;
           return (
-            <li key={layer.id} className={`layers-item ${isActive ? 'is-active' : ''}`}>
-              <button
-                className="layers-eye"
+            <li
+              key={layer.id}
+              className={cn(
+                'flex items-center gap-1 rounded-md px-1 py-[3px]',
+                isActive && 'bg-surface',
+              )}
+            >
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="shrink-0"
                 title={isHidden ? 'Show layer' : 'Hide layer (view only — not saved)'}
                 onClick={() => useEditorStore.getState().toggleLayerVisibility(layer.id)}
               >
                 {isHidden ? '🚫' : '👁'}
-              </button>
+              </Button>
 
               {isRenaming ? (
                 <input
-                  className="layers-rename-input"
+                  className="min-w-0 flex-1 rounded-[3px] border border-border bg-inset px-1 py-0.5 font-[inherit] text-fg"
                   autoFocus
                   value={renameValue}
                   onChange={(e) => setRenameValue(e.target.value)}
@@ -75,8 +92,10 @@ export function LayersPanel() {
                   }}
                 />
               ) : (
-                <button
-                  className="layers-name"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto flex-1 justify-start overflow-hidden px-1 py-0.5 text-left font-normal text-ellipsis whitespace-nowrap"
                   onClick={() => useEditorStore.getState().setActiveLayer(layer.id)}
                   onDoubleClick={() => {
                     setRenamingId(layer.id);
@@ -85,10 +104,13 @@ export function LayersPanel() {
                   title="Click to select as the paint target, double-click to rename"
                 >
                   {layer.name}
-                </button>
+                </Button>
               )}
 
-              <label className="layers-overhead" title="Renders above entities in-game (overhead)">
+              <label
+                className="flex flex-none items-center gap-0.5 text-[0.7rem] text-fg-dim"
+                title="Renders above entities in-game (overhead)"
+              >
                 <input
                   type="checkbox"
                   checked={layer.overhead}
@@ -97,27 +119,36 @@ export function LayersPanel() {
                 OH
               </label>
 
-              <button
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="shrink-0"
                 title="Bring forward (render on top)"
                 disabled={index === layers.length - 1}
                 onClick={() => useEditorStore.getState().moveLayer(layer.id, 'forward')}
               >
                 ↑
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="shrink-0"
                 title="Send backward (render underneath)"
                 disabled={index === 0}
                 onClick={() => useEditorStore.getState().moveLayer(layer.id, 'backward')}
               >
                 ↓
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="shrink-0"
                 title="Delete layer"
                 disabled={layers.length <= 1}
                 onClick={() => useEditorStore.getState().deleteLayer(layer.id)}
               >
                 ✕
-              </button>
+              </Button>
             </li>
           );
         })}

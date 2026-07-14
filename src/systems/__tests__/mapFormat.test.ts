@@ -32,7 +32,13 @@ interface RawObjectFixture {
   depth?: number;
   collision?: { col: number; row: number; w: number; h: number };
   region?: { x: number; y: number; w: number; h: number };
-  anim?: { frameWidth: number; frameHeight: number; frames: number; fps: number };
+  anim?: {
+    frameWidth: number;
+    frameHeight: number;
+    frames: number;
+    fps: number;
+    omit?: unknown;
+  };
   name?: string;
   rect?: { col: number; row: number; w: number; h: number };
   facing?: string;
@@ -399,6 +405,107 @@ describe('parseMap', () => {
         expect(Object.prototype.hasOwnProperty.call(obj, 'anim')).toBe(false);
       }
       expect(parseMap(JSON.parse(json))).toEqual(map);
+    });
+
+    describe('anim.omit (plan 017 step 6.3)', () => {
+      it('parses a legacy anim (no omit) and re-serializes byte-identical, WITHOUT an omit key', () => {
+        const raw = withRaw((r) => {
+          r.objects[2].anim = { frameWidth: 32, frameHeight: 48, frames: 4, fps: 8 };
+        });
+        const map = parseMap(raw);
+        const decor = decorAt(map, 'decor_0002');
+        expect(decor.anim).toEqual({ frameWidth: 32, frameHeight: 48, frames: 4, fps: 8 });
+        expect(decor.anim && 'omit' in decor.anim).toBe(false);
+
+        const json = serializeMap(map);
+        const parsedJson = JSON.parse(json) as {
+          objects: Array<{ id: string; anim?: Record<string, unknown> }>;
+        };
+        const animJson = parsedJson.objects.find((o) => o.id === 'decor_0002')?.anim;
+        expect(animJson).toEqual({ frameWidth: 32, frameHeight: 48, frames: 4, fps: 8 });
+        expect(animJson && Object.prototype.hasOwnProperty.call(animJson, 'omit')).toBe(false);
+        // Byte-identical: reparse yields the exact same object AND re-serializing gives the same JSON.
+        expect(parseMap(JSON.parse(json))).toEqual(map);
+        expect(serializeMap(parseMap(JSON.parse(json)))).toBe(json);
+      });
+
+      it('parses + round-trips a valid omit:[21] on frames:22 (played 21), omit preserved LAST', () => {
+        const raw = withRaw((r) => {
+          r.objects[2].anim = { frameWidth: 32, frameHeight: 48, frames: 22, fps: 8, omit: [21] };
+        });
+        const map = parseMap(raw);
+        const decor = decorAt(map, 'decor_0002');
+        expect(decor.anim).toEqual({
+          frameWidth: 32,
+          frameHeight: 48,
+          frames: 22,
+          fps: 8,
+          omit: [21],
+        });
+        // omit is the LAST key so legacy field order is preserved.
+        expect(decor.anim && Object.keys(decor.anim)).toEqual([
+          'frameWidth',
+          'frameHeight',
+          'frames',
+          'fps',
+          'omit',
+        ]);
+        const json = serializeMap(map);
+        const parsedJson = JSON.parse(json) as {
+          objects: Array<{ id: string; anim?: Record<string, unknown> }>;
+        };
+        const animJson = parsedJson.objects.find((o) => o.id === 'decor_0002')?.anim;
+        expect(animJson?.omit).toEqual([21]);
+        expect(parseMap(JSON.parse(json))).toEqual(map);
+      });
+
+      it('rejects a non-array omit', () => {
+        const raw = withRaw((r) => {
+          r.objects[2].anim = { frameWidth: 16, frameHeight: 16, frames: 4, fps: 8, omit: 3 };
+        });
+        expect(() => parseMap(raw)).toThrow(/anim\.omit must be an array/);
+      });
+
+      it('rejects a negative omit index', () => {
+        const raw = withRaw((r) => {
+          r.objects[2].anim = { frameWidth: 16, frameHeight: 16, frames: 4, fps: 8, omit: [-1] };
+        });
+        expect(() => parseMap(raw)).toThrow(/anim\.omit\[0\] must be >= 0/);
+      });
+
+      it('rejects a non-integer omit index', () => {
+        const raw = withRaw((r) => {
+          r.objects[2].anim = { frameWidth: 16, frameHeight: 16, frames: 4, fps: 8, omit: [1.5] };
+        });
+        expect(() => parseMap(raw)).toThrow(/anim\.omit\[0\] must be an integer/);
+      });
+
+      it('rejects a duplicate omit index', () => {
+        const raw = withRaw((r) => {
+          r.objects[2].anim = { frameWidth: 16, frameHeight: 16, frames: 4, fps: 8, omit: [1, 1] };
+        });
+        expect(() => parseMap(raw)).toThrow(/anim\.omit must not contain duplicate indices/);
+      });
+
+      it('rejects an omit index >= frames', () => {
+        const raw = withRaw((r) => {
+          r.objects[2].anim = { frameWidth: 16, frameHeight: 16, frames: 4, fps: 8, omit: [4] };
+        });
+        expect(() => parseMap(raw)).toThrow(/anim\.omit\[0\] 4 must be < frames \(4\)/);
+      });
+
+      it('rejects omit-everything (played count would be 0)', () => {
+        const raw = withRaw((r) => {
+          r.objects[2].anim = {
+            frameWidth: 16,
+            frameHeight: 16,
+            frames: 3,
+            fps: 8,
+            omit: [0, 1, 2],
+          };
+        });
+        expect(() => parseMap(raw)).toThrow(/anim\.omit skips every frame/);
+      });
     });
   });
 });

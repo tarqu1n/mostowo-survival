@@ -14,6 +14,10 @@ export interface CatalogPack {
   tileSize: number;
 }
 
+/** The three classifications an asset can carry. NOTE: the `'strip'` token is baked into `pack.json`
+ *  `rules`, the committed catalog, the server's `OVERRIDE_TYPES`, and `gen_regions.py`, so it stays
+ *  `'strip'` on the wire — but the editor UI DISPLAYS it as "Animated strip" (plan 017 step 6, a
+ *  label-only rename at the display layer). */
 export type CatalogAssetType = 'tile' | 'strip' | 'object';
 
 /** One detected sprite bounding box within an `object` atlas's sheet (plan 014 step 7a). `key` is
@@ -37,18 +41,24 @@ export interface CatalogAsset {
   /** Sheet/image pixel size. */
   w: number;
   h: number;
-  /** Frame count — present on `tile`/`strip` (sheet) assets, absent on standalone `object` images. */
+  /** Total grid cell count — present on `tile`/`strip` (sheet) assets, absent on standalone `object`
+   *  images. For a `strip`, plan 017 step 6 decouples this from the *played* frame set: `frames`
+   *  is always `cols*rows` (every cell in the grid), and `omit` (below) lists the cells skipped when
+   *  playing. A no-op for pre-6.4 data, where `frames` was already `cols*rows`. */
   frames?: number;
   /** Explicit per-frame cell size for a `strip` asset (Phaser `load.spritesheet` shape) — GRID
-   *  math, not just a single horizontal row (plan 014 step 7c): `frameHeight = h / rows`,
-   *  `frameWidth = w / (frames / rows)`, where `rows` defaults to 1 (the classic single-row case,
-   *  where this collapses to `frameHeight = h`, `frameWidth = w / frames`). `rows` itself isn't a
-   *  `CatalogAsset` field — it's a `pack.json` override input consumed at catalog-build time; a
-   *  consumer that needs it back derives `rows = h / frameHeight`, `cols = w / frameWidth`. Never a
-   *  square/smaller-dim guess (see `src/data/tileset.ts` `StripAnim` doc and
-   *  `scripts/asset-catalog.mjs`'s `stripFrameDims`). Absent on `tile`/`object` assets. */
+   *  math, not just a single horizontal row (plan 014 step 7c): `cols = w / frameWidth`,
+   *  `rows = h / frameHeight`, i.e. `frameWidth = w / cols`, `frameHeight = h / rows`. `cols`/`rows`
+   *  themselves aren't `CatalogAsset` fields — they're `pack.json` override inputs consumed at
+   *  catalog-build time; a consumer that needs them back derives them from `w`/`frameWidth` and
+   *  `h`/`frameHeight`. Never a square/smaller-dim guess (see `src/data/tileset.ts` `StripAnim` doc
+   *  and `scripts/asset-catalog.mjs`'s `stripFrameDims`). Absent on `tile`/`object` assets. */
   frameWidth?: number;
   frameHeight?: number;
+  /** Cell indices (row-major, `0..frames-1`) skipped by a geometry-mode `strip` — present only when
+   *  non-empty; the played set is `[0..frames-1]` minus `omit` (plan 017 step 6). Absent on
+   *  `tile`/`object` assets and on a strip with no omitted cells. */
+  omit?: number[];
   /** Present on `object` assets detected as multi-sprite atlases (>=2 regions merged from
    *  `<pack>/regions.json`) — see `scripts/pixel-crawler/gen_regions.py`. Absent ⇒ a plain
    *  single-sprite object (place the whole image), including every `object` asset with 0 or 1

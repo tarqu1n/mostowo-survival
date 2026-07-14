@@ -10,12 +10,22 @@ from compose import PC, sheet, font
 def components(rel, alpha_thresh=8, gap=1, min_area=40):
     im = np.asarray(sheet(rel))
     real = im[:, :, 3] > alpha_thresh          # true object pixels
+    H, W = real.shape
     a = real.copy()
     if gap:                                     # dilate only to bridge tiny gaps
         from itertools import product
+        # BOUNDED shift-and-OR (NOT np.roll, which is circular): np.roll wraps a bottom-edge
+        # sprite's dilation onto the top edge (and left<->right), merging sprites that sit on
+        # opposite borders into one component so neither is detected separately. A clipped shift
+        # keeps the same 8-connected square dilation without leaking across the sheet edges.
         for dy, dx in product(range(-gap, gap+1), repeat=2):
-            a = a | np.roll(np.roll(real, dy, 0), dx, 1)
-    H, W = a.shape
+            if dy == 0 and dx == 0:
+                continue
+            shifted = np.zeros_like(real)
+            ys_dst, ys_src = slice(max(0, dy), H - max(0, -dy)), slice(max(0, -dy), H - max(0, dy))
+            xs_dst, xs_src = slice(max(0, dx), W - max(0, -dx)), slice(max(0, -dx), W - max(0, dx))
+            shifted[ys_dst, xs_dst] = real[ys_src, xs_src]
+            a |= shifted
     lbl = np.zeros((H, W), int); cur = 0; boxes = []
     for sy in range(H):
         for sx in range(W):

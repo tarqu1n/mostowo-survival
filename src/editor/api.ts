@@ -75,19 +75,35 @@ export async function putThumb(id: string, png: Blob): Promise<void> {
 }
 
 /** A `pack.json` `overrides[relPath]` patch (plan 014 step 7c) — merged server-side into any
- *  existing override for that asset, never a wholesale replace. `type` forces classification;
- *  `frames`/`rows` describe a strip's frame grid (`rows` only meaningful when the resolved type is
- *  `strip`, default 1 if omitted — same meaning as the `pack.json` field). */
+ *  existing override for that asset, never a wholesale replace. `type` forces classification.
+ *  Plan 017 step 6 decouples grid geometry from the played-frame set: when `cols` is present the
+ *  resolved type is `strip` in **geometry mode** — `frames` is derived server-side as `cols*rows`
+ *  (`rows` defaults to 1 if omitted) and is never itself authored; `omit` lists the row-major cell
+ *  indices (`0..cols*rows-1`) to skip when playing, only meaningful alongside `cols`. `frames`/`rows`
+ *  without `cols` remain the legacy welded shape (kept for older overrides — a strip authored before
+ *  6.4, or a caller that hasn't migrated). */
 export interface AssetOverridePatch {
   type?: 'tile' | 'strip' | 'object';
   frames?: number;
   rows?: number;
+  cols?: number;
+  omit?: number[];
 }
 
 export interface AssetOverrideResult {
   /** Every non-empty output line from both regen child processes (plan pipes generator warnings
    *  back verbatim) — includes each script's own "wrote ..." summary line, not just warnings. */
   warnings: string[];
+}
+
+/** A bare sprite bounding box — exactly the shape `pack.json`'s `regions[relPath]` stores (plan 014
+ *  step 7a; the wire type for plan 017 step 4's in-app region editing). No `key`: that's a
+ *  catalog-only, coordinate-derived field (`catalog.ts`'s `CatalogRegion`). */
+export interface RegionRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 /** Patches `<pack>/pack.json`'s `overrides[relPath]` and reruns `gen_regions.py` +
@@ -110,6 +126,30 @@ export async function putAssetOverride(
       body: JSON.stringify({ packId, relPath, patch }),
     }),
     `putAssetOverride(${packId}/${relPath})`,
+  );
+  return (await res.json()) as AssetOverrideResult;
+}
+
+/** Replaces `<pack>/pack.json`'s `regions[relPath]` with `regions` WHOLE-LIST (not a merge — it's the
+ *  complete hand-authored sprite list, plan 017 step 4) and reruns `gen_regions.py` + `assets:catalog`
+ *  through the dev middleware (`/__editor/asset-regions`). An EMPTY array deletes the key = fall back
+ *  to auto-detection ("Reset to auto-detect"). Mirrors `putAssetOverride` exactly, including the
+ *  refetch-is-the-caller's-job contract (run `loadCatalog` afterwards) and throwing on a generator
+ *  failure (including the "python3 not found" graceful-degrade) via `expectOk`. The server clamps each
+ *  rect in-bounds of the sheet PNG and rejects an out-of-bounds one, so a bad box can't reach
+ *  `pack.json`. */
+export async function putAssetRegions(
+  packId: string,
+  relPath: string,
+  regions: RegionRect[],
+): Promise<AssetOverrideResult> {
+  const res = await expectOk(
+    await fetch(`${BASE}/asset-regions`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ packId, relPath, regions }),
+    }),
+    `putAssetRegions(${packId}/${relPath})`,
   );
   return (await res.json()) as AssetOverrideResult;
 }

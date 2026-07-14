@@ -1,877 +1,117 @@
-/* Map Builder editor styles (plan 014) — plain CSS, dark theme, no framework. */
+/* Map Builder editor styles (plan 014, plan 020) — Tailwind v4 entry.
+ *
+ * This file is the editor's ONE styling entry: `@import "tailwindcss"` (Tailwind preflight +
+ * utilities), the canonical brown/cream palette as `@theme` tokens (single source of truth),
+ * shadcn/ui's semantic CSS vars wired to those same tokens (one palette, not two), and the couple of
+ * primitives that genuinely can't be utilities (the animated-strip keyframe, the `pixelated`
+ * image-rendering utility) plus a minimal page baseline. All hand-written component rules have been
+ * culled — styling lives in Tailwind utilities + shadcn components colocated in the TSX (plan 020,
+ * Step 12). Imported only by src/editor/main.tsx → editor.html; the game page (index.html) never
+ * loads it, so Tailwind's preflight never touches the Phaser game. */
+@import 'tailwindcss';
 
+/* Canonical palette (plan 020) — raw brown/cream values, each defined exactly once. Token names
+ * deliberately avoid shadcn's semantic utility names (background/foreground/card/popover/primary/
+ * secondary/muted/accent/destructive/border/input/ring), which shadcn owns below. Two names differ
+ * from the plan's suggestions because of that collision: #5a4632 is `--color-active` (plan said
+ * --color-accent; shadcn owns accent=#3a2f2a) and #a99a8c is `--color-fg-dim` (plan said
+ * --color-muted; shadcn owns muted=surface-subtle). #3a2f2a (default border) has no palette token —
+ * use shadcn's `border-border` / `bg-border`. */
+@theme {
+  --color-app: #14100f;
+  --color-inset: #0e0b0a;
+  --color-inset-2: #17120f;
+  --color-raised: #1b1614;
+  --color-surface-subtle: #241d1a;
+  --color-surface: #2c2420;
+  --color-surface-3: #3a302b;
+  --color-border-muted: #6a5d54;
+  --color-active: #5a4632;
+  --color-accent-border: #7a5c3c;
+  --color-fg-bright: #f4ecd8;
+  --color-fg: #e8e0d8;
+  --color-fg-2: #d8c9bb;
+  --color-fg-muted: #c9bcae;
+  --color-fg-dim: #a99a8c;
+  --color-muted-2: #8a7f76;
+  --color-gold: #e0b020;
+  --color-gold-light: #f0d890;
+  --color-selection: #5fd0ff;
+  --color-pink: #e0708a;
+  --color-warm: #e0a08c;
+  --color-danger: #e07a6a;
+  --color-danger-strong: #b23b3b;
+  --color-danger-bg: #4a2420;
+  --color-danger-fg: #f4d0c8;
+  --color-ok-bg: #2f4632;
+  --color-ok-border: #46703c;
+}
+
+/* shadcn/ui semantic variables, wired to the palette tokens above (one palette). #3a2f2a (border /
+ * button-hover) is the only raw hex here — it's a shadcn semantic, not a palette utility. */
 :root {
   color-scheme: dark;
-}
-
-html,
-body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  background: #14100f;
-  color: #e8e0d8;
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    sans-serif;
-}
-
-#editor-root {
-  height: 100vh;
-}
-
-button {
-  font: inherit;
-  color: #e8e0d8;
-  background: #2c2420;
-  border: 1px solid #3a2f2a;
-  border-radius: 4px;
-  padding: 4px 10px;
-  cursor: pointer;
-}
-
-button:hover:not(:disabled) {
-  background: #3a2f2a;
-}
-
-button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-button.is-active {
-  background: #5a4632;
-  border-color: #7a5c3c;
-}
-
-/* ---- Shell: toolbar over a three-pane body ---- */
-
-.editor-shell {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-}
-
-.editor-body {
-  display: grid;
-  /* Library column width is set inline (drag-resizable, plan-less quick add); the 6px column next to
-     it is the drag handle. */
-  grid-template-columns: 240px 6px 1fr 280px;
-  flex: 1;
-  min-height: 0; /* let the viewport pane shrink instead of overflowing the shell */
-}
-
-.editor-resize-handle {
-  cursor: col-resize;
-  background: transparent;
-  touch-action: none;
-}
-
-.editor-resize-handle:hover,
-.editor-resize-handle.is-dragging {
-  background: #5a4632;
-}
-
-.editor-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 6px 12px;
-  background: #1b1614;
-  border-bottom: 1px solid #2c2420;
-}
-
-.editor-toolbar-group {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.editor-toolbar-title {
-  flex: 1;
-  justify-content: center;
-  font-size: 0.9rem;
-}
-
-.editor-mapid {
-  color: #8a7f76;
-  font-size: 0.8rem;
-}
-
-.editor-dirty {
-  color: #e0b020;
-}
-
-/* ---- Panes ---- */
-
-.editor-pane {
-  overflow: auto;
-  padding: 12px;
-  box-sizing: border-box;
-}
-
-.editor-pane h2 {
-  margin: 0 0 8px;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #a99a8c;
-}
-
-.editor-pane--library {
-  background: #1b1614;
-  border-right: 1px solid #2c2420;
-}
-
-.editor-pane--viewport {
-  display: flex;
-  flex-direction: column;
-  background: #0e0b0a;
-  padding: 0;
-  overflow: hidden;
-}
-
-/* ---- Central-pane tab strip + panels (plan 017 step 2) ---- */
-
-.editor-tab-strip {
-  display: flex;
-  align-items: stretch;
-  gap: 2px;
-  flex: none;
-  padding: 4px 6px 0;
-  background: #1b1614;
-  border-bottom: 1px solid #2c2420;
-  overflow-x: auto;
-}
-
-/* A chip is a <button>; these override the base button styles for the tab look. Object chips carry a
-   ✕ close; Map/World chips don't. */
-.editor-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: none;
-  max-width: 200px;
-  padding: 4px 10px;
-  font-size: 0.8rem;
-  color: #a99a8c;
-  background: #241d1a;
-  border: 1px solid #2c2420;
-  border-bottom: none;
-  border-radius: 5px 5px 0 0;
-  cursor: pointer;
-}
-
-.editor-tab:hover:not(.is-active) {
-  background: #2c2420;
-  color: #c9bcae;
-}
-
-.editor-tab.is-active {
-  /* match the panel background below so the active chip reads as continuous with its panel */
-  background: #0e0b0a;
-  color: #f4ecd8;
-  border-color: #3a2f2a;
-}
-
-.editor-tab-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.editor-tab-close {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  font-size: 0.7rem;
-  line-height: 1;
-  color: #8a7f76;
-  border-radius: 3px;
-  cursor: pointer;
-}
-
-.editor-tab-close:hover {
-  background: #4a2420;
-  color: #f4d0c8;
-}
-
-/* Every tab's panel is mounted at once and absolutely fills this area; only the active one is shown.
-   Inactive panels use `visibility:hidden` (via .is-hidden), never `display:none`, so the Phaser
-   Scale.RESIZE canvas in the Map panel keeps its layout size and never collapses to 0×0. */
-.editor-tab-panels {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-}
-
-.editor-tab-panel {
-  position: absolute;
-  inset: 0;
-}
-
-.editor-tab-panel.is-hidden {
-  visibility: hidden;
-  pointer-events: none;
-}
-
-/* ---- Object-editor tab (plan 017 step 3: full-size reclassify + correct per-frame preview) ---- */
-
-.editor-object-tab {
-  width: 100%;
-  height: 100%;
-  overflow: auto;
-  padding: 16px 18px;
-  box-sizing: border-box;
-}
-
-.editor-object-tab-title {
-  margin: 0 0 12px;
-  font-size: 1rem;
-  color: #f4ecd8;
-}
-
-.editor-object-tab-meta {
-  margin: 0 0 14px;
-  font-size: 0.85rem;
-}
-
-.editor-object-tab-meta > div {
-  display: flex;
-  gap: 10px;
-  padding: 2px 0;
-}
-
-.editor-object-tab-meta dt {
-  flex: none;
-  width: 56px;
-  color: #8a7f76;
-}
-
-.editor-object-tab-meta dd {
-  margin: 0;
-  color: #c9bcae;
-  word-break: break-all;
-}
-
-.editor-object-tab-id {
-  font-size: 0.78rem;
-  color: #8a7f76;
-  word-break: break-all;
-}
-
-.editor-object-form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-top: 16px;
-  max-width: 680px;
-}
-
-.editor-object-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: flex-end;
-}
-
-.editor-object-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.editor-object-field-label {
-  font-size: 0.72rem;
-  color: #8a7f76;
-}
-
-.editor-object-field select,
-.editor-object-field input {
-  font: inherit;
-  color: #e8e0d8;
-  background: #0e0b0a;
-  border: 1px solid #3a2f2a;
-  border-radius: 4px;
-  padding: 4px 8px;
-}
-
-.editor-object-field input {
-  width: 80px;
-}
-
-.editor-object-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.editor-object-chip {
-  font-size: 0.72rem;
-  padding: 2px 8px;
-}
-
-.editor-object-previews {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 28px;
-  align-items: flex-start;
-}
-
-.editor-object-preview {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.editor-object-preview figcaption {
-  font-size: 0.72rem;
-  color: #8a7f76;
-}
-
-/* Whole-sheet preview; the grid overlay is an absolutely-filling CSS grid drawn over it. */
-.editor-object-sheet {
-  position: relative;
-  background-repeat: no-repeat;
-  border: 1px solid #3a2f2a;
-}
-
-.editor-object-grid-overlay {
-  position: absolute;
-  inset: 0;
-  display: grid;
-}
-
-.editor-object-grid-cell {
-  border: 1px solid #e0b020;
-  opacity: 0.85;
-}
-
-/* Correctly cropped per-frame swatches — a checker backing so transparent frames read clearly. */
-.editor-object-frames {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  max-width: 340px;
-}
-
-.editor-object-frame {
-  display: block;
-  background-repeat: no-repeat;
-  border: 1px solid #3a2f2a;
-  background-color: #17120f;
-}
-
-.editor-object-error {
-  color: #e07a6a;
-  font-size: 0.8rem;
-  margin: 0;
-}
-
-.editor-object-warnings {
-  font-size: 0.72rem;
-  color: #8a7f76;
-  max-height: 96px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.editor-object-actions {
-  display: flex;
-  gap: 8px;
-  padding-top: 4px;
-  border-top: 1px solid #2c2420;
-}
-
-.editor-pane--inspector {
-  background: #1b1614;
-  border-left: 1px solid #2c2420;
-}
-
-.editor-placeholder {
-  color: #8a7f76;
-  font-size: 0.9rem;
-}
-
-/* The Phaser canvas host fills the centre pane; Scale.RESIZE tracks its size. */
-.editor-viewport-host {
-  width: 100%;
-  height: 100%;
-}
-
-.editor-empty-hint {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #6a5d54;
-  font-size: 0.95rem;
-  pointer-events: none;
-}
-
-/* ---- Modals (New / Open) ---- */
-
-.editor-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-
-.editor-modal {
-  background: #1b1614;
-  border: 1px solid #3a2f2a;
-  border-radius: 6px;
-  padding: 16px 18px;
-  min-width: 280px;
-  max-width: 360px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
-}
-
-.editor-modal h3 {
-  margin: 0 0 12px;
-  font-size: 1rem;
-}
-
-.editor-modal label {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin-bottom: 10px;
-  font-size: 0.85rem;
-  color: #a99a8c;
-}
-
-.editor-modal input {
-  font: inherit;
-  color: #e8e0d8;
-  background: #0e0b0a;
-  border: 1px solid #3a2f2a;
-  border-radius: 4px;
-  padding: 5px 8px;
-}
-
-.editor-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 6px;
-}
-
-/* ---- Shortcuts panel ---- */
-
-.editor-modal--wide {
-  max-width: 560px;
-}
-
-.shortcuts-body {
-  max-height: 65vh;
-  overflow-y: auto;
-  margin-bottom: 12px;
-}
-
-.shortcuts-group {
-  margin-bottom: 14px;
-}
-
-.shortcuts-group h4 {
-  margin: 0 0 6px;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #8a7f76;
-}
-
-.shortcuts-list {
-  margin: 0;
-}
-
-.shortcuts-row {
-  display: grid;
-  grid-template-columns: 190px 1fr;
-  gap: 10px;
-  align-items: baseline;
-  padding: 3px 0;
-  font-size: 0.85rem;
-}
-
-.shortcuts-row dt {
-  margin: 0;
-}
-
-.shortcuts-row dd {
-  margin: 0;
-  color: #c9bcae;
-}
-
-.shortcuts-or {
-  color: #8a7f76;
-  font-size: 0.75rem;
-}
-
-.shortcuts-row kbd {
-  display: inline-block;
-  font-family: inherit;
-  font-size: 0.72rem;
-  line-height: 1.4;
-  padding: 1px 6px;
-  color: #e8e0d8;
-  background: #0e0b0a;
-  border: 1px solid #3a2f2a;
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  white-space: nowrap;
-}
-
-.editor-map-list {
-  list-style: none;
-  margin: 0 0 10px;
-  padding: 0;
-  max-height: 260px;
-  overflow: auto;
-}
-
-.editor-map-list li {
-  margin-bottom: 4px;
-}
-
-.editor-map-list button {
-  width: 100%;
-  text-align: left;
-}
-
-.editor-error-text {
-  color: #e07a6a;
-  font-size: 0.8rem;
-  margin: -4px 0 8px;
-}
-
-/* ---- Toast ---- */
-
-.editor-toast {
-  position: fixed;
-  bottom: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 8px 16px;
-  border-radius: 5px;
-  font-size: 0.85rem;
-  z-index: 200;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-}
-
-.editor-toast--ok {
-  background: #2f4632;
-  border: 1px solid #46703c;
-}
-
-.editor-toast--error {
-  background: #4a2420;
-  border: 1px solid #b23b3b;
-  color: #f4d0c8;
-}
 
-/* Apply to any pixel-art image/canvas the editor renders (asset previews, the Phaser viewport). */
-.pixelated {
+  --background: var(--color-app);
+  --foreground: var(--color-fg);
+  --card: var(--color-raised);
+  --card-foreground: var(--color-fg);
+  --popover: var(--color-raised);
+  --popover-foreground: var(--color-fg);
+  --primary: var(--color-active);
+  --primary-foreground: var(--color-fg-bright);
+  --secondary: var(--color-surface);
+  --secondary-foreground: var(--color-fg);
+  --muted: var(--color-surface-subtle);
+  --muted-foreground: var(--color-muted-2);
+  --border: #3a2f2a;
+  --accent: var(--border);
+  --accent-foreground: var(--color-gold-light);
+  --destructive: var(--color-danger-strong);
+  --destructive-foreground: var(--color-danger-fg);
+  --input: var(--color-inset);
+  --ring: var(--color-accent-border);
+  --radius: 4px;
+}
+
+/* Bind shadcn's color/radius UTILITIES (bg-primary, text-muted-foreground, border-border, …) to the
+ * :root semantic vars, per the Tailwind-v4 shadcn convention. These names are disjoint from the
+ * @theme palette names above, so no token is defined twice and there are no circular var() refs. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+}
+
+/* Crisp pixel art on any image/canvas the editor renders (asset previews, Phaser viewport). Was the
+ * `.pixelated` class; a Tailwind v4 @utility so it composes with variants. */
+@utility pixelated {
   image-rendering: pixelated;
 }
 
-/* ---- Library panel (step 6) ---- */
-
-.lib-search {
-  width: 100%;
-  box-sizing: border-box;
-  font: inherit;
-  color: #e8e0d8;
-  background: #0e0b0a;
-  border: 1px solid #3a2f2a;
-  border-radius: 4px;
-  padding: 5px 8px;
-  margin-bottom: 10px;
-}
-
-.lib-tree {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 40vh;
-  overflow: auto;
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #2c2420;
-}
-
-.lib-tree-item {
-  text-align: left;
-  background: none;
-  border: none;
-  border-radius: 3px;
-  padding: 3px 6px;
-  font-size: 0.8rem;
-  color: #c9bcae;
-}
-
-.lib-tree-item:hover:not(:disabled) {
-  background: #2c2420;
-}
-
-.lib-tree-item.is-active {
-  background: #5a4632;
-  color: #f4ecd8;
-}
-
-.lib-tree-pack {
-  margin-bottom: 4px;
-}
-
-.lib-tree-pack-name {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: #6a5d54;
-  margin: 6px 0 2px;
-}
-
-.lib-results {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.lib-tile-sheet-name {
-  font-size: 0.75rem;
-  color: #a99a8c;
-  margin-bottom: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.lib-frame-grid {
-  display: grid;
-  gap: 1px;
-  overflow: auto;
-  max-height: 260px;
-  background: #0e0b0a;
-  padding: 2px;
-  border-radius: 3px;
-}
-
-.lib-frame {
-  position: relative;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 2px;
-  background: none;
-  line-height: 0;
-}
-
-.lib-frame.is-active {
-  border-color: #f0d890;
-}
-
-.lib-frame-swatch {
-  display: block;
-  image-rendering: pixelated;
-}
-
-.lib-card {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  text-align: left;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  padding: 4px;
-}
-
-.lib-card.is-active {
-  border-color: #f0d890;
-  background: #2c2420;
-}
-
-.lib-card--missing {
-  color: #e07a6a;
-  font-size: 0.75rem;
-}
-
-.lib-card-swatch {
-  flex: none;
-  width: 40px;
-  height: 40px;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
-  image-rendering: pixelated;
-  background-color: #0e0b0a;
-  border-radius: 2px;
-}
-
-.lib-card-label {
-  flex: 1;
-  font-size: 0.75rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.lib-heart {
-  flex: none;
-  position: absolute;
-  top: 0;
-  right: 1px;
-  font-size: 0.7rem;
-  color: #6a5d54;
-  cursor: pointer;
-}
-
-.lib-card .lib-heart {
-  position: static;
-  padding: 0 2px;
-}
-
-.lib-heart.is-fav {
-  color: #e0708a;
-}
-
-/* Reclassify ⚙ (plan 014 step 7c, rewired plan 017 step 2) — a small trigger self-anchored to the
-   top-right of any `position:relative` card wrapper; opens the asset's object-editor tab. */
-.lib-reclassify {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  z-index: 5;
-  display: inline-block;
-  font-size: 11px;
-  line-height: 14px;
-  padding: 1px 4px;
-  color: #8a7f76;
-  background: #0e0b0a;
-  border: 1px solid #3a2f2a;
-  border-radius: 3px;
-  cursor: pointer;
-}
-
-.lib-reclassify:hover {
-  color: #e0b020;
-  border-color: #5a4632;
-}
-
-/* ---- Atlas sheet picker + animated strip picker (step 7b) ---- */
-
-.lib-atlas-zoom {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 4px;
-}
-
-.lib-atlas-zoom input[type='range'] {
-  flex: 1;
-  min-width: 0;
-}
-
-.lib-atlas-zoom-btn {
-  flex: none;
-  width: 20px;
-  height: 20px;
-  line-height: 1;
-  border: 1px solid #3a302b;
-  border-radius: 3px;
-  background: #241d1a;
-  color: #d8c9bb;
-  cursor: pointer;
-}
-
-.lib-atlas-zoom-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.lib-atlas-zoom-val {
-  flex: none;
-  font-size: 0.7rem;
-  color: #a99a8c;
-  min-width: 26px;
-  text-align: right;
-}
-
-.lib-atlas-viewport {
-  max-height: 320px;
-  overflow: auto;
-  background: #0e0b0a;
-  border-radius: 3px;
-}
-
-.lib-atlas-canvas {
-  position: relative;
-  background-repeat: no-repeat;
-  background-color: #0e0b0a;
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-/* Pan affordance (middle-mouse-drag or hold-Space-drag) — higher specificity than any single-class
-   cursor rule set per-view (e.g. `.editor-region-canvas`'s crosshair), so it wins regardless of
-   declaration order. */
-.lib-atlas-canvas.is-pan-ready {
-  cursor: grab;
-}
-
-.lib-atlas-canvas.is-panning {
-  cursor: grabbing;
-}
-
-.lib-atlas-hotspot {
-  position: absolute;
-  margin: 0;
-  padding: 0;
-  border: 1px solid rgba(240, 216, 144, 0.35);
-  border-radius: 2px;
-  background: rgba(240, 216, 144, 0.08);
-}
-
-.lib-atlas-hotspot:hover {
-  background: rgba(240, 216, 144, 0.22);
-  border-color: rgba(240, 216, 144, 0.85);
-}
-
-.lib-atlas-hotspot.is-active {
-  background: rgba(95, 208, 255, 0.28);
-  border-color: #5fd0ff;
-}
-
-.lib-strip-anim {
-  flex-direction: column;
-  align-items: flex-start;
-}
-
-.lib-strip-swatch {
-  display: block;
-  background-repeat: no-repeat;
-  background-position: 0 0;
-  margin-bottom: 4px;
-  animation-name: lib-strip-play;
-  animation-iteration-count: infinite;
-}
-
-/* Pixel-exact frame stepping: the swatch is one frame wide and the sheet is drawn at its true scaled
- * width, so travelling background-position-x by the full strip width (`--strip-travel`, set inline to
- * `-frames*dispW`) over `steps(frames)` lands each step on a frame boundary — see AnimatedStripPicker's
- * doc for why the older percentage travel under-shifted. */
+/* Pixel-exact frame stepping for the Library's animated-strip picker: the swatch is one frame wide
+ * and the sheet is drawn at its true scaled width, so travelling background-position-x by the full
+ * strip width (`--strip-travel`, set inline to `-frames*dispW`) over `steps(frames)` lands each step
+ * on a frame boundary. See AnimatedStripPicker for why percentage travel under-shifted. */
 @keyframes lib-strip-play {
   from {
     background-position: 0 0;
@@ -881,147 +121,29 @@ button.is-active {
   }
 }
 
-/* ---- Layers panel (step 6) ---- */
+/* Page baseline (plan 020) — in `@layer base` so Tailwind utilities + shadcn component classes
+ * (layer `utilities`, ordered after `base`) always win over it. Tailwind preflight zeroes margins
+ * and sets a default font, but does NOT set page background/text colour — and editor.html carries no
+ * inline `<style>`, so without these rules the editor page renders white with a collapsed root. The
+ * former bare `button {}` reset was dropped here: every editor button is now either a shadcn
+ * `<Button>` or a self-styled native `<button>` (explicit bg/border utilities), so preflight's
+ * transparent-button default is exactly what's wanted. */
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--color-app);
+    color: var(--color-fg);
+    font-family:
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      sans-serif;
+  }
 
-.layers-list {
-  list-style: none;
-  margin: 10px 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.layers-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 4px;
-  border-radius: 4px;
-}
-
-.layers-item.is-active {
-  background: #2c2420;
-}
-
-.layers-item button {
-  padding: 2px 6px;
-  font-size: 0.75rem;
-}
-
-.layers-eye {
-  flex: none;
-}
-
-.layers-name {
-  flex: 1;
-  text-align: left;
-  background: none;
-  border: none;
-  color: inherit;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.layers-rename-input {
-  flex: 1;
-  font: inherit;
-  color: #e8e0d8;
-  background: #0e0b0a;
-  border: 1px solid #3a2f2a;
-  border-radius: 3px;
-  padding: 2px 4px;
-  min-width: 0;
-}
-
-.layers-overhead {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 0.7rem;
-  color: #a99a8c;
-}
-
-/* ---- Snap toggle (step 7) ---- */
-
-.editor-snap-toggle {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-/* ---- Inspector panel (step 7) ---- */
-
-.editor-pane-divider {
-  border: none;
-  border-top: 1px solid #2c2420;
-  margin: 14px 0;
-}
-
-.insp-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.insp-field {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  font-size: 0.8rem;
-  color: #a99a8c;
-}
-
-.insp-field input,
-.insp-field select {
-  font: inherit;
-  color: #e8e0d8;
-  background: #0e0b0a;
-  border: 1px solid #3a2f2a;
-  border-radius: 4px;
-  padding: 4px 6px;
-}
-
-.insp-field-row {
-  display: flex;
-  gap: 8px;
-}
-
-.insp-field-row .insp-field {
-  flex: 1;
-  min-width: 0;
-}
-
-.insp-hint {
-  margin: -2px 0 2px;
-  font-size: 0.72rem;
-  opacity: 0.75;
-}
-
-.insp-checkboxes {
-  align-items: center;
-  font-size: 0.8rem;
-  color: #c9bcae;
-}
-
-.insp-checkboxes label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.insp-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.insp-actions button {
-  font-size: 0.78rem;
-  padding: 4px 8px;
+  #editor-root {
+    height: 100vh;
+  }
 }

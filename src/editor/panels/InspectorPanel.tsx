@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { useEditorStore } from '../store/editorStore';
 import type {
   DecorObject,
@@ -6,6 +7,11 @@ import type {
   PortalFacing,
   PortalObject,
 } from '../../systems/mapFormat';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { cn } from '../lib/utils';
 
 /**
  * Inspector panel (plan 014 step 7) — shows/edits the selected object(s). Empty selection shows a
@@ -19,6 +25,27 @@ import type {
  * so this subscribes to `docRevision`/`mapEpoch`/`selectedObjectIds` purely as re-render triggers and
  * reads the current `map` via `getState()` in the render body.
  */
+
+/* Shared utility strings for the repeated Inspector shapes (plan 020 Step 7). */
+/** `.editor-pane h2` treatment (matches `LibraryPanel`'s heading) — the pane's ancestor rule that used
+ *  to apply this uppercase/label look is gone now the panel isn't wrapped in `.editor-pane`, so it's
+ *  restated here as utilities. */
+const headingClass = 'mb-2 text-[0.85rem] uppercase tracking-[0.04em] text-fg-dim';
+/** `.editor-placeholder`. */
+const placeholderClass = 'text-[0.9rem] text-muted-2';
+/** `.insp-fields`. */
+const fieldsWrapperClass = 'mb-2.5 flex flex-col gap-2';
+/** `.insp-field-row`. */
+const rowClass = 'flex gap-2';
+/** `.insp-field`, sans the `flex:1;min-width:0` that only applied when nested in a row (added at the
+ *  call site — see `NumberField`, the only field that's always row-nested). */
+const fieldClass = 'flex flex-col gap-[3px]';
+const fieldLabelClass = 'text-[0.8rem] font-normal text-fg-dim';
+/** `.insp-field input, .insp-field select`. `md:text-[0.8rem]` cancels shadcn `Input`'s own
+ *  `md:text-sm` breakpoint override so the size stays 0.8rem at every width. */
+const fieldInputClass =
+  'h-auto border-border bg-inset px-1.5 py-1 text-[0.8rem] text-fg shadow-none md:text-[0.8rem]';
+
 export function InspectorPanel() {
   const selectedObjectIds = useEditorStore((s) => s.selectedObjectIds);
   useEditorStore((s) => s.docRevision);
@@ -29,8 +56,8 @@ export function InspectorPanel() {
   if (!map) {
     return (
       <>
-        <h2>Inspector</h2>
-        <p className="editor-placeholder">No map open.</p>
+        <h2 className={headingClass}>Inspector</h2>
+        <p className={placeholderClass}>No map open.</p>
       </>
     );
   }
@@ -40,8 +67,8 @@ export function InspectorPanel() {
   if (selected.length === 0) {
     return (
       <>
-        <h2>Inspector</h2>
-        <p className="editor-placeholder">No selection.</p>
+        <h2 className={headingClass}>Inspector</h2>
+        <p className={placeholderClass}>No selection.</p>
       </>
     );
   }
@@ -51,55 +78,79 @@ export function InspectorPanel() {
 
   return (
     <>
-      <h2>Inspector</h2>
+      <h2 className={headingClass}>Inspector</h2>
       {selected.length === 1 ? (
         <SingleObjectFields obj={selected[0]} />
       ) : (
-        <p className="editor-placeholder">{selected.length} objects selected.</p>
+        <p className={placeholderClass}>{selected.length} objects selected.</p>
       )}
-      <div className="insp-actions">
-        <button
+      <div className="flex flex-wrap gap-1.5">
+        <Button
+          variant="outline"
+          size="sm"
           disabled={!hasDecor}
           title="Rotate the selected decor -90°"
           onClick={() => useEditorStore.getState().rotateObjects(ids, -90)}
         >
           ⟲ -90°
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
           disabled={!hasDecor}
           title="Rotate the selected decor +90°"
           onClick={() => useEditorStore.getState().rotateObjects(ids, 90)}
         >
           ⟳ +90°
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
           disabled={!hasDecor}
           onClick={() => useEditorStore.getState().flipObjects(ids, 'x')}
         >
           Flip H
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
           disabled={!hasDecor}
           onClick={() => useEditorStore.getState().flipObjects(ids, 'y')}
         >
           Flip V
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
           disabled={!hasDecor}
           title="Bring forward (stack on top)"
           onClick={() => useEditorStore.getState().bumpDepth(ids, 1)}
         >
           Bring forward
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
           disabled={!hasDecor}
           title="Send backward (stack underneath)"
           onClick={() => useEditorStore.getState().bumpDepth(ids, -1)}
         >
           Send back
-        </button>
-        <button onClick={() => useEditorStore.getState().duplicateObjects(ids)}>Duplicate</button>
-        <button onClick={() => useEditorStore.getState().deleteObjects(ids)}>Delete</button>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => useEditorStore.getState().duplicateObjects(ids)}
+        >
+          Duplicate
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => useEditorStore.getState().deleteObjects(ids)}
+        >
+          Delete
+        </Button>
       </div>
     </>
   );
@@ -113,7 +164,8 @@ function SingleObjectFields({ obj }: { obj: MapObject }) {
 
 /** A numeric field that commits on blur/Enter (not per-keystroke) — one undoable command per commit.
  *  Keyed by `value` so an external change (undo, a rotate/flip/depth button, a redo) forces the
- *  uncontrolled input to resync rather than showing stale in-progress text. */
+ *  uncontrolled input to resync rather than showing stale in-progress text. Always used row-nested
+ *  (X/Y, Scale X/Y, Rotation/Depth, Col/Row, W/H), hence the hardcoded `flex-1 min-w-0`. */
 function NumberField({
   label,
   value,
@@ -125,14 +177,19 @@ function NumberField({
   onCommit: (n: number) => void;
   step?: number;
 }) {
+  const id = useId();
   return (
-    <label className="insp-field">
-      {label}
-      <input
+    <div className={cn(fieldClass, 'min-w-0 flex-1')}>
+      <Label htmlFor={id} className={fieldLabelClass}>
+        {label}
+      </Label>
+      <Input
+        id={id}
         type="number"
         step={step}
         defaultValue={value}
         key={value}
+        className={fieldInputClass}
         onBlur={(e) => {
           const n = Number(e.target.value);
           if (Number.isFinite(n) && n !== value) onCommit(n);
@@ -141,7 +198,7 @@ function NumberField({
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
         }}
       />
-    </label>
+    </div>
   );
 }
 
@@ -152,26 +209,28 @@ function DecorFields({ obj }: { obj: DecorObject }) {
     }
   };
   return (
-    <div className="insp-fields">
-      <p className="editor-placeholder" title={obj.asset}>
+    <div className={fieldsWrapperClass}>
+      <p className={placeholderClass} title={obj.asset}>
         Decor: {obj.asset.split('/').pop()}
       </p>
       {obj.region && (
-        <p className="editor-placeholder" title="Atlas crop — set by the Library's hotspot picker">
+        <p className={placeholderClass} title="Atlas crop — set by the Library's hotspot picker">
           Region: {obj.region.w}×{obj.region.h} @ ({obj.region.x},{obj.region.y})
         </p>
       )}
       {obj.anim && (
-        <p className="editor-placeholder" title="Animated strip — fps is a fixed placement default">
+        <p className={placeholderClass} title="Animated strip — fps is a fixed placement default">
           Anim: {obj.anim.frames}f {obj.anim.frameWidth}×{obj.anim.frameHeight} @ {obj.anim.fps}fps
         </p>
       )}
-      <div className="insp-field-row">
+      <div className={rowClass}>
         <NumberField label="X" value={obj.x} onCommit={(x) => update({ x })} />
         <NumberField label="Y" value={obj.y} onCommit={(y) => update({ y })} />
       </div>
-      <p className="editor-placeholder insp-hint">Arrow keys nudge 1px · Shift+Arrow = 1 tile</p>
-      <div className="insp-field-row">
+      <p className={cn(placeholderClass, '-mt-0.5 mb-0.5 text-[0.72rem] opacity-75')}>
+        Arrow keys nudge 1px · Shift+Arrow = 1 tile
+      </p>
+      <div className={rowClass}>
         <NumberField
           label="Scale X"
           value={obj.scaleX}
@@ -185,7 +244,7 @@ function DecorFields({ obj }: { obj: DecorObject }) {
           onCommit={(scaleY) => update({ scaleY })}
         />
       </div>
-      <div className="insp-field-row">
+      <div className={rowClass}>
         <NumberField
           label="Rotation°"
           value={obj.rotation}
@@ -193,8 +252,8 @@ function DecorFields({ obj }: { obj: DecorObject }) {
         />
         <NumberField label="Depth" value={obj.depth} onCommit={(depth) => update({ depth })} />
       </div>
-      <div className="insp-field-row insp-checkboxes">
-        <label>
+      <div className={cn(rowClass, 'items-center text-[0.8rem] text-fg-muted')}>
+        <label className="flex items-center gap-1">
           <input
             type="checkbox"
             checked={obj.flipX}
@@ -202,7 +261,7 @@ function DecorFields({ obj }: { obj: DecorObject }) {
           />
           Flip X
         </label>
-        <label>
+        <label className="flex items-center gap-1">
           <input
             type="checkbox"
             checked={obj.flipY}
@@ -222,9 +281,9 @@ function NodeFields({ obj }: { obj: NodeObject }) {
     }
   };
   return (
-    <div className="insp-fields">
-      <p className="editor-placeholder">Node: {obj.ref}</p>
-      <div className="insp-field-row">
+    <div className={fieldsWrapperClass}>
+      <p className={placeholderClass}>Node: {obj.ref}</p>
+      <div className={rowClass}>
         <NumberField label="Col" value={obj.col} onCommit={(col) => update({ col })} />
         <NumberField label="Row" value={obj.row} onCommit={(row) => update({ row })} />
       </div>
@@ -235,38 +294,54 @@ function NodeFields({ obj }: { obj: NodeObject }) {
 const FACINGS: PortalFacing[] = ['up', 'down', 'left', 'right'];
 
 function PortalFields({ obj }: { obj: PortalObject }) {
+  const nameId = useId();
+  const facingId = useId();
   const update = (patch: Partial<Pick<PortalObject, 'name' | 'facing' | 'rect'>>): void => {
     if (!useEditorStore.getState().updatePortal(obj.id, patch)) {
       console.warn('[editor] portal edit refused — would land on void/out-of-bounds');
     }
   };
   return (
-    <div className="insp-fields">
-      <label className="insp-field">
-        Name
-        <input
+    <div className={fieldsWrapperClass}>
+      <div className={fieldClass}>
+        <Label htmlFor={nameId} className={fieldLabelClass}>
+          Name
+        </Label>
+        <Input
+          id={nameId}
           defaultValue={obj.name}
           key={obj.name}
+          className={fieldInputClass}
           onBlur={(e) => {
             const v = e.target.value.trim();
             if (v.length > 0 && v !== obj.name) update({ name: v });
           }}
         />
-      </label>
-      <label className="insp-field">
-        Facing
-        <select
-          value={obj.facing}
-          onChange={(e) => update({ facing: e.target.value as PortalFacing })}
-        >
-          {FACINGS.map((f) => (
-            <option key={f} value={f}>
-              {f}
-            </option>
-          ))}
-        </select>
-      </label>
-      <div className="insp-field-row">
+      </div>
+      <div className={fieldClass}>
+        <Label htmlFor={facingId} className={fieldLabelClass}>
+          Facing
+        </Label>
+        {/* Controlled value/onValueChange maps 1:1 onto the old value/onChange native select, so the
+            shadcn Select swap carries no behaviour risk (plan 020 Step 7 guidance). */}
+        <Select value={obj.facing} onValueChange={(v) => update({ facing: v as PortalFacing })}>
+          <SelectTrigger
+            id={facingId}
+            size="sm"
+            className={cn(fieldInputClass, 'w-full justify-between font-normal')}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {FACINGS.map((f) => (
+              <SelectItem key={f} value={f}>
+                {f}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className={rowClass}>
         <NumberField
           label="Col"
           value={obj.rect.col}
@@ -278,7 +353,7 @@ function PortalFields({ obj }: { obj: PortalObject }) {
           onCommit={(row) => update({ rect: { ...obj.rect, row } })}
         />
       </div>
-      <div className="insp-field-row">
+      <div className={rowClass}>
         <NumberField
           label="W"
           value={obj.rect.w}

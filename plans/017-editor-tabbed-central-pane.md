@@ -176,7 +176,30 @@ Verified against the current tree (`src/editor/`):
     sheet shows a correct 2×2 cropped preview (not the squished/mis-laid-out swatch); Apply updates
     the Library live; `npm run check` green.
 
-- [ ] **Step 4: Manual region editing in the object-editor tab** `[delegate opus]`
+- [x] **Step 4: Manual region editing in the object-editor tab** `[delegate opus]`
+  - Outcome: server `scripts/vite-editor-api.mjs` — new `PUT /__editor/asset-regions` (`{packId,relPath,
+    regions:[{x,y,w,h}]}`); `sanitiseRegions` mirrors `sanitiseOverridePatch` (all-or-nothing: integer
+    rects, `x/y>=0`, `w/h>=1`, in-bounds) validated against the sheet's IHDR dims read by an inline
+    `readPngSize` (deliberately NOT importing `asset-catalog.mjs`, which runs its build on import — fs
+    import extended with `openSync/readSync/closeSync`); whole-list replace of `pack.regions[relPath]`,
+    empty array `delete`s the key (→ auto-detect), then the same serialised `enqueueRegen` + 502/python3-
+    ENOENT graceful-degrade as `asset-override`; `regionParams` untouched; module-doc endpoint list +
+    a paragraph added. Client `src/editor/api.ts` — `putAssetRegions` + `RegionRect` (same refetch-is-
+    caller's-job contract as `putAssetOverride`). New pure `src/editor/regions.ts` (`sliceBox`/`seedRegions`
+    /`sanitiseClientRegions` + `Box`) + `src/editor/__tests__/regions.test.ts` (10 tests). UI
+    `src/editor/tabs/ObjectEditorTab.tsx` — tab body now type-conditional: draft `type==='object'` renders
+    a new `RegionsEditor` (zoomable sheet reusing `AtlasSheetPicker`'s scale/wheel math — copied, not
+    extracted, so `LibraryPanel.tsx` is untouched; draw-drag / click-select+live x/y/w/h inputs / move+8
+    resize handles / Delete-Backspace canvas-local key / cols×rows grid-slice; Save→`sanitiseClientRegions`
+    →`putAssetRegions`→`loadCatalog`, Reset→`putAssetRegions([])`; if the persisted asset isn't yet
+    `object` a `{type:'object'}` override is PUT first); `strip`/`tile` keep the step-3 frame-grid preview.
+    `src/editor/editor.css` — `editor-region-*` styles. `docs/ASSETS.md` — in-editor region-editing note.
+    No global shortcut added (Delete is canvas-local), so `shortcuts.ts`/Shortcuts panel unchanged.
+    Verified: `eslint src` 0 errors / 63 pre-existing warnings (mine clean), `vitest` 370/370, prettier
+    clean on the 7 changed files. ⚠ `tsc --noEmit` reports 2 errors BUT both are in `src/scenes/GameScene.ts`
+    (Matt's concurrent plan 018/019 `worldPx` dep change — out of scope, not the editor changes). ⚠ VISUAL
+    acceptance (Farm.png grid-slice → Save → Library shows new regions → Reset) NOT machine-verified — needs
+    a human at `npm run editor`.
   - Why: tightly-packed/touching sprites (e.g. `Environment/Props/Static/Farm.png`'s crop rows and
     seed-jar columns) can't be split by the connected-component detector (`scripts/pixel-crawler/objects.py`
     `components()`): where two sprites touch there's no transparent pixel to cut on, and detection can't
@@ -229,6 +252,123 @@ Verified against the current tree (`src/editor/`):
   - `docs/STATUS.md`: one line for the tabbed central pane + object-editor tab (incl. manual region
     editing for tightly-packed atlas sheets).
   - Done when: `npm run check` green; a human confirms the flow end-to-end at `npm run editor`.
+
+- [x] **Step 6: Animated-strip authoring — free cols×rows grid + arbitrary frame omission** `[delegate — sub-steps]`
+  - Outcome: all 7 sub-steps landed (each verified independently green). **6.1** `scripts/asset-catalog.mjs`:
+    `stripFrameDims` gained `cols`+`omit` (geometry mode: `frames=cols*rows`, sanitised `omit`; legacy
+    `frames`/`rows` mode unchanged), override-merge now also `delete`s `patch.cols`/`.omit`, `assertValidCatalog`
+    validates `omit`; `main()` guarded (`process.argv[1]===fileURLToPath`) + `stripFrameDims` exported so it's
+    importable; new `scripts/__tests__/asset-catalog.test.mjs` (7 cases); `vitest.config.ts` `include` extended
+    with `scripts/**/*.test.mjs`; byte-identical catalog reconfirmed. **6.2** `scripts/vite-editor-api.mjs`:
+    `sanitiseOverridePatch` accepts `cols`(int≥1)/`omit`(ints≥0, only with `cols`) + cross-field guard (indices
+    `<cells`, played `≥1`); new `scripts/__tests__/vite-editor-api.test.mjs` (18 cases). **6.3** (game-runtime)
+    `src/systems/mapFormat.ts` + `src/render/decorSprites.ts`: `DecorAnim` gained `omit?`; `parseDecorAnim`
+    validates (ints≥0, unique, `<frames`, played≥1); renderer plays `[0..frames-1]` minus omit and folds
+    `frames`+omit signature into the ANIM cache key (TEXTURE key stays geometry-only); legacy anim maps round-trip
+    byte-identical; +15 tests. **6.4** `src/editor/reclassify.ts`: `seedCols`/`seedOmit`; `reclassifyGrid(asset,
+    type,cols,rows,omit)` → `{cols,frameWidth,frameHeight,frames,played,valid}`; `reclassifyPatch`/`applyReclassify`
+    take cols+omit (never write `frames`); `CatalogAsset.omit?` + `AssetOverridePatch.cols?/omit?` added; minimal
+    compile-shim kept ObjectEditorTab green; `reclassify.test.ts` → 20 cases. **6.5**
+    `src/editor/tabs/ObjectEditorTab.tsx` + `editor.css`: Type option label → "Animated strip"; free Columns/Rows
+    inputs; per-frame preview renders ALL cells with click-to-toggle `omit` (dimmed/crossed); `omitInRange` guards
+    stale indices; Apply disabled on non-integer grid or `<1` played cell. **6.6** `editorStore.ts` (doc-only — the
+    fps-spread already threads `omit`) + `LibraryPanel.tsx`: `AnimatedStripPicker` passes `omit` when arming, static
+    first-frame swatch when `rows>1` or `omit` non-empty; `isAnimatableStrip` unchanged; +1 store test. **6.7**
+    (inline) `docs/ASSETS.md` (cols/omit geometry mode + object-editor-tab UI), `catalog.ts` `CatalogAssetType`
+    doc (the `'strip'` token displays as "Animated strip"), `docs/STATUS.md` plan-017 entry. No editor shortcut
+    added ⇒ `shortcuts.ts`/Shortcuts panel untouched. Verified: `tsc --noEmit` clean, `eslint` clean on changed
+    files, `prettier` clean on changed files, `vitest` 427/427. ⚠ VISUAL acceptance (reclassify the 192×704
+    Alchemy sheet → cols2/rows11/omit[21] → 21-frame preview; place → animates 21 frames; a mid-grid omit; catalog
+    diff touches only that asset) NOT machine-verified — needs a human at `npm run editor`. Pre-existing/concurrent,
+    out of scope: `npm run check`'s `format:check` fails on `src/debug/crashReporter.ts` (fails on HEAD too), and
+    `lint:md` fails on the untracked `plans/020-editor-tailwind-shadcn.md` (Matt's concurrent work).
+  - **Goal:** the Object Editor's `strip` (relabelled **"Animated strip"**) authoring can't express real
+    sheets. Today the override is `{type:'strip', frames, rows}` and the catalog builder derives
+    `cols = frames / rows` — so `frames` is BOTH the grid-cell count AND the animation length, welded
+    together. A sheet whose grid is 2 cols × 11 rows but whose **last cell is blank** (the motivating
+    case: `Environment/Structures/Stations/Alchemy/Alchemy_Table_01-Sheet.png`, 192×704 = 22 cells, 21
+    real frames) is inexpressible: geometry wants cols=2/rows=11 → 22 cells, but `frames:21` gives
+    `cols = 21/11`, non-integer, so `stripFrameDims` collapses it to "1 unsliced frame". Fix by
+    **decoupling grid geometry from the played-frame set**: author `cols`×`rows` freely, and omit ANY
+    cells (not just trailing — explicit user choice over trailing-only).
+  - **Data model** (settled with the advisor; backward-compatible — the committed catalog and existing
+    `pack.json` strip overrides regenerate byte-for-byte, never migrate them):
+    - **`pack.json` override** becomes `{ type:'strip', cols?, rows?, omit? }`:
+      - `cols` present → **geometry mode**: `frameWidth = w/cols`, `frameHeight = h/rows` (rows default
+        1); total cells `= cols*rows`; `omit: number[]` = cell indices (row-major, `0..cols*rows-1`)
+        to skip. `frames` is NOT authored here — it's derived.
+      - `cols` absent → **legacy mode**: today's `cols = frames/rows` path, unchanged, no `omit`. This
+        is the whole backward-compat story — existing `{frames:4}` / `{frames:4, rows:2}` entries hit
+        this branch and regenerate identically.
+    - **`CatalogAsset` (`src/editor/catalog.ts`)**: `frames` is redefined to mean **total grid cells
+      (`cols*rows`)** — a no-op for all existing data (today `frames === cols*rows` always, since no
+      omission exists yet), so the committed catalog stays valid. Add `omit?: number[]` (skipped
+      cells). `cols`/`rows` remain recoverable as `w/frameWidth` / `h/frameHeight` — no new geometry
+      field needed.
+    - **Played set** (every consumer): `[0..frames-1]` minus `omit`, ascending. `omit` absent/empty ⇒
+      identical to today's `start:0 → end:frames-1`.
+  - **Seams (ordered sub-steps, each independently green):**
+    - **6.1 Catalog builder + tests** `[delegate sonnet]` — `scripts/asset-catalog.mjs` `stripFrameDims`
+      gains a `colsOverride` + `omitOverride`: geometry mode when `cols` given (validate `frameWidth`/
+      `frameHeight`/`frames=cols*rows` integer, sanitise `omit` to unique ints in `[0,frames)`, warn +
+      fall back to 1 unsliced frame on a bad grid, same as today); legacy mode otherwise. Return
+      `{frameWidth, frameHeight, frames, omit}` and set all four on the asset explicitly.
+      **Advisor trap #1:** the override-merge (`asset-catalog.mjs:238`, `delete patch.type/.rows`) must
+      also `delete patch.cols` **and** `delete patch.omit`, or `cols`/`omit` leak into the committed
+      catalog as undocumented keys — `omit` is set from `stripFrameDims`'s *sanitised* output, not the
+      raw patch. Extend the module-doc override comment (line ~14). New cases in the catalog-builder
+      tests (2×11 with `omit:[21]`; a mid-grid omit; legacy still byte-identical).
+    - **6.2 Server sanitiser** `[delegate sonnet]` — `scripts/vite-editor-api.mjs`
+      `sanitiseOverridePatch`: accept integer `cols >= 1`; accept `omit` as an array of ints `>= 0`;
+      cross-field check when `cols`+`rows` present — every `omit` index `< cols*rows`, and played count
+      (`cols*rows - unique(omit)`) `>= 1` (reject "omit everything"). Keep the existing `frames`/`rows`
+      validation for legacy callers. Extend the module doc.
+    - **6.3 Runtime schema + renderer** `[delegate opus]` — **this is the sub-step that reaches
+      game-runtime code** (unlike steps 1–5's editor-only scope — call it out in the STATUS line):
+      - `src/systems/mapFormat.ts`: add optional `omit?: number[]` to `DecorAnim`; `parseDecorAnim`
+        validates (array of ints `>= 0`, unique, each `< frames`). `frames` stays required/`>0`.
+      - `src/render/decorSprites.ts` `resolveDecorDraw`: when `omit` is non-empty,
+        `generateFrameNumbers(key, { frames: played })` (the ascending kept-list) instead of
+        `{start:0, end:frames-1}`. **Advisor trap #2:** the anim cache key
+        (`decoranim:${asset}:${fw}x${fh}@${fps}`) carries no frame info — once `frames`/`omit` vary
+        independently of geometry, two placements of the same asset can silently share the wrong anim.
+        Fold `frames` **and** an `omit` signature into the key.
+    - **6.4 Reclassify helpers + tests** `[delegate sonnet]` — `src/editor/reclassify.ts`: add
+      `seedCols` (`w/frameWidth`, mirror of `seedRows`) and `seedOmit` (`asset.omit ?? []`);
+      `reclassifyGrid` takes `cols` + `omit` as inputs (stop deriving `cols=frames/rows`), returns the
+      cols/dims/validity + the played-cell list for the preview; `reclassifyPatch` writes
+      `{type, cols, rows, ...(omit.length ? {omit} : {})}` (never `frames` in geometry mode — keep
+      pack.json lean/self-documenting); `applyReclassify` signature → `(asset, type, cols, rows, omit)`.
+      `suggestGrids` chips become cols+rows shortcuts (clear `omit`). Update `reclassify.test.ts`.
+    - **6.5 Object Editor tab UI** `[delegate opus]` — `src/editor/tabs/ObjectEditorTab.tsx`: dropdown
+      option label `strip` → **"Animated strip"** (value stays `'strip'`); replace the Frames/Rows
+      inputs with **free-entry Columns/Rows**; render the per-frame preview as **all `cols*rows` cells**
+      where **clicking a cell toggles its `omit` membership** (omitted cells dimmed/crossed — the
+      arbitrary-omission UI); grid overlay uses `cols`×`rows`; disable Apply if `<1` cell would play or
+      the grid is non-integer. Apply → `applyReclassify(asset, type, cols, rows, omit)` → `loadCatalog`;
+      re-seed effect deps gain the cols-derived value + an `omit` signature.
+    - **6.6 Editor store + Library card** `[delegate sonnet]` — `editorStore.ts`: `ArmedObjectAsset.anim`
+      / `placeObjectAt` carry `omit` through (still `Omit<DecorAnim,'fps'>`). `LibraryPanel.tsx`:
+      `AnimatedStripPicker` passes `omit` when arming; its CSS `steps()` preview is single-horizontal-row
+      math (`frames*dispW` travel) — **fall back to a static first-frame swatch when `rows>1` or `omit`
+      is non-empty** (the true animated preview lives in the tab). `isAnimatableStrip`'s `frames>=2`
+      gate is unchanged (correct on total-cells).
+    - **6.7 Docs + labels** `[inline]` — `docs/ASSETS.md` (strip section: cols/rows + omit authoring),
+      the `CatalogAssetType` doc comment (note the `'strip'` token displays as "Animated strip"), and
+      `docs/STATUS.md` line. No editor keyboard shortcut added ⇒ `shortcuts.ts`/Shortcuts panel
+      untouched (but re-check the project rule if one is added).
+  - **Rename decision:** label-only. `'strip'` is baked into `pack.json` `rules`, the committed catalog,
+    `OVERRIDE_TYPES`, `CatalogAssetType`, and `scripts/pixel-crawler/objects.py`; renaming the token
+    end-to-end is pure churn across committed data for zero behaviour change. Map `'strip'` →
+    "Animated strip" only at the display layer.
+  - **Side effects:** unlike steps 1–5, this step DOES touch game-runtime code — `src/systems/mapFormat.ts`
+    and `src/render/decorSprites.ts` (6.3) — plus `scripts/asset-catalog.mjs`, `scripts/vite-editor-api.mjs`,
+    and `src/editor/*`. No change to `EditorScene`/pathfinding/placement transforms.
+  - **Done when** (VISUAL — human at `npm run editor`): reclassify the 192×704 Alchemy_Table_01 sheet to
+    `cols:2, rows:11`, click-omit the blank 22nd cell, Apply → the tab preview shows a correct 21-frame
+    2×11 grid; place it → the decor animates through 21 frames (no blank flash); the committed
+    `asset-catalog.json` diff touches ONLY that asset (proves backward-compat); a mid-grid omit also
+    plays correctly; `npm run check` green.
 
 ## Out of scope
 

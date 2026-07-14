@@ -100,7 +100,11 @@ export interface EditorOverlays {
  * plain whole-image placement, a `region` crop, or an `anim` strip, never more than one) — the Library
  * only ever constructs one of the three shapes, mirroring `DecorObject`'s own region/anim exclusivity.
  * `anim` omits `fps`: placement always stamps `DECOR_ANIM_DEFAULT_FPS` (critique #6 — no per-instance
- * editable fps in v1), so there's nothing to carry here.
+ * editable fps in v1), so there's nothing to carry here. `anim` may also carry an optional
+ * `omit: number[]` (plan 017 step 6) — row-major cell indices, `0..frames-1`, to skip; the played set
+ * is `[0..frames-1]` minus `omit`. Since `Omit<DecorAnim, 'fps'>` keeps every other `DecorAnim` field
+ * verbatim, `omit` already threads through unchanged — `placeDecor`'s `{ ...anim, fps }` spread stamps
+ * it onto `DecorObject.anim` with no dedicated handling needed.
  */
 export interface ArmedObjectAsset {
   assetId: string;

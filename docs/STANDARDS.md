@@ -22,6 +22,11 @@ shaped and checked*, that one's about *how the system is structured*.
   per the cross-device rule).
 - `lint-staged` (package.json): `*.ts` → `eslint --fix` + `prettier --write`; `*.md` →
   `markdownlint-cli2 --fix` only (no Prettier — see below); `*.{json,css,html}` → `prettier --write`.
+- **Editor styling (dev-only):** the Map Builder (`src/editor/**`) uses **Tailwind v4** (CSS-first,
+  no config file — `@tailwindcss/vite`) + **shadcn/ui** components (copied into `src/editor/ui/`, own
+  the code). The brown/cream palette is a single set of `@theme` tokens in `editor.css`, wired to
+  shadcn's semantic CSS vars. Tailwind is scoped to `editor.html` only — the game page never imports
+  it, so no preflight touches Phaser. Not in the prod bundle (plan 020).
 
 ## The markdown-is-model-context rule
 

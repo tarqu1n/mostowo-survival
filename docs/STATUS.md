@@ -242,6 +242,23 @@ of the old instant tap-to-feed. A tap on the fire always resolves to `refuel` (c
 its whole tile stack), so it can no longer fall through to a move that walks the worker into the
 blocking fire tile. Details: [GAME-MECHANICS.md](GAME-MECHANICS.md).
 
+## Editor: tabbed central pane + object-editor tab (plan 017)
+
+The Map Builder's central pane became a **tabbed container**: a permanent Map (and placeholder World)
+tab plus on-demand, closable **object-editor tabs** (one per asset, opened from the Library's ⚙). The
+always-mounted Phaser canvas survives tab switches (panels hide via `visibility`, never `display`), and
+global shortcuts (undo/redo/Delete/nudge) are gated to the Map tab. The object-editor tab hosts the
+reclassify UI — type dropdown, grid fields, and a **correctly cropped per-frame preview** (fixing the
+old squished multi-row swatch) — and, for `object` sheets, a **manual region editor** (draw / select /
+move+resize / grid-slice) that writes `pack.json` `regions` so tightly-packed atlases the
+connected-component detector can't split (e.g. Farm.png's touching crop rows) can be separated by hand.
+**Animated-strip authoring** (step 6) then **decoupled grid geometry from the played frame set**: a
+strip is authored as free **Columns × Rows** with arbitrary per-cell **omission** (`omit`), so a sheet
+like the 2×11 Alchemy table (22 cells, blank last cell) plays its 21 real frames. This step reached
+**game-runtime code** — `DecorAnim`/`parseDecorAnim` (`mapFormat.ts`) and the decor renderer
+(`decorSprites.ts`, which folds `frames`+`omit` into the anim cache key) — unlike the editor-only rest
+of the plan; existing catalog data and strip overrides regenerate byte-for-byte (backward-compatible).
+
 ## Runtime map loader — boots into an authored map (plan 018)
 
 The game no longer generates its world procedurally: it **boots straight into one authored map**

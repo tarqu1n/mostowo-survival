@@ -1,13 +1,25 @@
 import { useState } from 'react';
 import type { PortalFacing, PortalRect } from '../systems/mapFormat';
+import { Button } from './ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 const FACINGS: PortalFacing[] = ['up', 'down', 'left', 'right'];
+
+/** A labelled field row (`<Label>` + control), shared by the two fields below. */
+const fieldClass = 'flex flex-col gap-1.5';
 
 /**
  * Modal shown after a valid Portal-tool drag (mirrors `NewMapDialog`'s structure): collects a name +
  * facing, then the caller creates the `kind:'portal'` object. Facing defaults to whichever axis the
  * rect is longer on (a wide rect reads as a horizontal threshold → default 'down'; a tall rect reads
  * as a vertical one → default 'right'); a square rect defaults to 'down'.
+ *
+ * Rendered conditionally by `EditorApp` (only mounted while a portal rect is pending), so `open` is
+ * always `true`; `onOpenChange(false)` (Escape, overlay click, or the Dialog's own close button) is
+ * wired straight to the existing `onCancel` prop so the caller's contract is unchanged.
  */
 export function PortalDialog({
   rect,
@@ -25,38 +37,55 @@ export function PortalDialog({
   const valid = name.trim().length > 0;
 
   return (
-    <div className="editor-modal-backdrop" onClick={onCancel}>
-      <div className="editor-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>New portal</h3>
-        <p className="editor-placeholder">
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
+    >
+      <DialogContent className="bg-popover text-popover-foreground sm:max-w-[360px]">
+        <DialogHeader>
+          <DialogTitle>New portal</DialogTitle>
+        </DialogHeader>
+        <p className="text-[0.9rem] text-muted-2">
           Rect: col {rect.col}, row {rect.row}, {rect.w}×{rect.h}
         </p>
-        <label>
-          Name
-          <input
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="South road"
-          />
-        </label>
-        <label>
-          Facing
-          <select value={facing} onChange={(e) => setFacing(e.target.value as PortalFacing)}>
-            {FACINGS.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="editor-modal-actions">
-          <button onClick={onCancel}>Cancel</button>
-          <button disabled={!valid} onClick={() => onConfirm(name.trim(), facing)}>
-            Create
-          </button>
+        <div className="flex flex-col gap-3">
+          <div className={fieldClass}>
+            <Label htmlFor="portal-name">Name</Label>
+            <Input
+              id="portal-name"
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="South road"
+            />
+          </div>
+          <div className={fieldClass}>
+            <Label htmlFor="portal-facing">Facing</Label>
+            <Select value={facing} onValueChange={(v) => setFacing(v as PortalFacing)}>
+              <SelectTrigger id="portal-facing" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FACINGS.map((f) => (
+                  <SelectItem key={f} value={f}>
+                    {f}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-      </div>
-    </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button disabled={!valid} onClick={() => onConfirm(name.trim(), facing)}>
+            Create
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

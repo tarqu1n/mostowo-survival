@@ -277,6 +277,20 @@ non-sprite region). Both keyed by the sheet's relative path. Concrete examples a
 variants touch at the canopy edges and detect as one merged blob — the override splits it into its
 four (plus the already-correct dead-tree/stump) regions.
 
+**In-editor region editing (plan 017 step 4):** the `regions` list no longer has to be hand-authored
+in `pack.json`. Open an `object` asset's tab in the Map Builder (`npm run editor`) — its body is a
+**Regions** editor overlaying the sheet: drag to draw a box, click to select (with a live x/y/w/h
+readout + Delete), drag the body/handles to move/resize, and **grid-slice** a selected box into a
+cols×rows grid of equal cells (one action splits a whole merged crop/seed row — the motivating
+`Farm.png` case detection can't). **Save regions** `PUT`s `/__editor/asset-regions`
+(`scripts/vite-editor-api.mjs`), which **whole-list replaces** `pack.json`'s `regions[relPath]` (the
+server clamps every rect in-bounds of the sheet PNG and rejects an out-of-bounds one) then reruns
+both generators server-side, serialised, with the same `python3`-ENOENT graceful degrade as
+`/__editor/asset-override`. **Reset to auto-detect** saves an EMPTY list, which deletes the key so
+the sheet falls back to connected-component detection. (Picking `object` in the type dropdown for a
+strip/tile asset makes the Regions editor reachable; Save then forces the `object` type override
+first.)
+
 **Content-drift caveat:** the catalog build validates a sidecar region is in-bounds for its sheet
 (fatal if not — a stale sidecar after a sheet shrunk), but it can't detect a sprite that moved
 *within* a same-size sheet. Re-running `gen_regions.py` after editing ANY pack PNG is the only guard
@@ -295,19 +309,30 @@ override redoes the frame/region math, it doesn't just relabel a stale asset):
 - **`type: "tile" | "strip" | "object"`** — forces classification, overriding the `rules` glob
   match. A `-Sheet.png` forced to `object` gets a `gen_regions.py` detection pass (and gains
   `regions` if it detects ≥2 sprites); a `.png` forced to `strip` is excluded from detection.
-- **`rows`** (strip-only, default `1`) — turns the existing `frames` override into a GRID: with
-  `rows` rows, `frameHeight = h / rows`, `cols = frames / rows`, `frameWidth = w / cols`. `rows: 1`
-  (the default) collapses back to the original single-horizontal-row math, so every pre-existing
-  `frames`-only override still means exactly what it always did.
+- **`rows`** (strip-only, default `1`) — LEGACY mode: turns the existing `frames` override into a
+  GRID: with `rows` rows, `frameHeight = h / rows`, `cols = frames / rows`, `frameWidth = w / cols`.
+  `rows: 1` (the default) collapses back to the original single-horizontal-row math, so every
+  pre-existing `frames`-only override still means exactly what it always did.
+- **`cols` + `omit`** (strip-only, plan 017 step 6) — GEOMETRY mode, which **decouples the grid from
+  the played frames**. With `cols` present, `frameWidth = w / cols`, `frameHeight = h / rows` (rows
+  default `1`); the total cell count is `cols * rows`, and that is what the catalog's `frames` now
+  means. `omit: number[]` lists cell indices (row-major, `0..cols*rows-1`) to SKIP, so the played set
+  is every cell minus `omit`, ascending. This expresses a sheet whose grid has blank cells — e.g. the
+  Alchemy table `Alchemy_Table_01-Sheet.png` (192×704) is a 2×11 = 22-cell grid whose blank 22nd cell
+  is `"cols": 2, "rows": 11, "omit": [21]` → 21 played frames. In geometry mode `frames` is NOT
+  authored (it's derived from `cols*rows`); the server rejects an `omit` that skips every cell. Legacy
+  `frames`(+`rows`) overrides regenerate byte-for-byte — geometry mode is purely additive.
 
-Example — the furnace fix actually committed: `"Environment/Structures/Stations/Furnace/
+Example — the furnace fix (legacy mode): `"Environment/Structures/Stations/Furnace/
 Bricks_01-Sheet.png": { "frames": 4, "rows": 2 }` → `frameHeight = 96/2 = 48`, `cols = 4/2 = 2`,
-`frameWidth = 64/2 = 32`.
+`frameWidth = 64/2 = 32`. The same grid in geometry mode: `{ "cols": 2, "rows": 2 }`.
 
-**Preferred path — the in-editor "Reclassify" popover** (Library panel, plan 014 step 7c): click
-the ⚙ on any non-tile asset card to open a popover with a `type` dropdown and, for `strip`, `frames`/
-`rows` fields with a live grid overlay on the full sheet (updates as you type — pure arithmetic on
-`w`/`h`, no pixel decode) plus divisor-pair suggestion chips. Committing `PUT`s
+**Preferred path — the in-editor object-editor tab** (Library panel ⚙, plan 017): click the ⚙ on any
+non-tile asset card to open its full-size object-editor tab with a `type` dropdown (the `strip` option
+is labelled **"Animated strip"**) and, for a strip, free-entry **Columns**/**Rows** fields with a live
+grid overlay on the full sheet (updates as you type — pure arithmetic on `w`/`h`, no pixel decode) plus
+divisor-pair suggestion chips, and a per-frame preview where **clicking a cell toggles whether it's
+omitted** (the geometry-mode `omit` authoring above). Committing `PUT`s
 `/__editor/asset-override` (`scripts/vite-editor-api.mjs`, dev-only middleware), which patches
 `pack.json` and reruns **both** generators server-side, in order (`gen_regions.py` then
 `assets:catalog` — the sidecar must be current before the catalog build reads it), serialized so two

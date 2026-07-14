@@ -41,6 +41,12 @@ export type DecorDraw =
  * exactly once. An animated decor gets its OWN key with the frame dimensions baked in: Phaser slices a
  * spritesheet texture at load time, so two different `frameWidth`/`frameHeight` pairs over the same
  * URL can't share one texture object the way two whole-image reads of the same URL can.
+ *
+ * Deliberately keyed on GEOMETRY ONLY (`frameWidth`/`frameHeight`) — NOT `frames`/`fps`/`omit`. The
+ * spritesheet is sliced purely by frame dimensions at load time; `frames` and `omit` only affect
+ * PLAYBACK (which sliced cells the anim steps through), not the slicing itself (plan 017 step 6.3).
+ * So two placements of the same sheet with the same geometry but different `omit` should — and do —
+ * SHARE one texture; only their per-placement `anims` entry differs (see resolveDecorDraw's animKey).
  */
 export function decorTextureKey(path: string, anim?: DecorAnim): string {
   if (!anim) return tileImageKey(path);
@@ -101,12 +107,30 @@ export function resolveDecorDraw(
   if (!scene.textures.exists(key)) return undefined;
 
   if (obj.anim) {
-    const { frameWidth, frameHeight, frames, fps } = obj.anim;
-    const animKey = `decoranim:${obj.asset}:${frameWidth}x${frameHeight}@${fps}`;
+    const { frameWidth, frameHeight, frames, fps, omit } = obj.anim;
+    // Played set: ascending `[0..frames-1]` with the omitted cell indices removed (plan 017 step
+    // 6.3). Identical to the full `[0..frames-1]` range when nothing is omitted.
+    const omitSet = omit && omit.length ? new Set(omit) : undefined;
+    const played: number[] = [];
+    for (let i = 0; i < frames; i++) {
+      if (!omitSet?.has(i)) played.push(i);
+    }
+    // Advisor trap #2: the anim cache key must fold in `frames` AND an omit signature. Once grid
+    // geometry (frameWidth/frameHeight) is decoupled from the played-frame set, two placements of
+    // the SAME sheet+geometry+fps can legitimately want DIFFERENT played sets — so keying only on
+    // geometry/fps (the old `decoranim:asset:WxH@fps`) would let them silently share the wrong
+    // Phaser anim. Folding `frames` + a sorted omit signature in gives each distinct played set its
+    // own anim. This key is a runtime-only cache/`.play()` handle — never serialized into a map —
+    // so its format has zero byte-identical/round-trip impact.
+    const omitSig = omit && omit.length ? `:o${[...omit].sort((a, b) => a - b).join('-')}` : '';
+    const animKey = `decoranim:${obj.asset}:${frameWidth}x${frameHeight}@${fps}:${frames}${omitSig}`;
     if (!scene.anims.exists(animKey)) {
       scene.anims.create({
         key: animKey,
-        frames: scene.anims.generateFrameNumbers(key, { start: 0, end: frames - 1 }),
+        frames: scene.anims.generateFrameNumbers(
+          key,
+          omit?.length ? { frames: played } : { start: 0, end: frames - 1 },
+        ),
         frameRate: fps,
         repeat: -1,
       });

@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
+import { useDefaultLayout } from 'react-resizable-panels';
 import { TILE_SIZE } from '../config';
+import { cn } from './lib/utils';
 import { useEditorStore } from './store/editorStore';
 import { Toolbar } from './Toolbar';
 import { PhaserViewport } from './PhaserViewport';
@@ -8,17 +10,23 @@ import { LibraryPanel } from './panels/LibraryPanel';
 import { LayersPanel } from './panels/LayersPanel';
 import { InspectorPanel } from './panels/InspectorPanel';
 import { PortalDialog } from './PortalDialog';
-import { useToast, ToastHost } from './Toast';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable';
+import { Separator } from './ui/separator';
+import { Toaster } from './ui/sonner';
+import { TooltipProvider } from './ui/tooltip';
 
 /**
  * Map Builder shell (plan 014 step 5, extended steps 6-7): toolbar on top, then a three-pane body —
- * Library (left), the tabbed central pane (centre), Inspector + Layers (right). The central pane is a
- * tab strip over a panel area (plan 017 step 2): the permanent Map + World tabs plus an object-editor
- * tab per Library ⚙ click. Every tab's panel is mounted at once and shown/hidden by `visibility`
- * (never `display:none`) so the Phaser map canvas — expensive, stateful, `Scale.RESIZE` — survives
- * every switch instead of being torn down and rebuilt. Everything shares state through
- * `useEditorStore`; this component wires the panes, the tab strip, the global undo/redo + delete
- * shortcuts (gated to the Map tab), and the Portal-tool's name/facing dialog.
+ * Library (left), the tabbed central pane (centre), Inspector + Layers (right). The Library↔centre
+ * split is a shadcn `Resizable` group whose layout persists via its `autoSaveId` (plan 020 Step 5);
+ * the Inspector stays a fixed-width column. The central pane is a tab strip over a panel area (plan
+ * 017 step 2): the permanent Map + World tabs plus an object-editor tab per Library ⚙ click. Every
+ * tab's panel is mounted at once and shown/hidden by `visibility` (never `display:none`) so the
+ * Phaser map canvas — expensive, stateful, `Scale.RESIZE` — survives every switch instead of being
+ * torn down and rebuilt. Everything shares state through `useEditorStore`; this component wires the
+ * panes, the tab strip, the global undo/redo + delete shortcuts (gated to the Map tab), and the
+ * Portal-tool's name/facing dialog. One `TooltipProvider` here powers every editor Tooltip; one
+ * Sonner `Toaster` renders all toasts.
  */
 
 /** Arrow key → unit direction (screen space: up = -y). Drives the selected-object nudge below. */
@@ -29,63 +37,15 @@ const NUDGE_DIRS: Record<string, { x: number; y: number }> = {
   ArrowDown: { x: 0, y: 1 },
 };
 
-const LIBRARY_WIDTH_KEY = 'mostowo-editor-library-width';
-const LIBRARY_WIDTH_DEFAULT = 240;
-const LIBRARY_WIDTH_MIN = 180;
-const LIBRARY_WIDTH_MAX = 560;
-
-function loadLibraryWidth(): number {
-  const raw = Number(localStorage.getItem(LIBRARY_WIDTH_KEY));
-  if (!Number.isFinite(raw) || raw <= 0) return LIBRARY_WIDTH_DEFAULT;
-  return Math.min(LIBRARY_WIDTH_MAX, Math.max(LIBRARY_WIDTH_MIN, raw));
-}
-
 export function EditorApp() {
   const tabs = useEditorStore((s) => s.tabs);
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const map = useEditorStore((s) => s.map);
   const pendingPortalRect = useEditorStore((s) => s.pendingPortalRect);
-  const { toast, showToast } = useToast();
 
-  const [libraryWidth, setLibraryWidth] = useState(loadLibraryWidth);
-  const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
-  const [isResizingLibrary, setIsResizingLibrary] = useState(false);
-
-  // Drag-resize for the Library pane (left sidebar). Tracks pointermove/up on window rather than the
-  // handle itself, so the drag keeps following the cursor even once it leaves the thin handle strip.
-  const onLibraryResizeStart = useCallback(
-    (e: React.PointerEvent) => {
-      if (e.button !== 0) return;
-      e.preventDefault();
-      resizeRef.current = { startX: e.clientX, startWidth: libraryWidth };
-      setIsResizingLibrary(true);
-    },
-    [libraryWidth],
-  );
-
-  useEffect(() => {
-    if (!isResizingLibrary) return;
-    const onMove = (e: PointerEvent) => {
-      const r = resizeRef.current;
-      if (!r) return;
-      const next = r.startWidth + (e.clientX - r.startX);
-      setLibraryWidth(Math.min(LIBRARY_WIDTH_MAX, Math.max(LIBRARY_WIDTH_MIN, next)));
-    };
-    const onUp = () => {
-      resizeRef.current = null;
-      setIsResizingLibrary(false);
-    };
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-    return () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-    };
-  }, [isResizingLibrary]);
-
-  useEffect(() => {
-    localStorage.setItem(LIBRARY_WIDTH_KEY, String(libraryWidth));
-  }, [libraryWidth]);
+  // react-resizable-panels v4 persistence: restores the Library/centre split on load and saves it
+  // after each drag (localStorage). Replaces the old hand-rolled pixel-width + localStorage logic.
+  const layout = useDefaultLayout({ id: 'mostowo-editor-layout', storage: localStorage });
 
   // Ctrl/Cmd+Z = undo, Shift+Ctrl/Cmd+Z = redo, Delete/Backspace = remove the selected object(s),
   // arrow keys = nudge the selection. Ignored while typing in a dialog/Inspector field (the SAME
@@ -138,117 +98,155 @@ export function EditorApp() {
   }, []);
 
   return (
-    <div className="editor-shell">
-      <Toolbar showToast={showToast} />
-      <div
-        className="editor-body"
-        style={{ gridTemplateColumns: `${libraryWidth}px 6px 1fr 280px` }}
-      >
-        <aside className="editor-pane editor-pane--library">
-          <LibraryPanel />
-        </aside>
-        <div
-          className={`editor-resize-handle ${isResizingLibrary ? 'is-dragging' : ''}`}
-          onPointerDown={onLibraryResizeStart}
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Resize Library panel"
-        />
-        <main className="editor-pane editor-pane--viewport">
-          <div className="editor-tab-strip" role="tablist">
-            {tabs.map((tab) => {
-              const isActive = tab.id === activeTabId;
-              const closable = tab.kind === 'object';
-              const label =
-                tab.kind === 'map'
-                  ? 'Map'
-                  : tab.kind === 'world'
-                    ? 'World'
-                    : (tab.assetId.split('/').pop() ?? tab.assetId);
-              return (
-                <button
-                  key={tab.id}
-                  role="tab"
-                  aria-selected={isActive}
-                  className={`editor-tab ${isActive ? 'is-active' : ''}`}
-                  title={tab.kind === 'object' ? tab.assetId : label}
-                  onClick={() => useEditorStore.getState().activateTab(tab.id)}
-                  // Middle-click closes an object tab (a common tab-strip convention). onAuxClick
-                  // fires for non-primary buttons; guard on button === 1 (middle).
-                  onAuxClick={(e) => {
-                    if (closable && e.button === 1) {
-                      e.preventDefault();
-                      useEditorStore.getState().closeTab(tab.id);
-                    }
-                  }}
+    // One TooltipProvider for the whole editor — steps 6-11 use <Tooltip> without adding their own.
+    <TooltipProvider delayDuration={300}>
+      <div className="flex h-screen flex-col">
+        <Toolbar />
+        {/* min-h-0 lets the viewport pane shrink instead of overflowing the shell. */}
+        <div className="flex min-h-0 flex-1">
+          {/* Library ↔ centre split; the Inspector (right) is a fixed 280px column outside the group,
+              matching the original single-handle layout. autoSaveId persists the split across reloads. */}
+          <ResizablePanelGroup
+            orientation="horizontal"
+            className="min-w-0 flex-1"
+            defaultLayout={layout.defaultLayout}
+            onLayoutChanged={layout.onLayoutChanged}
+          >
+            {/* String sizes are percentages in v4 (numbers would be pixels). */}
+            <ResizablePanel id="library" defaultSize="20" minSize="13" maxSize="45">
+              <aside className="box-border h-full overflow-auto border-r border-surface bg-raised p-3">
+                <LibraryPanel />
+              </aside>
+            </ResizablePanel>
+            <ResizableHandle className="hover:bg-active" />
+            <ResizablePanel id="center" minSize="30">
+              <main className="flex h-full flex-col overflow-hidden bg-inset">
+                <div
+                  className="flex flex-none items-stretch gap-0.5 overflow-x-auto border-b border-surface bg-raised px-1.5 pt-1"
+                  role="tablist"
                 >
-                  <span className="editor-tab-label">{label}</span>
-                  {closable && (
-                    <span
-                      className="editor-tab-close"
-                      role="button"
-                      aria-label="Close tab"
-                      title="Close tab"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        useEditorStore.getState().closeTab(tab.id);
-                      }}
-                    >
-                      ✕
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          {/* Every tab's panel is mounted at once, absolutely filling the panel area; only the active
-              one is visible. Inactive panels are hidden with `visibility` (via .is-hidden), NEVER
-              `display:none` — display:none would collapse the Scale.RESIZE Phaser canvas to 0×0. So
-              the Map panel (and its live Phaser game) stays mounted regardless of the active tab. */}
-          <div className="editor-tab-panels">
-            {tabs.map((tab) => {
-              const hidden = tab.id !== activeTabId;
-              const panelClass = `editor-tab-panel ${hidden ? 'is-hidden' : ''}`;
-              if (tab.kind === 'map') {
-                return (
-                  <div key={tab.id} className={panelClass}>
-                    <PhaserViewport />
-                    {!map && <div className="editor-empty-hint">New or Open a map to begin.</div>}
-                  </div>
-                );
-              }
-              if (tab.kind === 'world') {
-                return (
-                  <div key={tab.id} className={panelClass}>
-                    <div className="editor-empty-hint">World view — coming in step 9.</div>
-                  </div>
-                );
-              }
-              return (
-                <div key={tab.id} className={panelClass}>
-                  <ObjectEditorTab assetId={tab.assetId} />
+                  {tabs.map((tab) => {
+                    const isActive = tab.id === activeTabId;
+                    const closable = tab.kind === 'object';
+                    const label =
+                      tab.kind === 'map'
+                        ? 'Map'
+                        : tab.kind === 'world'
+                          ? 'World'
+                          : (tab.assetId.split('/').pop() ?? tab.assetId);
+                    return (
+                      <button
+                        key={tab.id}
+                        role="tab"
+                        aria-selected={isActive}
+                        className={cn(
+                          'flex max-w-[200px] flex-none cursor-pointer items-center gap-1.5 rounded-t-[5px] border border-b-0 px-2.5 py-1 text-[0.8rem]',
+                          isActive
+                            ? 'border-border bg-inset text-fg-bright'
+                            : 'border-surface bg-surface-subtle text-fg-dim hover:bg-surface hover:text-fg-muted',
+                        )}
+                        title={tab.kind === 'object' ? tab.assetId : label}
+                        onClick={() => useEditorStore.getState().activateTab(tab.id)}
+                        // Middle-click closes an object tab (a common tab-strip convention). onAuxClick
+                        // fires for non-primary buttons; guard on button === 1 (middle).
+                        onAuxClick={(e) => {
+                          if (closable && e.button === 1) {
+                            e.preventDefault();
+                            useEditorStore.getState().closeTab(tab.id);
+                          }
+                        }}
+                      >
+                        <span className="truncate">{label}</span>
+                        {closable && (
+                          <span
+                            className="inline-flex size-4 flex-none cursor-pointer items-center justify-center rounded-[3px] text-[0.7rem] leading-none text-muted-2 hover:bg-danger-bg hover:text-danger-fg"
+                            role="button"
+                            aria-label="Close tab"
+                            title="Close tab"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              useEditorStore.getState().closeTab(tab.id);
+                            }}
+                          >
+                            ✕
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
-        </main>
-        <aside className="editor-pane editor-pane--inspector">
-          <InspectorPanel />
-          <hr className="editor-pane-divider" />
-          <LayersPanel />
-        </aside>
-      </div>
-      <ToastHost toast={toast} />
-      {pendingPortalRect && (
-        <PortalDialog
-          rect={pendingPortalRect}
-          onConfirm={(name, facing) => {
-            useEditorStore.getState().createPortal(pendingPortalRect, name, facing);
-            useEditorStore.getState().setPendingPortalRect(null);
+                {/* Every tab's panel is mounted at once, absolutely filling the panel area; only the
+                    active one is visible. Inactive panels are hidden with `invisible` (visibility:hidden),
+                    NEVER `hidden`/display:none — display:none would collapse the Scale.RESIZE Phaser
+                    canvas to 0×0. So the Map panel (and its live Phaser game) stays mounted regardless
+                    of the active tab. */}
+                <div className="relative min-h-0 flex-1">
+                  {tabs.map((tab) => {
+                    const hidden = tab.id !== activeTabId;
+                    const panelClass = cn(
+                      'absolute inset-0',
+                      hidden && 'invisible pointer-events-none',
+                    );
+                    if (tab.kind === 'map') {
+                      return (
+                        <div key={tab.id} className={panelClass}>
+                          <PhaserViewport />
+                          {!map && (
+                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[0.95rem] text-border-muted">
+                              New or Open a map to begin.
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    if (tab.kind === 'world') {
+                      return (
+                        <div key={tab.id} className={panelClass}>
+                          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[0.95rem] text-border-muted">
+                            World view — coming in step 9.
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={tab.id} className={panelClass}>
+                        <ObjectEditorTab assetId={tab.assetId} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </main>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+          <aside className="box-border w-[280px] shrink-0 overflow-auto border-l border-surface bg-raised p-3">
+            <InspectorPanel />
+            <Separator className="my-3.5" />
+            <LayersPanel />
+          </aside>
+        </div>
+        {/* Match the old toast colours: green success / red error (the shared brown popover would make
+            the two indistinguishable). `!` beats sonner's runtime-injected --normal-bg. */}
+        <Toaster
+          position="bottom-center"
+          duration={2500}
+          toastOptions={{
+            classNames: {
+              success: 'bg-ok-bg! border-ok-border! text-fg!',
+              error: 'bg-danger-bg! border-danger-strong! text-danger-fg!',
+            },
           }}
-          onCancel={() => useEditorStore.getState().setPendingPortalRect(null)}
         />
-      )}
-    </div>
+        {pendingPortalRect && (
+          <PortalDialog
+            rect={pendingPortalRect}
+            onConfirm={(name, facing) => {
+              useEditorStore.getState().createPortal(pendingPortalRect, name, facing);
+              useEditorStore.getState().setPendingPortalRect(null);
+            }}
+            onCancel={() => useEditorStore.getState().setPendingPortalRect(null)}
+          />
+        )}
+      </div>
+    </TooltipProvider>
   );
 }

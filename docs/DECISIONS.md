@@ -7,6 +7,23 @@ Format: `YYYY-MM-DD — [DECIDED|PROPOSED|OPEN] Title` then a short rationale.
 
 ---
 
+## 2026-07-14 — [DECIDED] Editor styling → Tailwind v4 + shadcn/ui (dev-only)
+
+The dev-only Map Builder editor (`src/editor/**`) migrated from a 1292-line hand-written `editor.css`
+to **Tailwind v4** (CSS-first, no config — `@tailwindcss/vite`) + **shadcn/ui** as the component layer
+(copied into `src/editor/ui/`, own-the-code, not an npm dep). Rationale: colocated styling for fast
+visual iteration, and reusable accessible primitives instead of re-hand-rolling UI. Key choices:
+
+- **One palette source of truth.** The brown/cream palette is a single set of `@theme` tokens in
+  `editor.css`; shadcn's semantic CSS vars are wired to those same tokens (one palette, not two).
+- **Dev-only, zero prod impact.** Tailwind is imported only by `editor.css` → `editor.html`. The game
+  page (`index.html` / Phaser) never loads it, so Tailwind's preflight never touches the game, and the
+  editor stays excluded from `vite build` (`rollupOptions.input: 'index.html'`).
+- `editor.css` is now just the Tailwind entry: `@import`, the token blocks, a minimal page baseline,
+  the `pixelated` utility, and the `lib-strip-play` keyframe — no hand-written component rules.
+
+Full plan + step history: `plans/020-editor-tailwind-shadcn.md`.
+
 ## 2026-07-14 — [DECIDED] Campfire fixes (plan 016): refuel is a worker order, flame scales (not sheet-swaps), outline is a rect
 
 Post-playtest fixes to the plan-012 campfire. Four boundary calls (advisor-consulted before build):
