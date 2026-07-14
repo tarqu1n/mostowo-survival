@@ -275,8 +275,8 @@ export const CAMPFIRE_LIGHT_MIN_FRAC = 0.4;
  */
 export const CAMPFIRE_FLAME_LARGE_MIN_FRAC = 0.5;
 export const CAMPFIRE_FLAME_LARGE_SCALE_MIN = 0.85;
-export const CAMPFIRE_FLAME_RISE_PX = 6;
-export const CAMPFIRE_SMOKE_RISE_PX = 30;
+export const CAMPFIRE_FLAME_RISE_PX = 2;
+export const CAMPFIRE_SMOKE_RISE_PX = 22;
 
 /** Semantic colour palette (dark & grotty). Expand as the art identity firms up. */
 export const COLORS = {
