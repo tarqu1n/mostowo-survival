@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { serializeMap, parseMap, migrateMap } from '../systems/mapFormat';
 import { getMap, putMap } from './api';
-import { useEditorStore, type EditorTool } from './store/editorStore';
+import {
+  useEditorStore,
+  type EditorOverlays,
+  type EditorTool,
+  type PaintMode,
+} from './store/editorStore';
 import { NewMapDialog, type NewMapFields } from './NewMapDialog';
 import { OpenMapDialog } from './OpenMapDialog';
 import { ShortcutsDialog } from './ShortcutsDialog';
@@ -10,8 +15,8 @@ import { Button } from './ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { cn } from './lib/utils';
 
-/** The paint tools + pan + the step-7 object tools, in display order. Collision/zone/shape land in a
- *  later step. */
+/** The paint tools + pan + the step-7 object tools + the step-8 collision/zone/shape tools, in
+ *  display order. */
 const TOOLS: Array<{ id: EditorTool; label: string; title: string }> = [
   { id: 'pan', label: 'Pan', title: 'Pan the viewport (also: middle-drag or Space+drag)' },
   {
@@ -29,6 +34,45 @@ const TOOLS: Array<{ id: EditorTool; label: string; title: string }> = [
     title: 'Place the object armed in the Library (arm a decor/node asset first)',
   },
   { id: 'portal', label: 'Portal', title: 'Draw a tile rect, then name it + set its facing' },
+  {
+    id: 'collision',
+    label: 'Collision',
+    title:
+      'Paint base-terrain walkability (drag = blocked, Alt+drag = walkable). Mode below picks brush/rect/fill.',
+  },
+  {
+    id: 'zone',
+    label: 'Zone',
+    title:
+      'Paint the active zone (drag = assign, Alt+drag = clear). Select a zone in the Zones panel first.',
+  },
+  {
+    id: 'shape',
+    label: 'Shape',
+    title:
+      "Carve the map's irregular shape (drag = void, Alt+drag = restore inside). Mode below picks brush/rect/fill.",
+  },
+];
+
+/** Tools that share the brush/rect/fill gesture selector (`paintMode`, step 8) instead of each
+ *  gesture having its own `EditorTool` id like tile painting does — see the store's `PaintMode` doc. */
+const PAINT_MODE_TOOLS: ReadonlySet<EditorTool> = new Set(['collision', 'zone', 'shape']);
+const PAINT_MODES: Array<{ id: PaintMode; label: string }> = [
+  { id: 'brush', label: 'Brush' },
+  { id: 'rect', label: 'Rect' },
+  { id: 'fill', label: 'Fill' },
+];
+
+/** Overlay toggles shown as checkboxes, mirroring the existing Snap checkbox. */
+const OVERLAYS: Array<{ id: keyof EditorOverlays; label: string; title: string }> = [
+  { id: 'grid', label: 'Grid', title: 'Show the tile grid' },
+  {
+    id: 'walkability',
+    label: 'Collision',
+    title:
+      'Red tint = blocked base terrain. Hatched cells = a runtime obstacle (decor collision/node) on top, read-only.',
+  },
+  { id: 'zones', label: 'Zones', title: 'Show each zone as a coloured tint + name label' },
 ];
 
 /** `.editor-toolbar-group` (plan 020 Step 6) — a row of related controls within the toolbar; every
@@ -51,6 +95,8 @@ export function Toolbar() {
   const armedObjectAsset = useEditorStore((s) => s.armedObjectAsset);
   const armedNodeRef = useEditorStore((s) => s.armedNodeRef);
   const snapToTileCenter = useEditorStore((s) => s.snapToTileCenter);
+  const paintMode = useEditorStore((s) => s.paintMode);
+  const overlays = useEditorStore((s) => s.overlays);
 
   const [showNew, setShowNew] = useState(false);
   const [showOpen, setShowOpen] = useState(false);
@@ -167,6 +213,27 @@ export function Toolbar() {
         })}
       </div>
 
+      {PAINT_MODE_TOOLS.has(activeTool) && (
+        <div className={groupClass} title="Gesture for the Collision/Zone/Shape tools">
+          {PAINT_MODES.map((mode) => (
+            <Button
+              key={mode.id}
+              variant="ghost"
+              size="sm"
+              className={cn(
+                'font-normal',
+                paintMode === mode.id
+                  ? 'bg-active text-fg-bright hover:bg-active'
+                  : 'text-fg-muted hover:bg-surface',
+              )}
+              onClick={() => useEditorStore.getState().setPaintMode(mode.id)}
+            >
+              {mode.label}
+            </Button>
+          ))}
+        </div>
+      )}
+
       <div className={groupClass}>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -184,6 +251,24 @@ export function Toolbar() {
             always tile-snapped.
           </TooltipContent>
         </Tooltip>
+      </div>
+
+      <div className={groupClass}>
+        {OVERLAYS.map((overlay) => (
+          <Tooltip key={overlay.id}>
+            <TooltipTrigger asChild>
+              <label className="flex cursor-pointer items-center gap-1 text-[0.85rem]">
+                <input
+                  type="checkbox"
+                  checked={overlays[overlay.id]}
+                  onChange={() => useEditorStore.getState().toggleOverlay(overlay.id)}
+                />
+                {overlay.label}
+              </label>
+            </TooltipTrigger>
+            <TooltipContent>{overlay.title}</TooltipContent>
+          </Tooltip>
+        ))}
       </div>
 
       <div className={cn(groupClass, 'flex-1 justify-center text-[0.9rem]')}>

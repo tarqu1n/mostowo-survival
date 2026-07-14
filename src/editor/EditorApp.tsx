@@ -8,6 +8,7 @@ import { PhaserViewport } from './PhaserViewport';
 import { ObjectEditorTab } from './tabs/ObjectEditorTab';
 import { LibraryPanel } from './panels/LibraryPanel';
 import { LayersPanel } from './panels/LayersPanel';
+import { ZonesPanel } from './panels/ZonesPanel';
 import { InspectorPanel } from './panels/InspectorPanel';
 import { PortalDialog } from './PortalDialog';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable';
@@ -222,6 +223,8 @@ export function EditorApp() {
             <InspectorPanel />
             <Separator className="my-3.5" />
             <LayersPanel />
+            <Separator className="my-3.5" />
+            <ZonesPanel />
           </aside>
         </div>
         {/* Match the old toast colours: green success / red error (the shared brown popover would make

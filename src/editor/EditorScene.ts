@@ -2,23 +2,32 @@ import Phaser from 'phaser';
 import { TILE_SIZE, GROUND_CHUNK_ROWS } from '../config';
 import { ACTIVE_TILESET, resolveTile, sheetKey, tileImageKey } from '../data/tileset';
 import { NODES } from '../data/nodes';
-import { cellIndex, isInside, type MapFile, type PortalRect } from '../systems/mapFormat';
+import { cellIndex, getCell, isInside, type MapFile, type PortalRect } from '../systems/mapFormat';
 import { worldToTile, snapToTileCenter } from '../systems/grid';
-import { useEditorStore } from './store/editorStore';
+import { useEditorStore, type PaintMode } from './store/editorStore';
 import { parseAssetId, tilesetAssetUrl } from './textureLoading';
 import { queueDecorTexture, resolveDecorDraw } from '../render/decorSprites';
+import { objectFootprintCells } from './objectOps';
+
+/** Which target grid a `collision`/`zone`/`shape` tool gesture writes to (plan 014 step 8) — see
+ *  `dispatchTargetPaint`. */
+type PaintTarget = 'collision' | 'zone' | 'shape';
 
 /**
  * The editor's single Phaser scene (plan 014 step 5). Renders the open map pixel-identically to the
  * game via the same `resolveTile` seam: tile layers bake into per-layer chunked `RenderTexture`s
  * with the batch API (mirroring `world/groundRenderer.ts` — per-tile `drawFrame` is pathologically
  * slow), objects draw on top with their stored transform, and overlay `Graphics` draw the void
- * checker, grid and hover cell above everything. Void cells reject the hover cursor.
+ * checker, grid, walkability tint/hatch, zone tints/labels, the shape-tool boundary outline, and the
+ * hover cell above everything (step 8 adds walkability/zones/shape). Void cells reject the hover
+ * cursor.
  *
  * It observes the editor store (the sole React↔Phaser bridge): a `mapEpoch` change = full reload
  * (textures → bake → camera fit); a `docRevision` change = rebake in place; an `overlays` change =
- * overlay redraw. Robustness: a texture that fails to load is logged and skipped (authored maps may
- * reference assets that don't exist yet mid-development), never crashing the scene.
+ * overlay redraw; an `activeTool` change also triggers an overlay redraw (step 8 — the shape-tool
+ * boundary only shows while that tool is active). Robustness: a texture that fails to load is logged
+ * and skipped (authored maps may reference assets that don't exist yet mid-development), never
+ * crashing the scene.
  */
 
 const MIN_ZOOM = 1;
@@ -28,7 +37,11 @@ const PAN_MARGIN_TILES = 6;
 // Render depths. Tile layers occupy 0..layers.length-1; everything else sits above them.
 const DEPTH_VOID = 500;
 const DEPTH_OBJECTS = 1000;
+const DEPTH_WALKABILITY = 1500;
+const DEPTH_ZONES = 1550;
+const DEPTH_ZONE_LABELS = 1560;
 const DEPTH_GRID = 9000;
+const DEPTH_SHAPE_BOUNDARY = 9100;
 const DEPTH_HOVER = 9500;
 const DEPTH_SELECTION = 9550;
 const DEPTH_RECT_PREVIEW = 9600;
@@ -41,6 +54,14 @@ const GRID_COLOUR = 0x4a3f38;
 const HOVER_COLOUR = 0xf0d890;
 const SELECTION_COLOUR = 0x5fd0ff;
 const PORTAL_PREVIEW_COLOUR = 0x7aa6ff;
+const COLLISION_PREVIEW_COLOUR = 0xd06a5a;
+const ZONE_PREVIEW_COLOUR = 0x8fd67a;
+const SHAPE_PREVIEW_COLOUR = 0xfff05a;
+
+// Step 8 overlays.
+const WALKABILITY_TINT = 0xd04040;
+const WALKABILITY_HATCH = 0xffffff;
+const SHAPE_BOUNDARY_COLOUR = 0xfff05a;
 
 // Node/portal marker fallback (used when a node ref is unknown, or its tile texture isn't resident —
 // real tile-role sprite rendering is the step-7 default; portals are always a labelled outline).
@@ -62,6 +83,12 @@ export class EditorScene extends Phaser.Scene {
   private hoverGfx?: Phaser.GameObjects.Graphics;
   private rectPreviewGfx?: Phaser.GameObjects.Graphics;
   private selectionGfx?: Phaser.GameObjects.Graphics;
+  // ---- Step 8 overlays ----
+  private walkabilityGfx?: Phaser.GameObjects.Graphics;
+  private zonesGfx?: Phaser.GameObjects.Graphics;
+  private shapeBoundaryGfx?: Phaser.GameObjects.Graphics;
+  /** Zone name labels (Graphics can't draw text) — rebuilt every `drawZonesOverlay` call. */
+  private zoneLabelTexts: Phaser.GameObjects.Text[] = [];
 
   private panning = false;
   private panLast = { x: 0, y: 0 };
@@ -81,6 +108,26 @@ export class EditorScene extends Phaser.Scene {
   } | null = null;
   /** An in-progress rect-tool drag: the pressed corner. Committed as one command on pointer-up. */
   private rectDrag: { startCol: number; startRow: number } | null = null;
+
+  // ---- Collision/zone/shape tool state (step 8) ----
+  /** An in-progress collision/zone/shape brush drag: which target grid, the value it's painting
+   *  (`on`, locked at pointer-down — see `handleTargetToolDown`'s doc on why a modifier held mid-drag
+   *  doesn't retroactively change it), its coalescing strokeId, and the last painted cell. Mirrors
+   *  `activeStroke` (tile brush/eraser) generalised over the target grid instead of duplicating it. */
+  private activeTargetStroke: {
+    target: PaintTarget;
+    on: boolean;
+    strokeId: string;
+    lastCol: number;
+    lastRow: number;
+  } | null = null;
+  /** An in-progress collision/zone/shape rect drag. Mirrors `rectDrag`. */
+  private targetRectDrag: {
+    target: PaintTarget;
+    on: boolean;
+    startCol: number;
+    startRow: number;
+  } | null = null;
 
   // ---- Object tool state (step 7) ----
   /** An in-progress Portal-tool drag: the pressed tile corner. Mirrors `rectDrag`, but commits to
@@ -104,7 +151,10 @@ export class EditorScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor('rgba(0,0,0,0)'); // transparent — the dark pane shows through
     this.voidGfx = this.add.graphics().setDepth(DEPTH_VOID);
+    this.walkabilityGfx = this.add.graphics().setDepth(DEPTH_WALKABILITY);
+    this.zonesGfx = this.add.graphics().setDepth(DEPTH_ZONES);
     this.gridGfx = this.add.graphics().setDepth(DEPTH_GRID);
+    this.shapeBoundaryGfx = this.add.graphics().setDepth(DEPTH_SHAPE_BOUNDARY);
     this.hoverGfx = this.add.graphics().setDepth(DEPTH_HOVER);
     this.selectionGfx = this.add.graphics().setDepth(DEPTH_SELECTION);
     this.rectPreviewGfx = this.add.graphics().setDepth(DEPTH_RECT_PREVIEW);
@@ -140,6 +190,12 @@ export class EditorScene extends Phaser.Scene {
       ),
       useEditorStore.subscribe(
         (s) => s.overlays,
+        () => this.redrawOverlays(),
+      ),
+      // The shape-tool boundary outline only draws while that tool is active (step 8) — re-render on
+      // every tool switch so entering/leaving `shape` shows/hides it.
+      useEditorStore.subscribe(
+        (s) => s.activeTool,
         () => this.redrawOverlays(),
       ),
       useEditorStore.subscribe(
@@ -186,7 +242,12 @@ export class EditorScene extends Phaser.Scene {
     this.objectSprites = [];
     this.objectDisplayById.clear();
     this.voidGfx?.clear();
+    this.walkabilityGfx?.clear();
+    this.zonesGfx?.clear();
+    for (const t of this.zoneLabelTexts) t.destroy();
+    this.zoneLabelTexts = [];
     this.gridGfx?.clear();
+    this.shapeBoundaryGfx?.clear();
     this.hoverGfx?.clear();
     this.selectionGfx?.clear();
     this.rectPreviewGfx?.clear();
@@ -196,6 +257,8 @@ export class EditorScene extends Phaser.Scene {
     this.rectDrag = null;
     this.portalDrag = null;
     this.objectDrag = null;
+    this.activeTargetStroke = null;
+    this.targetRectDrag = null;
   }
 
   private loadTexturesThenBuild(map: MapFile, epoch: number): void {
@@ -545,10 +608,122 @@ export class EditorScene extends Phaser.Scene {
   // ---- Overlays ----
 
   private redrawOverlays(): void {
-    const { map, overlays } = useEditorStore.getState();
+    const { map, overlays, activeTool } = useEditorStore.getState();
     this.drawVoid(map);
     this.drawGrid(map, overlays.grid);
+    this.drawWalkabilityOverlay(map, overlays.walkability);
+    this.drawZonesOverlay(map, overlays.zones);
+    this.drawShapeBoundary(map, activeTool === 'shape');
     if (!map) this.hoverGfx?.clear();
+  }
+
+  /** Red ~40% tint on blocked base-terrain cells (`walkability.cells[i] === 1`), toggled by
+   *  `overlays.walkability`. Also hatches the footprint of every RUNTIME obstacle that composites on
+   *  top of base terrain at runtime — decor WITH a `collision` footprint, and every node — read-only,
+   *  for authoring clarity (walkability painting never touches these; see the store's module doc).
+   *  Cosmetic decor (no `collision`) and portals don't block, so they're excluded. */
+  private drawWalkabilityOverlay(map: MapFile | null, show: boolean): void {
+    const g = this.walkabilityGfx;
+    if (!g) return;
+    g.clear();
+    g.setVisible(show);
+    if (!map || !show) return;
+    const { width, height } = map.meta;
+
+    g.fillStyle(WALKABILITY_TINT, 0.4);
+    for (let row = 0; row < height; row++) {
+      for (let col = 0; col < width; col++) {
+        if (getCell(map.walkability.cells, col, row, width) !== 1) continue;
+        g.fillRect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+      }
+    }
+
+    g.lineStyle(1, WALKABILITY_HATCH, 0.55);
+    for (const obj of map.objects) {
+      if (obj.kind === 'portal') continue; // portals never block
+      if (obj.kind === 'decor' && !obj.collision) continue; // cosmetic decor doesn't block
+      for (const { col, row } of objectFootprintCells(obj, map.meta.tileSize)) {
+        if (col < 0 || row < 0 || col >= width || row >= height) continue;
+        const x = col * TILE_SIZE;
+        const y = row * TILE_SIZE;
+        g.lineBetween(x, y, x + TILE_SIZE, y + TILE_SIZE);
+        g.lineBetween(x + TILE_SIZE, y, x, y + TILE_SIZE);
+      }
+    }
+  }
+
+  /** Each zone def rendered as its colour at ~30% alpha over its cells, plus a name label at the
+   *  region's centroid, toggled by `overlays.zones`. */
+  private drawZonesOverlay(map: MapFile | null, show: boolean): void {
+    const g = this.zonesGfx;
+    for (const t of this.zoneLabelTexts) t.destroy();
+    this.zoneLabelTexts = [];
+    if (!g) return;
+    g.clear();
+    g.setVisible(show);
+    if (!map || !show) return;
+    const { width, height } = map.meta;
+
+    for (const def of map.zones.defs) {
+      let colour: number;
+      try {
+        colour = Phaser.Display.Color.HexStringToColor(def.colour).color;
+      } catch {
+        colour = 0x888888; // malformed colour string — still show SOMETHING rather than skip the zone
+      }
+      g.fillStyle(colour, 0.3);
+      let sumCol = 0;
+      let sumRow = 0;
+      let count = 0;
+      for (let row = 0; row < height; row++) {
+        for (let col = 0; col < width; col++) {
+          if (getCell(map.zones.cells, col, row, width) !== def.id) continue;
+          g.fillRect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+          sumCol += col + 0.5;
+          sumRow += row + 0.5;
+          count++;
+        }
+      }
+      if (count === 0) continue; // an empty zone def has no cells to centre a label on
+      const text = this.add
+        .text((sumCol / count) * TILE_SIZE, (sumRow / count) * TILE_SIZE, def.name, {
+          fontFamily: 'monospace',
+          fontSize: '10px',
+          color: '#f4ecd8',
+          backgroundColor: 'rgba(0,0,0,0.45)',
+          padding: { x: 3, y: 1 },
+        })
+        .setOrigin(0.5)
+        .setDepth(DEPTH_ZONE_LABELS);
+      this.zoneLabelTexts.push(text);
+    }
+  }
+
+  /** While the shape tool is active, trace a bright outline along the inside/void boundary (and the
+   *  map edge) so the author can see the authored mask clearly while carving it. */
+  private drawShapeBoundary(map: MapFile | null, show: boolean): void {
+    const g = this.shapeBoundaryGfx;
+    if (!g) return;
+    g.clear();
+    g.setVisible(show);
+    if (!map || !show) return;
+    const { width, height } = map.meta;
+    g.lineStyle(2, SHAPE_BOUNDARY_COLOUR, 0.95);
+    for (let row = 0; row < height; row++) {
+      for (let col = 0; col < width; col++) {
+        if (!isInside(map, col, row)) continue;
+        const x = col * TILE_SIZE;
+        const y = row * TILE_SIZE;
+        if (row === 0 || !isInside(map, col, row - 1)) g.lineBetween(x, y, x + TILE_SIZE, y);
+        if (row === height - 1 || !isInside(map, col, row + 1)) {
+          g.lineBetween(x, y + TILE_SIZE, x + TILE_SIZE, y + TILE_SIZE);
+        }
+        if (col === 0 || !isInside(map, col - 1, row)) g.lineBetween(x, y, x, y + TILE_SIZE);
+        if (col === width - 1 || !isInside(map, col + 1, row)) {
+          g.lineBetween(x + TILE_SIZE, y, x + TILE_SIZE, y + TILE_SIZE);
+        }
+      }
+    }
   }
 
   private drawVoid(map: MapFile | null): void {
@@ -724,6 +899,14 @@ export class EditorScene extends Phaser.Scene {
       return;
     }
 
+    // The shape tool ALSO bypasses the isInside gate below — painting a cell back to "inside" would
+    // be impossible if void cells (which is exactly what isInside rejects) refused the tool. It uses
+    // its own in-bounds-only check (see `handleShapePointerDown`).
+    if (state.activeTool === 'shape') {
+      this.handleShapePointerDown(pointer, state.map, state.paintMode);
+      return;
+    }
+
     const { col, row } = this.pointerTile(pointer);
     if (!isInside(state.map, col, row)) return;
 
@@ -771,9 +954,108 @@ export class EditorScene extends Phaser.Scene {
         this.portalDrag = { startCol: col, startRow: row };
         this.drawRectPreview(col, row, col, row, PORTAL_PREVIEW_COLOUR);
         break;
+      case 'collision': {
+        // Default (no modifier) marks the cell blocked — the primary "add an obstacle" action;
+        // Alt clears it, mirroring the free-pixel-placement modifier convention (step 7). Locked for
+        // the whole gesture at press time (see `activeTargetStroke`'s doc).
+        const alt = pointer.event instanceof MouseEvent && pointer.event.altKey;
+        this.dispatchTargetPaint('collision', col, row, !alt, state.paintMode);
+        break;
+      }
+      case 'zone': {
+        // Default paints the active zone id; Alt clears the cell's zone assignment regardless of
+        // which zone owned it.
+        const alt = pointer.event instanceof MouseEvent && pointer.event.altKey;
+        this.dispatchTargetPaint('zone', col, row, !alt, state.paintMode);
+        break;
+      }
       default:
-        break; // collision/zone/shape land in a later step
+        break; // 'shape' is handled above, before the isInside gate
     }
+  }
+
+  /** Shape tool press (step 8) — bypasses the shared isInside gate (see caller's comment). Default
+   *  (no modifier) carves VOID, the primary authoring action when starting from a full rectangular
+   *  map; Alt restores a cell to inside. Locked for the whole gesture at press time, same as every
+   *  other modifier-gated tool. */
+  private handleShapePointerDown(
+    pointer: Phaser.Input.Pointer,
+    map: MapFile,
+    paintMode: PaintMode,
+  ): void {
+    const { col, row } = this.pointerTile(pointer);
+    if (col < 0 || row < 0 || col >= map.meta.width || row >= map.meta.height) return;
+    const alt = pointer.event instanceof MouseEvent && pointer.event.altKey;
+    this.dispatchTargetPaint('shape', col, row, alt, paintMode);
+  }
+
+  /** Dispatches a collision/zone/shape tool press to the right gesture (step 8) — generalises the
+   *  brush/rect/fill mechanics the tile-paint tools each get their own `EditorTool` for, since these
+   *  three tools each write a DIFFERENT target grid rather than a tile layer (see `PaintMode`'s doc in
+   *  the store). `on` is the value locked in for this whole gesture (collision: blocked; zone: paint
+   *  vs. clear; shape: inside vs. void). */
+  private dispatchTargetPaint(
+    target: PaintTarget,
+    col: number,
+    row: number,
+    on: boolean,
+    paintMode: PaintMode,
+  ): void {
+    switch (paintMode) {
+      case 'brush': {
+        const strokeId = this.mintStrokeId();
+        this.activeTargetStroke = { target, on, strokeId, lastCol: col, lastRow: row };
+        this.applyTargetSegment(col, row, col, row);
+        break;
+      }
+      case 'fill':
+        this.applyTargetFill(target, col, row, on);
+        break;
+      case 'rect':
+        this.targetRectDrag = { target, on, startCol: col, startRow: row };
+        this.drawRectPreview(col, row, col, row, this.targetPreviewColour(target));
+        break;
+    }
+  }
+
+  private applyTargetSegment(fromCol: number, fromRow: number, toCol: number, toRow: number): void {
+    const s = this.activeTargetStroke;
+    if (!s) return;
+    const store = useEditorStore.getState();
+    if (s.target === 'collision') {
+      store.paintWalkabilityLine(fromCol, fromRow, toCol, toRow, s.strokeId, s.on);
+    } else if (s.target === 'zone') {
+      store.paintZoneLine(fromCol, fromRow, toCol, toRow, s.strokeId, s.on);
+    } else {
+      store.paintShapeLine(fromCol, fromRow, toCol, toRow, s.strokeId, s.on);
+    }
+  }
+
+  private applyTargetFill(target: PaintTarget, col: number, row: number, on: boolean): void {
+    const store = useEditorStore.getState();
+    if (target === 'collision') store.fillWalkabilityFrom(col, row, on);
+    else if (target === 'zone') store.fillZoneFrom(col, row, on);
+    else store.fillShapeFrom(col, row, on);
+  }
+
+  private applyTargetRect(
+    target: PaintTarget,
+    startCol: number,
+    startRow: number,
+    col: number,
+    row: number,
+    on: boolean,
+  ): void {
+    const store = useEditorStore.getState();
+    if (target === 'collision') store.paintWalkabilityRect(startCol, startRow, col, row, on);
+    else if (target === 'zone') store.paintZoneRect(startCol, startRow, col, row, on);
+    else store.paintShapeRect(startCol, startRow, col, row, on);
+  }
+
+  private targetPreviewColour(target: PaintTarget): number {
+    if (target === 'collision') return COLLISION_PREVIEW_COLOUR;
+    if (target === 'zone') return ZONE_PREVIEW_COLOUR;
+    return SHAPE_PREVIEW_COLOUR;
   }
 
   /** Select-tool press: pick the topmost object under the pointer (plain click = single-select,
@@ -849,6 +1131,31 @@ export class EditorScene extends Phaser.Scene {
       return;
     }
 
+    if (this.activeTargetStroke) {
+      const { col, row } = this.pointerTile(pointer);
+      const s = this.activeTargetStroke;
+      if (col !== s.lastCol || row !== s.lastRow) {
+        this.applyTargetSegment(s.lastCol, s.lastRow, col, row);
+        s.lastCol = col;
+        s.lastRow = row;
+      }
+      this.updateHover(pointer);
+      return;
+    }
+
+    if (this.targetRectDrag) {
+      const { col, row } = this.pointerTile(pointer);
+      this.drawRectPreview(
+        this.targetRectDrag.startCol,
+        this.targetRectDrag.startRow,
+        col,
+        row,
+        this.targetPreviewColour(this.targetRectDrag.target),
+      );
+      this.updateHover(pointer);
+      return;
+    }
+
     if (this.portalDrag) {
       const { col, row } = this.pointerTile(pointer);
       this.drawRectPreview(
@@ -900,6 +1207,18 @@ export class EditorScene extends Phaser.Scene {
         .paintRectArea(this.rectDrag.startCol, this.rectDrag.startRow, col, row);
       this.rectDrag = null;
       this.rectPreviewGfx?.clear();
+      return;
+    }
+    if (this.activeTargetStroke) {
+      this.activeTargetStroke = null;
+      return;
+    }
+    if (this.targetRectDrag) {
+      const { col, row } = this.pointerTile(pointer);
+      const drag = this.targetRectDrag;
+      this.targetRectDrag = null;
+      this.rectPreviewGfx?.clear();
+      this.applyTargetRect(drag.target, drag.startCol, drag.startRow, col, row, drag.on);
       return;
     }
     if (this.portalDrag) {

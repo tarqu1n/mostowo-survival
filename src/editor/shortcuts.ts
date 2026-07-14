@@ -8,7 +8,8 @@
  * The shortcuts are actually handled in two places:
  *   - `EditorApp.tsx`   — the window `keydown` handler (undo/redo, delete, arrow-nudge).
  *   - `EditorScene.ts`  — the Phaser input wiring (wheel-zoom, pan, and the pointer-tool modifiers:
- *                          Alt = free-pixel, Shift-click = multi-select, drag = move).
+ *                          Alt = free-pixel, Shift-click = multi-select, drag = move; plus the
+ *                          Collision/Zone/Shape tools' Alt = paint-the-complement-value modifier).
  * Both sites carry a comment pointing back here. If the two ever drift, THIS file is the one that's
  * wrong — fix it to match the handlers.
  */
@@ -44,6 +45,21 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       {
         keys: ['Alt (hold)'],
         action: 'Place/drag decor at free pixels, bypassing tile-centre snap',
+      },
+    ],
+  },
+  {
+    title: 'Collision / Zones / Shape',
+    shortcuts: [
+      {
+        keys: ['Drag'],
+        action:
+          'Collision: mark blocked · Zone: paint the active zone · Shape: carve void (the toolbar Brush/Rect/Fill buttons pick the gesture)',
+      },
+      {
+        keys: ['Alt + Drag'],
+        action:
+          'Collision: clear to walkable · Zone: clear the cell’s zone · Shape: restore to inside',
       },
     ],
   },

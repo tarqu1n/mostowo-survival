@@ -932,7 +932,7 @@ free values render nearest-neighbour and are the author's aesthetic call.
     `npm run editor`: reclassify `Bricks_01` → `frames:4, rows:2`, watch the grid overlay + animated
     preview, place it → an animated furnace drops (not the whole sheet), save→reopen round-trips.
 
-- [ ] **Step 8: Shape, walkability + zones painting** `[delegate sonnet]`
+- [x] **Step 8: Shape, walkability + zones painting** `[delegate sonnet]`
   - Generalise the step-6 paint pipeline over a "target grid" (tile layer / walkability / zones /
     shape) rather than duplicating tool code.
   - **Shape tool**: paints inside(1)/void(0) into `shape.cells`. Painting a cell void also clears
@@ -956,6 +956,33 @@ free values render nearest-neighbour and are the author's aesthetic call.
     per-zone favourites and see the Library favourites filter follow the active zone;
     save→reopen preserves; saved JSON passes `parseMap` void-consistency; undo works across
     shape/collision/zone edits; `npm run check` green.
+  - Outcome: all changes confined to `src/editor/` (5 modified, 6 new — verified via `git status`).
+    New pure modules `shapeOps.ts` (`computeVoidCascade` — given cells going void, returns tile
+    cells + zone cells + object indices to clear/remove) and `zoneOps.ts` (`nextFreeZoneId` lowest
+    free uint8, `defaultZoneColour`); `panels/ZonesPanel.tsx` (create/rename/recolour/delete/select
+    active zone, styled with the `ui/` kit like `LayersPanel`). `editorStore.ts`: generalised the
+    step-6 paint pipeline via `commandFromChanges` (generic do/undo builder) reused by tile,
+    walkability, and zone painting; `EditorScene` dispatches all three via one
+    `dispatchTargetPaint(target,col,row,on,paintMode)` (new `paintMode` brush/rect/fill store field,
+    shown as a toolbar sub-selector). Shape uses `buildShapeCommand`: void-going cells bundle
+    tile-zeroing + zone-zeroing + object-removal into the SAME undoable `Command` (void-consistency
+    always true); inside-restore is a plain flip, no cascade. Overlays: walkability = red 40% tint +
+    read-only white hatch of decor/node footprints; zones = 30%-alpha colour + centroid name label;
+    shape = bright yellow inside/void boundary while the tool is active — all toggled from Toolbar.
+    Library favourites-follow-`activeZoneId` was already wired (step 6) — verified, no change.
+    **Bug fixed:** `activeZoneId` wasn't reconciled on undo/redo/newMap/loadMap/closeMap (unlike
+    `activeLayerId`) — a stale/deleted zone id could be painted, violating `parseMap`; added
+    `reconcileActiveZone` + resets. Updated `shortcuts.ts` for the Alt-modifier semantics (in-app
+    Shortcuts panel kept in sync). Tests: +34 new (`shapeOps` 8, `zoneOps` 7, `editorStoreTerrain`
+    19) covering void-cascade + undo, lowest-free-id alloc/reuse/exhaustion, void-skip painting,
+    round-trip `serializeMap`→`parseMap` passing void-consistency for a carved shape + walkability +
+    two zones; 461/461 pass. `npm run check`: typecheck/lint(0 err)/lint:md/scoped format/test all
+    green; the only `format:check` red is `src/debug/crashReporter.ts` — a tracked file with ZERO
+    diff (committed unformatted by a concurrent session), outside this step's scope. NOT
+    machine-verified (no React/DOM harness): the live click-through at `npm run editor` — carve void
+    over tiles/objects, paint collision + two zones, toggle each overlay, per-zone favourites follow
+    active zone, save→reload→reopen persists, undo/redo across shape/collision/zone incl. tool
+    switches.
 
 - [ ] **Step 9: World view tab + neighbour ghost strips** `[delegate sonnet]`
   - **Update (plan 017 landed):** the `view: 'map'|'world'` toolbar toggle this step was written

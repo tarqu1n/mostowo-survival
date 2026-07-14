@@ -37,6 +37,7 @@ import {
   type PortalObject,
   type PortalRect,
   type TileLayer,
+  type ZoneDef,
 } from '../../systems/mapFormat';
 import type { TileSource } from '../../data/tileset';
 import type { WorldLayout } from '../../systems/worldLayout';
@@ -49,8 +50,11 @@ import {
   floodFill,
   lineCells,
   rectCells,
+  type CellChange,
 } from '../paintOps';
 import { footprintIsValid, nextObjectId } from '../objectOps';
+import { computeVoidCascade } from '../shapeOps';
+import { defaultZoneColour, nextFreeZoneId } from '../zoneOps';
 import { HistoryStack, type Command } from './history';
 
 /** A central-pane tab (plan 017 step 1). `map`/`world` are the two permanent, non-closable tabs; an
@@ -74,6 +78,13 @@ export type EditorTool =
   | 'shape'
   | 'place'
   | 'portal';
+
+/** Which gesture the `collision`/`zone`/`shape` tools paint with (plan 014 step 8) — mirrors the
+ *  brush/rect/fill distinction that tile painting expresses as separate `EditorTool`s, but those
+ *  three tools each write a DIFFERENT target grid rather than a tile layer, so one tool id covers all
+ *  three gestures and `paintMode` picks the gesture. Tile painting (`brush`/`eraser`/`fill`/`rect`)
+ *  ignores this field entirely — it keeps using `activeTool` as its own gesture selector. */
+export type PaintMode = 'brush' | 'rect' | 'fill';
 
 /** A drag/commit delta for `translateObjects` — px for decor (`dxPx`/`dyPx`), tile steps for
  *  node/portal (`dCol`/`dRow`, always whole tiles — see module doc on nodes/portals being inherently
@@ -164,6 +175,8 @@ export interface EditorState {
    *  Set on pointer-up of a valid (non-void) portal drag; cleared on dialog confirm/cancel. */
   pendingPortalRect: PortalRect | null;
   selectedObjectIds: string[];
+  /** Gesture for the `collision`/`zone`/`shape` tools (step 8) — see `PaintMode`'s doc. */
+  paintMode: PaintMode;
   activeZoneId: number | null;
   overlays: EditorOverlays;
   /** Editor VIEW state, not map data — which layer ids are hidden in the viewport. Never touches
@@ -200,6 +213,7 @@ export interface EditorState {
   setSnapToTileCenter(enabled: boolean): void;
   setPendingPortalRect(rect: PortalRect | null): void;
   setSelectedObjectIds(ids: string[]): void;
+  setPaintMode(mode: PaintMode): void;
   setActiveZoneId(id: number | null): void;
   toggleOverlay(key: keyof EditorOverlays): void;
   toggleLayerVisibility(layerId: string): void;
@@ -242,6 +256,66 @@ export interface EditorState {
   /** Toggles `assetId` in the active zone's favourites (`zones.defs[activeZoneId].favourites`) when a
    *  zone is active, else in the map-level `meta.favourites` (created lazily on first use). */
   toggleFavourite(assetId: string): void;
+
+  // ---- collision / walkability (step 8) ----
+  /** Paints `walkability.cells` along a line segment (brush stroke, `strokeId`-coalesced), skipping
+   *  void cells like every other paint tool. `blocked` sets `1` (blocked) or `0` (walkable). */
+  paintWalkabilityLine(
+    fromCol: number,
+    fromRow: number,
+    toCol: number,
+    toRow: number,
+    strokeId: string,
+    blocked: boolean,
+  ): void;
+  /** Flood-fills `walkability.cells` from `(col,row)`, bounded by the shape mask. */
+  fillWalkabilityFrom(col: number, row: number, blocked: boolean): void;
+  /** Fills a rectangle of `walkability.cells`. */
+  paintWalkabilityRect(c0: number, r0: number, c1: number, r1: number, blocked: boolean): void;
+
+  // ---- zones (step 8) ----
+  /** Creates a zone def with the lowest free uint8 id (1..255), a default name/colour, activates it,
+   *  and returns the new id — or `null` (no mutation, a console warning) if the id space is
+   *  exhausted (all 255 zone ids taken). */
+  createZone(): number | null;
+  renameZone(id: number, name: string): void;
+  recolourZone(id: number, colour: string): void;
+  /** Deletes a zone def AND clears every cell painted with its id, as ONE undoable command.
+   *  Deactivates it if it was the active zone. */
+  deleteZone(id: number): void;
+  /** Paints `zones.cells` along a line segment (brush stroke, `strokeId`-coalesced), skipping void
+   *  cells. `paint` writes the active zone's id (no-op + console warning if none is active); `!paint`
+   *  clears to `0` regardless of which zone owned the cell. */
+  paintZoneLine(
+    fromCol: number,
+    fromRow: number,
+    toCol: number,
+    toRow: number,
+    strokeId: string,
+    paint: boolean,
+  ): void;
+  fillZoneFrom(col: number, row: number, paint: boolean): void;
+  paintZoneRect(c0: number, r0: number, c1: number, r1: number, paint: boolean): void;
+
+  // ---- shape (step 8) ----
+  /** Paints `shape.cells` along a line segment (brush stroke, `strokeId`-coalesced). `inside=true`
+   *  sets the cell to `1` (a plain cell-value change, no side effects). `inside=false` voids it
+   *  (`0`) — as one undoable command with the FULL void-consistency cascade (every tile layer cell
+   *  zeroed, zone id zeroed, overlapping objects removed — see `computeVoidCascade`). Materializes
+   *  `map.shape` on first use (an absent shape means "all inside"); undoing back past the very first
+   *  shape edit restores the absent state exactly. NOT gated by the shape mask (`isInside`) — that
+   *  would make void cells impossible to paint back to inside — only by the map's width/height
+   *  bounds. */
+  paintShapeLine(
+    fromCol: number,
+    fromRow: number,
+    toCol: number,
+    toRow: number,
+    strokeId: string,
+    inside: boolean,
+  ): void;
+  fillShapeFrom(col: number, row: number, inside: boolean): void;
+  paintShapeRect(c0: number, r0: number, c1: number, r1: number, inside: boolean): void;
 
   // ---- objects: place, transform, stack, portals (step 7) ----
   /** Places a `decor` object at `(x,y)` px with the default cosmetic transform (scale 1, rotation 0,
@@ -332,6 +406,90 @@ function resolveBrushValue(map: MapFile, brushAsset: string | null): number {
   }
 }
 
+/** Builds a plain `{index}->value` undoable Command from a pre-computed `CellChange` list — shared by
+ *  every target-grid paint action (tile layers, walkability, zones; step 8 generalises the step-6
+ *  tile-paint pipeline over "which cells array" rather than duplicating this do/undo pair per
+ *  target). Shape painting does NOT use this directly — it needs the extra void-consistency cascade,
+ *  see `buildShapeCommand`. Returns `null` (nothing to apply) when `changes` is empty. */
+function commandFromChanges(
+  cells: number[],
+  changes: CellChange[],
+  value: number,
+  strokeId?: string,
+): Command | null {
+  if (changes.length === 0) return null;
+  return {
+    strokeId,
+    do: () => {
+      for (const c of changes) cells[c.index] = value;
+    },
+    undo: () => {
+      for (const c of changes) cells[c.index] = c.prev;
+    },
+  };
+}
+
+/** In-bounds check that deliberately ignores the shape mask — used ONLY by the shape tool itself
+ *  (painting the mask can't be gated by the mask it's editing; every other paint tool gates on the
+ *  real `isInside`, which DOES respect it). */
+function inBounds(map: MapFile, col: number, row: number): boolean {
+  return col >= 0 && row >= 0 && col < map.meta.width && row < map.meta.height;
+}
+
+/**
+ * Builds the ONE undoable command for a shape-paint operation touching `points` (already filtered to
+ * `inBounds`). `inside=true` is a plain cell-set (no cascade). `inside=false` computes
+ * `computeVoidCascade` for exactly the cells that are NEWLY voided (i.e. currently `1`, per the
+ * pre-edit `shapeCellsBase`) and bundles the tile-layer/zone zeroing + object removal into the same
+ * command. Materializes `map.shape` (absent ⇒ all-inside) on first write; `hadShapeBefore` lets undo
+ * restore the exact prior absent/present state. Returns `null` if nothing would change.
+ */
+function buildShapeCommand(
+  map: MapFile,
+  points: ReadonlyArray<{ col: number; row: number }>,
+  inside: boolean,
+): Command | null {
+  const width = map.meta.width;
+  const height = map.meta.height;
+  const hadShapeBefore = !!map.shape;
+  const shapeCellsBase = map.shape
+    ? map.shape.cells
+    : (new Array(width * height).fill(1) as number[]);
+  const value = inside ? 1 : 0;
+  const changes = cellsToChanges(shapeCellsBase, width, points, value);
+  if (changes.length === 0) return null;
+
+  const cascade = inside ? null : computeVoidCascade(map, new Set(changes.map((c) => c.index)));
+  const removedObjects = cascade
+    ? cascade.removedObjectIndices.map((index) => ({ index, obj: map.objects[index] }))
+    : [];
+
+  return {
+    do: () => {
+      if (!map.shape) map.shape = { cells: shapeCellsBase.slice() };
+      for (const c of changes) map.shape.cells[c.index] = value;
+      if (cascade) {
+        for (const tc of cascade.tileChanges) map.layers[tc.layerIndex].cells[tc.index] = 0;
+        for (const zc of cascade.zoneChanges) map.zones.cells[zc.index] = 0;
+        for (let i = removedObjects.length - 1; i >= 0; i--) {
+          map.objects.splice(removedObjects[i].index, 1);
+        }
+      }
+    },
+    undo: () => {
+      if (cascade) {
+        for (const { index, obj } of removedObjects) map.objects.splice(index, 0, obj);
+        for (const zc of cascade.zoneChanges) map.zones.cells[zc.index] = zc.prev;
+        for (const tc of cascade.tileChanges) map.layers[tc.layerIndex].cells[tc.index] = tc.prev;
+      }
+      if (map.shape) {
+        for (const c of changes) map.shape.cells[c.index] = c.prev;
+      }
+      if (!hadShapeBefore) map.shape = undefined;
+    },
+  };
+}
+
 /** Next auto `layer_NNNN` id — scans existing ids so re-adding after deletes never collides. */
 function nextLayerId(map: MapFile): string {
   let max = 0;
@@ -351,6 +509,17 @@ function reconcileSelection(map: MapFile | null, ids: string[]): string[] {
   if (!map) return [];
   const existing = new Set(map.objects.map((o) => o.id));
   return ids.filter((id) => existing.has(id));
+}
+
+/** Falls back to `null` if `activeZoneId` no longer names a zone def (a delete, or an undo/redo that
+ *  crossed a zone's creation/deletion) — called after every history-stack move (mirrors
+ *  `reconcileActiveLayer`/`reconcileSelection`). This isn't just tidiness: `paintZoneLine`/`Rect`/
+ *  `fillZoneFrom` paint the RAW `activeZoneId` value into `zones.cells` when `paint` is true, so a
+ *  dangling id would let the zone tool write a cell value with no matching `zones.defs` entry —
+ *  exactly what `parseMap`'s zone-id invariant rejects. */
+function reconcileActiveZone(map: MapFile | null, activeZoneId: number | null): number | null {
+  if (!map || activeZoneId === null) return null;
+  return map.zones.defs.some((z) => z.id === activeZoneId) ? activeZoneId : null;
 }
 
 /** Drop object tabs whose asset is gone from the fresh catalog, and re-point `activeTabId` if it
@@ -409,6 +578,7 @@ export const useEditorStore = create<EditorState>()(
     snapToTileCenter: true,
     pendingPortalRect: null,
     selectedObjectIds: [],
+    paintMode: 'brush',
     activeZoneId: null,
     overlays: { grid: true, walkability: false, zones: false, ghosts: false },
     hiddenLayerIds: [],
@@ -426,6 +596,7 @@ export const useEditorStore = create<EditorState>()(
         mapId: id,
         activeLayerId: map.layers[0]?.id ?? null,
         selectedObjectIds: [],
+        activeZoneId: null,
         armedObjectAsset: null,
         armedNodeRef: null,
         pendingPortalRect: null,
@@ -445,6 +616,7 @@ export const useEditorStore = create<EditorState>()(
         mapId: id,
         activeLayerId: map.layers[0]?.id ?? null,
         selectedObjectIds: [],
+        activeZoneId: null,
         armedObjectAsset: null,
         armedNodeRef: null,
         pendingPortalRect: null,
@@ -464,6 +636,7 @@ export const useEditorStore = create<EditorState>()(
         mapId: null,
         activeLayerId: null,
         selectedObjectIds: [],
+        activeZoneId: null,
         armedObjectAsset: null,
         armedNodeRef: null,
         pendingPortalRect: null,
@@ -516,6 +689,7 @@ export const useEditorStore = create<EditorState>()(
     setSnapToTileCenter: (snapToTileCenter) => set({ snapToTileCenter }),
     setPendingPortalRect: (pendingPortalRect) => set({ pendingPortalRect }),
     setSelectedObjectIds: (selectedObjectIds) => set({ selectedObjectIds }),
+    setPaintMode: (paintMode) => set({ paintMode }),
     setActiveZoneId: (activeZoneId) => set({ activeZoneId }),
     toggleOverlay: (key) =>
       set((s): Partial<EditorState> => ({ overlays: { ...s.overlays, [key]: !s.overlays[key] } })),
@@ -537,6 +711,7 @@ export const useEditorStore = create<EditorState>()(
         docRevision: s.docRevision + 1,
         activeLayerId: reconcileActiveLayer(s.map, s.activeLayerId),
         selectedObjectIds: reconcileSelection(s.map, s.selectedObjectIds),
+        activeZoneId: reconcileActiveZone(s.map, s.activeZoneId),
         canUndo: history.canUndo(),
         canRedo: history.canRedo(),
       }));
@@ -550,6 +725,7 @@ export const useEditorStore = create<EditorState>()(
         pendingDirty: null, // a whole coalesced stroke reverted at once — fall back to a full rebake
         activeLayerId: reconcileActiveLayer(s.map, s.activeLayerId),
         selectedObjectIds: reconcileSelection(s.map, s.selectedObjectIds),
+        activeZoneId: reconcileActiveZone(s.map, s.activeZoneId),
         canUndo: history.canUndo(),
         canRedo: history.canRedo(),
       }));
@@ -563,6 +739,7 @@ export const useEditorStore = create<EditorState>()(
         pendingDirty: null,
         activeLayerId: reconcileActiveLayer(s.map, s.activeLayerId),
         selectedObjectIds: reconcileSelection(s.map, s.selectedObjectIds),
+        activeZoneId: reconcileActiveZone(s.map, s.activeZoneId),
         canUndo: history.canUndo(),
         canRedo: history.canRedo(),
       }));
@@ -587,16 +764,8 @@ export const useEditorStore = create<EditorState>()(
         isInside(map, col, row),
       );
       const changes = cellsToChanges(layer.cells, map.meta.width, points, value);
-      if (changes.length === 0) return;
-      const cmd: Command = {
-        strokeId,
-        do: () => {
-          for (const c of changes) layer.cells[c.index] = value;
-        },
-        undo: () => {
-          for (const c of changes) layer.cells[c.index] = c.prev;
-        },
-      };
+      const cmd = commandFromChanges(layer.cells, changes, value, strokeId);
+      if (!cmd) return;
       const chunks = [...new Set(points.map(({ row }) => Math.floor(row / GROUND_CHUNK_ROWS)))];
       set({ pendingDirty: { layerIndex, chunks } });
       get().applyCommand(cmd);
@@ -612,16 +781,8 @@ export const useEditorStore = create<EditorState>()(
         isInside(map, col, row),
       );
       const changes = cellsToChanges(layer.cells, map.meta.width, points, 0);
-      if (changes.length === 0) return;
-      const cmd: Command = {
-        strokeId,
-        do: () => {
-          for (const c of changes) layer.cells[c.index] = 0;
-        },
-        undo: () => {
-          for (const c of changes) layer.cells[c.index] = c.prev;
-        },
-      };
+      const cmd = commandFromChanges(layer.cells, changes, 0, strokeId);
+      if (!cmd) return;
       const chunks = [...new Set(points.map(({ row }) => Math.floor(row / GROUND_CHUNK_ROWS)))];
       set({ pendingDirty: { layerIndex, chunks } });
       get().applyCommand(cmd);
@@ -643,15 +804,8 @@ export const useEditorStore = create<EditorState>()(
         value,
         (c, r) => isInside(map, c, r),
       );
-      if (changes.length === 0) return;
-      const cmd: Command = {
-        do: () => {
-          for (const c of changes) layer.cells[c.index] = value;
-        },
-        undo: () => {
-          for (const c of changes) layer.cells[c.index] = c.prev;
-        },
-      };
+      const cmd = commandFromChanges(layer.cells, changes, value);
+      if (!cmd) return;
       const width = map.meta.width;
       const chunks = [
         ...new Set(changes.map((c) => Math.floor(Math.floor(c.index / width) / GROUND_CHUNK_ROWS))),
@@ -669,17 +823,259 @@ export const useEditorStore = create<EditorState>()(
       const value = resolveBrushValue(map, brushAsset);
       const points = rectCells(c0, r0, c1, r1, (c, r) => isInside(map, c, r));
       const changes = cellsToChanges(layer.cells, map.meta.width, points, value);
-      if (changes.length === 0) return;
-      const cmd: Command = {
-        do: () => {
-          for (const c of changes) layer.cells[c.index] = value;
-        },
-        undo: () => {
-          for (const c of changes) layer.cells[c.index] = c.prev;
-        },
-      };
+      const cmd = commandFromChanges(layer.cells, changes, value);
+      if (!cmd) return;
       const chunks = [...new Set(points.map(({ row }) => Math.floor(row / GROUND_CHUNK_ROWS)))];
       set({ pendingDirty: { layerIndex, chunks } });
+      get().applyCommand(cmd);
+    },
+
+    // ---- collision / walkability (step 8) ----
+    // Base-terrain passability only, gated by the shape mask like every other paint tool. No tile
+    // layer is touched, so there's nothing to rebake — `pendingDirty: { layerIndex: 0, chunks: [] }`
+    // reuses the existing narrow-rebake signal to mean "rebake nothing" (an empty chunk list is a
+    // no-op loop in `EditorScene.onDocEdited`) instead of falling back to a full, pointless retile.
+
+    paintWalkabilityLine: (fromCol, fromRow, toCol, toRow, strokeId, blocked) => {
+      const map = get().map;
+      if (!map) return;
+      const value = blocked ? 1 : 0;
+      const points = lineCells(fromCol, fromRow, toCol, toRow).filter(({ col, row }) =>
+        isInside(map, col, row),
+      );
+      const changes = cellsToChanges(map.walkability.cells, map.meta.width, points, value);
+      const cmd = commandFromChanges(map.walkability.cells, changes, value, strokeId);
+      if (!cmd) return;
+      set({ pendingDirty: { layerIndex: 0, chunks: [] } });
+      get().applyCommand(cmd);
+    },
+
+    fillWalkabilityFrom: (col, row, blocked) => {
+      const map = get().map;
+      if (!map) return;
+      const value = blocked ? 1 : 0;
+      const changes = floodFill(
+        map.walkability.cells,
+        map.meta.width,
+        map.meta.height,
+        col,
+        row,
+        value,
+        (c, r) => isInside(map, c, r),
+      );
+      const cmd = commandFromChanges(map.walkability.cells, changes, value);
+      if (!cmd) return;
+      set({ pendingDirty: { layerIndex: 0, chunks: [] } });
+      get().applyCommand(cmd);
+    },
+
+    paintWalkabilityRect: (c0, r0, c1, r1, blocked) => {
+      const map = get().map;
+      if (!map) return;
+      const value = blocked ? 1 : 0;
+      const points = rectCells(c0, r0, c1, r1, (c, r) => isInside(map, c, r));
+      const changes = cellsToChanges(map.walkability.cells, map.meta.width, points, value);
+      const cmd = commandFromChanges(map.walkability.cells, changes, value);
+      if (!cmd) return;
+      set({ pendingDirty: { layerIndex: 0, chunks: [] } });
+      get().applyCommand(cmd);
+    },
+
+    // ---- zones (step 8) ----
+
+    createZone: () => {
+      const map = get().map;
+      if (!map) return null;
+      const id = nextFreeZoneId(map.zones.defs);
+      if (id === null) {
+        console.warn('[editor] cannot create zone — id space exhausted (255 zones)');
+        return null;
+      }
+      const def: ZoneDef = {
+        id,
+        name: `Zone ${id}`,
+        colour: defaultZoneColour(map.zones.defs.length),
+        favourites: [],
+      };
+      const cmd: Command = {
+        do: () => {
+          map.zones.defs.push(def);
+        },
+        undo: () => {
+          const i = map.zones.defs.indexOf(def);
+          if (i >= 0) map.zones.defs.splice(i, 1);
+        },
+      };
+      get().applyCommand(cmd);
+      set({ activeZoneId: id });
+      return id;
+    },
+
+    renameZone: (id, name) => {
+      const map = get().map;
+      if (!map) return;
+      const def = map.zones.defs.find((z) => z.id === id);
+      if (!def) return;
+      const trimmed = name.trim();
+      if (trimmed.length === 0 || trimmed === def.name) return;
+      const prev = def.name;
+      const cmd: Command = {
+        do: () => {
+          def.name = trimmed;
+        },
+        undo: () => {
+          def.name = prev;
+        },
+      };
+      get().applyCommand(cmd);
+    },
+
+    recolourZone: (id, colour) => {
+      const map = get().map;
+      if (!map) return;
+      const def = map.zones.defs.find((z) => z.id === id);
+      if (!def || def.colour === colour) return;
+      const prev = def.colour;
+      const cmd: Command = {
+        do: () => {
+          def.colour = colour;
+        },
+        undo: () => {
+          def.colour = prev;
+        },
+      };
+      get().applyCommand(cmd);
+    },
+
+    deleteZone: (id) => {
+      const map = get().map;
+      if (!map) return;
+      const defIndex = map.zones.defs.findIndex((z) => z.id === id);
+      if (defIndex < 0) return;
+      const removedDef = map.zones.defs[defIndex];
+      const cellChanges: CellChange[] = [];
+      map.zones.cells.forEach((v, index) => {
+        if (v === id) cellChanges.push({ index, prev: v });
+      });
+      const cmd: Command = {
+        do: () => {
+          map.zones.defs.splice(defIndex, 1);
+          for (const c of cellChanges) map.zones.cells[c.index] = 0;
+        },
+        undo: () => {
+          map.zones.defs.splice(defIndex, 0, removedDef);
+          for (const c of cellChanges) map.zones.cells[c.index] = c.prev;
+        },
+      };
+      // `applyCommand` reconciles `activeZoneId` to `null` automatically if it pointed at the
+      // just-removed def (see `reconcileActiveZone`) — no separate deselect step needed here.
+      get().applyCommand(cmd);
+    },
+
+    paintZoneLine: (fromCol, fromRow, toCol, toRow, strokeId, paint) => {
+      const { map, activeZoneId } = get();
+      if (!map) return;
+      if (paint && activeZoneId === null) {
+        console.warn('[editor] zone brush: no active zone selected — arm one in the Zones panel');
+        return;
+      }
+      const value = paint ? (activeZoneId as number) : 0;
+      const points = lineCells(fromCol, fromRow, toCol, toRow).filter(({ col, row }) =>
+        isInside(map, col, row),
+      );
+      const changes = cellsToChanges(map.zones.cells, map.meta.width, points, value);
+      const cmd = commandFromChanges(map.zones.cells, changes, value, strokeId);
+      if (!cmd) return;
+      set({ pendingDirty: { layerIndex: 0, chunks: [] } });
+      get().applyCommand(cmd);
+    },
+
+    fillZoneFrom: (col, row, paint) => {
+      const { map, activeZoneId } = get();
+      if (!map) return;
+      if (paint && activeZoneId === null) {
+        console.warn('[editor] zone fill: no active zone selected — arm one in the Zones panel');
+        return;
+      }
+      const value = paint ? (activeZoneId as number) : 0;
+      const changes = floodFill(
+        map.zones.cells,
+        map.meta.width,
+        map.meta.height,
+        col,
+        row,
+        value,
+        (c, r) => isInside(map, c, r),
+      );
+      const cmd = commandFromChanges(map.zones.cells, changes, value);
+      if (!cmd) return;
+      set({ pendingDirty: { layerIndex: 0, chunks: [] } });
+      get().applyCommand(cmd);
+    },
+
+    paintZoneRect: (c0, r0, c1, r1, paint) => {
+      const { map, activeZoneId } = get();
+      if (!map) return;
+      if (paint && activeZoneId === null) {
+        console.warn('[editor] zone rect: no active zone selected — arm one in the Zones panel');
+        return;
+      }
+      const value = paint ? (activeZoneId as number) : 0;
+      const points = rectCells(c0, r0, c1, r1, (c, r) => isInside(map, c, r));
+      const changes = cellsToChanges(map.zones.cells, map.meta.width, points, value);
+      const cmd = commandFromChanges(map.zones.cells, changes, value);
+      if (!cmd) return;
+      set({ pendingDirty: { layerIndex: 0, chunks: [] } });
+      get().applyCommand(cmd);
+    },
+
+    // ---- shape (step 8) ----
+    // Deliberately NOT gated by `isInside` — see `buildShapeCommand`'s doc. A shape edit can touch
+    // every tile layer at once (the void cascade), so it explicitly clears `pendingDirty` to force
+    // `onDocEdited`'s full chunked rebake fallback rather than narrowing to one layer.
+
+    paintShapeLine: (fromCol, fromRow, toCol, toRow, strokeId, inside) => {
+      const map = get().map;
+      if (!map) return;
+      const points = lineCells(fromCol, fromRow, toCol, toRow).filter(({ col, row }) =>
+        inBounds(map, col, row),
+      );
+      const cmd = buildShapeCommand(map, points, inside);
+      if (!cmd) return;
+      cmd.strokeId = strokeId;
+      set({ pendingDirty: null });
+      get().applyCommand(cmd);
+    },
+
+    fillShapeFrom: (col, row, inside) => {
+      const map = get().map;
+      if (!map) return;
+      // Flood fill bounded only by map bounds (not the mask it's editing) — matches every other
+      // shape operation's `inBounds` gate.
+      const width = map.meta.width;
+      const height = map.meta.height;
+      const baseCells = map.shape
+        ? map.shape.cells
+        : (new Array(width * height).fill(1) as number[]);
+      const changes = floodFill(baseCells, width, height, col, row, inside ? 1 : 0, () => true);
+      if (changes.length === 0) return;
+      const points = changes.map((c) => ({
+        col: c.index % width,
+        row: Math.floor(c.index / width),
+      }));
+      const cmd = buildShapeCommand(map, points, inside);
+      if (!cmd) return;
+      set({ pendingDirty: null });
+      get().applyCommand(cmd);
+    },
+
+    paintShapeRect: (c0, r0, c1, r1, inside) => {
+      const map = get().map;
+      if (!map) return;
+      const points = rectCells(c0, r0, c1, r1, (c, r) => inBounds(map, c, r));
+      const cmd = buildShapeCommand(map, points, inside);
+      if (!cmd) return;
+      set({ pendingDirty: null });
       get().applyCommand(cmd);
     },
 
