@@ -6,6 +6,7 @@ import type { ResourceNodeDef } from '../../data/types';
 import { tileToWorldCenter } from '../../systems/grid';
 import { ACTIVE_TILESET, resolveTile } from '../../data/tileset';
 import type { TreeNode } from '../../entities/types';
+import type { NodeObject } from '../../systems/mapFormat';
 import type { GameScene } from '../GameScene';
 
 /**
@@ -32,12 +33,11 @@ export interface ResourceNodeManagerDeps {
  * composite can't live in either manager) and the harvest task loop (`beginCurrent`/`runHarvest`),
  * which calls back into this manager's queries/commands instead of touching a `trees` field directly.
  *
- * Constructed fresh in `buildWorld()` each (re)start, at the exact point the old inline `spawnTrees()`
- * call used to run — **before** the player exists (`buildWorld()`'s construction order is
- * load-bearing; see GameScene). The constructor itself must never reach for player state; only
- * call-time closures may. It also does NOT auto-spawn — `spawnTrees()` is a separate call right after
- * construction — so construction stays side-effect-free, matching the "constructor must not touch
- * player" rule with zero risk of the ordering mattering later.
+ * Constructed fresh in `buildWorld()` each (re)start, **before** the player exists (`buildWorld()`'s
+ * construction order is load-bearing; see GameScene). The constructor itself must never reach for
+ * player state; only call-time closures may. It also does NOT auto-spawn — `loadNodes()` is a
+ * separate call right after construction — so construction stays side-effect-free, matching the
+ * "constructor must not touch player" rule with zero risk of the ordering mattering later.
  *
  * **`all()` returns the raw backing array — alive AND dead nodes alike.** `pickSpriteAt`/`isBlocked`/
  * the queue-glow pass each already do their own `if (!t.alive) …` filtering on top, so filtering
@@ -66,35 +66,28 @@ export class ResourceNodeManager {
 
   // --- Spawning ----------------------------------------------------------------
 
-  /** Seed the starting camp cluster: a few trees, rocks, and berry bushes at fixed tiles near the
-   *  player spawn (so tests can rely on them being there). */
-  spawnTrees(): void {
-    // Positioned around the map centre (~22,40) where the player spawns — same layout relative to the
-    // player as before the map doubled, so the starting scene stays familiar with room to roam beyond.
-    for (const [col, row] of [
-      [16, 28],
-      [25, 32],
-      [19, 40],
-    ] as Array<[number, number]>) {
-      this.addNode(NODES.tree, col, row);
-    }
-    // A few rocks around the same camp cluster (near the player spawn ~22,40) so there's a stone
-    // source in view and within reach from the start (see plan 008).
-    for (const [col, row] of [
-      [26, 43],
-      [18, 45],
-      [28, 36],
-    ] as Array<[number, number]>) {
-      this.addNode(NODES.rock, col, row);
-    }
-    // Berry bushes near the camp — the starting food source. Non-blocking, so the worker walks through
-    // them (unlike trees/rocks) and forages from an adjacent tile. Fixed tiles so tests can rely on them.
-    for (const [col, row] of [
-      [21, 43],
-      [24, 38],
-      [17, 41],
-    ] as Array<[number, number]>) {
-      this.addNode(NODES.berryBush, col, row);
+  /**
+   * Hydrate nodes from authored map data (plan 018 Step A6) — the runtime source of the world's
+   * resource nodes (trees/rocks/bushes). Callers
+   * filter `MapObject[]` to `kind === 'node'` before calling this (not this method's job — it only
+   * ever sees pre-filtered {@link NodeObject}s). `parseMap` does NOT cross-check `obj.ref` against
+   * `NODES` (see `NodeObject`'s own doc in `systems/mapFormat.ts`), so an unknown ref is a real
+   * possibility here, not just a defensive check — warn (DEV-only, like `decorSprites.ts`'s region
+   * warning) and skip that one object rather than throwing and losing the rest of the map's nodes.
+   */
+  loadNodes(objects: NodeObject[]): void {
+    for (const obj of objects) {
+      const def = NODES[obj.ref];
+      if (!def) {
+        if (import.meta.env.DEV) {
+          console.warn(
+            `[ResourceNodeManager] node "${obj.id}" at (${obj.col},${obj.row}) references unknown ` +
+              `NODES key "${obj.ref}" — skipping. Check src/data/nodes.ts for the valid ref set.`,
+          );
+        }
+        continue;
+      }
+      this.addNode(def, obj.col, obj.row);
     }
   }
 

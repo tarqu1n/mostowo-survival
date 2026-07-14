@@ -1,10 +1,10 @@
 import Phaser from 'phaser';
-import { TILE_SIZE, COLORS } from '../../config';
+import { TILE_SIZE, COLORS, SPAWN_TILE, BASE_ZONE_SIZE } from '../../config';
 import { tileKey, worldToTile, snapToTileCenter, tileToWorldCenter } from '../../systems/grid';
 import { reachableAdjacent, type Cell, type Dims } from '../../systems/pathfind';
 import { ACTIVE_TILESET, resolveTile } from '../../data/tileset';
 import { BUILDABLES } from '../../data/buildables';
-import { isInBase } from '../../systems/base';
+import { isInBase, baseZoneFromSpawn, type Rect } from '../../systems/base';
 import type { BuildSite } from '../../entities/types';
 import type { CharacterSprite } from '../../entities/Character';
 import type { GameScene } from '../GameScene';
@@ -68,6 +68,15 @@ export class BuildManager {
   private readonly siteTiles = new Set<string>();
   private nextSiteId = 0;
 
+  /**
+   * The base zone rect, computed once from config (plan 018 A8). Config-computed rather than
+   * threaded in as a dep: GameScene's BuildManagerDeps construction is owned by a later, concurrent
+   * plan step (A11) that this step must not touch, so adding a required new dep here would leave
+   * GameScene not compiling. This keeps that call site untouched; A11 can swap it for a threaded dep
+   * later if the rect needs to vary at runtime (e.g. a claimed/movable base).
+   */
+  private readonly baseZoneRect: Rect = baseZoneFromSpawn(SPAWN_TILE, BASE_ZONE_SIZE);
+
   constructor(
     private readonly scene: GameScene,
     private readonly deps: BuildManagerDeps,
@@ -130,7 +139,8 @@ export class BuildManager {
     const dims = this.deps.dims();
     if (col < 0 || row < 0 || col >= dims.cols || row >= dims.rows) return false;
     // Base-zone restriction for `baseOnly` buildables (e.g. the campfire); walls place anywhere.
-    if (BUILDABLES[this.selectedBuildableId].baseOnly && !isInBase(col, row)) return false;
+    if (BUILDABLES[this.selectedBuildableId].baseOnly && !isInBase(this.baseZoneRect, col, row))
+      return false;
     if (this.isOccupied(col, row) || this.hasSiteTile(col, row)) return false;
     // Only blocking nodes (trees/rocks) veto placement — a non-blocking bush can be built over.
     if (this.deps.hasBlockingTree(col, row)) return false;

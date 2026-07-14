@@ -1,7 +1,5 @@
 import type Phaser from 'phaser';
 import {
-  MAP_WIDTH,
-  MAP_HEIGHT,
   PLAYER_MAX_HP,
   PLAYER_START_SPEED,
   PLAYER_START_VISION,
@@ -30,11 +28,13 @@ export class PlayerCharacter extends Character {
    *  via the scene's `setAttackLockUntil` dep (see GameScene's `fx` field). */
   attackLockUntil = 0;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene, spawn: { x: number; y: number }) {
     // Player: 3-way directional idle + walk (down/side/up). Each strip is its own texture (key ==
     // anim key, loaded in PreloadScene); side art faces right, updateAnim mirrors it with flipX.
+    // Spawn is passed in (plan 018 A11: the authored SPAWN_TILE + map origin, computed by GameScene)
+    // rather than the old fixed map-centre, so the player lands on the start map's authored spawn tile.
     const { player: playerActor } = ACTIVE_TILESET.actors;
-    const sprite = scene.add.sprite(MAP_WIDTH / 2, MAP_HEIGHT / 2, playerAnimKey('idle', 'down'));
+    const sprite = scene.add.sprite(spawn.x, spawn.y, playerAnimKey('idle', 'down'));
     scene.physics.add.existing(sprite);
     super(scene, sprite as CharacterSprite, {
       maxHp: PLAYER_MAX_HP,

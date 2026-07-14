@@ -241,3 +241,17 @@ wood at a time with the yellow queued outline, self-terminating when topped up o
 of the old instant tap-to-feed. A tap on the fire always resolves to `refuel` (column-hit-tested over
 its whole tile stack), so it can no longer fall through to a move that walks the worker into the
 blocking fire tile. Details: [GAME-MECHANICS.md](GAME-MECHANICS.md).
+
+## Runtime map loader — boots into an authored map (plan 018)
+
+The game no longer generates its world procedurally: it **boots straight into one authored map**
+(`START_MAP_ID`, currently `test`). `PreloadScene` loads the map file + its textures, then
+`GameScene.buildWorld()` bakes the authored tile layers (`drawMapLayers`), renders decor
+(`DecorManager`), hydrates resource nodes from authored `node` objects (`loadNodes`), and derives
+camera/physics bounds + a spawn-anchored base zone from the map's geometry. Map loading lives in
+`src/systems/mapRuntime.ts` (eager manifest/world + lazy per-map chunks via `import.meta.glob`);
+walkability composites the map's authored cells under runtime obstacles. Enemies stay procedural;
+portals are parsed-and-held (no transitions yet). The old procedural `drawGround`/`spawnTrees` path
+and the fixed `MAP_WIDTH`/`MAP_HEIGHT`/`BASE_ZONE` consts are gone. **Temp:** hunger is non-lethal
+(`HUNGER_LETHAL=false`) until the start map carries authored food. Adjacent-ring streaming is
+[plan 019](../plans/019-l1-map-streaming.md).

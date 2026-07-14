@@ -29,8 +29,9 @@ Data-driven content · pure systems · decoupled scenes:
   `Inventory`, `combat`.
 - **`src/entities/`** — actor classes owning their sprite (`Character` → `PlayerCharacter`/`MonsterCharacter`).
 - **`src/scenes/`** — Boot → Preload → MainMenu → Game (world) + `UIScene` HUD overlay; comms via
-  `game.events` (`build:*`) + shared `registry`. `fx`/`input`/`build`/`world` hold the extracted scene
-  managers (`world/` = the state-owning world subsystems, e.g. `ResourceNodeManager`/`EnemyManager`).
+  `game.events` (`build:*`) + shared `registry`. Game boots into an **authored map** loaded at runtime
+  (`systems/mapRuntime.ts`, plan 018 — not procedural gen). `fx`/`input`/`build`/`world` hold the extracted
+  scene managers (`world/` = the state-owning world subsystems, e.g. `ResourceNodeManager`/`EnemyManager`).
 - **`src/ui/`** — Container-based UI kit (`Button`, `Panel`, `arrangeRow/Column/Grid`, `theme`).
 - **`src/render/`** — baked textures (e.g. `glowTexture.ts`), not frame-loop shaders.
 - **`tests/`** — three-tier harness (unit / scenario / boot canary).

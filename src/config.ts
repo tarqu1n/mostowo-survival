@@ -34,21 +34,12 @@ export const RENDER_SCALE: number = (() => {
   return Math.min(3, Math.max(1, Math.ceil(window.devicePixelRatio || 1)));
 })();
 
-/**
- * World (map) size in pixels — the playable area, larger than the render viewport (BASE_*). The
- * camera scrolls/follows within it. Held at 2× the base in each dimension (a 45×80-tile map) so the
- * room to roam and build scales with the larger native-scale actors (see DECISIONS.md 2026-07-12);
- * BASE_* stays the fixed viewport/HUD design size.
- */
-export const MAP_WIDTH = BASE_WIDTH * 2;
-export const MAP_HEIGHT = BASE_HEIGHT * 2;
-
 /** Pixel size of a world tile at base resolution. */
 export const TILE_SIZE = 16;
 
 /**
  * Ground is baked into RenderTextures stacked vertically, this many tile-rows tall each (see
- * GameScene.drawGround). One map-tall texture (80 rows = 1280px after the map doubled) developed
+ * groundRenderer.drawMapLayers). One map-tall texture (80 rows = 1280px after the map doubled) developed
  * faint, evenly-spaced dark horizontal lines that worsened toward the bottom — only on real mobile
  * GPUs, never on desktop/headless. Cause: NEAREST sampling of a tall texture at reduced fragment
  * precision (`mediump` where the GPU lacks `GL_FRAGMENT_PRECISION_HIGH`) rounds the texel coordinate
@@ -238,11 +229,22 @@ export const HUNGER_VIGNETTE_COLOR = 0xe0b020;
 export const HUNGER_VIGNETTE_MAX_ALPHA = 0.5;
 
 /**
- * Base zone (see plan 014 Context & decisions). A fixed rectangular tile-bounds region, centred
- * near the spawn/camp tile (~22,40), that base-only buildables (e.g. the campfire) may be placed
- * within. Inclusive of both min and max on each axis. Fixed for now; may become dynamic later.
+ * TEMP stopgap (plan 018 critique #1): the start map has no food nodes yet and trunk auto-deploys;
+ * keep hunger non-lethal until authored food lands, then set true / remove.
  */
-export const BASE_ZONE = { minCol: 12, maxCol: 32, minRow: 26, maxRow: 52 };
+export const HUNGER_LETHAL = false;
+
+/** Map ID to load at game start (must match a key in maps/manifest.json). */
+export const START_MAP_ID = 'test';
+
+/** Player spawn location within the start map, in tile coordinates (col, row). */
+export const SPAWN_TILE = { col: 21, row: 33 };
+
+/**
+ * Base zone size in tiles (width, height). The runtime base zone is a rect of this size centred on
+ * the spawn tile — see `baseZoneFromSpawn` (plan 018 A8, which replaced the old fixed-bounds BASE_ZONE).
+ */
+export const BASE_ZONE_SIZE = { w: 21, h: 27 };
 
 /**
  * Campfire fuel (see plan 014 Context & decisions). The fire is always burning once built, draining

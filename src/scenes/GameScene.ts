@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import {
-  MAP_WIDTH,
-  MAP_HEIGHT,
+  START_MAP_ID,
+  SPAWN_TILE,
   TILE_SIZE,
   CHOP_INTERVAL_MS,
   CAMPFIRE_FUEL_MAX,
@@ -21,8 +21,11 @@ import {
 import { ITEMS } from '../data/items';
 import { NODES } from '../data/nodes';
 import { Inventory } from '../systems/Inventory';
-import { tileKey } from '../systems/grid';
+import { tileKey, tileToWorldCenter } from '../systems/grid';
 import { findPath, reachableAdjacent, type Cell } from '../systems/pathfind';
+import { originOf } from '../systems/mapRuntime';
+import { mapBlocks } from '../systems/mapWalkability';
+import type { MapFile, DecorObject, NodeObject, PortalObject } from '../systems/mapFormat';
 import { breadcrumb, setCrashContext } from '../debug/crashReporter';
 import { TaskQueue, type Action } from '../systems/tasks';
 import { resolveMeleeAttack } from '../systems/combat';
@@ -36,13 +39,14 @@ import { ScenePicker } from './input/ScenePicker';
 import { BuildManager } from './build/BuildManager';
 import { TaskGlowRenderer } from './fx/TaskGlowRenderer';
 import { ResourceNodeManager } from './world/ResourceNodeManager';
+import { DecorManager } from './world/DecorManager';
 import { EnemyManager } from './world/EnemyManager';
 import { CampfireManager } from './world/CampfireManager';
 import { SurvivalClock } from './world/SurvivalClock';
 import { VisionController } from './fx/VisionController';
 import { TestApi } from './testApi';
 import { registerActorAnims } from './world/actorAnims';
-import { drawGround } from './world/groundRenderer';
+import { drawMapLayers } from './world/groundRenderer';
 
 /**
  * World scene: the worker task system. The player unit pathfinds around obstacles (walls + live
@@ -108,9 +112,8 @@ export class GameScene extends Phaser.Scene {
   private survivalClock!: SurvivalClock;
 
   // Resource nodes — trees/rocks/bushes: spawn, harvest, regrow (plan 015 Step 1) — see
-  // src/scenes/world/ResourceNodeManager.ts. Constructed fresh in buildWorld() each (re)start, at the
-  // same point the old inline spawnTrees() call used to run (before the player exists); wires its own
-  // SHUTDOWN teardown directly.
+  // src/scenes/world/ResourceNodeManager.ts. Constructed fresh in buildWorld() each (re)start, before
+  // the player exists; hydrated from authored map nodes (loadNodes); wires its own SHUTDOWN teardown.
   private resourceNodeManager!: ResourceNodeManager;
 
   // Enemies — spawn, per-frame AI tick, attack/kill, DEV-menu scatter (plan 015 Step 2) — see
@@ -144,10 +147,22 @@ export class GameScene extends Phaser.Scene {
   // (it wires its own input.on(...) listeners there and tears them down on SHUTDOWN itself), so unlike
   // `fx` above it is NOT a field initializer — see the controller's class doc for why that's fine here.
   private pointerInput!: PointerInputController;
-  private gridDims = {
-    cols: Math.floor(MAP_WIDTH / TILE_SIZE),
-    rows: Math.floor(MAP_HEIGHT / TILE_SIZE),
-  };
+  // Grid dimensions in tiles. Recomputed per (re)start in buildWorld() from the loaded map's
+  // `meta.width/height` (plan 018 A11) — NOT a field initializer, because Phaser reuses this scene
+  // instance across death-restarts and the dims must re-derive from whichever map is loaded. Read via
+  // `dims()` deps by EnemyManager/BuildManager/pathfind/randomiseWorld/TestApi.
+  private gridDims = { cols: 0, rows: 0 };
+  // The authored start map + its placement origin (global tile coords) — set at the top of
+  // buildWorld() (plan 018 A11). `isBlocked` composites the map's own walkability in, converting a
+  // GLOBAL (col,row) back to map-local by subtracting `mapOrigin`.
+  private startMap!: MapFile;
+  private mapOrigin: { col: number; row: number } = { col: 0, row: 0 };
+  // Runtime decor renderer (plan 018 A7) — draws authored `decor` objects + contributes their
+  // collision footprints to `isBlocked`. Constructed fresh in buildWorld() each (re)start.
+  private decorManager!: DecorManager;
+  // Authored `portal` objects — parse-and-hold only at L0 (plan 018 decision): stored for plan 019's
+  // map-streaming transitions, with NO transition behaviour wired here.
+  private portals: PortalObject[] = [];
   // Queue/glow presentation (plan 013 Step 6) — see src/scenes/fx/TaskGlowRenderer.ts. Constructed
   // fresh in buildWorld() each (re)start; wires its own SHUTDOWN teardown directly.
   private taskGlowRenderer!: TaskGlowRenderer;
@@ -179,6 +194,8 @@ export class GameScene extends Phaser.Scene {
         playerTile: this.playerChar?.tile(),
         playerHp: this.playerChar?.hp,
         nodes: this.resourceNodeManager?.all().length,
+        map: START_MAP_ID,
+        portals: this.portals.length, // parse-and-hold count (plan 018); wired for transitions in 019
       };
     });
     breadcrumb('scene', 'GameScene create done');
@@ -217,15 +234,30 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Build this (re)start's world: ground, shared inventory, resource nodes + the first enemy pack,
-   * player + enemy animations, the player character, the build/queue-glow/pointer managers, the
-   * camera + fog-of-war + night overlay, and the HUD overlay scene. Order matters in a couple of
+   * Build this (re)start's world from the authored start map (plan 018): baked tile layers + decor,
+   * shared inventory, resource nodes hydrated from `node` objects + the (still procedural) first enemy
+   * pack, player + enemy animations, the player character spawned at `SPAWN_TILE`, the
+   * build/queue-glow/pointer managers, the camera + fog-of-war + night overlay sized to the map, and
+   * the HUD overlay scene. Order matters in a couple of
    * places (called out inline): the player must exist before BuildManager's collider, and both
    * managers before UIScene launch (hudHitTest closes over `this.ui`, assigned at the very end, but
    * that's only read from a later pointer event, never during this method).
    */
   private buildWorld(): void {
-    drawGround(this);
+    // Authored start map — loaded + its textures made resident in PreloadScene (plan 018 A10). Global
+    // tile coords + an `originPx` offset are used throughout the runtime world path (plan 018
+    // decision), so plan 019's adjacent-map streaming can place a second map away from the world
+    // origin without reworking any of this. At L0 there's one map and `originOf` returns {0,0}.
+    const map = this.registry.get('startMap') as MapFile;
+    this.startMap = map;
+    this.mapOrigin = originOf(START_MAP_ID);
+    const originPx = { x: this.mapOrigin.col * TILE_SIZE, y: this.mapOrigin.row * TILE_SIZE };
+    const worldPx = { w: map.meta.width * TILE_SIZE, h: map.meta.height * TILE_SIZE };
+    // Per-map grid dims (see the field's note) — recomputed here each (re)start from the loaded map.
+    this.gridDims = { cols: map.meta.width, rows: map.meta.height };
+
+    // Tile layers baked from the authored palette/cells (plan 018 A4). Honours per-layer `overhead` depth.
+    drawMapLayers(this, map, originPx);
 
     // Shared character inventory — stored in the registry so the UIScene reads the same instance.
     this.inv = new Inventory({
@@ -235,13 +267,32 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('inventory', this.inv);
 
     // Resource nodes (plan 015 Step 1) — constructed before the player (its constructor must not
-    // touch player closures); spawnTrees() is a separate call right after so construction itself
+    // touch player closures); loadNodes() is a separate call right after so construction itself
     // stays side-effect-free. See ResourceNodeManagerDeps for why each closure is narrowed this way.
     this.resourceNodeManager = new ResourceNodeManager(this, {
       repath: () => this.repath(),
       addYield: (itemId, n) => this.inv.add(itemId, n),
     });
-    this.resourceNodeManager.spawnTrees();
+    // Hydrate resource nodes from authored `node` objects (plan 018 A6). test.map.json carries none
+    // yet (see the Phase-A content ship gate) — hunger stays non-lethal via HUNGER_LETHAL until
+    // authored food lands, so a node-less map can't starve out.
+    this.resourceNodeManager.loadNodes(
+      map.objects.filter((o): o is NodeObject => o.kind === 'node'),
+    );
+
+    // Decor (plan 018 A7) — the animated bonfire + static rocks. Construction is side-effect-free;
+    // render() draws each object at its global pixel position and folds any collision footprint into
+    // the isBlocked composite. Built here (before the player) alongside the other static-world
+    // managers — its constructor never touches player state.
+    this.decorManager = new DecorManager(this);
+    this.decorManager.render(
+      map.objects.filter((o): o is DecorObject => o.kind === 'decor'),
+      originPx,
+    );
+
+    // Portals — parse-and-hold only at L0 (plan 018 decision): stored for plan 019's map-streaming
+    // transitions; NO transition behaviour is wired here. (test.map.json has none.)
+    this.portals = map.objects.filter((o): o is PortalObject => o.kind === 'portal');
 
     // Enemies (plan 015 Step 2) — constructed before the player (its constructor must not touch
     // player closures — only the deps' call-time closures below may); spawnEnemies() is a separate
@@ -266,10 +317,15 @@ export class GameScene extends Phaser.Scene {
 
     // Player + enemy anim registration (plan 015 Step 6) — see world/actorAnims.ts.
     registerActorAnims(this);
-    this.playerChar = new PlayerCharacter(this);
+    // Player spawns at the authored SPAWN_TILE (config), offset by the map origin — was the fixed
+    // map-centre (plan 018 A11). tileToWorldCenter puts it at the tile's centre pixel.
+    this.playerChar = new PlayerCharacter(this, {
+      x: tileToWorldCenter(SPAWN_TILE.col) + originPx.x,
+      y: tileToWorldCenter(SPAWN_TILE.row) + originPx.y,
+    });
     // playerStats is the player's stat bag surfaced for the Wellbeing screen's stat rows.
     this.registry.set('playerStats', this.playerChar.stats);
-    this.physics.world.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
+    this.physics.world.setBounds(originPx.x, originPx.y, worldPx.w, worldPx.h);
 
     // Build placement (plan 013 Step 6) — constructed fresh each (re)start; its constructor wires a
     // physics collider against the player sprite just constructed above, and its own SHUTDOWN
@@ -358,7 +414,7 @@ export class GameScene extends Phaser.Scene {
     // tap-to-target game, so the camera should never lag behind where the player actually is.
     // centerOn avoids a visible pan-in from (0,0) on the first frame. A manual drag breaks this lock
     // (free look); the HUD's FOLLOW button re-engages it.
-    this.cameras.main.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
+    this.cameras.main.setBounds(originPx.x, originPx.y, worldPx.w, worldPx.h);
     this.cameras.main.centerOn(this.player.x, this.player.y);
     this.registry.set('following', true);
     this.cameras.main.startFollow(this.player, true);
@@ -371,6 +427,7 @@ export class GameScene extends Phaser.Scene {
       getPlayerSprite: () => this.player,
       getVision: () => this.playerChar.stats.vision,
       lightSources: () => this.campfireManager.lightSources(),
+      worldPx, // fog dim-rect spans the loaded map (plan 018 A9) instead of fixed MAP_WIDTH/HEIGHT
     });
 
     // Day/night clock + hunger/starvation (plan 015 Step 3) — constructed fresh each (re)start, at
@@ -382,6 +439,7 @@ export class GameScene extends Phaser.Scene {
       canAfford: (cost) => this.inv.canAfford(cost),
       spend: (cost) => this.inv.spend(cost),
       lightSources: () => this.campfireManager.lightSources(),
+      worldPx, // night overlay spans the loaded map (plan 018 A9) instead of fixed MAP_WIDTH/HEIGHT
     });
 
     // HUD overlay runs alongside this scene; grab its instance for the UI-tap guard. UIScene
@@ -585,7 +643,12 @@ export class GameScene extends Phaser.Scene {
    * blueprints and non-blocking nodes (bushes, `def.blocksPath === false`) are passable.
    */
   private readonly isBlocked = (col: number, row: number): boolean =>
-    this.buildManager.isOccupied(col, row) || this.resourceNodeManager.hasBlockingNode(col, row);
+    this.buildManager.isOccupied(col, row) ||
+    this.resourceNodeManager.hasBlockingNode(col, row) ||
+    this.decorManager.blocksAt(col, row) ||
+    // The map's own base walkability composites UNDER the runtime obstacles above (plan 018 A5/A11);
+    // convert the GLOBAL (col,row) back to map-local by subtracting the map origin.
+    mapBlocks(this.startMap, col - this.mapOrigin.col, row - this.mapOrigin.row);
 
   /** Path the worker toward `goal`; returns false if unreachable (`null` path). `[]` = already there. */
   private pathTo(goal: Cell): boolean {

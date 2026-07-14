@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { MAP_WIDTH, MAP_HEIGHT, PLAYER_START_VISION } from '../../config';
+import { PLAYER_START_VISION } from '../../config';
 import type { CharacterSprite } from '../../entities/Character';
 import type { GameScene } from '../GameScene';
 
@@ -21,6 +21,10 @@ export interface VisionControllerDeps {
    *  depth-5 dim rect is revealed around a lit source (plan 012). Empty ⇒ the reveal is just the player
    *  circle, as before. */
   lightSources(): readonly { x: number; y: number; radius: number }[];
+  /** World pixel extent (loaded map's width/height in px) — the dim rect spans this instead of the
+   *  old fixed `MAP_WIDTH`/`MAP_HEIGHT` (plan 018 A9: runtime map loader, world extent now derives
+   *  from the loaded map rather than a compile-time constant). */
+  worldPx: { w: number; h: number };
 }
 
 /**
@@ -68,8 +72,9 @@ export class VisionController {
     this.fogShape = scene.add.graphics().setVisible(false);
     const fogMask = this.fogShape.createGeometryMask();
     fogMask.setInvertAlpha(true);
+    const { w, h } = deps.worldPx;
     scene.add
-      .rectangle(MAP_WIDTH / 2, MAP_HEIGHT / 2, MAP_WIDTH, MAP_HEIGHT, 0x000000, 0.2)
+      .rectangle(w / 2, h / 2, w, h, 0x000000, 0.2)
       .setDepth(5)
       .setMask(fogMask);
     this.update();

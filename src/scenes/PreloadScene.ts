@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BASE_WIDTH, BASE_HEIGHT, COLORS, TILE_SIZE } from '../config';
+import { BASE_WIDTH, BASE_HEIGHT, COLORS, TILE_SIZE, START_MAP_ID } from '../config';
 import {
   ACTIVE_TILESET,
   sheetKey,
@@ -19,6 +19,11 @@ import {
   type PlayerState,
 } from '../data/tileset';
 import { ITEMS } from '../data/items';
+import { loadMapFile } from '../systems/mapRuntime';
+import type { MapFile } from '../systems/mapFormat';
+import { parseAssetId, tilesetAssetUrl } from '../render/assetPaths';
+import { queueDecorTexture } from '../render/decorSprites';
+import { breadcrumb } from '../debug/crashReporter';
 
 /**
  * Loads the active tileset (see `src/data/tileset.ts`) and shows a simple loading bar. All keys are
@@ -148,6 +153,85 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.scene.start('MainMenu');
+    // The base tileset (above) is loaded synchronously by Phaser's own preload lifecycle. The
+    // authored start map is loaded HERE instead: `loadMapFile` is async (dynamic import + parse) and
+    // Phaser's preload() is synchronous, so its extra (decor) textures ride a second load batch that
+    // we drive by hand — mirroring the editor's queue → load.start() → COMPLETE → proceed shape. This
+    // keeps GameScene.buildWorld (plan 018 A11) fully synchronous: the map + every texture it needs
+    // are resident before GameScene.create runs.
+    void this.loadStartMapThenContinue();
+  }
+
+  /**
+   * Load the authored start map, stash it in the registry for GameScene, queue its extra textures,
+   * then start MainMenu once they're resident. Any failure to load/parse the map is re-thrown so the
+   * always-on crash reporter's global handler surfaces a copyable on-device overlay (critique #2) —
+   * a broken start map must be diagnosable, never a silent black loading screen that hangs.
+   */
+  private async loadStartMapThenContinue(): Promise<void> {
+    let map: MapFile;
+    try {
+      map = await loadMapFile(START_MAP_ID);
+    } catch (err) {
+      breadcrumb('boot', `start-map "${START_MAP_ID}" failed to load`);
+      throw err instanceof Error
+        ? err
+        : new Error(`start-map "${START_MAP_ID}" failed to load: ${String(err)}`);
+    }
+    // GameScene.buildWorld (A11) reads this instead of generating a world procedurally.
+    this.registry.set('startMap', map);
+
+    if (this.queueMapTextures(map)) {
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => this.scene.start('MainMenu'));
+      this.load.start();
+    } else {
+      this.scene.start('MainMenu');
+    }
+  }
+
+  /**
+   * Queue every texture the start map needs beyond the base ACTIVE_TILESET load — palette sources
+   * (deduped, honouring each entry's own `pack`) + decor sheets/images — via the runtime asset-path
+   * helpers, never `src/editor` (plan 018 guardrail). Mirrors `EditorScene.queueTextures`. Node
+   * objects render as their tile-role sprite (tree/rock/bush), all of which the base preload already
+   * loaded, so they need nothing here. Guards already-resident (`textures.exists`) and already-queued
+   * (`seen`) keys — for `test.map.json` the palette is `Floors_Tiles.png` (already resident), so in
+   * practice only decor is queued. Returns whether anything was queued (nothing → proceed at once).
+   */
+  private queueMapTextures(map: MapFile): boolean {
+    const seen = new Set<string>();
+    const addImage = (key: string, srcUrl: string): void => {
+      if (this.textures.exists(key) || seen.has(key)) return;
+      seen.add(key);
+      this.load.image(key, srcUrl);
+    };
+    const addSheet = (key: string, srcUrl: string): void => {
+      if (this.textures.exists(key) || seen.has(key)) return;
+      seen.add(key);
+      this.load.spritesheet(key, srcUrl, { frameWidth: TILE_SIZE, frameHeight: TILE_SIZE });
+    };
+
+    for (const entry of map.palette) {
+      if (!entry) continue; // reserved empty slot (palette[0])
+      if (entry.source.kind === 'image') {
+        addImage(tileImageKey(entry.source.path), tilesetAssetUrl(entry.pack, entry.source.path));
+      } else {
+        addSheet(sheetKey(entry.source.sheet), tilesetAssetUrl(entry.pack, entry.source.sheet));
+      }
+    }
+
+    for (const obj of map.objects) {
+      if (obj.kind !== 'decor') continue;
+      try {
+        const { pack, path } = parseAssetId(obj.asset);
+        queueDecorTexture(this, obj, path, tilesetAssetUrl(pack, path), seen);
+      } catch (e) {
+        // A single malformed decor ref shouldn't abort the whole boot — warn and skip (matches the
+        // editor). Its sprite simply won't render; DecorManager (A7) skips a missing texture too.
+        console.warn(`[preload] skipping decor "${obj.id}": ${(e as Error).message}`);
+      }
+    }
+
+    return seen.size > 0;
   }
 }

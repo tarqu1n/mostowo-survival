@@ -1,12 +1,11 @@
 import Phaser from 'phaser';
 import {
-  MAP_WIDTH,
-  MAP_HEIGHT,
   COLORS,
   DAY_MS,
   TWILIGHT_MS,
   HUNGER_MAX,
   HUNGER_DRAIN_PER_SEC,
+  HUNGER_LETHAL,
   STARVE_DAMAGE,
   STARVE_DAMAGE_INTERVAL_MS,
 } from '../../config';
@@ -40,6 +39,10 @@ export interface SurvivalClockDeps {
    *  today, via the scene, no manager↔manager edge). Each becomes a hole in the night overlay so a lit
    *  source is readable at night. Empty ⇒ no holes ⇒ full night, byte-identical to pre-campfire behaviour. */
   lightSources(): readonly { x: number; y: number; radius: number }[];
+  /** World pixel extent (loaded map's width/height in px) — the night overlay spans this instead of
+   *  the old fixed `MAP_WIDTH`/`MAP_HEIGHT` (plan 018 A9: runtime map loader, world extent now derives
+   *  from the loaded map rather than a compile-time constant). */
+  worldPx: { w: number; h: number };
 }
 
 /**
@@ -101,8 +104,9 @@ export class SurvivalClock {
     private readonly scene: GameScene,
     private readonly deps: SurvivalClockDeps,
   ) {
+    const { w, h } = deps.worldPx;
     this.nightOverlay = scene.add
-      .rectangle(MAP_WIDTH / 2, MAP_HEIGHT / 2, MAP_WIDTH, MAP_HEIGHT, COLORS.night, 1)
+      .rectangle(w / 2, h / 2, w, h, COLORS.night, 1)
       .setAlpha(0)
       .setDepth(15);
     // Campfire light: an inverted geometry mask over the overlay (filled circle ⇒ hole). Created once;
@@ -162,7 +166,12 @@ export class SurvivalClock {
       this.starveElapsed += delta;
       while (this.starveElapsed >= STARVE_DAMAGE_INTERVAL_MS) {
         this.starveElapsed -= STARVE_DAMAGE_INTERVAL_MS;
-        this.deps.damagePlayer(STARVE_DAMAGE);
+        // TEMP stopgap (plan 018 critique #1): hunger still ticks/displays above regardless; only the
+        // lethal HP drain is gated off until the start map has authored food. Delete this `if` (and
+        // HUNGER_LETHAL in config.ts) once food lands / the flag is flipped true.
+        if (HUNGER_LETHAL) {
+          this.deps.damagePlayer(STARVE_DAMAGE);
+        }
       }
     } else {
       this.starveElapsed = 0;

@@ -47,9 +47,10 @@ pure fuel math (`drainFuel`/`feedFuel`/`isLit`/`fuelFrac`) in
 
 ## Base zone
 
-A fixed rectangle, `BASE_ZONE` (tile bounds) in [src/config.ts](../src/config.ts) — **placeholder**,
-expected to be replaced by a dynamic/claimed base later. Checked via `isInBase(col, row)` in
-[src/systems/base.ts](../src/systems/base.ts); gates any `baseOnly` buildable's placement.
+A constant-size rect anchored at (centred on) the spawn tile: `BASE_ZONE_SIZE` (tile extent) in
+[src/config.ts](../src/config.ts), computed via `baseZoneFromSpawn(SPAWN_TILE, BASE_ZONE_SIZE)` —
+**placeholder**, expected to be replaced by a dynamic/claimed base later. Checked via `isInBase(rect,
+col, row)` in [src/systems/base.ts](../src/systems/base.ts); gates any `baseOnly` buildable's placement.
 
 ## Light/night interaction
 

@@ -98,7 +98,7 @@ export interface BuildableDef extends ObjectStats {
   color: number;
   /** Light/vision radius in **tiles** this structure casts once built; omit for non-light-sources. */
   light?: number;
-  /** Restricts placement to the base zone (see config.BASE_ZONE); omit to allow placement anywhere. */
+  /** Restricts placement to the base zone (see config.BASE_ZONE_SIZE); omit to allow placement anywhere. */
   baseOnly?: boolean;
   /** Whether this structure occupies its tile and blocks movement/pathing; omit ⇒ not yet decided (a later step defaults it). */
   blocksPath?: boolean;
