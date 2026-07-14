@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { TILE_SIZE, COLORS } from '../../config';
+import { breadcrumb } from '../../debug/crashReporter';
 import { NODES } from '../../data/nodes';
 import type { ResourceNodeDef } from '../../data/types';
 import { tileToWorldCenter } from '../../systems/grid';
@@ -153,6 +154,7 @@ export class ResourceNodeManager {
   }
 
   chop(tree: TreeNode): void {
+    breadcrumb('node', `chop ${tree.def.id} ${tree.id}`, { hp: tree.hp - 1, alive: tree.alive });
     tree.hp -= 1;
     this.deps.addYield(tree.def.yieldItemId, tree.def.yieldPerHit);
     // Bump relative to the node's fitted base scale (not an absolute 1 — the pine is scaled down).
@@ -162,10 +164,15 @@ export class ResourceNodeManager {
     this.scene.tweens.add({ targets: tree.sprite, scale: base * 1.18, duration: 80, yoyo: true });
     if (tree.hp <= 0) {
       tree.alive = false;
+      breadcrumb('node', `deplete ${tree.def.id} ${tree.id}`, { regrowMs: tree.def.regrowMs });
       // No dedicated depleted sprite in the pack yet (see docs/ASSETS.md) — tint the felled node to
       // its stumpColor as a stand-in "stump"/rubble state rather than a mismatched placeholder rect.
       tree.sprite.setScale(base).setTint(tree.def.stumpColor);
       this.scene.time.delayedCall(tree.def.regrowMs, () => {
+        // A delayedCall scheduled here survives clearAll() (which destroys sprites but leaves the
+        // scene clock running), so guard against a sprite destroyed during the regrow window — the
+        // breadcrumb'd `spriteAlive:false` case is exactly the shape of a use-after-destroy crash.
+        breadcrumb('node', `regrow ${tree.def.id} ${tree.id}`, { spriteAlive: tree.sprite.active });
         tree.hp = tree.def.maxHp;
         tree.alive = true;
         tree.sprite.clearTint();
@@ -185,6 +192,10 @@ export class ResourceNodeManager {
    * deliberately keeps the counter running — pre-existing behaviour, preserved as-is.
    */
   clearAll(opts: { resetIds: boolean }): void {
+    breadcrumb('world', 'clearAll (destroys node sprites)', {
+      count: this.trees.length,
+      resetIds: opts.resetIds,
+    });
     for (const t of this.trees) t.sprite.destroy();
     this.trees = [];
     if (opts.resetIds) this.nextTreeId = 0;

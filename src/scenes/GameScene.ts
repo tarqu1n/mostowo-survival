@@ -23,6 +23,7 @@ import { NODES } from '../data/nodes';
 import { Inventory } from '../systems/Inventory';
 import { tileKey } from '../systems/grid';
 import { findPath, reachableAdjacent, type Cell } from '../systems/pathfind';
+import { breadcrumb, setCrashContext } from '../debug/crashReporter';
 import { TaskQueue, type Action } from '../systems/tasks';
 import { resolveMeleeAttack } from '../systems/combat';
 import type { UIScene } from './UIScene';
@@ -166,6 +167,29 @@ export class GameScene extends Phaser.Scene {
     this.buildWorld();
     this.wireBus();
     this.installTestApi();
+    // Feed the crash reporter a live state snapshot, sampled only if/when a crash is caught. Read
+    // defensively (optional-chain) — the reporter wraps this call, but a clean snapshot beats a
+    // "provider threw" line in the report.
+    setCrashContext(() => {
+      const a = this.queue.current;
+      return {
+        mode: this.mode,
+        action: a ? { kind: a.kind, target: this.describeActionTarget(a) } : null,
+        harvestSwing: this.harvestSwing,
+        playerTile: this.playerChar?.tile(),
+        playerHp: this.playerChar?.hp,
+        nodes: this.resourceNodeManager?.all().length,
+      };
+    });
+    breadcrumb('scene', 'GameScene create done');
+  }
+
+  /** One-line description of an action's target for the crash report (no sprite refs). */
+  private describeActionTarget(a: Action): string {
+    if (a.kind === 'harvest') return a.treeId;
+    if (a.kind === 'refuel') return a.campfireId;
+    if (a.kind === 'build') return a.siteId;
+    return `(${a.col},${a.row})`;
   }
 
   /**
@@ -598,6 +622,7 @@ export class GameScene extends Phaser.Scene {
       this.player.body.setVelocity(0, 0);
       return;
     }
+    breadcrumb('action', `begin ${a.kind}`, { target: this.describeActionTarget(a) });
     if (a.kind === 'move') {
       if (!this.pathTo({ col: a.col, row: a.row })) this.completeCurrent();
       return;
@@ -873,6 +898,7 @@ export class GameScene extends Phaser.Scene {
    */
   private killPlayer(): void {
     console.log('player down — restarting'); // the death→restart signal the death spec asserts
+    breadcrumb('world', 'player died → scene.restart scheduled');
     this.cancelAll();
     this.fx.cleanupActorFx(this.player); // clear an in-flight hit-flash so the corpse isn't left mid-squash
     const dur = this.playerChar.die(); // freezes + plays the collapse; returns its duration

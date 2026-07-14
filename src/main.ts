@@ -1,10 +1,15 @@
 import Phaser from 'phaser';
 import { BASE_WIDTH, BASE_HEIGHT, COLORS, RENDER_SCALE } from './config';
+import { installCrashReporter } from './debug/crashReporter';
 import { BootScene } from './scenes/BootScene';
 import { PreloadScene } from './scenes/PreloadScene';
 import { MainMenuScene } from './scenes/MainMenuScene';
 import { GameScene } from './scenes/GameScene';
 import { UIScene } from './scenes/UIScene';
+
+// Install FIRST, before the game boots, so it catches boot/preload errors too. On-device overlay for
+// uncaught errors — this game is usually tested on a phone with no reachable console (see the module).
+installCrashReporter();
 
 /**
  * Phaser game bootstrap. Mobile-first, portrait, pixel-art, touch-native.
