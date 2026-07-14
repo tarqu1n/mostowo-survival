@@ -431,16 +431,15 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
         },
       },
       // Two DISTINCT hands (the skeleton's own are unreadable nubs), so it doesn't read as two identical
-      // fists: off hand = brown gloved fist (_derived/hand.png, Hands.png idx 4), mirrored via offFlip so
-      // it's the opposite hand; main hand = the open grip (_derived/hand_open.png, idx 6 — the right hand,
-      // thumb on the outside; idx 7 was its left-hand mirror) tilted mainRot 14° to wrap the raised weapon.
-      // Both centred on their anchor. mainZ 2 draws the grip over the weapon (z 1); offZ 1 sits the free
-      // fist beside the body.
+      // fists: off (free) hand = brown gloved fist (_derived/hand.png, Hands.png idx 4); main (weapon)
+      // hand = the open grip (_derived/hand_open.png, idx 7) tilted mainRot 14° to wrap the raised weapon.
+      // Both centred on their anchor, mirrored with the body. mainZ 2 draws the grip over the weapon
+      // (z 1); offZ 1 sits the free fist beside the body. (The idx-4 fist reads as the correct hand —
+      // thumb on the outside — un-flipped, so `offFlip` is left off; it's the lever if that ever inverts.)
       hand: {
         source: { kind: 'image', path: '_derived/hand.png' },
         mainSource: { kind: 'image', path: '_derived/hand_open.png' },
         mainRot: 14,
-        offFlip: true,
         pivot: [0.5, 0.5],
         mainZ: 2,
         offZ: 1,

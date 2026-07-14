@@ -117,7 +117,7 @@ needs to be treated as precious.
 |`_derived/weapons/club.png`|`Weapons/Bone/Bone.png`|1 (bone mace, grip at bottom; `sips -Z 40` → 7×40)|
 |`_derived/weapons/knife.png`|`Weapons/Bone/Bone.png`|7 (bone dagger, grip at bottom; `sips -Z 18` → 4×18)|
 |`_derived/hand.png`|`Weapons/Hands/Hands.png`|4 (brown gloved fist, 8×7 — the **off** hand; a leather-glove look chosen over the tan idx-0 fist, which read as bare human skin on a skeleton. Sheet has 6 styles × L/R pairs: idx 0/2 tan fist/palm, 4/6 brown fist/palm, 8/10 green orc fist/palm. See "Weapon attachment" below)|
-|`_derived/hand_open.png`|`Weapons/Hands/Hands.png`|6 (brown open palm, 7×6 — the **main** (weapon-gripping) hand, distinct from the off-hand fist so the pair isn't two identical hands; this is the **right** hand (thumb on the outside) — idx 7 is its left-hand mirror; tilted 14° in-engine to wrap the raised weapon. See "Weapon attachment" below)|
+|`_derived/hand_open.png`|`Weapons/Hands/Hands.png`|7 (brown open palm, 7×6 — the **main** (weapon-gripping) hand, distinct from the off-hand fist so the pair isn't two identical hands; tilted 14° in-engine to wrap the raised weapon. See "Weapon attachment" below)|
 
 > The two bone weapons are extracted big (80/27px) then downscaled to sit proportionately on the
 > ~30px skeleton (club distinctly larger than the knife). They draw at integer scale 1 from these
@@ -206,10 +206,10 @@ attack strip — see `WEAPON_SWING_*` in `config.ts`.
 vanish at game scale — the pack's promo art composites visible hands + weapons on top). So two
 **distinct** hands (`actors.enemy.hand`) are pinned to the anchors every tick, so the pair reads as a
 real left + right instead of two identical fists (the bug the single-image version had): the **off
-hand** is the brown gloved fist (`_derived/hand.png`, idx 4), mirrored against the body via `offFlip`
-so it's the opposite hand; the **main hand** is an **open grip** (`mainSource` = `_derived/hand_open.png`,
-idx 6 — the right hand, thumb on the outside; idx 7 is its left-hand mirror) that wraps the raised
-weapon, tilted by `mainRot` (14°, negated with the body) to follow the blade. `mainHand` grips the weapon (drawn over it via `mainZ`); `offHand` is the free fist beside the
+hand** is the brown gloved fist (`_derived/hand.png`, idx 4 — reads as the correct hand, thumb on the
+outside, un-flipped, so `offFlip` is left off); the **main hand** is an **open grip** (`mainSource` =
+`_derived/hand_open.png`, idx 7) that wraps the raised weapon, tilted by `mainRot` (14°, negated with
+the body) to follow the blade. `mainHand` grips the weapon (drawn over it via `mainZ`); `offHand` is the free fist beside the
 body (`offZ`). The main hand sits at the SAME anchor as the weapon, so it stays put while the weapon
 arcs about it. Both hands render whether or not the mob is armed; they're destroyed with the weapon on
 death (the 96px Death strip carries no anchors). The `mainHand` anchor `rot` also leans the resting
@@ -251,6 +251,37 @@ files or editing a `pack.json`.
 
 `public/assets/tilesets/mostowo-custom/` is the (currently-empty) skeleton home for future self-made
 art — same `pack.json` shape, `licence: "original"`.
+
+### Atlas sprite regions (plan 014 step 7a)
+
+Most `object`-type sheets are actually multi-sprite ATLASES (e.g. `Furniture.png` 800×864 holds ~50
+placeable props). Rather than physically splitting a sheet into one file per sprite, each pack's
+committed `regions.json` sidecar (`public/assets/tilesets/<pack>/regions.json`) carries per-sprite
+bounding boxes, detected by connected-components analysis; `asset-catalog.mjs` merges these in so a
+`CatalogAsset` with >=2 regions gets a `regions: [{key,x,y,w,h}]` array (0 or 1 stays a plain single
+object). Editor/game crop the chosen region at render — the sheet stays the load/dedupe unit
+(`collectTextureSources` doc in `mapFormat.ts` has the mobile-memory trade-off this implies).
+
+**Regen (always both, in order):**
+```
+python3 scripts/pixel-crawler/gen_regions.py && npm run assets:catalog
+```
+Never hand-edit `regions.json` — it's generated, like the catalog itself. The only hand-authored
+inputs are two escape-hatch maps in that pack's `pack.json`: `regionParams` (per-sheet detection
+tuning — `alphaThresh`/`gap`/`minArea`) and `regions` (a verbatim per-sheet region list, for sheets
+where no amount of tuning gets it right — e.g. touching sprites that merge, or a false-positive
+non-sprite region). Both keyed by the sheet's relative path. Concrete examples already in
+`pixel-crawler/pack.json`: `Rocks.png`/`Resources.png`/`Esoteric.png`/`Tools.png` each had a baked-in
+"PALETTE:" swatch legend in one corner that connected-components happily detects as a "sprite" — the
+`regions` override drops just that one box; `Trees/Model_03/Size_04-export.png`'s four colour
+variants touch at the canopy edges and detect as one merged blob — the override splits it into its
+four (plus the already-correct dead-tree/stump) regions.
+
+**Content-drift caveat:** the catalog build validates a sidecar region is in-bounds for its sheet
+(fatal if not — a stale sidecar after a sheet shrunk), but it can't detect a sprite that moved
+*within* a same-size sheet. Re-running `gen_regions.py` after editing ANY pack PNG is the only guard
+— there's no automatic staleness check for that case (by design: this module reads pixels, `parseMap`
+deliberately doesn't).
 
 ## Item icons (Gemini pipeline, plan 009)
 
