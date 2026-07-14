@@ -10,10 +10,13 @@ import {
 } from '../../config';
 import { tileToWorldCenter } from '../../systems/grid';
 import { BUILDABLES } from '../../data/buildables';
-import { campfireAnimKey } from '../../data/tileset';
+import { campfireBaseKey, campfireFlameKey } from '../../data/tileset';
 import { drainFuel, feedFuel, isLit, fuelFrac } from '../../systems/campfire';
 import type { CampfireUnit, BuildSite } from '../../entities/types';
 import type { GameScene } from '../GameScene';
+
+/** Ember/log base render height in tiles (the flame's height comes from the buildable's `tilesTall`). */
+const EMBER_TILES = 2;
 
 /**
  * Narrow scene state {@link CampfireManager} needs but doesn't own — GameScene supplies these as
@@ -29,8 +32,9 @@ export interface CampfireManagerDeps {
 
 /**
  * Campfires — the first live, per-frame-simulated buildable (plan 012). Owns the campfire collection
- * and each one's animated fire sprite (so it is the sole writer of the sprite's anim/tint, and its
- * sole destroyer). A campfire is created by {@link materialise} when its build site completes (called
+ * and each one's TWO fire sprites — an ember/log base + a flame layered over it (plan 016) — so it is
+ * the sole writer of their anim/tint/scale and their sole destroyer. A campfire is created by
+ * {@link materialise} when its build site completes (called
  * from `BuildManager.finishSite` via the scene-mediated `materialiseBuildable` dep — BuildManager
  * still owns the site rect + its occupancy/collision body, this manager owns only the visual + fuel).
  *
@@ -66,26 +70,35 @@ export class CampfireManager {
 
   // --- Lifecycle -----------------------------------------------------------------
 
-  /** Turn a completed campfire build site into a live, burning campfire: a bottom-anchored animated
-   *  fire sprite (mirrors ResourceNodeManager's node scale/anchor) that starts full and lit.
-   *  `baseScale` is the fitted native scale (full-fuel size); tick multiplies it by the fuel fraction. */
+  /** Turn a completed campfire build site into a live, burning campfire: two bottom-anchored layers at
+   *  the fire's tile — an ember/log `base` (fixed height) and a `flame` drawn just above it (its
+   *  `flameBaseScale` is the full-fuel size; tick multiplies it by the fuel fraction). Starts full + lit. */
   materialise(site: BuildSite): void {
     const def = BUILDABLES[site.buildableId];
-    const sprite = this.scene.add
-      .sprite(tileToWorldCenter(site.col), tileToWorldCenter(site.row), campfireAnimKey())
-      .setDepth(1);
-    const baseScale = (TILE_SIZE * (def.tilesTall ?? 1)) / sprite.frame.height;
-    sprite.setOrigin(0.5, def.originY ?? 1).play(campfireAnimKey());
+    const x = tileToWorldCenter(site.col);
+    const y = tileToWorldCenter(site.row);
+    const originY = def.originY ?? 1;
+    const base = this.scene.add.sprite(x, y, campfireBaseKey()).setDepth(1).setOrigin(0.5, originY);
+    base.setScale((TILE_SIZE * EMBER_TILES) / base.frame.height).play(campfireBaseKey());
+    // Flame sits a hair above the base (depth 1.01) so it draws over the embers; height = the
+    // buildable's tilesTall at full fuel, scaled down as fuel drains (see applyScale).
+    const flame = this.scene.add
+      .sprite(x, y, campfireFlameKey())
+      .setDepth(1.01)
+      .setOrigin(0.5, originY);
+    const flameBaseScale = (TILE_SIZE * (def.tilesTall ?? 1)) / flame.frame.height;
+    flame.play(campfireFlameKey());
     const c: CampfireUnit = {
       id: `campfire-${this.nextId++}`,
       col: site.col,
       row: site.row,
-      sprite,
+      sprite: base,
+      flame,
       fuel: CAMPFIRE_FUEL_MAX,
       lit: true,
-      baseScale,
+      flameBaseScale,
     };
-    this.applyScale(c); // full tank → native size
+    this.applyScale(c); // full tank → native flame size
     this.campfires.push(c);
   }
 
@@ -104,11 +117,13 @@ export class CampfireManager {
     }
   }
 
-  /** Set the fire's display scale from its fuel: `baseScale × fuelFrac(fuel)`, so a full tank is the
-   *  native size and a dying fire shrinks toward `CAMPFIRE_FLAME_MIN_FRAC` of it. The sole scale writer
-   *  (drain in tick, the jump-up on feed, and douse all route through here) — no scale tween to fight. */
+  /** Scale the FLAME from its fuel: `flameBaseScale × fuelFrac(fuel)`, so a full tank is native size and
+   *  a dying fire's flame shrinks toward `CAMPFIRE_FLAME_MIN_FRAC` of it. The ember base is fixed — only
+   *  the flame grows/shrinks. Sole flame-scale writer (drain in tick + the jump-up on feed route here). */
   private applyScale(c: CampfireUnit): void {
-    c.sprite.setScale(c.baseScale * fuelFrac(c.fuel, CAMPFIRE_FUEL_MAX, CAMPFIRE_FLAME_MIN_FRAC));
+    c.flame.setScale(
+      c.flameBaseScale * fuelFrac(c.fuel, CAMPFIRE_FUEL_MAX, CAMPFIRE_FLAME_MIN_FRAC),
+    );
   }
 
   // --- Tap-to-feed ---------------------------------------------------------------
@@ -137,8 +152,10 @@ export class CampfireManager {
    *  after (none if lit, ash-grey if out). */
   flashNoFuel(c: CampfireUnit): void {
     c.sprite.setTint(COLORS.ghostInvalid);
+    c.flame.setTint(COLORS.ghostInvalid);
     this.scene.time.delayedCall(160, () => {
       if (!c.sprite.active) return; // torn down by a scenario reset before the blink cleared
+      c.flame.clearTint();
       if (c.lit) c.sprite.clearTint();
       else c.sprite.setTint(0x555555);
     });
@@ -191,19 +208,19 @@ export class CampfireManager {
 
   // --- Reset / teardown ----------------------------------------------------------
 
-  /** Douse: stop the flame, dim it ash-grey, and shrink to the empty size (fuel is 0 here). */
+  /** Douse: hide + stop the flame (embers remain), and dim the ember base ash-grey (fuel is 0 here). */
   private douse(c: CampfireUnit): void {
     c.lit = false;
-    c.sprite.stop();
+    c.flame.stop();
+    c.flame.setVisible(false);
     c.sprite.setTint(0x555555);
-    this.applyScale(c);
   }
 
-  /** Light/relight: clear the dim tint + resume the flame loop (tick scales it to current fuel). */
+  /** Light/relight: un-dim the embers, show + resume the flame, and size it to current fuel. */
   private light(c: CampfireUnit): void {
     c.lit = true;
     c.sprite.clearTint();
-    c.sprite.play(campfireAnimKey(), true);
+    c.flame.setVisible(true).play(campfireFlameKey(), true);
     this.applyScale(c);
   }
 
@@ -213,7 +230,10 @@ export class CampfireManager {
    * SHUTDOWN path (see class doc).
    */
   reset(): void {
-    for (const c of this.campfires) c.sprite.destroy();
+    for (const c of this.campfires) {
+      c.sprite.destroy();
+      c.flame.destroy();
+    }
     this.campfires = [];
     this.nextId = 0;
   }

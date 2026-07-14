@@ -41,19 +41,23 @@ export interface BuildSite {
 /**
  * A built campfire in the world: its animated fire sprite plus fuel/lit state. Owned by
  * CampfireManager, the sole writer of the sprite's anim/tint (and its sole destroyer). `fuel` drains
- * every frame; `lit` mirrors `fuel > 0` and drives the light it casts + its dim-out when spent.
- * `baseScale` is the fire's fitted native (full-fuel) display scale; CampfireManager multiplies it by
- * the fuel fraction each tick so the flame grows/shrinks with fuel.
+ * every frame; `lit` mirrors `fuel > 0` and drives the light it casts + its dim-out when spent. The
+ * fire is TWO layered sprites: `sprite` is the ember/log base (always present) and `flame` is the
+ * flame drawn on top. CampfireManager scales `flame` by fuel each tick (`flameBaseScale` is its
+ * full-fuel size) and hides it when the fire's out, leaving the embers.
  */
 export interface CampfireUnit {
   id: string;
   col: number;
   row: number;
+  /** Ember/log base layer — always visible (dimmed when out). */
   sprite: Phaser.GameObjects.Sprite;
+  /** Flame layer, drawn over the base — scaled by fuel, hidden at 0. */
+  flame: Phaser.GameObjects.Sprite;
   fuel: number;
   lit: boolean;
-  /** Fitted native display scale (full-fuel size) — CampfireManager render state; scaled by fuel. */
-  baseScale: number;
+  /** Flame's fitted full-fuel display scale — CampfireManager render state; ×fuelFrac each tick. */
+  flameBaseScale: number;
 }
 
 /**

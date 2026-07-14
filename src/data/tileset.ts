@@ -170,13 +170,15 @@ export interface TilesetManifest {
   };
   /**
    * Placeable-station animations, keyed by station role — separate from `actors` since these aren't
-   * characters. Today just the campfire's looping fire strip (see `data/buildables.ts`'s `campfire`
-   * entry, whose `animKey` must match `campfireAnimKey()`). CampfireManager scales this single sprite
-   * by fuel so the fire visibly grows/shrinks — the Bonfire_0x sheets aren't a clean intensity ramp
-   * (some are braziers, some bare flames), so a consistent sprite + scale reads better than swapping.
+   * characters. The campfire layers two strips: a `base` (glowing embers/logs — always present) and a
+   * `flame` drawn on top (plan 016). Neither sheet alone works — the Bonfire_0x sheets read as a flat
+   * ember spread ("no flame"), and the Fire_0x flames alone look like they float with no fuel under
+   * them — so we composite. CampfireManager scales the flame by fuel (grows/shrinks; hidden at 0,
+   * leaving embers); the base stays put. `data/buildables.ts`'s `campfire.animKey` just needs to be
+   * truthy to route through the animated-buildable branch.
    */
   stations: {
-    campfire: StripAnim;
+    campfire: { base: StripAnim; flame: StripAnim };
   };
 }
 
@@ -447,15 +449,22 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
     },
   },
   stations: {
-    // Bonfire_07-Sheet.png: a log fire with prominent flames (128×32 = 4 frames of 32×32). Chosen for
-    // the clearest visible flame — Bonfire_05 (the earlier pick) read as barely-there at this size,
-    // which is what "there is no flame" was about. CampfireManager scales this single sprite by fuel so
-    // the fire grows/shrinks (plan 016); the Bonfire_0x set isn't a clean intensity ramp to swap across
-    // (01/02/04 are braziers, 06/08 bare flames), so one consistent sprite + scale is the right call.
+    // base = Bonfire_03 (a low log/ember pile, 128×32 = 4 frames of 32×32) — the glowing fuel that
+    // stays put and is all that's left once the fire's out. flame = Fire_01 (a bright orange flame,
+    // 128×48 = 4 frames of 32 wide × 48 tall) drawn on top, scaled by fuel. frameWidth(32) ≠
+    // frameSize(48) for the flame, so both are declared (a bare frameSize:48 would slice between frames).
     campfire: {
-      path: 'Environment/Structures/Stations/Bonfire/Bonfire_07-Sheet.png',
-      frameSize: 32,
-      frames: 4,
+      base: {
+        path: 'Environment/Structures/Stations/Bonfire/Bonfire_03-Sheet.png',
+        frameSize: 32,
+        frames: 4,
+      },
+      flame: {
+        path: 'Environment/Structures/Stations/Bonfire/Fire_01-Sheet.png',
+        frameWidth: 32,
+        frameSize: 48,
+        frames: 4,
+      },
     },
   },
 };
@@ -494,11 +503,11 @@ export const enemyIdleKey = 'enemy-idle';
 /** Texture/anim key for the enemy Death strip (one-shot collapse on kill). */
 export const enemyDeathKey = 'enemy-death';
 
-/**
- * Texture/anim key for the campfire's looping fire strip (see `stations.campfire` above). Must match
- * the `animKey: 'campfire'` on the `campfire` entry in `data/buildables.ts`.
- */
-export const campfireAnimKey = (): string => 'campfire';
+/** Texture/anim key for the campfire's ember/log base layer (see `stations.campfire.base`). */
+export const campfireBaseKey = (): string => 'campfire-base';
+
+/** Texture/anim key for the campfire's flame layer, drawn over the base (see `stations.campfire.flame`). */
+export const campfireFlameKey = (): string => 'campfire-flame';
 
 /** Texture key for an item's icon image (loaded from `public/assets/icons/<icon>`). */
 export const iconKey = (id: string): string => `icon:${id}`;

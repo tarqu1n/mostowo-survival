@@ -1,8 +1,7 @@
 import Phaser from 'phaser';
-import { COLORS, TILE_SIZE } from '../../config';
+import { COLORS } from '../../config';
 import { tileToWorldCenter } from '../../systems/grid';
 import { bakeGlowTexture } from '../../render/glowTexture';
-import { BUILDABLES } from '../../data/buildables';
 import type { Action } from '../../systems/tasks';
 import type { TreeNode, BuildSite, CampfireUnit } from '../../entities/types';
 import type { ResourceNodeDef } from '../../data/types';
@@ -131,21 +130,30 @@ export class TaskGlowRenderer {
   }
 
   /**
-   * Outline a queued-for-refuel campfire: a yellow stroked rect over its whole `tilesTall` tile column
-   * (bottom-anchored, so the column rises from the foot tile). Deliberately a stroked rect, NOT a baked
-   * silhouette halo like {@link addTreeGlow}: bakeGlowTexture reads the sprite's *source image*, which
-   * for the fire is the full multi-frame sheet (a 4-tile-wide smear), and the fire animates / flares /
-   * swaps textures by fuel — three sync problems a static tree halo never has. The rect matches the
-   * queued-*site* stroke style and is pushed into `queueMarkers` so {@link reset} tears it down.
+   * Outline a queued-for-refuel campfire: a yellow stroked rect hugging the fire sprite's actual
+   * rendered bounds (+ a small pad), so it tracks the fuel-scaled flame instead of dwarfing it — a
+   * fixed 2-tile column looked huge around the small flame. Deliberately a stroked rect, NOT a baked
+   * silhouette halo like {@link addTreeGlow}: bakeGlowTexture reads the sprite's *source image* (the
+   * full 4-frame sheet — a wide smear) and the fire animates + scales by fuel, sync problems a static
+   * tree halo never has. Matches the queued-*site* stroke; pushed into `queueMarkers` so {@link reset}
+   * tears it down.
    */
   outlineCampfire(c: CampfireUnit): void {
-    const tilesTall = BUILDABLES.campfire.tilesTall ?? 1;
+    // Hug the union of the two layers' world AABBs (ember base + fuel-scaled flame) + a small pad, so
+    // the box tracks the actual fire instead of a fixed tile column (which dwarfed the small flame).
+    const b = c.sprite.getBounds();
+    const f = c.flame.getBounds();
+    const left = Math.min(b.left, f.left);
+    const right = Math.max(b.right, f.right);
+    const top = Math.min(b.top, f.top);
+    const bottom = Math.max(b.bottom, f.bottom);
+    const pad = 4;
     const box = this.scene.add
       .rectangle(
-        tileToWorldCenter(c.col),
-        tileToWorldCenter(c.row) - (TILE_SIZE * (tilesTall - 1)) / 2, // centre over the tile column
-        TILE_SIZE,
-        TILE_SIZE * tilesTall,
+        (left + right) / 2,
+        (top + bottom) / 2,
+        right - left + pad,
+        bottom - top + pad,
         COLORS.queued,
         0, // no fill — outline only
       )

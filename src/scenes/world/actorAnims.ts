@@ -6,7 +6,8 @@ import {
   enemyWalkKey,
   enemyIdleKey,
   enemyDeathKey,
-  campfireAnimKey,
+  campfireBaseKey,
+  campfireFlameKey,
   type Facing,
   type PlayerState,
 } from '../../data/tileset';
@@ -80,16 +81,18 @@ export function registerActorAnims(scene: Phaser.Scene): void {
       repeat: 0,
     });
   }
-  // Campfire (station): a looping flame flicker. Registered here alongside the actors so every
-  // anims.create lives in one guarded place (plan 012); key + frame count come from the manifest.
-  // CampfireManager scales the played sprite by fuel (plan 016) — the anim itself is fuel-agnostic.
-  if (!scene.anims.exists(campfireAnimKey())) {
+  // Campfire (station): two looping flickers — the ember/log base and the flame layered on top (plan
+  // 016). Registered here alongside the actors so every anims.create lives in one guarded place; keys +
+  // frame counts come from the manifest. CampfireManager scales the flame by fuel (anims are fuel-agnostic).
+  const { base: campfireBase, flame: campfireFlame } = ACTIVE_TILESET.stations.campfire;
+  for (const [key, strip] of [
+    [campfireBaseKey(), campfireBase],
+    [campfireFlameKey(), campfireFlame],
+  ] as const) {
+    if (scene.anims.exists(key)) continue;
     scene.anims.create({
-      key: campfireAnimKey(),
-      frames: scene.anims.generateFrameNumbers(campfireAnimKey(), {
-        start: 0,
-        end: ACTIVE_TILESET.stations.campfire.frames - 1,
-      }),
+      key,
+      frames: scene.anims.generateFrameNumbers(key, { start: 0, end: strip.frames - 1 }),
       frameRate: 8, // steady flame flicker
       repeat: -1,
     });
