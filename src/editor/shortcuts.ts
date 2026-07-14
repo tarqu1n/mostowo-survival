@@ -66,8 +66,21 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: 'Edit',
     shortcuts: [
-      { keys: ['Ctrl/Cmd + Z'], action: 'Undo' },
-      { keys: ['Shift + Ctrl/Cmd + Z'], action: 'Redo' },
+      { keys: ['Ctrl/Cmd + Z'], action: 'Undo (works on both the Map and World tabs)' },
+      { keys: ['Shift + Ctrl/Cmd + Z'], action: 'Redo (works on both the Map and World tabs)' },
+    ],
+  },
+  {
+    title: 'World view',
+    shortcuts: [
+      {
+        keys: ['Drag from tray'],
+        action: 'Place an unplaced map onto the world grid (snaps to whole tiles)',
+      },
+      { keys: ['Drag a placed map'], action: 'Reposition it (snaps to whole tiles)' },
+      { keys: ['✕ on a map'], action: 'Remove it from the world (back to the unplaced tray)' },
+      { keys: ['Mouse wheel'], action: 'Zoom the world grid' },
+      { keys: ['Drag empty grid', 'Middle-drag'], action: 'Pan the world grid' },
     ],
   },
   {

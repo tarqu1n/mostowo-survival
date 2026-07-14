@@ -40,7 +40,7 @@ import {
   type ZoneDef,
 } from '../../systems/mapFormat';
 import type { TileSource } from '../../data/tileset';
-import type { WorldLayout } from '../../systems/worldLayout';
+import type { MapPlacement, WorldLayout } from '../../systems/worldLayout';
 import { GROUND_CHUNK_ROWS } from '../../config';
 import type { AssetCatalog } from '../catalog';
 import { parseAssetId } from '../textureLoading';
@@ -155,6 +155,16 @@ export interface EditorState {
   mapId: string | null;
   dirty: boolean;
   world: WorldLayout;
+  /** Bumped on every world-layout mutation (`applyWorldCommand`, undo/redo of a `domain:'world'`
+   *  entry) — mirrors `docRevision`'s role for `map`: `world.placements` is mutated IN PLACE (same
+   *  reference), so React components (`WorldViewTab`) subscribe to this counter purely as a
+   *  re-render trigger and read the current `world` via `getState()` in the render body, exactly
+   *  like `ZonesPanel` does for `map`. */
+  worldRevision: number;
+  /** Unsaved `world.json` changes — the World view's OWN dirty flag, independent of the per-map
+   *  `dirty` (placements and the open map document are different files with different save
+   *  actions). */
+  worldDirty: boolean;
   catalog: EditorCatalog;
   activeLayerId: string | null;
   activeTool: EditorTool;
@@ -192,6 +202,15 @@ export interface EditorState {
   docRevision: number;
   canUndo: boolean;
   canRedo: boolean;
+  /** Thumbnail-bake capability (plan 014 step 9) — `EditorScene` is the only thing with every tile
+   *  texture resident, so it's the only thing that CAN bake a thumbnail, but the store is the only
+   *  React↔Phaser bridge (module doc) and there's no scene ref in React. So `EditorScene.create()`
+   *  installs this closure (producing a 1px-per-tile PNG `Blob` of the CURRENTLY open map, `null` if
+   *  none) and clears it back to `null` on teardown; `Toolbar`'s Save calls it after a successful
+   *  `putMap` and PUTs the result via `putThumb`. `null` before the scene has mounted, or after it's
+   *  torn down (StrictMode double-mount, HMR) — callers must treat a `null` capability, or a `null`
+   *  Blob result, as "skip the thumbnail export", never as a save failure. */
+  bakeThumbnail: (() => Promise<Blob | null>) | null;
 
   // ---- actions (all document mutations route through the history stack) ----
   newMap(id: string, name: string, width: number, height: number): void;
@@ -217,15 +236,42 @@ export interface EditorState {
   setActiveZoneId(id: number | null): void;
   toggleOverlay(key: keyof EditorOverlays): void;
   toggleLayerVisibility(layerId: string): void;
+  /** Replaces the whole world layout WITHOUT touching history — used to seed `world` from disk on the
+   *  World view's initial load (`getWorld` → `parseWorldLayout`). Resets `worldDirty` to `false`
+   *  (freshly read) and bumps `worldRevision`. Do NOT use for user edits — those go through the
+   *  history-tracked `addPlacement`/`movePlacement`/`removePlacement`. */
   setWorld(world: WorldLayout): void;
+  /** Marks the world layout clean after a successful `putWorld`. */
+  markWorldSaved(): void;
+  /** Installs (or clears, with `null`) the thumbnail-bake capability — called by `EditorScene` on
+   *  create/teardown. See `bakeThumbnail`'s doc. */
+  setBakeThumbnail(fn: (() => Promise<Blob | null>) | null): void;
   setCatalog(catalog: EditorCatalog): void;
   markSaved(): void;
   applyCommand(cmd: Command): void;
+  /** Applies a world-layout command through the SAME history stack as `applyCommand`, stamping
+   *  `domain:'world'` so undo/redo update the world side effects (`worldDirty`/`worldRevision`)
+   *  rather than the map's (`dirty`/`docRevision`). Placement edits route through here so Ctrl+Z
+   *  works uniformly across map and world. */
+  applyWorldCommand(cmd: Command): void;
   undo(): void;
   redo(): void;
   /** Read + clear `pendingDirty` in one step — `EditorScene` calls this once per rebake so a stale
    *  value never lingers into an unrelated edit. */
   consumePendingDirty(): PendingDirty | null;
+
+  // ---- world layout (step 9) — placement edits, all undoable through the ONE history stack ----
+  /** Adds a placement for `mapId` at `origin` (whole global tile coords). No-op (returns `false`) if
+   *  the map is already placed. One undoable command tagged `domain:'world'`. */
+  addPlacement(mapId: string, origin: { col: number; row: number }): boolean;
+  /** Moves an existing placement's origin to `origin` (whole global tile coords). No-op (returns
+   *  `false`) if the map isn't placed or the origin is unchanged. One undoable command tagged
+   *  `domain:'world'` — `strokeId` (optional) coalesces a whole drag into one undo entry, exactly
+   *  like paint strokes. */
+  movePlacement(mapId: string, origin: { col: number; row: number }, strokeId?: string): boolean;
+  /** Removes `mapId`'s placement (returns it to the unplaced tray). No-op (returns `false`) if it
+   *  isn't placed. One undoable command tagged `domain:'world'`. */
+  removePlacement(mapId: string): boolean;
 
   // ---- painting (step 6) ----
   /** Brush stroke: paints every cell along the segment `(fromCol,fromRow)`→`(toCol,toRow)` on the
@@ -569,6 +615,8 @@ export const useEditorStore = create<EditorState>()(
     mapId: null,
     dirty: false,
     world: EMPTY_WORLD,
+    worldRevision: 0,
+    worldDirty: false,
     catalog: null,
     activeLayerId: null,
     activeTool: 'pan',
@@ -587,6 +635,7 @@ export const useEditorStore = create<EditorState>()(
     docRevision: 0,
     canUndo: false,
     canRedo: false,
+    bakeThumbnail: null,
 
     newMap: (id, name, width, height) => {
       const map = createEmptyMap(id, name, width, height);
@@ -699,7 +748,10 @@ export const useEditorStore = create<EditorState>()(
           ? s.hiddenLayerIds.filter((id) => id !== layerId)
           : [...s.hiddenLayerIds, layerId],
       })),
-    setWorld: (world) => set({ world }),
+    setWorld: (world) =>
+      set((s) => ({ world, worldDirty: false, worldRevision: s.worldRevision + 1 })),
+    markWorldSaved: () => set({ worldDirty: false }),
+    setBakeThumbnail: (fn) => set({ bakeThumbnail: fn }),
     setCatalog: (catalog) =>
       set((s) => ({ catalog, ...reconcileTabs(s.tabs, s.activeTabId, catalog) })),
     markSaved: () => set({ dirty: false }),
@@ -717,8 +769,29 @@ export const useEditorStore = create<EditorState>()(
       }));
     },
 
+    applyWorldCommand: (cmd) => {
+      history.apply({ ...cmd, domain: 'world' });
+      set((s) => ({
+        worldDirty: true,
+        worldRevision: s.worldRevision + 1,
+        canUndo: history.canUndo(),
+        canRedo: history.canRedo(),
+      }));
+    },
+
     undo: () => {
       if (!history.undo()) return;
+      // A single shared stack spans map + world; the reverted entry's `domain` tag says which side
+      // effects to bump (see history.ts / applyWorldCommand).
+      if (history.getLastDomain() === 'world') {
+        set((s) => ({
+          worldDirty: true,
+          worldRevision: s.worldRevision + 1,
+          canUndo: history.canUndo(),
+          canRedo: history.canRedo(),
+        }));
+        return;
+      }
       set((s) => ({
         dirty: true,
         docRevision: s.docRevision + 1,
@@ -733,6 +806,15 @@ export const useEditorStore = create<EditorState>()(
 
     redo: () => {
       if (!history.redo()) return;
+      if (history.getLastDomain() === 'world') {
+        set((s) => ({
+          worldDirty: true,
+          worldRevision: s.worldRevision + 1,
+          canUndo: history.canUndo(),
+          canRedo: history.canRedo(),
+        }));
+        return;
+      }
       set((s) => ({
         dirty: true,
         docRevision: s.docRevision + 1,
@@ -749,6 +831,66 @@ export const useEditorStore = create<EditorState>()(
       const { pendingDirty } = get();
       if (pendingDirty) set({ pendingDirty: null });
       return pendingDirty;
+    },
+
+    // ---- world layout (step 9) ----
+    // `world.placements` is mutated IN PLACE (the command closures capture the live array), exactly
+    // like `map` is — so undo/redo restore it without replacing the `world` object reference. The
+    // World tab mounts once for the app's lifetime (all tabs stay mounted, hidden via CSS) and seeds
+    // `world` from disk exactly once via `setWorld`, so these captured references never go stale.
+
+    addPlacement: (mapId, origin) => {
+      const world = get().world;
+      if (world.placements.some((p) => p.mapId === mapId)) return false;
+      const placement: MapPlacement = { mapId, origin: { col: origin.col, row: origin.row } };
+      const cmd: Command = {
+        do: () => {
+          world.placements.push(placement);
+        },
+        undo: () => {
+          const i = world.placements.indexOf(placement);
+          if (i >= 0) world.placements.splice(i, 1);
+        },
+      };
+      get().applyWorldCommand(cmd);
+      return true;
+    },
+
+    movePlacement: (mapId, origin, strokeId) => {
+      const world = get().world;
+      const placement = world.placements.find((p) => p.mapId === mapId);
+      if (!placement) return false;
+      if (placement.origin.col === origin.col && placement.origin.row === origin.row) return false;
+      const prev = { col: placement.origin.col, row: placement.origin.row };
+      const next = { col: origin.col, row: origin.row };
+      const cmd: Command = {
+        strokeId,
+        do: () => {
+          placement.origin = { ...next };
+        },
+        undo: () => {
+          placement.origin = { ...prev };
+        },
+      };
+      get().applyWorldCommand(cmd);
+      return true;
+    },
+
+    removePlacement: (mapId) => {
+      const world = get().world;
+      const index = world.placements.findIndex((p) => p.mapId === mapId);
+      if (index < 0) return false;
+      const removed = world.placements[index];
+      const cmd: Command = {
+        do: () => {
+          world.placements.splice(index, 1);
+        },
+        undo: () => {
+          world.placements.splice(index, 0, removed);
+        },
+      };
+      get().applyWorldCommand(cmd);
+      return true;
     },
 
     // ---- painting ----

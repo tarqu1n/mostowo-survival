@@ -14,6 +14,13 @@
  * them in order. Stroke ids are unique per drag (the store mints a fresh one on pointer-down), so a
  * fresh stroke — or any command issued after an undo/redo — never merges into a stale entry (the
  * top entry it would target is no longer the one it shared an id with).
+ *
+ * `domain` (plan 014 step 9): an opaque, generic string tag a caller can stamp on a `Command` — this
+ * module never interprets it, just remembers the most recently applied/undone/redone entry's tag via
+ * `getLastDomain()`. The editor store uses this to run ONE shared undo/redo stack across both the map
+ * document and the world-layout placements (so Ctrl+Z works uniformly regardless of which tab is
+ * active) while still knowing, after a move, which side effects (map `dirty`/`docRevision` vs. world
+ * `worldDirty`) to update — without this module needing to know anything about maps or worlds.
  */
 
 export interface Command {
@@ -25,6 +32,8 @@ export interface Command {
   undo: () => void;
   /** Consecutive commands with an equal, defined `strokeId` coalesce into one undo entry. */
   strokeId?: string;
+  /** Opaque caller-defined tag — see module doc. Untagged commands are simply `undefined`. */
+  domain?: string;
 }
 
 /** One undo-stack slot. A plain command is a single-op entry; a coalesced stroke holds many ops
@@ -32,6 +41,7 @@ export interface Command {
 interface Entry {
   strokeId?: string;
   label?: string;
+  domain?: string;
   dos: Array<() => void>;
   undos: Array<() => void>;
 }
@@ -39,12 +49,14 @@ interface Entry {
 export class HistoryStack {
   private undoStack: Entry[] = [];
   private redoStack: Entry[] = [];
+  private lastDomain: string | undefined;
 
   /** Run `cmd.do()`, record it, and clear the redo history. Coalesces into the top entry when
    *  stroke ids match (see module doc). */
   apply(cmd: Command): void {
     cmd.do();
     this.redoStack = [];
+    this.lastDomain = cmd.domain;
     const top = this.undoStack[this.undoStack.length - 1];
     if (cmd.strokeId !== undefined && top && top.strokeId === cmd.strokeId) {
       top.dos.push(cmd.do);
@@ -54,6 +66,7 @@ export class HistoryStack {
     this.undoStack.push({
       strokeId: cmd.strokeId,
       label: cmd.label,
+      domain: cmd.domain,
       dos: [cmd.do],
       undos: [cmd.undo],
     });
@@ -64,6 +77,7 @@ export class HistoryStack {
   undo(): boolean {
     const entry = this.undoStack.pop();
     if (!entry) return false;
+    this.lastDomain = entry.domain;
     for (let i = entry.undos.length - 1; i >= 0; i--) entry.undos[i]();
     this.redoStack.push(entry);
     return true;
@@ -74,9 +88,16 @@ export class HistoryStack {
   redo(): boolean {
     const entry = this.redoStack.pop();
     if (!entry) return false;
+    this.lastDomain = entry.domain;
     for (const run of entry.dos) run();
     this.undoStack.push(entry);
     return true;
+  }
+
+  /** The `domain` tag of the entry most recently touched by `apply`/`undo`/`redo` — see module doc.
+   *  `undefined` before any command has been applied, or if that command was untagged. */
+  getLastDomain(): string | undefined {
+    return this.lastDomain;
   }
 
   canUndo(): boolean {

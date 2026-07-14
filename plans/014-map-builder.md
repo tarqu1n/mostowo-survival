@@ -984,7 +984,7 @@ free values render nearest-neighbour and are the author's aesthetic call.
     active zone, save→reload→reopen persists, undo/redo across shape/collision/zone incl. tool
     switches.
 
-- [ ] **Step 9: World view tab + neighbour ghost strips** `[delegate sonnet]`
+- [x] **Step 9: World view tab + neighbour ghost strips** `[delegate sonnet]`
   - **Update (plan 017 landed):** the `view: 'map'|'world'` toolbar toggle this step was written
     against no longer exists — plan 017 replaced it with a tab-strip architecture and already
     created a permanent, non-closable `world` tab (`editorStore.ts`'s `EditorTab` union); today
@@ -1029,6 +1029,43 @@ free values render nearest-neighbour and are the author's aesthetic call.
     shows map B's border tiles as a ghost strip exactly where they belong; toggling ghosts works;
     undo works for placement moves; saving a map writes/updates its thumb PNG at the right
     dimensions; `npm run check` green.
+  - Outcome: all changes confined to `src/editor/` (6 modified, 4 new — verified via `git status`).
+    New: `worldViewOps.ts` (pure, Phaser-free: drag snap `snapPxDeltaToTiles`/`pxToTile`,
+    `unplacedMapIds`, ghost-strip geometry `computeGhostStripCells`/`ghostBoundingBox`) +
+    `__tests__/worldViewOps.test.ts` (14) + `store/__tests__/editorStoreWorld.test.ts` (9);
+    `tabs/WorldViewTab.tsx` (the world view). **World view = React/DOM, NOT a second Phaser game**
+    (the one-`Phaser.Game` rule holds) — placed maps are absolutely-positioned `<img>` of their
+    committed thumbnail scaled to `width×height × zoom` at `(origin − worldMin) × zoom`; missing
+    thumbnails degrade to a labelled coloured rect; pointer drag (tray→place / body→reposition /
+    empty→pan), cursor-anchored wheel zoom, whole-tile snap, live coords + `validateWorld` feedback
+    in a status bar (red highlight on overlap + amber warning badges). **Placement edits route
+    through the ONE history stack**: `history.ts` gained a generic `domain` tag + `getLastDomain()`;
+    `editorStore.ts` got `world` placement state (`worldRevision`/`worldDirty`),
+    `addPlacement`/`movePlacement`/`removePlacement` + domain-tagged `applyWorldCommand`, domain-aware
+    `undo`/`redo`, `setWorld`/`markWorldSaved`, and the `bakeThumbnail` capability field +
+    `setBakeThumbnail`. **Thumbnail bake = Phaser via the store bridge**: `EditorScene.create()`
+    installs a `bakeThumbnail` closure (1px/tile composite of tile layers bottom→top, void
+    transparent, snapshot→PNG Blob) cleared on teardown; `Toolbar.handleSave` calls it after a
+    successful `putMap` and PUTs via `putThumb` (a thumb failure only warns, never fails the save).
+    **Ghost strips = Phaser in the Map scene**, gated on `overlays.ghosts` AND the open map being
+    placed: neighbours fetched on demand (`getMap`→`parseMap`), clipped to the ~12-tile ring via
+    `computeGhostStripCells`, baked into dimmed (α 0.4) RTs just outside the map's bounds, missing/
+    invalid neighbours skipped with a small notice, async guarded by a `ghostEpoch` token, refreshed
+    on reopen / ghosts-toggle / switch-to-Map-tab (no live cross-editor sync). `EditorApp.tsx`
+    renders `<WorldViewTab/>` and broadens the undo/redo shortcut to Map **and** World tabs (Delete/
+    nudge stay Map-only); `shortcuts.ts` updated in sync. **Deviation:** the world Save button (with
+    error-disable) lives inside `WorldViewTab`, not the Toolbar — the toolbar Save is map-scoped
+    (different file + dirty flag), so a self-contained world Save avoids an artificial cross-tab
+    signal and matches the step's actual requirement. No middleware change needed (`PUT
+    /__editor/world` + `/maps/:id/thumb` already existed). Verified: `npx tsc --noEmit` green; eslint
+    0 errors; prettier clean on all 10 touched files; 484/484 tests pass (461 prior + 23 new).
+    Aggregate `npm run check` red ONLY on `src/debug/crashReporter.ts` (a committed-unformatted file
+    from a concurrent session, zero working-tree diff — same as step 8), outside this step's scope.
+    NOT machine-verified (no React/DOM harness): the live click-through at `npm run editor` — place
+    two maps so shapes interlock, overlap → red + world-Save disabled, separate → saves valid
+    `world.json`, reopen map A with Ghosts on → map B's border tiles appear at the seam, toggle
+    ghosts, undo a placement move (works on the World tab too), Save a map → thumb PNG written at
+    `width×height` px.
 
 - [ ] **Step 10: Autotile terrain brush** `[delegate sonnet]`
   - Terrain definitions: add to the pixel-crawler `pack.json` (or a sibling `terrains.json` if

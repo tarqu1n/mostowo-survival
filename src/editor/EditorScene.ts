@@ -2,10 +2,19 @@ import Phaser from 'phaser';
 import { TILE_SIZE, GROUND_CHUNK_ROWS } from '../config';
 import { ACTIVE_TILESET, resolveTile, sheetKey, tileImageKey } from '../data/tileset';
 import { NODES } from '../data/nodes';
-import { cellIndex, getCell, isInside, type MapFile, type PortalRect } from '../systems/mapFormat';
+import {
+  cellIndex,
+  getCell,
+  isInside,
+  parseMap,
+  type MapFile,
+  type PortalRect,
+} from '../systems/mapFormat';
 import { worldToTile, snapToTileCenter } from '../systems/grid';
 import { useEditorStore, type PaintMode } from './store/editorStore';
 import { parseAssetId, tilesetAssetUrl } from './textureLoading';
+import { getMap } from './api';
+import { computeGhostStripCells, ghostBoundingBox, type GhostCell } from './worldViewOps';
 import { queueDecorTexture, resolveDecorDraw } from '../render/decorSprites';
 import { objectFootprintCells } from './objectOps';
 
@@ -34,7 +43,13 @@ const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
 const PAN_MARGIN_TILES = 6;
 
+// Neighbour ghost strips (step 9): how deep into each placed neighbour to render, and at what alpha.
+const GHOST_STRIP_TILES = 12;
+const GHOST_ALPHA = 0.4;
+
 // Render depths. Tile layers occupy 0..layers.length-1; everything else sits above them.
+const DEPTH_GHOST = 250; // dimmed neighbour strips — above tile layers, below the void hatch/objects
+const DEPTH_GHOST_NOTICE = 9200;
 const DEPTH_VOID = 500;
 const DEPTH_OBJECTS = 1000;
 const DEPTH_WALKABILITY = 1500;
@@ -73,6 +88,14 @@ export class EditorScene extends Phaser.Scene {
   private currentEpoch = -1;
 
   private chunkRTs: Phaser.GameObjects.RenderTexture[][] = []; // [layerIndex][chunkIndex]
+  /** One dimmed RenderTexture per placed neighbour whose tiles reach into the open map's border ring
+   *  (step 9). Rebuilt by `refreshGhosts`; strictly read-only + non-interactive. */
+  private ghostRTs: Phaser.GameObjects.RenderTexture[] = [];
+  /** "N neighbour(s) missing/invalid" notice, camera-fixed; rebuilt each `refreshGhosts`. */
+  private ghostNotice?: Phaser.GameObjects.Text;
+  /** Bumped on every `refreshGhosts` so a slower earlier async pass (neighbour fetch + texture load)
+   *  that resolves late can detect it's been superseded and bail before drawing stale strips. */
+  private ghostEpoch = 0;
   private objectSprites: Phaser.GameObjects.GameObject[] = [];
   /** Object id → its primary display GameObject (decor's image; node/portal's marker rect) — lets the
    *  select tool hit-test/highlight by id without re-deriving bounds from map data (step 7). Rebuilt
@@ -190,7 +213,19 @@ export class EditorScene extends Phaser.Scene {
       ),
       useEditorStore.subscribe(
         (s) => s.overlays,
-        () => this.redrawOverlays(),
+        () => {
+          this.redrawOverlays();
+          void this.refreshGhosts(); // ghosts toggle lives in overlays.ghosts (step 9)
+        },
+      ),
+      // Ghost strips refresh on VIEW-SWITCH back to the Map tab (plan 014 step 9: "refresh on
+      // view-switch/reopen, no live sync") — a neighbour placed/moved in the World tab shows next
+      // time the Map tab is shown, without any live cross-tab wiring.
+      useEditorStore.subscribe(
+        (s) => s.activeTabId,
+        (activeTabId) => {
+          if (activeTabId === 'map') void this.refreshGhosts();
+        },
       ),
       // The shape-tool boundary outline only draws while that tool is active (step 8) — re-render on
       // every tool switch so entering/leaving `shape` shows/hides it.
@@ -211,6 +246,11 @@ export class EditorScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
     this.events.once(Phaser.Scenes.Events.DESTROY, () => this.teardown());
 
+    // Install the thumbnail-bake capability the React Save flow invokes through the store (the bridge
+    // is store-only — no scene ref in React; see editorStore's `bakeThumbnail` doc). Cleared on
+    // teardown so a torn-down scene (StrictMode double-mount / HMR) never leaves a dangling closure.
+    useEditorStore.getState().setBakeThumbnail(() => this.bakeThumbnailBlob());
+
     this.syncDocument();
   }
 
@@ -219,6 +259,8 @@ export class EditorScene extends Phaser.Scene {
     this.unsubs = [];
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
+    if (useEditorStore.getState().bakeThumbnail) useEditorStore.getState().setBakeThumbnail(null);
+    this.clearGhosts();
   }
 
   // ---- Document lifecycle ----
@@ -238,6 +280,7 @@ export class EditorScene extends Phaser.Scene {
   private clearRender(): void {
     for (const layer of this.chunkRTs) for (const rt of layer) rt.destroy();
     this.chunkRTs = [];
+    this.clearGhosts();
     for (const obj of this.objectSprites) obj.destroy();
     this.objectSprites = [];
     this.objectDisplayById.clear();
@@ -335,6 +378,8 @@ export class EditorScene extends Phaser.Scene {
     this.redrawOverlays();
     this.applyLayerVisibility();
     this.fitCamera(map);
+    // A reopen/reload re-derives the neighbour ghost strips from the current world layout (step 9).
+    void this.refreshGhosts();
   }
 
   /**
@@ -828,6 +873,232 @@ export class EditorScene extends Phaser.Scene {
   private mintStrokeId(): string {
     this.strokeCounter += 1;
     return `stroke-${Date.now()}-${this.strokeCounter}`;
+  }
+
+  // ---- Neighbour ghost strips (step 9) ----
+
+  private clearGhosts(): void {
+    for (const rt of this.ghostRTs) rt.destroy();
+    this.ghostRTs = [];
+    this.ghostNotice?.destroy();
+    this.ghostNotice = undefined;
+  }
+
+  /**
+   * Rebuild the read-only, dimmed strips of every placed NEIGHBOUR's tile layers that reach into the
+   * open map's ~`GHOST_STRIP_TILES`-deep border ring (plan 014 step 9). Gated on `overlays.ghosts`
+   * AND the open map being placed in `world`. Neighbour files are fetched on demand (`getMap` →
+   * `parseMap`) and clipped STRICTLY to the ring (via `computeGhostStripCells`, never the whole
+   * neighbour map); a neighbour that's missing/invalid is skipped and counted into a small on-screen
+   * notice. Async + guarded by `ghostEpoch` so a stale in-flight pass (slow fetch/texture load) never
+   * draws over a newer one. No live cross-editor sync — this only runs on map reopen, ghosts-toggle,
+   * or a switch back to the Map tab (see `create`'s subscriptions).
+   */
+  private async refreshGhosts(): Promise<void> {
+    const token = ++this.ghostEpoch;
+    this.clearGhosts();
+    const { map, mapId, world, overlays } = useEditorStore.getState();
+    if (!map || !mapId || !overlays.ghosts) return;
+    const mine = world.placements.find((p) => p.mapId === mapId);
+    if (!mine) return; // the open map isn't placed — nothing to ghost against
+
+    const strips: Array<{ map: MapFile; cells: GhostCell[] }> = [];
+    const missing: string[] = [];
+    for (const n of world.placements) {
+      if (n.mapId === mapId) continue;
+      let nmap: MapFile;
+      try {
+        nmap = parseMap(await getMap(n.mapId));
+      } catch {
+        missing.push(n.mapId);
+        continue;
+      }
+      if (token !== this.ghostEpoch) return; // a newer refresh superseded this pass
+      const cells = computeGhostStripCells(
+        mine.origin,
+        map.meta.width,
+        map.meta.height,
+        GHOST_STRIP_TILES,
+        n.origin,
+        nmap.meta.width,
+        nmap.meta.height,
+        (col, row) => isInside(nmap, col, row),
+      );
+      if (cells.length > 0) strips.push({ map: nmap, cells });
+    }
+    if (token !== this.ghostEpoch) return;
+
+    // Queue every neighbour palette texture the strips need (deduped), then bake once resident.
+    const seen = new Set<string>();
+    let queued = false;
+    for (const strip of strips) {
+      if (this.queuePaletteTextures(strip.map, seen)) queued = true;
+    }
+    const bake = (): void => {
+      if (token !== this.ghostEpoch) return;
+      for (const strip of strips) this.bakeGhostStrip(strip.map, strip.cells);
+      this.showGhostNotice(missing);
+    };
+    if (queued) {
+      this.load.once(Phaser.Loader.Events.COMPLETE, bake);
+      this.load.start();
+    } else {
+      bake();
+    }
+  }
+
+  /** Queue only the palette (tile-layer) textures of `map` — the ghost strips draw tile layers, not
+   *  objects. `seen` dedupes across strips within one refresh. Returns whether anything was queued. */
+  private queuePaletteTextures(map: MapFile, seen: Set<string>): boolean {
+    let queued = false;
+    for (const entry of map.palette) {
+      if (!entry) continue;
+      if (entry.source.kind === 'image') {
+        const key = tileImageKey(entry.source.path);
+        if (!this.textures.exists(key) && !seen.has(key)) {
+          seen.add(key);
+          this.load.image(key, tilesetAssetUrl(entry.pack, entry.source.path));
+          queued = true;
+        }
+      } else {
+        const key = sheetKey(entry.source.sheet);
+        if (!this.textures.exists(key) && !seen.has(key)) {
+          seen.add(key);
+          this.load.spritesheet(key, tilesetAssetUrl(entry.pack, entry.source.sheet), {
+            frameWidth: TILE_SIZE,
+            frameHeight: TILE_SIZE,
+          });
+          queued = true;
+        }
+      }
+    }
+    return queued;
+  }
+
+  /** Bake one neighbour's strip cells into a single dimmed RenderTexture, positioned just outside the
+   *  open map's bounds in the open map's LOCAL scene coordinates (where my (0,0) is scene (0,0)); the
+   *  strip's local cell coords are exactly that offset. All neighbour tile layers draw bottom→top. */
+  private bakeGhostStrip(nmap: MapFile, cells: GhostCell[]): void {
+    const box = ghostBoundingBox(cells);
+    if (!box) return;
+    const cols = box.maxCol - box.minCol + 1;
+    const rows = box.maxRow - box.minRow + 1;
+    const rt = this.add
+      .renderTexture(
+        box.minCol * TILE_SIZE,
+        box.minRow * TILE_SIZE,
+        cols * TILE_SIZE,
+        rows * TILE_SIZE,
+      )
+      .setOrigin(0, 0)
+      .setDepth(DEPTH_GHOST)
+      .setAlpha(GHOST_ALPHA);
+    const width = nmap.meta.width;
+    rt.beginDraw();
+    for (const cell of cells) {
+      const dx = (cell.localCol - box.minCol) * TILE_SIZE;
+      const dy = (cell.localRow - box.minRow) * TILE_SIZE;
+      for (const layer of nmap.layers) {
+        const paletteIndex = layer.cells[cellIndex(cell.neighbourCol, cell.neighbourRow, width)];
+        if (paletteIndex === 0) continue;
+        const entry = nmap.palette[paletteIndex];
+        if (!entry) continue;
+        const { key, frame } = resolveTile(entry.source);
+        if (!this.textures.exists(key)) continue;
+        rt.batchDrawFrame(key, frame, dx, dy);
+      }
+    }
+    rt.endDraw();
+    rt.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
+    this.ghostRTs.push(rt);
+  }
+
+  /** Small camera-fixed notice when one or more placed neighbours couldn't be loaded/parsed. */
+  private showGhostNotice(missing: string[]): void {
+    if (missing.length === 0) return;
+    const msg = `⚠ ${missing.length} neighbour${missing.length === 1 ? '' : 's'} missing/invalid: ${missing.join(', ')}`;
+    this.ghostNotice = this.add
+      .text(6, 6, msg, {
+        fontFamily: 'monospace',
+        fontSize: '10px',
+        color: '#f4d0c8',
+        backgroundColor: 'rgba(74,36,32,0.85)',
+        padding: { x: 4, y: 2 },
+      })
+      .setScrollFactor(0)
+      .setDepth(DEPTH_GHOST_NOTICE);
+  }
+
+  // ---- Thumbnail bake (step 9) ----
+
+  /**
+   * Bakes the open map to a 1px-per-tile PNG `Blob` (tile layers bottom→top, clipped to the shape
+   * mask, void = transparent) — the capability the React Save flow invokes through the store. Renders
+   * a full-resolution composite offscreen, then downscales it by `1/TILE_SIZE` into a `width×height`
+   * RenderTexture and snapshots that to a PNG. Resolves `null` if no map is open or the snapshot
+   * fails (the caller treats that as "skip the thumbnail", never a save failure).
+   */
+  private bakeThumbnailBlob(): Promise<Blob | null> {
+    const map = useEditorStore.getState().map;
+    if (!map) return Promise.resolve(null);
+    const { width, height } = map.meta;
+
+    // 1) full-resolution composite (inside cells only → void stays transparent), offscreen.
+    const full = this.make.renderTexture(
+      { width: width * TILE_SIZE, height: height * TILE_SIZE },
+      false,
+    );
+    full.setOrigin(0, 0);
+    for (const layer of map.layers) {
+      full.beginDraw();
+      for (let row = 0; row < height; row++) {
+        for (let col = 0; col < width; col++) {
+          if (!isInside(map, col, row)) continue;
+          const paletteIndex = layer.cells[cellIndex(col, row, width)];
+          if (paletteIndex === 0) continue;
+          const entry = map.palette[paletteIndex];
+          if (!entry) continue;
+          const { key, frame } = resolveTile(entry.source);
+          if (!this.textures.exists(key)) continue;
+          full.batchDrawFrame(key, frame, col * TILE_SIZE, row * TILE_SIZE);
+        }
+      }
+      full.endDraw();
+    }
+
+    // 2) downscale into a 1px-per-tile RenderTexture (drawing the scaled composite into it).
+    const thumb = this.make.renderTexture({ width, height }, false);
+    thumb.setOrigin(0, 0);
+    full
+      .setPosition(0, 0)
+      .setOrigin(0, 0)
+      .setScale(1 / TILE_SIZE);
+    thumb.draw(full);
+
+    // 3) snapshot the thumb to a PNG blob (snapshot yields an <img> with a data URL → fetch → blob).
+    return new Promise<Blob | null>((resolve) => {
+      const cleanup = (): void => {
+        full.destroy();
+        thumb.destroy();
+      };
+      thumb.snapshot((result) => {
+        if (result instanceof HTMLImageElement) {
+          fetch(result.src)
+            .then((r) => r.blob())
+            .then((blob) => {
+              cleanup();
+              resolve(blob);
+            })
+            .catch(() => {
+              cleanup();
+              resolve(null);
+            });
+        } else {
+          cleanup();
+          resolve(null);
+        }
+      });
+    });
   }
 
   // ---- Camera ----

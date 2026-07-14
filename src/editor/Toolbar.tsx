@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { serializeMap, parseMap, migrateMap } from '../systems/mapFormat';
-import { getMap, putMap } from './api';
+import { getMap, putMap, putThumb } from './api';
 import {
   useEditorStore,
   type EditorOverlays,
@@ -113,10 +113,28 @@ export function Toolbar() {
       await putMap(current.meta.id, json);
       useEditorStore.getState().markSaved();
       toast.success(`Saved "${current.meta.name}".`);
+      // Every successful map save also (re)bakes the 1px-per-tile thumbnail the World view renders
+      // from (plan 014 step 9), so thumbnails never drift from content. The bake capability is
+      // installed by EditorScene through the store (the bridge is store-only — no scene ref here).
+      // A thumb-export failure must NOT fail the save — the map is already persisted — so it only
+      // warns (toast + console), never re-throws into the error branch below.
+      void exportThumbnail(current.meta.id);
     } catch (e) {
       toast.error(`Save failed: ${(e as Error).message}`, { duration: 5000 });
     } finally {
       setSaving(false);
+    }
+  }
+
+  /** Bake + upload the thumbnail; swallow failures into a mild warning (see `handleSave`). */
+  async function exportThumbnail(id: string): Promise<void> {
+    try {
+      const bake = useEditorStore.getState().bakeThumbnail;
+      const blob = bake ? await bake() : null;
+      if (blob) await putThumb(id, blob);
+    } catch (e) {
+      console.warn('[editor] thumbnail export failed:', e);
+      toast(`Saved, but thumbnail export failed: ${(e as Error).message}`, { duration: 4000 });
     }
   }
 

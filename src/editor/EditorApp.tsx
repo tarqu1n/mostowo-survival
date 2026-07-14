@@ -6,6 +6,7 @@ import { useEditorStore } from './store/editorStore';
 import { Toolbar } from './Toolbar';
 import { PhaserViewport } from './PhaserViewport';
 import { ObjectEditorTab } from './tabs/ObjectEditorTab';
+import { WorldViewTab } from './tabs/WorldViewTab';
 import { LibraryPanel } from './panels/LibraryPanel';
 import { LayersPanel } from './panels/LayersPanel';
 import { ZonesPanel } from './panels/ZonesPanel';
@@ -54,19 +55,24 @@ export function EditorApp() {
   // NOTE: any shortcut added/changed here must be reflected in `shortcuts.ts` (the Shortcuts panel).
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      // These all act on the MAP document; ignore them entirely unless the Map tab is showing, so
-      // e.g. pressing Delete while an object-editor tab is active never silently deletes selected
-      // map objects (read via getState — this effect has an empty dep array). Top correctness risk
-      // of the tabbed pane (plan 017 step 2).
-      if (useEditorStore.getState().activeTabId !== 'map') return;
+      const activeTabId = useEditorStore.getState().activeTabId;
       const el = document.activeElement;
       if (el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return;
+      // Undo/redo drive the ONE shared history stack, which spans both map edits and world-layout
+      // placements (plan 014 step 9) — so they're allowed on the Map AND World tabs (the store's
+      // undo/redo bump the right side effects per the reverted entry's domain). An object-editor tab
+      // has its own local form state and no document history, so undo/redo stay disabled there.
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        if (activeTabId !== 'map' && activeTabId !== 'world') return;
         e.preventDefault();
         if (e.shiftKey) useEditorStore.getState().redo();
         else useEditorStore.getState().undo();
         return;
       }
+      // Delete/nudge act on the MAP document only — ignore them unless the Map tab is showing, so
+      // e.g. pressing Delete while the World or an object-editor tab is active never silently deletes
+      // selected map objects. Top correctness risk of the tabbed pane (plan 017 step 2).
+      if (activeTabId !== 'map') return;
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const ids = useEditorStore.getState().selectedObjectIds;
         if (ids.length > 0) {
@@ -203,9 +209,7 @@ export function EditorApp() {
                     if (tab.kind === 'world') {
                       return (
                         <div key={tab.id} className={panelClass}>
-                          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[0.95rem] text-border-muted">
-                            World view — coming in step 9.
-                          </div>
+                          <WorldViewTab />
                         </div>
                       );
                     }
