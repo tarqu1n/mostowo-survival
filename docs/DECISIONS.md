@@ -7,6 +7,33 @@ Format: `YYYY-MM-DD — [DECIDED|PROPOSED|OPEN] Title` then a short rationale.
 
 ---
 
+## 2026-07-14 — [DECIDED] Campfire fixes (plan 016): refuel is a worker order, flame scales (not sheet-swaps), outline is a rect
+
+Post-playtest fixes to the plan-012 campfire. Four boundary calls (advisor-consulted before build):
+
+- **Refuel is a queued `refuel` worker order, not an instant tap.** Tapping the fire enqueues an order
+  (walk adjacent → tend one wood per `CAMPFIRE_FEED_INTERVAL_MS`), mirroring harvest, with the yellow
+  queued outline and toggle-off-on-re-tap. Chosen over the old instant tap-to-feed so refuelling reads
+  as work (and shares the task-queue spine). The order self-terminates on *conditions* (topped up: a
+  full wood won't fit; or bag empty) since a fire persists — never on entity death.
+- **Tap→action resolves in `ScenePicker.actionAt` (campfire → `refuel`), and the fire is column-hit-
+  tested over its whole tile stack.** This structurally kills the "tap falls through to a move and the
+  worker walks into the blocking fire tile" bug — a tap on the fire can never become a move — and the
+  column test keeps it tappable regardless of the flickering flame's opaque pixels.
+- **Flame grows/shrinks by SCALING one consistent sprite, not swapping the Bonfire_0x sheets.** Those
+  sheets aren't a clean embers→roaring ramp (01/02/04 are braziers, 06/08 bare flames), so swapping
+  them morphs the fire's *structure*. One sprite (Bonfire_07) scaled by `fuelFrac` reads coherently.
+  The advisor's original objections to scaling (alpha-pick instability, glow re-sync) don't apply here
+  because picking is column-based and the outline is a rect, not a sprite-following glow.
+- **Queued outline is a stroked rect, not a baked-glow silhouette like queued trees.** `bakeGlowTexture`
+  reads the whole multi-frame sheet (a 4-tile-wide smear) and the fire animates/scales — a rect over
+  the tile column matches the queued-*site* style with none of that. The tree's soft glow was **not**
+  reused for the fire.
+
+**Deferred (logged, not done):** a general path-stall watchdog in `advancePath` — a move order beside
+any wall can still corner-cut into a static collider and stall. Refuel removes the campfire trigger;
+the general fix (no waypoint progress for N ms → repath/complete) is out of scope for plan 016.
+
 ## 2026-07-13 — [DECIDED] Buildable runtime stays bespoke for now; generalise on buildable #2
 
 The campfire is the first *live* (per-frame-simulated) buildable, but it will be one of many

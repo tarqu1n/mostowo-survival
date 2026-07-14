@@ -4,6 +4,7 @@ import { TaskQueue, type Action } from '../tasks';
 const move = (col: number, row: number): Action => ({ kind: 'move', col, row });
 const harvest = (treeId: string): Action => ({ kind: 'harvest', treeId });
 const build = (siteId: string): Action => ({ kind: 'build', siteId });
+const refuel = (campfireId: string): Action => ({ kind: 'refuel', campfireId });
 
 describe('TaskQueue', () => {
   it('all() is empty when nothing is queued', () => {
@@ -100,6 +101,22 @@ describe('TaskQueue', () => {
     expect(currentChanged).toBe(true);
     expect(q.current).toBeNull();
     expect(q.all()).toEqual([]);
+  });
+
+  it('removeWhere() toggles a refuel order like a harvest (current-vs-pending)', () => {
+    // The refuel variant threads through the same queue logic GameScene.toggleRefuel relies on.
+    const q = new TaskQueue();
+    q.append(refuel('c1')); // current
+    q.append(harvest('t1'));
+    q.append(refuel('c2'));
+
+    // Un-queue a PENDING refuel: current untouched.
+    expect(q.removeWhere((a) => a.kind === 'refuel' && a.campfireId === 'c2')).toBe(false);
+    expect(q.all()).toEqual([refuel('c1'), harvest('t1')]);
+
+    // Un-queue the CURRENT refuel: next pending shifts into current.
+    expect(q.removeWhere((a) => a.kind === 'refuel' && a.campfireId === 'c1')).toBe(true);
+    expect(q.current).toEqual(harvest('t1'));
   });
 
   it('removeWhere() with no match leaves the queue and current unchanged', () => {

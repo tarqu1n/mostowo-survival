@@ -230,3 +230,14 @@ every `BUILDABLES` entry with cost/affordability; picking one selects it for pla
 first non-wall buildable, the **campfire** — a base-zone-only light + vision source with continuous
 fuel drain and tap-to-feed refuelling, owned by its own `CampfireManager` per the 013/015 manager
 pattern. Tuned numbers + the full mechanic write-up: [GAME-MECHANICS.md](GAME-MECHANICS.md).
+
+## Campfire fuel-scaled flame/light + queueable refuel (plan 016)
+
+Post-playtest fix pass on the campfire. The flame sprite **and** its light/vision radius now **scale
+with fuel** (a single consistent sprite scaled — the Bonfire_0x sheets aren't a clean intensity ramp),
+so the fire visibly grows as you feed it and shrinks + dims as it burns down. Refuelling is now a
+**queued worker order** (`refuel` Action) — tap the fire and the worker walks over and tends it one
+wood at a time with the yellow queued outline, self-terminating when topped up or out of wood — instead
+of the old instant tap-to-feed. A tap on the fire always resolves to `refuel` (column-hit-tested over
+its whole tile stack), so it can no longer fall through to a move that walks the worker into the
+blocking fire tile. Details: [GAME-MECHANICS.md](GAME-MECHANICS.md).

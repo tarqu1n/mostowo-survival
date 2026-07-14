@@ -1,7 +1,15 @@
 # Campfire — fuel-scaled flame/light + queueable refuel
 
-> Status: planned. Post-playtest fix pass on plan 012's buildable campfire. Advisor-reviewed
-> (2026-07-13). Awaiting execution.
+> Status: executed on branch `plan-016-campfire` (worktree, alongside concurrent sessions), 2026-07-14.
+> Build/typecheck clean, unit 297/297, campfire e2e 8/8 (full e2e green single-worker; 2 known
+> MainMenu-tap parallel-load flakes). Advisor-reviewed (2026-07-13).
+>
+> **Deviation from Step 3 (flame rendering):** the planned sheet-swap across Bonfire_01..08 was
+> abandoned mid-execution — a screenshot showed those sheets are NOT a clean intensity ramp (01/02/04
+> braziers, 06/08 bare flames), so swapping morphed the fire's *structure*. Replaced with **one
+> consistent sprite (Bonfire_07) scaled by `fuelFrac`**; the advisor's objections to scaling were moot
+> given the column-pick + stroked-rect choices already made. Light-radius lerp, refuel-as-order, and
+> the pick fix all landed as planned. See DECISIONS.md 2026-07-14.
 
 ## Summary
 Three playtest issues with the plan-012 campfire, all fixed by one interlocking change:

@@ -1,28 +1,37 @@
 import { test, expect } from '@playwright/test';
-import { startGame, applyScenario, tileToClient, held } from './harness';
+import { startGame, applyScenario, tileToClient, held, state } from './harness';
 
-// Real command-mode tap-to-feed (an input-resolution regression, like gestures.spec.ts — so it drives
-// actual pointer clicks on a live RAF loop rather than the deterministic step() harness). The campfire
-// is bottom-anchored + multi-tile, so its flame renders a tile ABOVE its foot tile; feeding resolves
-// the fire via the forgiving sprite raycast (ScenePicker.campfireAt), NOT a bare worldToTile — so a
-// tap anywhere on the fire feeds it. Guards the bug where tapping the flame fell through to a move
-// order ("walked at it") because only the exact foot tile matched.
-test('a command-mode tap on the campfire flame (above its foot tile) feeds it one wood', async ({
+// Real command-mode tap-to-refuel (an input-resolution regression, like gestures.spec.ts — so it
+// drives actual pointer clicks on a live RAF loop rather than the deterministic step() harness).
+// Plan 016: a tap on a campfire no longer instant-feeds — it QUEUES a refuel worker order (walk
+// adjacent, then tend). The campfire is bottom-anchored + multi-tile, so its flame renders a tile
+// ABOVE its foot tile; ScenePicker column-hit-tests the whole tile stack, so a tap anywhere on the
+// fire resolves to the fire (a `refuel` action), NOT a move. Guards the bug where tapping the flame
+// fell through to a move order and "walked the worker into" the blocking fire tile.
+test('a command-mode tap on the campfire flame queues a refuel and the worker tends it', async ({
   page,
 }) => {
   await startGame(page);
-  await applyScenario(page, { player: [22, 44], campfires: [[22, 40]], inventory: { wood: 5 } });
+  // Fire seeded below full so a refuel has room to feed (a full fire correctly refuses).
+  await applyScenario(page, {
+    player: [22, 44],
+    campfires: [[22, 40]],
+    campfireFuel: 30,
+    inventory: { wood: 5 },
+  });
   await page.waitForTimeout(250); // let the follow-cam settle on the player
 
   const woodBefore = await held(page, 'wood');
-  const flame = await tileToClient(page, 22, 39); // one tile above the foot (40) — the old miss
-  const foot = await tileToClient(page, 22, 40); // the foot tile — always worked
+  const flame = await tileToClient(page, 22, 39); // one tile ABOVE the foot (40) — the old fall-through
 
   await page.mouse.click(flame.x, flame.y);
-  await page.waitForTimeout(120);
-  expect(await held(page, 'wood')).toBe(woodBefore - 1); // the fix: a flame tap now feeds
+  await page.waitForTimeout(3000); // walk the 4 tiles over + tend (one wood/s)
 
-  await page.mouse.click(foot.x, foot.y);
-  await page.waitForTimeout(120);
-  expect(await held(page, 'wood')).toBe(woodBefore - 2); // foot tap still feeds
+  // The flame tap resolved to the fire and tended it: wood was consumed and the fire's fuel rose.
+  expect(await held(page, 'wood')).toBeLessThan(woodBefore);
+  const s = await state(page);
+  expect(s.campfires[0].fuel).toBeGreaterThan(30);
+  // …and the worker never walked ONTO the fire's blocking tile (the "walks in and gets stuck" bug):
+  // it stands adjacent, not on (22,40).
+  expect(s.pcol === 22 && s.prow === 40).toBe(false);
 });

@@ -22,12 +22,27 @@ are defined in [src/data/buildables.ts](../src/data/buildables.ts) (`BuildableDe
 Cost **10 stone + 10 wood**; placeable **base-zone only**; **always burning once built** — drains fuel
 continuously, day and night. Fuel max **120**, burns **1/s** (⇒ a full tank lasts ~120s, short of a
 full day/night cycle — deliberate upkeep pressure), **+30 fuel per wood** fed (⇒ 4 wood refuels an
-empty fire), starts full. Light + vision radius **8 tiles**. Blocks its tile like a wall. **Tap the
-fire to feed 1 wood** (command mode only) — relights/refuels; goes dark at 0 fuel. All numbers are
-`CAMPFIRE_FUEL_MAX`/`CAMPFIRE_FUEL_BURN_PER_SEC`/`CAMPFIRE_FUEL_PER_WOOD` in
-[src/config.ts](../src/config.ts). Owned at runtime by
-[src/scenes/world/CampfireManager.ts](../src/scenes/world/CampfireManager.ts) (sprite, fuel tick,
-tap-to-feed); pure fuel math (`drainFuel`/`feedFuel`/`isLit`) in
+empty fire), starts full. Blocks its tile like a wall. Goes dark at 0 fuel.
+
+**Flame + light scale with fuel (plan 016):** the fire sprite and its light/vision radius both lerp
+with fuel — a full fire is native-size + **8-tile** light; a dying one shrinks to `CAMPFIRE_FLAME_MIN_FRAC`
+of that size and `CAMPFIRE_LIGHT_MIN_FRAC` of that radius (both in [src/config.ts](../src/config.ts)).
+A single consistent sprite is scaled (Bonfire_07); the Bonfire_0x sheets aren't a clean intensity ramp
+to swap across, so scaling reads better than a per-level swap.
+
+**Refuel is a queued worker order (plan 016), not an instant tap:** tapping the fire (command mode)
+enqueues a `refuel` order — the worker walks adjacent, then feeds **1 wood every
+`CAMPFIRE_FEED_INTERVAL_MS`** (tending, like chop/mine), showing the yellow queued outline; re-tapping
+toggles it off. It self-terminates when a full wood no longer fits (topped up) or the bag runs dry.
+Because a tap on the fire always resolves to `refuel` (never a move), it can't walk the worker into the
+blocking fire tile.
+
+All numbers are `CAMPFIRE_FUEL_MAX`/`_BURN_PER_SEC`/`_PER_WOOD`/`_FEED_INTERVAL_MS`/`_LIGHT_MIN_FRAC`/
+`_FLAME_MIN_FRAC` in [src/config.ts](../src/config.ts). Owned at runtime by
+[src/scenes/world/CampfireManager.ts](../src/scenes/world/CampfireManager.ts) (sprite scale, fuel tick,
+`feedOne`); the `refuel` executor + tap→action resolution are in
+[src/scenes/GameScene.ts](../src/scenes/GameScene.ts) / [ScenePicker](../src/scenes/input/ScenePicker.ts);
+pure fuel math (`drainFuel`/`feedFuel`/`isLit`/`fuelFrac`) in
 [src/systems/campfire.ts](../src/systems/campfire.ts).
 
 ## Base zone

@@ -10,7 +10,10 @@ import { defineConfig, devices } from '@playwright/test';
  * '/mostowo-survival/'), so the baseURL is the dev root. The container ships a pre-installed
  * Chromium; honour SMOKE_CHROMIUM_PATH (same env the boot canary uses) for its executable.
  */
-const PORT = 5174;
+// Overridable via E2E_PORT so a git worktree can run its e2e on its own dev server, in parallel with
+// another checkout's server (the default 5174), instead of Playwright reusing whichever server is
+// already on the port and testing the wrong code. Defaults to 5174 for normal single-checkout runs.
+const PORT = Number(process.env.E2E_PORT) || 5174;
 const chromiumPath = process.env.SMOKE_CHROMIUM_PATH;
 
 export default defineConfig({

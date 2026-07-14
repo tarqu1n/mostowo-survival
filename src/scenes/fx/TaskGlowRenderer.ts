@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
-import { COLORS } from '../../config';
+import { COLORS, TILE_SIZE } from '../../config';
 import { tileToWorldCenter } from '../../systems/grid';
 import { bakeGlowTexture } from '../../render/glowTexture';
+import { BUILDABLES } from '../../data/buildables';
 import type { Action } from '../../systems/tasks';
-import type { TreeNode, BuildSite } from '../../entities/types';
+import type { TreeNode, BuildSite, CampfireUnit } from '../../entities/types';
 import type { ResourceNodeDef } from '../../data/types';
 import type { GameScene } from '../GameScene';
 
@@ -25,6 +26,8 @@ export interface TaskGlowRendererDeps {
   allSites(): readonly BuildSite[];
   /** Look up a build site by id. */
   siteById(id: string): BuildSite | undefined;
+  /** Look up a built campfire by id (undefined once gone) — for the queued-refuel outline. */
+  campfireById(id: string): CampfireUnit | undefined;
   /** Base display scale for a node's sprite (see GameScene.nodeScale) — the glow halo's radius is
    *  converted to source texels through this, so it reads the same regardless of source resolution. */
   nodeScale(sprite: Phaser.GameObjects.Image, def: ResourceNodeDef): number;
@@ -70,6 +73,9 @@ export class TaskGlowRenderer {
       } else if (a.kind === 'build') {
         const site = this.deps.siteById(a.siteId);
         if (site && !site.done) site.rect.setStrokeStyle(2, COLORS.queued, 1);
+      } else if (a.kind === 'refuel') {
+        const c = this.deps.campfireById(a.campfireId);
+        if (c) this.outlineCampfire(c);
       } else {
         this.queueMarkers.push(
           this.scene.add
@@ -122,6 +128,30 @@ export class TaskGlowRenderer {
         ease: 'Sine.InOut',
       });
     }
+  }
+
+  /**
+   * Outline a queued-for-refuel campfire: a yellow stroked rect over its whole `tilesTall` tile column
+   * (bottom-anchored, so the column rises from the foot tile). Deliberately a stroked rect, NOT a baked
+   * silhouette halo like {@link addTreeGlow}: bakeGlowTexture reads the sprite's *source image*, which
+   * for the fire is the full multi-frame sheet (a 4-tile-wide smear), and the fire animates / flares /
+   * swaps textures by fuel — three sync problems a static tree halo never has. The rect matches the
+   * queued-*site* stroke style and is pushed into `queueMarkers` so {@link reset} tears it down.
+   */
+  outlineCampfire(c: CampfireUnit): void {
+    const tilesTall = BUILDABLES.campfire.tilesTall ?? 1;
+    const box = this.scene.add
+      .rectangle(
+        tileToWorldCenter(c.col),
+        tileToWorldCenter(c.row) - (TILE_SIZE * (tilesTall - 1)) / 2, // centre over the tile column
+        TILE_SIZE,
+        TILE_SIZE * tilesTall,
+        COLORS.queued,
+        0, // no fill — outline only
+      )
+      .setStrokeStyle(2, COLORS.queued, 1)
+      .setDepth(4);
+    this.queueMarkers.push(box);
   }
 
   /**
