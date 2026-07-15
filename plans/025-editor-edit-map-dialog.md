@@ -1,6 +1,6 @@
 # Editor: Edit Map Dialog (Rename + Resize)
 
-> Status: in review
+> Status: deployed
 
 ## Summary
 
