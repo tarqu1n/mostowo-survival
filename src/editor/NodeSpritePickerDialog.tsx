@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { DecorRegion } from '../systems/mapFormat';
 import { tilesetAssetUrl } from './textureLoading';
-import type { AssetCatalog, CatalogAsset, CatalogRegion } from './catalog';
+import { regionKey, type AssetCatalog, type CatalogAsset, type CatalogRegion } from './catalog';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
@@ -181,7 +181,7 @@ function RegionStep({
         >
           {(asset.regions ?? []).map((region) => (
             <button
-              key={region.key}
+              key={regionKey(region)}
               type="button"
               className={cn(
                 'absolute m-0 rounded-[2px] border p-0',

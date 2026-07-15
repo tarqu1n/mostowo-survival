@@ -14,10 +14,13 @@ in `pack.json` (plan 014 step 7c, `is_object_sheet()` below) forces this classif
 mirrors `scripts/asset-catalog.mjs`'s `type = override.type ?? ruleType` — so a `-Sheet.png` forced
 to `object` DOES get a detection pass and a `.png` forced to `strip`/`tile` is EXCLUDED from one.
 
-Region `key = "${x}_${y}"` — the box's top-left corner, NOT its detection order/index. Detection
-order can shift run-to-run (tie-breaking on ambiguous pixels), but a sprite's pixel position only
-changes when someone actually edits the sheet — so coordinate-derived keys stay stable across
-regens, which is what lets a map author's `DecorObject.region` reference survive a re-run.
+Region `key = "${x}_${y}_${w}_${h}"` — the full box rect, NOT its detection order/index. Top-left
+alone (`"${x}_${y}"`) is NOT unique: two distinct sprites can share a corner (nested/overlapping
+boxes), so `w`/`h` are needed to keep the key collision-free (see also `catalog.ts`'s `regionKey`).
+Detection order can shift run-to-run (tie-breaking on ambiguous pixels), but a sprite's rect only
+changes when someone actually edits the sheet — so rect-derived keys stay stable across regens. (A
+map author's `DecorObject.region` reference survives a re-run via the stored `{x,y,w,h}` rect itself,
+not this `key` field, which is catalog display metadata only.)
 
 Per-sheet escape hatches live in `pack.json` (read here, applied per-relpath):
   - `regionParams`: `{ "<relPath>": { alphaThresh, gap, minArea } }` — tunes `components()`'s
@@ -120,7 +123,7 @@ def boxes_to_regions(boxes):
     """`components()` boxes are `(x0, y0, x1, y1)` with `x1`/`y1` EXCLUSIVE — convert to the sidecar's
     `{key, x, y, w, h}` shape and sort by (y, x) so output order never depends on detection order."""
     regions = [
-        {"key": f"{x0}_{y0}", "x": x0, "y": y0, "w": x1 - x0, "h": y1 - y0}
+        {"key": f"{x0}_{y0}_{x1 - x0}_{y1 - y0}", "x": x0, "y": y0, "w": x1 - x0, "h": y1 - y0}
         for (x0, y0, x1, y1) in boxes
     ]
     regions.sort(key=lambda r: (r["y"], r["x"]))
@@ -165,7 +168,13 @@ def process_pack(pack_dir):
             params = {**DEFAULT_PARAMS, **region_param_overrides.get(rel, {})}
             regions = sorted(
                 (
-                    {"key": f"{r['x']}_{r['y']}", "x": r["x"], "y": r["y"], "w": r["w"], "h": r["h"]}
+                    {
+                        "key": f"{r['x']}_{r['y']}_{r['w']}_{r['h']}",
+                        "x": r["x"],
+                        "y": r["y"],
+                        "w": r["w"],
+                        "h": r["h"],
+                    }
                     for r in region_overrides[rel]
                 ),
                 key=lambda r: (r["y"], r["x"]),

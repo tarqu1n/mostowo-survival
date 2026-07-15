@@ -21,14 +21,24 @@ export interface CatalogPack {
 export type CatalogAssetType = 'tile' | 'strip' | 'object';
 
 /** One detected sprite bounding box within an `object` atlas's sheet (plan 014 step 7a). `key` is
- *  coordinate-derived (`"${x}_${y}"`, see `scripts/pixel-crawler/gen_regions.py`), stable across
- *  regens unless the sprite actually moves. */
+ *  rect-derived (`"${x}_${y}_${w}_${h}"`, see `scripts/pixel-crawler/gen_regions.py`), stable across
+ *  regens unless the sprite actually moves/resizes. Prefer `regionKey()` below for a list/React key:
+ *  it recomputes from the rect, so it stays collision-free even against catalog data still carrying
+ *  the old top-left-only `key` before a regen. */
 export interface CatalogRegion {
   key: string;
   x: number;
   y: number;
   w: number;
   h: number;
+}
+
+/** Unique list/React key for a region: the full rect, NOT just the `key` field. Two distinct sprites
+ *  can share a top-left corner (nested/overlapping boxes), so `key` alone (`"${x}_${y}"`) can collide
+ *  — deriving from `x/y/w/h` here is collision-proof regardless of how stale the catalog's `key` is
+ *  (see `scripts/pixel-crawler/gen_regions.py`). */
+export function regionKey(r: { x: number; y: number; w: number; h: number }): string {
+  return `${r.x}_${r.y}_${r.w}_${r.h}`;
 }
 
 export interface CatalogAsset {

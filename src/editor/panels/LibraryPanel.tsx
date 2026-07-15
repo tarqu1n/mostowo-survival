@@ -18,6 +18,7 @@ import { colorToHex, resolveSkinPreviewUrl } from '../nodeTypesUi';
 import type { TerrainDef } from '../terrainCatalog';
 import {
   catalogTileCols,
+  regionKey,
   type AssetCatalog,
   type CatalogAsset,
   type CatalogRegion,
@@ -1041,7 +1042,7 @@ function AtlasSheetPicker({
               armedRegion.h === region.h;
             return (
               <button
-                key={region.key}
+                key={regionKey(region)}
                 className={cn(
                   'absolute m-0 rounded-[2px] border p-0',
                   isArmed
