@@ -3,8 +3,10 @@ import { TILE_SIZE, COLORS } from '../../config';
 import { breadcrumb } from '../../debug/crashReporter';
 import { NODES } from '../../data/nodes';
 import type { ResourceNodeDef } from '../../data/types';
+import type { ParsedNodeDef, NormalizedNodeSkinDef } from '../../systems/nodeDefs';
 import { tileToWorldCenter } from '../../systems/grid';
-import { ACTIVE_TILESET, resolveTile } from '../../data/tileset';
+import { parseAssetId } from '../../render/assetPaths';
+import { resolveDecorDraw } from '../../render/decorSprites';
 import type { TreeNode } from '../../entities/types';
 import type { NodeObject } from '../../systems/mapFormat';
 import type { GameScene } from '../GameScene';
@@ -87,20 +89,29 @@ export class ResourceNodeManager {
         }
         continue;
       }
-      this.addNode(def, obj.col, obj.row);
+      this.addNode(def, obj.col, obj.row, obj.skin);
     }
   }
 
-  /** Spawn one resource node of `def` (tree, rock, …) at a tile; sized/anchored from its own data. */
-  addNode(def: ResourceNodeDef, col: number, row: number): void {
-    const { key, frame } = resolveTile(ACTIVE_TILESET.tiles[def.tile]);
+  /**
+   * Spawn one resource node of `def` (tree, rock, …) at a tile; sized/anchored + textured from the
+   * chosen skin (plan 021 step 5). `skinId` picks which of `def.skins` to render (given id → that
+   * skin; absent/unknown → `def.skins[0]`, so legacy maps with no authored `skin` still render).
+   */
+  addNode(def: ParsedNodeDef, col: number, row: number, skinId?: string): void {
+    const skin = this.resolveSkin(def, skinId);
+    // Seed `add.image` with the skin's own (preloaded) texture — `applySkinAppearance` below then
+    // sizes/anchors it. Falls back to Phaser's always-present `__WHITE` if the asset can't be
+    // resolved (a content error the world-integrity test + editor validation catch upstream) so a
+    // broken ref degrades to a blank marker instead of hard-crashing the boot.
+    const seed = this.resolveSkinTexture(skin.asset, skin.region);
     const sprite = this.scene.add
-      .image(tileToWorldCenter(col), tileToWorldCenter(row), key, frame)
+      .image(tileToWorldCenter(col), tileToWorldCenter(row), seed?.key ?? '__WHITE', seed?.frame)
       .setDepth(1);
-    // Each species sizes/anchors itself from its def (critique #2): a pine scales to ~2.6 tiles and
-    // anchors near its base so the canopy overhangs up; a rock is ~1 tile, centred. sprite.x/y stay
-    // the tile centre, so treeAt()'s distance check is unaffected regardless of scale/origin.
-    sprite.setScale(this.nodeScale(sprite, def)).setOrigin(def.originX, def.originY);
+    // Each species sizes/anchors itself from its def/skin (critique #2): a pine scales to ~2.6 tiles
+    // and anchors near its base so the canopy overhangs up; a rock is ~1 tile, centred. sprite.x/y
+    // stay the tile centre, so treeAt()'s distance check is unaffected regardless of scale/origin.
+    this.applySkinAppearance(sprite, def, skin, 'live');
     this.trees.push({
       id: `${def.id}-${this.nextTreeId++}`,
       sprite,
@@ -109,12 +120,77 @@ export class ResourceNodeManager {
       alive: true,
       col,
       row,
+      skin: skin.id,
     });
   }
 
-  /** Base display scale for a node image (derived from its source height + the def's `tilesTall`). */
-  nodeScale(sprite: Phaser.GameObjects.Image, def: ResourceNodeDef): number {
-    return (TILE_SIZE * def.tilesTall) / sprite.frame.height;
+  /** Resolve a node's skin: the one matching `skinId`, else the def's first skin (the "default"). */
+  private resolveSkin(def: ParsedNodeDef, skinId?: string): NormalizedNodeSkinDef {
+    return (
+      (skinId !== undefined ? def.skins.find((s) => s.id === skinId) : undefined) ?? def.skins[0]
+    );
+  }
+
+  /**
+   * Point `sprite` at the skin's live (or, `variant === 'depleted'`, its stump) texture and size/anchor
+   * it. The `depleted` sub-shape carries only `asset`/`region`, so a stump reuses the skin's/def's
+   * sizing (`tilesTall`/`originX`/`originY`). If the catalog asset isn't resident (a content error —
+   * PreloadScene loads every referenced skin's textures), the texture is left unchanged and a DEV
+   * warning is logged, rather than hard-failing.
+   */
+  private applySkinAppearance(
+    sprite: Phaser.GameObjects.Image,
+    def: ParsedNodeDef,
+    skin: NormalizedNodeSkinDef,
+    variant: 'live' | 'depleted',
+  ): void {
+    const src = variant === 'depleted' && skin.depleted ? skin.depleted : skin;
+    const tex = this.resolveSkinTexture(src.asset, src.region);
+    if (tex) {
+      if (tex.frame !== undefined) sprite.setTexture(tex.key, tex.frame);
+      else sprite.setTexture(tex.key);
+    } else if (import.meta.env.DEV) {
+      console.warn(
+        `[ResourceNodeManager] node "${def.id}" skin "${skin.id}" asset "${src.asset}" is not ` +
+          `resident — sprite left as-is. Check the skin's catalog id + PreloadScene enumeration.`,
+      );
+    }
+    sprite
+      .setScale(this.nodeScale(sprite, def, skin))
+      .setOrigin(skin.originX ?? def.originX, skin.originY ?? def.originY);
+  }
+
+  /** Resolve a skin asset (+ optional region crop) to a resident Phaser texture key/frame via the
+   *  shared decor resolver, or `null` if the texture isn't loaded / the id is malformed. */
+  private resolveSkinTexture(
+    asset: string,
+    region: NormalizedNodeSkinDef['region'],
+  ): { key: string; frame?: string | number } | null {
+    let path: string;
+    try {
+      ({ path } = parseAssetId(asset));
+    } catch {
+      return null; // malformed asset id — skins are validated at authoring time; skip defensively
+    }
+    const draw = resolveDecorDraw(
+      this.scene,
+      { id: 'node', asset, ...(region ? { region } : {}) },
+      path,
+    );
+    if (!draw) return null; // texture not resident
+    if (draw.kind === 'region') return { key: draw.key, frame: draw.frame };
+    return { key: draw.key }; // 'whole' (skins never carry an anim)
+  }
+
+  /** Base display scale for a node image (derived from its source height + the skin's `tilesTall`
+   *  override, falling back to the def's `tilesTall`). `skin` omitted ⇒ def default (the shared glow
+   *  seam calls it that way — see `TaskGlowRenderer`). */
+  nodeScale(
+    sprite: Phaser.GameObjects.Image,
+    def: ResourceNodeDef,
+    skin?: { tilesTall?: number },
+  ): number {
+    return (TILE_SIZE * (skin?.tilesTall ?? def.tilesTall)) / sprite.frame.height;
   }
 
   // --- Queries -------------------------------------------------------------------
@@ -153,14 +229,20 @@ export class ResourceNodeManager {
     // Bump relative to the node's fitted base scale (not an absolute 1 — the pine is scaled down).
     // Animate only the node — its queued glow halo mirrors this (and any future sway/fall) each frame
     // via syncGlowTransforms(), so animations never have to drive the glow themselves.
-    const base = this.nodeScale(tree.sprite, tree.def);
+    const skin = this.resolveSkin(tree.def, tree.skin);
+    const base = this.nodeScale(tree.sprite, tree.def, skin);
     this.scene.tweens.add({ targets: tree.sprite, scale: base * 1.18, duration: 80, yoyo: true });
     if (tree.hp <= 0) {
       tree.alive = false;
       breadcrumb('node', `deplete ${tree.def.id} ${tree.id}`, { regrowMs: tree.def.regrowMs });
-      // No dedicated depleted sprite in the pack yet (see docs/ASSETS.md) — tint the felled node to
-      // its stumpColor as a stand-in "stump"/rubble state rather than a mismatched placeholder rect.
-      tree.sprite.setScale(base).setTint(tree.def.stumpColor);
+      if (skin.depleted) {
+        // This skin carries a matching stump sprite — swap to it (own texture, skin/def sizing).
+        this.applySkinAppearance(tree.sprite, tree.def, skin, 'depleted');
+      } else {
+        // No depleted sprite for this skin — tint the felled node to its stumpColor as a stand-in
+        // "stump"/rubble state rather than a mismatched placeholder (today's fallback, preserved).
+        tree.sprite.setScale(base).setTint(tree.def.stumpColor);
+      }
       this.scene.time.delayedCall(tree.def.regrowMs, () => {
         // A delayedCall scheduled here survives clearAll() (which destroys sprites but leaves the
         // scene clock running), so guard against a sprite destroyed during the regrow window — the
@@ -168,6 +250,8 @@ export class ResourceNodeManager {
         breadcrumb('node', `regrow ${tree.def.id} ${tree.id}`, { spriteAlive: tree.sprite.active });
         tree.hp = tree.def.maxHp;
         tree.alive = true;
+        // Restore the live sprite (undoes either the depleted-texture swap or the stumpColor tint).
+        this.applySkinAppearance(tree.sprite, tree.def, skin, 'live');
         tree.sprite.clearTint();
         this.deps.repath(); // regrown tree may now block the active route
       });

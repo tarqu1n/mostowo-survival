@@ -132,9 +132,6 @@ export interface TilesetManifest {
      */
     ground: Array<{ source: TileSource; weight: number }>;
     wall: TileSource;
-    tree: TileSource;
-    rock: TileSource;
-    bush: TileSource;
   };
   actors: {
     /**
@@ -216,9 +213,10 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
       }, // grass (3,10)
     ],
     wall: { kind: 'sheetFrame', sheet: 'Environment/Tilesets/Wall_Tiles.png', frame: 83 }, // grey stone fill (8,3)
-    tree: { kind: 'image', path: '_derived/tree_pine.png' }, // extracted green pine (Model_02/Size_03 idx 3)
-    rock: { kind: 'image', path: '_derived/rock.png' }, // extracted grey boulder (Rocks.png idx 5)
-    bush: { kind: 'image', path: '_derived/bush.png' }, // placeholder berry bush (scripts/placeholder-art.mjs; real art = plan 009)
+    // Node sprites (tree/rock/bush) are NO LONGER manifest roles (plan 021 step 6) — every node def
+    // now names its own catalog asset per skin (see src/data/maps/nodes.json), resolved via the
+    // shared decor/catalog render path. The `_derived/*.png` sprites still exist; they're referenced
+    // as catalog assets (`pixel-crawler/_derived/{tree_pine,rock,bush}.png`), not fixed roles here.
   },
   actors: {
     player: {

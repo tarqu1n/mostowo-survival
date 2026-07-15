@@ -51,10 +51,21 @@ import {
   type ZoneDef,
 } from '../../systems/mapFormat';
 import type { TileSource } from '../../data/tileset';
+import { pickWeighted } from '../../data/tileset';
 import type { Dims } from '../../systems/autotile';
 import type { MapPlacement, WorldLayout } from '../../systems/worldLayout';
 import { GROUND_CHUNK_ROWS, TILE_SIZE } from '../../config';
 import { toast } from 'sonner';
+import { NODES } from '../../data/nodes';
+import nodesJson from '../../data/maps/nodes.json';
+import {
+  parseNodeDefs,
+  type AuthoredNodeDef,
+  type NodeDefsFile,
+  type NodeSkinDef,
+  type ParsedNodeDef,
+} from '../../systems/nodeDefs';
+import { ITEMS } from '../../data/items';
 import { getMapReferenceSidecar, mapReferenceImageUrl } from '../api';
 import { computeAutoAlign, parseSidecar, type AutoAlign } from '../underlayAlign';
 import {
@@ -82,13 +93,15 @@ import { defaultZoneColour, nextFreeZoneId } from '../zoneOps';
 import { computeTerrainBake } from '../terrainOps';
 import { HistoryStack, type Command } from './history';
 
-/** A central-pane tab (plan 017 step 1). `map`/`world` are the two permanent, non-closable tabs; an
- *  `object` tab is opened on demand from the Library's ⚙ (one per asset) and can be closed. The id is
- *  deterministic — `map` / `world` / `object:<assetId>` — so `openObjectTab` dedupes with a plain
- *  `find` and no separate lookup table is needed. */
+/** A central-pane tab (plan 017 step 1, extended plan 021 step 8). `map`/`world`/`nodeTypes` are the
+ *  three permanent, non-closable tabs; an `object` tab is opened on demand from the Library's ⚙ (one
+ *  per asset) and can be closed. The id is deterministic — `map` / `world` / `nodeTypes` /
+ *  `object:<assetId>` — so `openObjectTab` dedupes with a plain `find` and no separate lookup table is
+ *  needed. */
 export type EditorTab =
   | { id: 'map'; kind: 'map' }
   | { id: 'world'; kind: 'world' }
+  | { id: 'nodeTypes'; kind: 'nodeTypes' }
   | { id: string; kind: 'object'; assetId: string };
 
 export type EditorTool =
@@ -208,6 +221,24 @@ export interface EditorState {
    *  fetch (`loadTerrainCatalog`) lands. The terrain brush (armed via `activeTerrainId`) and the
    *  pre-save full rebake both read this to resolve a terrain id to its sheet + blob mapping. */
   terrainCatalog: TerrainCatalog | null;
+  /** Authored node-def registry (plan 021 step 7) — the editable RAW list (`AuthoredNodeDef[]`, same
+   *  shape as `nodes.json`'s `defs`), NOT the parsed `ResourceNodeDef`-shaped map (see
+   *  `nodeDefsParsed`). Seeded synchronously from the bundled `src/data/maps/nodes.json` (mirrors
+   *  `src/data/nodes.ts`'s boot-time `NODES`) so the palette/placement never see an empty registry
+   *  before `loadNodeDefs()` (`nodeDefsSource.ts`, called from the Library panel's mount effect
+   *  alongside `loadCatalog`/`loadTerrainCatalog`) resolves the live `GET /__editor/nodes` fetch. */
+  nodeDefs: AuthoredNodeDef[];
+  /** `parseNodeDefs({version:1, defs: nodeDefs})`, recomputed by every commit (`tryParseNodeDefs`) so
+   *  it's always in lockstep with `nodeDefs`. This is what the palette (`LibraryPanel`) and placement
+   *  (`EditorScene`) read INSTEAD of the boot-time `NODES` import, so a newly authored/edited def
+   *  appears without a reload (plan 021 step 7's "palette + placement read the live store" side
+   *  effect). */
+  nodeDefsParsed: Record<string, ParsedNodeDef>;
+  /** Unsaved node-def changes — this registry's own dirty flag, independent of the per-map `dirty`
+   *  and world's `worldDirty` (`nodes.json` is a third, separate file with its own save action). */
+  nodeDefsDirty: boolean;
+  /** Bumps on every node-def mutation — a React re-render trigger, mirrors `worldRevision`. */
+  nodeDefsRevision: number;
   /** A `TerrainDef.id` armed for the `terrain` tool (step 10) — mirrors `activeZoneId`'s role for the
    *  `zone` tool. `null` ⇒ the terrain tool is disarmed (painting/erasing both no-op with a warning). */
   activeTerrainId: string | null;
@@ -337,6 +368,15 @@ export interface EditorState {
   setCatalog(catalog: EditorCatalog): void;
   setTerrainCatalog(catalog: TerrainCatalog | null): void;
   setActiveTerrainId(id: string | null): void;
+  /** Installs a freshly-loaded node-def registry (`GET /__editor/nodes` result) — mirrors `setWorld`:
+   *  no history entry, resets `nodeDefsDirty` to `false`, bumps `nodeDefsRevision`. Re-validates via
+   *  `parseNodeDefs` regardless (the single choke point every node-def path commits through — see
+   *  `tryParseNodeDefs`); on a corrupt/invalid file this toasts and leaves whatever registry was
+   *  already loaded (the bundled seed, or a prior good load) in place rather than clobbering the
+   *  store with bad data. */
+  setNodeDefs(defs: AuthoredNodeDef[]): void;
+  /** Marks the node-def registry clean after a successful `putNodes`. */
+  markNodeDefsSaved(): void;
   markSaved(): void;
   applyCommand(cmd: Command): void;
   /** Applies a world-layout command through the SAME history stack as `applyCommand`, stamping
@@ -362,6 +402,51 @@ export interface EditorState {
   /** Removes `mapId`'s placement (returns it to the unplaced tray). No-op (returns `false`) if it
    *  isn't placed. One undoable command tagged `domain:'world'`. */
   removePlacement(mapId: string): boolean;
+
+  // ---- node defs registry (plan 021 step 7) — create/duplicate/update/delete node TYPES (defs),
+  //      not placed instances (see `placeNode`/`updateNode` for those). Every mutation below builds a
+  //      candidate `nodeDefs` array and runs it through `parseNodeDefs` (`tryParseNodeDefs`) before
+  //      committing — an invalid result toasts the precise reason and leaves the store untouched. NOT
+  //      wired into the history stack (unlike map/world edits): `nodes.json` is its own file with its
+  //      own dirty flag/save action (`nodeDefsDirty`/`putNodes`), not part of the map/world undo
+  //      timeline. ----
+  /** Appends a new def with sensible defaults (a single placeholder skin — replace its asset via
+   *  `updateSkin`/the Node Types panel's picker before placing it for real) and a fresh id (`node`,
+   *  `node_2`, … — scans every existing def id, unlike `nextObjectId`'s `prefix_0001` scheme for
+   *  placed objects). Returns the new id, or `null` (+ toast) if the candidate somehow fails to
+   *  validate (shouldn't happen with these defaults). */
+  createNodeDef(): string | null;
+  /** Deep-copies `id`'s def with a fresh id (`<id>_copy`, `<id>_copy_2`, …) and name (`"<name>
+   *  copy"`), appends it, returns the new id. `null` (+ toast) if `id` doesn't exist or the copy
+   *  somehow fails to validate. */
+  duplicateNodeDef(id: string): string | null;
+  /** Merges `patch` into def `id` (everything but `id`/`skins` — skins go through the dedicated
+   *  sub-actions below) and commits if the result validates. `false` (+ toast) if `id` doesn't exist
+   *  or the patched def is invalid (e.g. `yieldItemId` not in `ITEMS`, non-positive `maxHp`). */
+  updateNodeDef(id: string, patch: Partial<Omit<AuthoredNodeDef, 'id' | 'skins'>>): boolean;
+  /** Removes def `id` — GUARDED: refuses (`false` + toast with the reason) if any placed
+   *  `kind:'node'` object in the CURRENTLY OPEN map still references it (`ref === id`). Known
+   *  limitation: only the open map is scanned (this store only ever holds one open `MapFile` at a
+   *  time — it does not mirror the world-integrity test's eager load of every committed map); a def
+   *  referenced solely by a map that ISN'T currently open can still be deleted here, and would only
+   *  be caught by the world-integrity test on the next full-suite run. `false` (+ toast) if `id`
+   *  doesn't exist. */
+  deleteNodeDef(id: string): boolean;
+  /** Appends a new skin (placeholder asset, weight 1) to def `defId`, returns its fresh id (`skin`,
+   *  `skin_2`, … scoped to that def's own skin ids), or `null` (+ toast) if `defId` doesn't exist. */
+  addSkin(defId: string): string | null;
+  /** Merges `patch` into skin `skinId` of def `defId` and commits if the result validates. `false`
+   *  (+ toast) if the def/skin doesn't exist or the patch is invalid (e.g. non-positive `weight`). */
+  updateSkin(defId: string, skinId: string, patch: Partial<Omit<NodeSkinDef, 'id'>>): boolean;
+  /** Removes skin `skinId` from def `defId` — GUARDED like `deleteNodeDef` (same open-map-only
+   *  limitation: refuses if a placed node in the open map has `ref: defId, skin: skinId`), and
+   *  independently refused by `parseNodeDefs` itself if it would leave the def with zero skins (a def
+   *  always needs at least one — no separate check needed here). */
+  removeSkin(defId: string, skinId: string): boolean;
+  /** Moves skin `skinId` (within def `defId`) to array index `toIndex` (clamped in range) —
+   *  reordering changes which skin is `skins[0]` (the def's "default"). `false` if the def/skin
+   *  doesn't exist. */
+  moveSkin(defId: string, skinId: string, toIndex: number): boolean;
 
   // ---- resize (plan 024 step 2) ----
   /** Resizes the open map by `edges` (tiles; a negative edge crops) as ONE undoable command — see
@@ -540,8 +625,13 @@ export interface EditorState {
    *  void); patches to purely cosmetic fields (scale/rotation/flip/depth) always apply. One undoable
    *  command per call. */
   updateDecor(id: string, patch: Partial<Omit<DecorObject, 'id' | 'kind' | 'asset'>>): boolean;
-  /** Patches a `node` object's `col`/`row` (Inspector fields); footprint-validated. */
-  updateNode(id: string, patch: Partial<Pick<NodeObject, 'col' | 'row'>>): boolean;
+  /** Patches a `node` object's `col`/`row`/`skin` (Inspector fields); footprint-validated. A `skin`
+   *  patch overrides the placement-rolled skin (plan 021 step 9). */
+  updateNode(id: string, patch: Partial<Pick<NodeObject, 'col' | 'row' | 'skin'>>): boolean;
+  /** Advances the selected node's `skin` to the next one in its def's `skins` list (wraps), acting on
+   *  the placement-rolled/overridden skin. Drives the cycle-skin shortcut (plan 021 step 9). No-op
+   *  (returns false) if the node's def has 0/1 skins. One undoable command per call (via `updateNode`). */
+  cycleNodeSkin(id: string): boolean;
   /** Patches a `portal` object's `name`/`facing`/`rect` (Inspector fields); a `rect` patch is
    *  footprint-validated (every cell of the new rect must stay inside). */
   updatePortal(id: string, patch: Partial<Pick<PortalObject, 'name' | 'facing' | 'rect'>>): boolean;
@@ -808,6 +898,77 @@ function reconcileTabs(
   return { tabs: kept, activeTabId: stillActive ? activeTabId : 'map' };
 }
 
+// ---- node defs registry helpers (plan 021 step 7) ----
+
+/** Validates a candidate node-defs array as a whole `NodeDefsFile` (`{version:1, defs: candidate}`)
+ *  via `parseNodeDefs` — the single choke point every node-def mutation (create/duplicate/update/
+ *  delete/skin sub-actions) AND `setNodeDefs`'s initial/reload install commit through. Never throws
+ *  itself; callers toast `error` and leave state untouched on failure. */
+function tryParseNodeDefs(
+  candidate: AuthoredNodeDef[],
+): { ok: true; parsed: Record<string, ParsedNodeDef> } | { ok: false; error: string } {
+  try {
+    return { ok: true, parsed: parseNodeDefs({ version: 1, defs: candidate }) };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** Lowest-numbered free id of the form `base`, `base_2`, `base_3`, … not already present in
+ *  `existing` — node-def ids and per-def skin ids are freeform authored strings (unlike the
+ *  sequential `prefix_0001` scheme `nextObjectId` mints for placed map objects), so a fresh one just
+ *  needs to dodge whatever's already taken. */
+function freshId(existing: Iterable<string>, base: string): string {
+  const used = new Set(existing);
+  if (!used.has(base)) return base;
+  for (let n = 2; ; n++) {
+    const candidate = `${base}_${n}`;
+    if (!used.has(candidate)) return candidate;
+  }
+}
+
+/** Placeholder skin asset id stamped by `createNodeDef`/`addSkin` — passes `parseNodeDefs` (which
+ *  only requires a non-empty string) but isn't a real catalog asset. The Node Types panel (plan 021
+ *  step 8) is expected to replace it via the region/asset picker before the def is placed or saved
+ *  for real use; the world-integrity test (`src/data/maps/__tests__/world.test.ts`) catches an
+ *  unreplaced placeholder landing in a COMMITTED `nodes.json` (it cross-checks every def's skins
+ *  against the asset catalog). */
+export const PLACEHOLDER_SKIN_ASSET = '__unassigned__';
+
+/** Fallback `yieldItemId` for a freshly-created def — the first entry in `ITEMS` (deterministic; and
+ *  always valid — `parseNodeDefs` would refuse the candidate anyway if `ITEMS` were somehow empty). */
+const DEFAULT_YIELD_ITEM_ID = Object.keys(ITEMS)[0] ?? 'wood';
+
+function defaultAuthoredNodeDef(id: string): AuthoredNodeDef {
+  return {
+    id,
+    name: 'New node',
+    maxHp: 10,
+    yieldItemId: DEFAULT_YIELD_ITEM_ID,
+    yieldPerHit: 1,
+    regrowMs: 60_000,
+    blocksPath: true,
+    color: 0xffffff,
+    stumpColor: 0x808080,
+    tilesTall: 1,
+    originX: 0.5,
+    originY: 1,
+    skins: [{ id: 'default', asset: PLACEHOLDER_SKIN_ASSET, weight: 1 }],
+  };
+}
+
+/** True if the CURRENTLY OPEN map places a `kind:'node'` object referencing `defId` (optionally also
+ *  matching a specific `skinId`) — the delete-guard's cross-ref check. See `deleteNodeDef`/
+ *  `removeSkin`'s interface docs for the open-map-only limitation (this store holds one open
+ *  `MapFile` at a time, not every committed map). */
+function openMapReferencesNodeDef(map: MapFile | null, defId: string, skinId?: string): boolean {
+  if (!map) return false;
+  return map.objects.some(
+    (obj) =>
+      obj.kind === 'node' && obj.ref === defId && (skinId === undefined || obj.skin === skinId),
+  );
+}
+
 /** Bundles several `{do,undo}` op pairs into ONE `Command` — `do` runs them in order, `undo` reverses
  *  them in REVERSE order (so a later op's undo, which may assume an earlier op's effect, unwinds
  *  first). Used by the multi-object batch actions (rotate/flip/depth-bump) so selecting N objects and
@@ -873,6 +1034,7 @@ export const useEditorStore = create<EditorState>()(
     tabs: [
       { id: 'map', kind: 'map' },
       { id: 'world', kind: 'world' },
+      { id: 'nodeTypes', kind: 'nodeTypes' },
     ],
     activeTabId: 'map',
     map: null,
@@ -883,6 +1045,14 @@ export const useEditorStore = create<EditorState>()(
     worldDirty: false,
     catalog: null,
     terrainCatalog: null,
+    // Seeded synchronously from the bundled JSON (see `nodeDefs`/`nodeDefsParsed`'s interface docs) —
+    // `NODES` (src/data/nodes.ts) IS `parseNodeDefs(nodesJson)`, reused here directly as the initial
+    // parsed view so it's byte-identical to boot-time NODES until `loadNodeDefs()` overwrites it with
+    // whatever's actually on disk via the editor API.
+    nodeDefs: (nodesJson as NodeDefsFile).defs,
+    nodeDefsParsed: NODES,
+    nodeDefsDirty: false,
+    nodeDefsRevision: 0,
     activeTerrainId: null,
     activeLayerId: null,
     activeTool: 'pan',
@@ -987,7 +1157,7 @@ export const useEditorStore = create<EditorState>()(
       ),
     closeTab: (id) =>
       set((s): Partial<EditorState> => {
-        if (id === 'map' || id === 'world') return {}; // permanent tabs — never closed
+        if (id === 'map' || id === 'world' || id === 'nodeTypes') return {}; // permanent tabs — never closed
         const index = s.tabs.findIndex((t) => t.id === id);
         if (index < 0) return {}; // not open — nothing to remove
         const tabs = s.tabs.filter((t) => t.id !== id);
@@ -1197,6 +1367,20 @@ export const useEditorStore = create<EditorState>()(
       set((s) => ({ catalog, ...reconcileTabs(s.tabs, s.activeTabId, catalog) })),
     setTerrainCatalog: (terrainCatalog) => set({ terrainCatalog }),
     setActiveTerrainId: (activeTerrainId) => set({ activeTerrainId }),
+    setNodeDefs: (defs) => {
+      const result = tryParseNodeDefs(defs);
+      if (!result.ok) {
+        toast.error(`Couldn't load node defs: ${result.error}`);
+        return;
+      }
+      set((s) => ({
+        nodeDefs: defs,
+        nodeDefsParsed: result.parsed,
+        nodeDefsDirty: false,
+        nodeDefsRevision: s.nodeDefsRevision + 1,
+      }));
+    },
+    markNodeDefsSaved: () => set({ nodeDefsDirty: false }),
     markSaved: () => set({ dirty: false }),
 
     applyCommand: (cmd) => {
@@ -1374,6 +1558,238 @@ export const useEditorStore = create<EditorState>()(
       return true;
     },
 
+    // ---- node defs registry (plan 021 step 7) ----
+
+    createNodeDef: () => {
+      const { nodeDefs } = get();
+      const id = freshId(
+        nodeDefs.map((d) => d.id),
+        'node',
+      );
+      const candidate = [...nodeDefs, defaultAuthoredNodeDef(id)];
+      const result = tryParseNodeDefs(candidate);
+      if (!result.ok) {
+        toast.error(`Couldn't create node def: ${result.error}`);
+        return null;
+      }
+      set((s) => ({
+        nodeDefs: candidate,
+        nodeDefsParsed: result.parsed,
+        nodeDefsDirty: true,
+        nodeDefsRevision: s.nodeDefsRevision + 1,
+      }));
+      return id;
+    },
+
+    duplicateNodeDef: (id) => {
+      const { nodeDefs } = get();
+      const source = nodeDefs.find((d) => d.id === id);
+      if (!source) {
+        toast.error(`Can't duplicate — node def "${id}" not found`);
+        return null;
+      }
+      const newId = freshId(
+        nodeDefs.map((d) => d.id),
+        `${id}_copy`,
+      );
+      // Deep-copy via JSON round-trip (mirrors `serializeMap`'s posture elsewhere) — `AuthoredNodeDef`
+      // is plain JSON-shaped data, no functions/Dates/etc to worry about losing.
+      const cloned = JSON.parse(JSON.stringify(source)) as AuthoredNodeDef;
+      const copy: AuthoredNodeDef = { ...cloned, id: newId, name: `${source.name} copy` };
+      const candidate = [...nodeDefs, copy];
+      const result = tryParseNodeDefs(candidate);
+      if (!result.ok) {
+        toast.error(`Couldn't duplicate node def: ${result.error}`);
+        return null;
+      }
+      set((s) => ({
+        nodeDefs: candidate,
+        nodeDefsParsed: result.parsed,
+        nodeDefsDirty: true,
+        nodeDefsRevision: s.nodeDefsRevision + 1,
+      }));
+      return newId;
+    },
+
+    updateNodeDef: (id, patch) => {
+      const { nodeDefs } = get();
+      const index = nodeDefs.findIndex((d) => d.id === id);
+      if (index < 0) {
+        toast.error(`Can't update — node def "${id}" not found`);
+        return false;
+      }
+      const candidate = nodeDefs.slice();
+      candidate[index] = { ...candidate[index], ...patch, id, skins: candidate[index].skins };
+      const result = tryParseNodeDefs(candidate);
+      if (!result.ok) {
+        toast.error(`Invalid node def: ${result.error}`);
+        return false;
+      }
+      set((s) => ({
+        nodeDefs: candidate,
+        nodeDefsParsed: result.parsed,
+        nodeDefsDirty: true,
+        nodeDefsRevision: s.nodeDefsRevision + 1,
+      }));
+      return true;
+    },
+
+    deleteNodeDef: (id) => {
+      const { nodeDefs, map } = get();
+      const index = nodeDefs.findIndex((d) => d.id === id);
+      if (index < 0) {
+        toast.error(`Can't delete — node def "${id}" not found`);
+        return false;
+      }
+      if (openMapReferencesNodeDef(map, id)) {
+        toast.error(`Can't delete "${id}" — it's still placed in the open map`);
+        return false;
+      }
+      const candidate = nodeDefs.slice();
+      candidate.splice(index, 1);
+      const result = tryParseNodeDefs(candidate);
+      if (!result.ok) {
+        toast.error(`Couldn't delete node def: ${result.error}`);
+        return false;
+      }
+      set((s) => ({
+        nodeDefs: candidate,
+        nodeDefsParsed: result.parsed,
+        nodeDefsDirty: true,
+        nodeDefsRevision: s.nodeDefsRevision + 1,
+      }));
+      return true;
+    },
+
+    addSkin: (defId) => {
+      const { nodeDefs } = get();
+      const defIndex = nodeDefs.findIndex((d) => d.id === defId);
+      if (defIndex < 0) {
+        toast.error(`Can't add skin — node def "${defId}" not found`);
+        return null;
+      }
+      const def = nodeDefs[defIndex];
+      const skinId = freshId(
+        def.skins.map((s) => s.id),
+        'skin',
+      );
+      const newSkin: NodeSkinDef = { id: skinId, asset: PLACEHOLDER_SKIN_ASSET, weight: 1 };
+      const candidate = nodeDefs.slice();
+      candidate[defIndex] = { ...def, skins: [...def.skins, newSkin] };
+      const result = tryParseNodeDefs(candidate);
+      if (!result.ok) {
+        toast.error(`Couldn't add skin: ${result.error}`);
+        return null;
+      }
+      set((s) => ({
+        nodeDefs: candidate,
+        nodeDefsParsed: result.parsed,
+        nodeDefsDirty: true,
+        nodeDefsRevision: s.nodeDefsRevision + 1,
+      }));
+      return skinId;
+    },
+
+    updateSkin: (defId, skinId, patch) => {
+      const { nodeDefs } = get();
+      const defIndex = nodeDefs.findIndex((d) => d.id === defId);
+      if (defIndex < 0) {
+        toast.error(`Can't update skin — node def "${defId}" not found`);
+        return false;
+      }
+      const def = nodeDefs[defIndex];
+      const skinIndex = def.skins.findIndex((s) => s.id === skinId);
+      if (skinIndex < 0) {
+        toast.error(`Can't update skin — "${skinId}" not found on def "${defId}"`);
+        return false;
+      }
+      const skins = def.skins.slice();
+      skins[skinIndex] = { ...skins[skinIndex], ...patch, id: skinId };
+      const candidate = nodeDefs.slice();
+      candidate[defIndex] = { ...def, skins };
+      const result = tryParseNodeDefs(candidate);
+      if (!result.ok) {
+        toast.error(`Invalid skin: ${result.error}`);
+        return false;
+      }
+      set((s) => ({
+        nodeDefs: candidate,
+        nodeDefsParsed: result.parsed,
+        nodeDefsDirty: true,
+        nodeDefsRevision: s.nodeDefsRevision + 1,
+      }));
+      return true;
+    },
+
+    removeSkin: (defId, skinId) => {
+      const { nodeDefs, map } = get();
+      const defIndex = nodeDefs.findIndex((d) => d.id === defId);
+      if (defIndex < 0) {
+        toast.error(`Can't remove skin — node def "${defId}" not found`);
+        return false;
+      }
+      const def = nodeDefs[defIndex];
+      const skinIndex = def.skins.findIndex((s) => s.id === skinId);
+      if (skinIndex < 0) {
+        toast.error(`Can't remove skin — "${skinId}" not found on def "${defId}"`);
+        return false;
+      }
+      if (openMapReferencesNodeDef(map, defId, skinId)) {
+        toast.error(`Can't remove skin "${skinId}" — it's still placed on a node in the open map`);
+        return false;
+      }
+      const skins = def.skins.slice();
+      skins.splice(skinIndex, 1);
+      const candidate = nodeDefs.slice();
+      candidate[defIndex] = { ...def, skins };
+      // parseNodeDefs itself refuses an empty `skins` array — no separate "last skin" check needed.
+      const result = tryParseNodeDefs(candidate);
+      if (!result.ok) {
+        toast.error(`Couldn't remove skin: ${result.error}`);
+        return false;
+      }
+      set((s) => ({
+        nodeDefs: candidate,
+        nodeDefsParsed: result.parsed,
+        nodeDefsDirty: true,
+        nodeDefsRevision: s.nodeDefsRevision + 1,
+      }));
+      return true;
+    },
+
+    moveSkin: (defId, skinId, toIndex) => {
+      const { nodeDefs } = get();
+      const defIndex = nodeDefs.findIndex((d) => d.id === defId);
+      if (defIndex < 0) {
+        toast.error(`Can't reorder skins — node def "${defId}" not found`);
+        return false;
+      }
+      const def = nodeDefs[defIndex];
+      const skinIndex = def.skins.findIndex((s) => s.id === skinId);
+      if (skinIndex < 0) {
+        toast.error(`Can't reorder skins — "${skinId}" not found on def "${defId}"`);
+        return false;
+      }
+      const skins = def.skins.slice();
+      const [moved] = skins.splice(skinIndex, 1);
+      const clampedIndex = Math.max(0, Math.min(toIndex, skins.length));
+      skins.splice(clampedIndex, 0, moved);
+      const candidate = nodeDefs.slice();
+      candidate[defIndex] = { ...def, skins };
+      const result = tryParseNodeDefs(candidate);
+      if (!result.ok) {
+        toast.error(`Couldn't reorder skins: ${result.error}`);
+        return false;
+      }
+      set((s) => ({
+        nodeDefs: candidate,
+        nodeDefsParsed: result.parsed,
+        nodeDefsDirty: true,
+        nodeDefsRevision: s.nodeDefsRevision + 1,
+      }));
+      return true;
+    },
+
     // ---- resize (plan 024 step 2) ----
 
     resizeMap: (edges) => {
@@ -1430,7 +1846,9 @@ export const useEditorStore = create<EditorState>()(
       // World coupling: only a top/left edit moves the origin, and only if this map is placed.
       const placement =
         dLeft !== 0 || dTop !== 0 ? world.placements.find((p) => p.mapId === mapId) : undefined;
-      const prevOrigin = placement ? { col: placement.origin.col, row: placement.origin.row } : null;
+      const prevOrigin = placement
+        ? { col: placement.origin.col, row: placement.origin.row }
+        : null;
       const coupled = !!placement;
 
       const cmd: Command = {
@@ -2096,7 +2514,22 @@ export const useEditorStore = create<EditorState>()(
       const map = get().map;
       if (!map) return false;
       const id = nextObjectId(map, 'node');
-      const obj: NodeObject = { id, kind: 'node', ref, col, row };
+      // Roll a weighted-random skin from the def so a placed forest comes out visually varied
+      // (plan 021 step 9) — the inspector picker + cycle-skin shortcut let you override it after.
+      // Only persist `skin` when the roll differs from the def's default (`skins[0]`): an omitted
+      // `skin` already means "the first skin", so single-skin seeds (tree/rock/bush) stay byte-identical
+      // to today and map files don't carry a redundant `skin: "default"` on every placement.
+      const def = get().nodeDefsParsed[ref];
+      const rolled = def && def.skins.length > 0 ? pickWeighted(def.skins).id : undefined;
+      const skin = rolled !== undefined && def && rolled !== def.skins[0].id ? rolled : undefined;
+      const obj: NodeObject = {
+        id,
+        kind: 'node',
+        ref,
+        col,
+        row,
+        ...(skin !== undefined ? { skin } : {}),
+      };
       if (!footprintIsValid(map, obj)) return false;
       const cmd: Command = {
         do: () => {
@@ -2319,13 +2752,32 @@ export const useEditorStore = create<EditorState>()(
       if (!obj) return false;
       const candidate: NodeObject = { ...obj, ...patch };
       if (!footprintIsValid(map, candidate)) return false;
-      const prev: Partial<Pick<NodeObject, 'col' | 'row'>> = { col: obj.col, row: obj.row };
+      const prev: Partial<Pick<NodeObject, 'col' | 'row' | 'skin'>> = {
+        col: obj.col,
+        row: obj.row,
+        skin: obj.skin,
+      };
       const cmd: Command = {
         do: () => Object.assign(obj, patch),
         undo: () => Object.assign(obj, prev),
       };
       get().applyCommand(cmd);
       return true;
+    },
+
+    cycleNodeSkin: (id) => {
+      const map = get().map;
+      if (!map) return false;
+      const obj = map.objects.find((o) => o.id === id && o.kind === 'node') as
+        NodeObject | undefined;
+      if (!obj) return false;
+      const def = get().nodeDefsParsed[obj.ref];
+      if (!def || def.skins.length < 2) return false;
+      const cur = obj.skin ?? def.skins[0].id;
+      const idx = def.skins.findIndex((s) => s.id === cur);
+      // Unknown current skin ⇒ treat as position 0 so the first cycle lands on skins[1].
+      const next = def.skins[(Math.max(idx, 0) + 1) % def.skins.length];
+      return get().updateNode(id, { skin: next.id });
     },
 
     updatePortal: (id, patch) => {

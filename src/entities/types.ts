@@ -7,18 +7,24 @@
  */
 
 import type Phaser from 'phaser';
-import type { ResourceNodeDef } from '../data/types';
+import type { ParsedNodeDef } from '../systems/nodeDefs';
 import type { MonsterCharacter } from './MonsterCharacter';
 
 /** A live/stump resource node instance in the world (tree sprite + its data + state). */
 export interface TreeNode {
   id: string;
   sprite: Phaser.GameObjects.Image;
-  def: ResourceNodeDef;
+  /** The parsed def (superset of `ResourceNodeDef`, adding `skins`) — carried so the harvest/regrow
+   *  path can resolve {@link skin}'s live/depleted sprite without a `NODES` re-lookup (plan 021 step 5). */
+  def: ParsedNodeDef;
   hp: number;
   alive: boolean;
   col: number;
   row: number;
+  /** Which of `def.skins` this instance renders (rolled on placement, persisted on the map object as
+   *  `NodeObject.skin`; absent/unknown ⇒ `def.skins[0]`). Drives the live sprite and, if that skin
+   *  carries a `depleted`, its stump sprite (plan 021 step 5). */
+  skin: string;
 }
 
 /**

@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "defs": [
+    {
+      "id": "tree",
+      "name": "Tree",
+      "maxHp": 3,
+      "yieldItemId": "wood",
+      "yieldPerHit": 1,
+      "regrowMs": 15000,
+      "blocksPath": true,
+      "color": 3104052,
+      "stumpColor": 5914408,
+      "tilesTall": 5,
+      "originX": 0.5,
+      "originY": 0.92,
+      "standOffsets": [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [1, 1],
+        [-1, 1]
+      ],
+      "skins": [
+        {
+          "id": "default",
+          "asset": "pixel-crawler/_derived/tree_pine.png"
+        }
+      ]
+    },
+    {
+      "id": "rock",
+      "name": "Rock",
+      "maxHp": 4,
+      "yieldItemId": "stone",
+      "yieldPerHit": 1,
+      "regrowMs": 30000,
+      "blocksPath": true,
+      "harvestAnim": "mine",
+      "color": 9079434,
+      "stumpColor": 5921370,
+      "tilesTall": 1.2,
+      "originX": 0.5,
+      "originY": 0.8,
+      "skins": [
+        {
+          "id": "default",
+          "asset": "pixel-crawler/_derived/rock.png"
+        }
+      ]
+    },
+    {
+      "id": "berryBush",
+      "name": "Berry Bush",
+      "maxHp": 1,
+      "yieldItemId": "berries",
+      "yieldPerHit": 2,
+      "regrowMs": 20000,
+      "blocksPath": false,
+      "harvestAnim": "gather",
+      "color": 4156724,
+      "stumpColor": 4872762,
+      "tilesTall": 1.2,
+      "originX": 0.5,
+      "originY": 0.72,
+      "skins": [
+        {
+          "id": "default",
+          "asset": "pixel-crawler/_derived/bush.png"
+        }
+      ]
+    }
+  ]
+}

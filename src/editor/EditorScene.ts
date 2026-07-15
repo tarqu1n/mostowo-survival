@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import { TILE_SIZE, GROUND_CHUNK_ROWS } from '../config';
-import { ACTIVE_TILESET, resolveTile, sheetKey, tileImageKey } from '../data/tileset';
-import { NODES } from '../data/nodes';
+import { resolveTile, sheetKey, tileImageKey } from '../data/tileset';
 import {
   cellIndex,
   getCell,
@@ -390,16 +389,28 @@ export class EditorScene extends Phaser.Scene {
           console.warn(`[editor] skipping decor "${obj.id}": ${(e as Error).message}`);
         }
       } else if (obj.kind === 'node') {
-        // Nodes render as their real tile-role sprite (matches ResourceNodeManager.addNode) —
-        // queue that role's texture too. An unknown ref falls back to a marker (see placeNodeSprite),
-        // needing no texture.
-        const def = NODES[obj.ref];
+        // Nodes render per skin from the catalog (matches ResourceNodeManager, plan 021 step 6) —
+        // queue every skin's live + depleted asset of the referenced def so a placed skin, an
+        // inspector override, or a cycle always has a resident texture. Skins carry no anim, so each
+        // asset shares the plain whole-image `tileImageKey` (a region crop reuses it). An unknown ref
+        // falls back to a marker (see placeNodeSprite), needing no texture. Reads the store's live
+        // parsed registry (plan 021 step 7), not the boot-time `NODES` import, so an in-session def
+        // edit is reflected without a reload.
+        const def = useEditorStore.getState().nodeDefsParsed[obj.ref];
         if (!def) continue;
-        const source = ACTIVE_TILESET.tiles[def.tile];
-        if (source.kind === 'image') {
-          addImage(tileImageKey(source.path), tilesetAssetUrl(ACTIVE_TILESET.id, source.path));
-        } else {
-          addSheet(sheetKey(source.sheet), tilesetAssetUrl(ACTIVE_TILESET.id, source.sheet));
+        const queueSkinAsset = (asset: string): void => {
+          try {
+            const { pack, path } = parseAssetId(asset);
+            addImage(tileImageKey(path), tilesetAssetUrl(pack, path));
+          } catch (e) {
+            console.warn(
+              `[editor] skipping node "${obj.id}" skin asset "${asset}": ${(e as Error).message}`,
+            );
+          }
+        };
+        for (const skin of def.skins) {
+          queueSkinAsset(skin.asset);
+          if (skin.depleted) queueSkinAsset(skin.depleted.asset);
         }
       }
     }
@@ -614,25 +625,45 @@ export class EditorScene extends Phaser.Scene {
     return display;
   }
 
-  /** Nodes render as their REAL tile-role sprite, matching `ResourceNodeManager.addNode` exactly:
-   *  position = tile centre (both axes), scale = `(TILE_SIZE * tilesTall) / frameHeight`, origin =
-   *  `(originX, originY)`. Falls back to a labelled marker (unknown ref, or its texture isn't
-   *  resident) so authoring always shows *something* pickable. */
+  /** Nodes render per skin from the catalog, matching `ResourceNodeManager.applySkinAppearance`
+   *  exactly (plan 021 step 6): resolve the placed skin (or the def's first/default) → its catalog
+   *  sprite via the shared decor resolver; position = tile centre (both axes), scale =
+   *  `(TILE_SIZE * tilesTall) / frameHeight`, origin = `(originX, originY)` with per-skin overrides.
+   *  Falls back to a labelled marker (unknown ref, malformed/unresolved asset) so authoring always
+   *  shows *something* pickable. */
   private placeNodeSprite(
     obj: Extract<MapFile['objects'][number], { kind: 'node' }>,
   ): Phaser.GameObjects.GameObject | undefined {
     const x = obj.col * TILE_SIZE + TILE_SIZE / 2;
     const y = obj.row * TILE_SIZE + TILE_SIZE / 2;
-    const def = NODES[obj.ref];
+    // Reads the store's live parsed registry (plan 021 step 7), not the boot-time `NODES` import.
+    const def = useEditorStore.getState().nodeDefsParsed[obj.ref];
     if (!def) return this.addMarker(x, y, TILE_SIZE, TILE_SIZE, NODE_MARKER, obj.ref);
 
-    const { key, frame } = resolveTile(ACTIVE_TILESET.tiles[def.tile]);
-    if (!this.textures.exists(key))
+    const skin =
+      (obj.skin !== undefined ? def.skins.find((s) => s.id === obj.skin) : undefined) ??
+      def.skins[0];
+    let path: string;
+    try {
+      ({ path } = parseAssetId(skin.asset));
+    } catch {
+      return this.addMarker(x, y, TILE_SIZE, TILE_SIZE, NODE_MARKER, obj.ref);
+    }
+    const draw = resolveDecorDraw(
+      this,
+      { id: obj.ref, asset: skin.asset, ...(skin.region ? { region: skin.region } : {}) },
+      path,
+    );
+    // Skins never carry an anim (see NodeSkinDef) — an 'anim' draw is unreachable, marker is defensive.
+    if (!draw || draw.kind === 'anim')
       return this.addMarker(x, y, TILE_SIZE, TILE_SIZE, NODE_MARKER, obj.ref);
 
-    const img = frame === undefined ? this.add.image(x, y, key) : this.add.image(x, y, key, frame);
-    img.setScale((TILE_SIZE * def.tilesTall) / img.frame.height);
-    img.setOrigin(def.originX, def.originY);
+    const img =
+      draw.kind === 'region'
+        ? this.add.image(x, y, draw.key, draw.frame)
+        : this.add.image(x, y, draw.key);
+    img.setScale((TILE_SIZE * (skin.tilesTall ?? def.tilesTall)) / img.frame.height);
+    img.setOrigin(skin.originX ?? def.originX, skin.originY ?? def.originY);
     img.setDepth(DEPTH_OBJECTS);
     this.objectSprites.push(img);
     return img;

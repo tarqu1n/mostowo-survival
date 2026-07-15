@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import type { DecorAnim, DecorObject } from '../systems/mapFormat';
+import type { DecorAnim, DecorObject, DecorRegion } from '../systems/mapFormat';
 import { tileImageKey } from '../data/tileset';
 
 /**
@@ -28,6 +28,21 @@ export type DecorDraw =
   | { kind: 'whole'; key: string }
   | { kind: 'region'; key: string; frame: string }
   | { kind: 'anim'; key: string; animKey: string };
+
+/**
+ * The minimal shape {@link resolveDecorDraw} needs — a catalog `asset` id plus its optional static
+ * `region` crop or `anim` strip, and an `id` for dev-warning context. A full `DecorObject` satisfies
+ * it, and so does a resource-node SKIN (asset + optional region, never anim — see `NodeSkinDef`), so
+ * node rendering reuses this exact resolver rather than duplicating the region-subframe + drift-guard
+ * logic (plan 021 step 5). `region`/`anim` stay mutually exclusive at the source (`NodeSkinDef` has no
+ * `anim`; `mapFormat` enforces it for decor), so the resolver's discriminated-union output is exact.
+ */
+export interface DrawableRef {
+  id: string;
+  asset: string;
+  region?: DecorRegion;
+  anim?: DecorAnim;
+}
 
 /**
  * Deterministic Phaser texture key for the sheet/image a decor needs, given its resolved pack-relative
@@ -100,7 +115,7 @@ export function queueDecorTexture(
  */
 export function resolveDecorDraw(
   scene: Phaser.Scene,
-  obj: DecorObject,
+  obj: DrawableRef,
   path: string,
 ): DecorDraw | undefined {
   const key = decorTextureKey(path, obj.anim);

@@ -1,6 +1,18 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useEditorStore, DECOR_ANIM_DEFAULT_FPS } from '../editorStore';
-import { parseMap, serializeMap, type DecorObject, type MapFile } from '../../../systems/mapFormat';
+import {
+  parseMap,
+  serializeMap,
+  type DecorObject,
+  type MapFile,
+  type NodeObject,
+} from '../../../systems/mapFormat';
+import nodesJson from '../../../data/maps/nodes.json';
+import type { AuthoredNodeDef, NodeDefsFile } from '../../../systems/nodeDefs';
+
+/** Committed seed defs (tree/rock/berryBush, each single-skin) — deep-cloned per test so a mutation
+ *  of the singleton `nodeDefs` registry can't bleed across tests. */
+const SEED_NODE_DEFS = (nodesJson as NodeDefsFile).defs;
 
 const DECOR_ASSET = 'pixel-crawler/Environment/Props/Static/Rocks.png#5';
 const ATLAS_ASSET = 'pixel-crawler/Environment/Props/Static/Furniture.png';
@@ -282,6 +294,81 @@ describe('editorStore objects: updateDecor/updateNode/updatePortal', () => {
       .getState()
       .updatePortal(id, { rect: { col: 0, row: 0, w: 1, h: 1 } });
     expect(refused).toBe(false);
+  });
+});
+
+describe('editorStore objects: node skins (plan 021 step 9)', () => {
+  // `nodeDefs` is a module-level singleton `reset()`/newMap doesn't clear, so also restore the seed
+  // registry each test (deep-cloned) — else `addSkin` accumulates skins across tests.
+  beforeEach(() => {
+    reset(20, 20);
+    useEditorStore
+      .getState()
+      .setNodeDefs(JSON.parse(JSON.stringify(SEED_NODE_DEFS)) as AuthoredNodeDef[]);
+  });
+
+  /** Give `tree` a real second skin so the roll/override/cycle paths have a choice to make (seed defs
+   *  ship single-skin). Returns the new skin's id. */
+  function addTreeSkin(): string {
+    const id = useEditorStore.getState().addSkin('tree');
+    expect(id).not.toBeNull();
+    return id!;
+  }
+
+  it('placeNode omits `skin` for a single-skin def (byte-identical to legacy placement)', () => {
+    useEditorStore.getState().placeNode('tree', 2, 3);
+    const node = useEditorStore.getState().map!.objects[0] as NodeObject;
+    expect(node.skin).toBeUndefined();
+    expect('skin' in node).toBe(false);
+  });
+
+  it('placeNode rolls a valid skin from a multi-skin def; over many placements it varies', () => {
+    const second = addTreeSkin();
+    const valid = new Set([undefined, second]); // omitted `skin` == the default (skins[0])
+    const seen = new Set<string | undefined>();
+    for (let i = 0; i < 80; i++) {
+      // Distinct cells on the 20x20 map (col 0..19, row 0..3 → 80 cells).
+      useEditorStore.getState().placeNode('tree', i % 20, Math.floor(i / 20));
+    }
+    for (const o of useEditorStore.getState().map!.objects) {
+      const skin = (o as NodeObject).skin;
+      expect(valid.has(skin)).toBe(true);
+      seen.add(skin);
+    }
+    // Two equal-weight skins over 80 rolls: P(all identical) ≈ 2·2⁻⁸⁰ — effectively impossible.
+    expect(seen.size).toBe(2);
+  });
+
+  it('updateNode overrides `skin` undoably', () => {
+    const second = addTreeSkin();
+    useEditorStore.getState().placeNode('tree', 1, 1);
+    const map = useEditorStore.getState().map!;
+    const id = map.objects[0].id;
+    const before = (map.objects[0] as NodeObject).skin;
+    expect(useEditorStore.getState().updateNode(id, { skin: second })).toBe(true);
+    expect((map.objects[0] as NodeObject).skin).toBe(second);
+    useEditorStore.getState().undo();
+    expect((map.objects[0] as NodeObject).skin).toBe(before);
+  });
+
+  it('cycleNodeSkin advances through the def skins and wraps', () => {
+    const second = addTreeSkin(); // tree skins are now ['default', second]
+    useEditorStore.getState().placeNode('tree', 1, 1);
+    const map = useEditorStore.getState().map!;
+    const node = map.objects[0] as NodeObject;
+    const id = node.id;
+    // Force a known start (default) regardless of the placement roll.
+    useEditorStore.getState().updateNode(id, { skin: 'default' });
+    expect(useEditorStore.getState().cycleNodeSkin(id)).toBe(true);
+    expect((map.objects[0] as NodeObject).skin).toBe(second);
+    expect(useEditorStore.getState().cycleNodeSkin(id)).toBe(true); // wraps back to default
+    expect((map.objects[0] as NodeObject).skin).toBe('default');
+  });
+
+  it('cycleNodeSkin is a no-op for a single-skin def', () => {
+    useEditorStore.getState().placeNode('rock', 1, 1); // seed rock has one skin
+    const id = useEditorStore.getState().map!.objects[0].id;
+    expect(useEditorStore.getState().cycleNodeSkin(id)).toBe(false);
   });
 });
 

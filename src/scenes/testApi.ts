@@ -1,7 +1,7 @@
 import type Phaser from 'phaser';
 import { DAY_MS, HUNGER_MAX } from '../config';
 import { NODES } from '../data/nodes';
-import type { ResourceNodeDef } from '../data/types';
+import type { ParsedNodeDef } from '../systems/nodeDefs';
 import type { Inventory } from '../systems/Inventory';
 import type { Dims } from '../systems/pathfind';
 import {
@@ -101,7 +101,7 @@ export interface TestApiDeps {
 
   // Spawning stays scene-owned (plan 013 Step 6 — GameScene keeps "spawning/world-gen"); TestApi
   // only calls it while building a scenario's declared world.
-  addNode(def: ResourceNodeDef, col: number, row: number): void;
+  addNode(def: ParsedNodeDef, col: number, row: number): void;
   addEnemy(id: string, col: number, row: number, opts?: MonsterSpawnOpts): void;
   /** Destroy every tree/enemy GameObject and reset their arrays + id counters — the shared preamble
    *  of a world reset (mirrors `randomiseWorld`'s own inline copy, which keeps the id counters

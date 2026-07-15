@@ -101,6 +101,9 @@ export interface NodeObject {
   ref: string;
   col: number;
   row: number;
+  /** Chosen skin id within the referenced def's `skins`; omit ⇒ the def's first/default skin.
+   *  Per-placed-instance art (plan 021). Omitted-when-absent for byte-identical legacy round-trip. */
+  skin?: string;
 }
 
 /** A crop rect (sheet-local px) into `DecorObject.asset`'s source PNG — plan 014 step 7a's
@@ -517,12 +520,16 @@ function parseMapObject(value: unknown, path: string): MapObject {
   if (kind === 'node') {
     const ref = expectString(obj.ref, `${path}.ref`);
     if (ref.length === 0) fail(`${path}.ref must be a non-empty string`);
+    // skin is optional and read only when present, so the key is never added when absent — that's
+    // what keeps a node authored before plan 021 step 4 byte-identical on round-trip.
+    const skin = obj.skin === undefined ? undefined : expectString(obj.skin, `${path}.skin`);
     return {
       id,
       kind: 'node',
       ref,
       col: expectInt(obj.col, `${path}.col`),
       row: expectInt(obj.row, `${path}.row`),
+      ...(skin !== undefined ? { skin } : {}),
     };
   }
 

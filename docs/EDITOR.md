@@ -57,6 +57,22 @@ Transform settings (opacity, X/Y offset, scale) persist **per-map to localStorag
 `mostowo-editor-underlay:` — never in `.map.json` or prod. Sidecar JSON auto-aligns to grid.
 Toggle with `U` or panel checkbox. Phone-usable. Capture tool — new references in-editor via **Reference → "Capture new"** (name + `lat,lon` + radius, runs on dev-server), or batch-script via the CLI — see [map-reference/](../scripts/map-reference/README.md).
 
+## Node Types (authored resource nodes)
+
+A central-pane **Node Types** tab authors the resource-node registry (`src/data/maps/nodes.json`) —
+replacing the old compile-time `NODES` constant. Per def: gameplay stats (name, HP, yield item +
+amount, regrow, blocks-path, harvest anim, colours) plus a list of **skins** — interchangeable
+sprites drawn from the asset catalog, each with a live sprite, an optional matching
+**depleted/stump** sprite (absent ⇒ today's tint-to-`stumpColor` fallback), a weight, and optional
+per-skin sizing overrides. **Duplicate** a def to spin up a yield **tier** (e.g. a bigger tree worth
+more wood) with its own skins. Delete is blocked while any map still references the def.
+
+Three independent axes: **tier** = a separate def (gameplay), **skin** = which sprite a placed node
+uses (aesthetics), **state** = live↔depleted (runtime, never authored/serialized). On placement a
+skin is rolled **weighted-random** and persisted on the node (`NodeObject.skin`); override it in the
+**Inspector** (Skin dropdown, shown when the def has ≥2 skins) or press **S** to cycle the selected
+node's skin. An omitted `skin` ⇒ the def's first skin, so legacy maps round-trip byte-identical.
+
 ## File formats — source of truth is the code
 
 Do **not** treat this doc as the schema. The authoritative shapes + validators are:
@@ -66,6 +82,11 @@ Do **not** treat this doc as the schema. The authoritative shapes + validators a
   `TileLayer.cells`, never the semantic mask). Terrain autotile bakes at a cropped edge self-heal on the next Save via `rebakeTerrainsForSave()`.
 - **World** (`world.json`): `src/systems/worldLayout.ts` — `parseWorldLayout`/`validateWorld`, the
   global-coord helpers, and the manifest seam.
+- **Node defs** (`src/data/maps/nodes.json`, sibling of `world.json`): `src/systems/nodeDefs.ts` —
+  `parseNodeDefs` (boot-time fail-fast parser AND the editor's form validator) + the `AuthoredNodeDef`/
+  `NodeSkinDef` types. `version: 1`; a def's `skins[0]` is its default. Cross-file checks (map `ref` ∈
+  defs, `NodeObject.skin` ∈ that def's skins, every skin `asset` ∈ catalog) live in the
+  world-integrity test.
 
 ### Rules the validator enforces (know these before authoring)
 
@@ -94,6 +115,10 @@ above the registry — so `loadMap` stays a pure authored-file fetch. Consequent
 layers/walkability/zones/shape are never overlayable: **runtime-mutable things are objects with
 stable ids**, and a gate opening = the overlay patches that object, its footprint vanishes, tiles
 unblock via the existing `isBlocked` composition.
+
+Each authored file has its own bespoke dev-middleware handler in `scripts/vite-editor-api.mjs`:
+`GET/PUT /__editor/world`, `/__editor/maps/:id` (regenerates the manifest + thumbnail), and
+`/__editor/nodes` (writes `nodes.json`; no manifest regen — node defs aren't a map placement).
 
 ## Packs & catalog
 

@@ -131,3 +131,39 @@ describe('editorStore tabs', () => {
     expect(useEditorStore.getState().activeTabId).toBe('object:pack/a.png');
   });
 });
+
+/** Node Types (plan 021 step 8) — a THIRD permanent, non-closable tab. These tests reset to the
+ *  store's real initial tab shape (map/world/nodeTypes), unlike `resetTabs()` above (which deliberately
+ *  strips `nodeTypes` to keep the object-tab tests' expected arrays unchanged). */
+describe('editorStore tabs: nodeTypes (plan 021 step 8)', () => {
+  beforeEach(() => {
+    useEditorStore.setState({
+      tabs: [
+        { id: 'map', kind: 'map' },
+        { id: 'world', kind: 'world' },
+        { id: 'nodeTypes', kind: 'nodeTypes' },
+      ],
+      activeTabId: 'map',
+      catalog: null,
+    });
+  });
+
+  it('is present alongside map/world and can be activated', () => {
+    expect(tabIds()).toEqual(['map', 'world', 'nodeTypes']);
+    useEditorStore.getState().activateTab('nodeTypes');
+    expect(useEditorStore.getState().activeTabId).toBe('nodeTypes');
+  });
+
+  it('closeTab is a no-op on the permanent nodeTypes tab', () => {
+    useEditorStore.getState().activateTab('nodeTypes');
+    useEditorStore.getState().closeTab('nodeTypes');
+
+    expect(tabIds()).toEqual(['map', 'world', 'nodeTypes']);
+    expect(useEditorStore.getState().activeTabId).toBe('nodeTypes');
+  });
+
+  it('survives setCatalog reconciliation (never an object tab, never dropped)', () => {
+    useEditorStore.getState().setCatalog(catalogWith('pack/a.png'));
+    expect(tabIds()).toEqual(['map', 'world', 'nodeTypes']);
+  });
+});

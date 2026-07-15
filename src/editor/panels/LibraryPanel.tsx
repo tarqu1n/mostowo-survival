@@ -8,13 +8,13 @@ import {
   type ReactNode,
 } from 'react';
 import { TILE_SIZE } from '../../config';
-import { NODES } from '../../data/nodes';
-import { ACTIVE_TILESET } from '../../data/tileset';
-import type { ResourceNodeDef } from '../../data/types';
+import type { ParsedNodeDef } from '../../systems/nodeDefs';
 import type { DecorAnim, DecorRegion } from '../../systems/mapFormat';
 import { parseAssetId, tilesetAssetUrl } from '../textureLoading';
 import { loadCatalog } from '../catalogSource';
 import { loadTerrainCatalog } from '../terrainCatalogSource';
+import { loadNodeDefs } from '../nodeDefsSource';
+import { colorToHex, resolveSkinPreviewUrl } from '../nodeTypesUi';
 import type { TerrainDef } from '../terrainCatalog';
 import {
   catalogTileCols,
@@ -35,8 +35,10 @@ import { cn } from '../lib/utils';
 /**
  * Library panel (plan 014 steps 6-7b) — loads the generated asset catalog, browses it by pack/category
  * (or text search over id/tags), a "Favourites" pseudo-category for the active zone's (or, with no
- * zone active, the map's) favourited assets, and a "Nodes" pseudo-category listing `NODES` entries
- * (previewed via their tileset role). Tile-type assets (the 5 grid tilesheets) expand into a clickable
+ * zone active, the map's) favourited assets, and a "Nodes" pseudo-category listing the editor store's
+ * live `nodeDefsParsed` registry (plan 021 step 7 — NOT the boot-time `NODES` import, so a def
+ * created/edited in-session appears here without a reload), previewed via their default skin's
+ * catalog sprite. Tile-type assets (the 5 grid tilesheets) expand into a clickable
  * frame grid; clicking a frame sets `brushAsset` and switches to the Brush tool. Non-tile assets arm
  * `decor` placement (`armedObjectAsset`/`armedNodeRef` for Nodes, mutually exclusive — see editorStore's
  * module doc) and switch to the Place tool, mirroring how a tile click switches to Brush — kept
@@ -162,10 +164,15 @@ export function LibraryPanel() {
   const [selectedPack, setSelectedPack] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  // Which packs are expanded in the nav. Packs start collapsed (empty set) so the tree stays compact —
+  // the catalog has many packs, each with several categories, and rendering them all open overran the
+  // pane. A pack is toggled open/shut by clicking its header.
+  const [expandedPacks, setExpandedPacks] = useState<ReadonlySet<string>>(new Set());
 
   const brushAsset = useEditorStore((s) => s.brushAsset);
   const armedObjectAsset = useEditorStore((s) => s.armedObjectAsset);
   const armedNodeRef = useEditorStore((s) => s.armedNodeRef);
+  const nodeDefsParsed = useEditorStore((s) => s.nodeDefsParsed);
   const activeZoneId = useEditorStore((s) => s.activeZoneId);
   const terrainCatalog = useEditorStore((s) => s.terrainCatalog);
   const activeTerrainId = useEditorStore((s) => s.activeTerrainId);
@@ -184,6 +191,12 @@ export function LibraryPanel() {
     // Terrains category (logged), not a Library-wide error, since it's a much smaller/newer surface.
     loadTerrainCatalog().catch((e: unknown) => {
       console.warn('[editor] terrain catalog failed to load:', (e as Error).message);
+    });
+    // Node defs (plan 021 step 7) load independently too — the store is already seeded from the
+    // bundled `nodes.json` (see editorStore's `nodeDefs` doc), so a failure here just means the
+    // palette keeps showing that build-time seed rather than whatever's newer on disk.
+    loadNodeDefs().catch((e: unknown) => {
+      console.warn('[editor] node defs failed to load:', (e as Error).message);
     });
     return () => {
       cancelled = true;
@@ -278,6 +291,14 @@ export function LibraryPanel() {
   function toggleFavourite(assetId: string): void {
     useEditorStore.getState().toggleFavourite(assetId);
   }
+  function togglePack(packId: string): void {
+    setExpandedPacks((prev) => {
+      const next = new Set(prev);
+      if (next.has(packId)) next.delete(packId);
+      else next.add(packId);
+      return next;
+    });
+  }
 
   return (
     // The shadcn Tooltips on the sparse chrome controls (zoom +/−, reclassify cog) are powered by the
@@ -331,25 +352,39 @@ export function LibraryPanel() {
               >
                 🟩 Terrains
               </TreeItem>
-              {catalog.packs.map((pack) => (
-                <div key={pack.id} className="mb-1">
-                  <div className="mt-1.5 mb-0.5 text-[0.7rem] uppercase tracking-[0.03em] text-border-muted">
-                    {pack.name}
-                  </div>
-                  {(categoriesByPack.get(pack.id) ?? []).map((category) => (
-                    <TreeItem
-                      key={category}
-                      active={selectedPack === pack.id && selectedCategory === category}
-                      onClick={() => {
-                        setSelectedPack(pack.id);
-                        setSelectedCategory(category);
-                      }}
+              {catalog.packs.map((pack) => {
+                const expanded = expandedPacks.has(pack.id);
+                const categories = categoriesByPack.get(pack.id) ?? [];
+                return (
+                  <div key={pack.id} className="mb-1">
+                    <button
+                      type="button"
+                      className="mt-1.5 mb-0.5 flex w-full items-center gap-1 text-[0.7rem] uppercase tracking-[0.03em] text-border-muted hover:text-fg-dim"
+                      aria-expanded={expanded}
+                      onClick={() => togglePack(pack.id)}
                     >
-                      {category}
-                    </TreeItem>
-                  ))}
-                </div>
-              ))}
+                      <span className="flex-none text-[0.65rem]">{expanded ? '▾' : '▸'}</span>
+                      <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">
+                        {pack.name}
+                      </span>
+                      <span className="flex-none tabular-nums">{categories.length}</span>
+                    </button>
+                    {expanded &&
+                      categories.map((category) => (
+                        <TreeItem
+                          key={category}
+                          active={selectedPack === pack.id && selectedCategory === category}
+                          onClick={() => {
+                            setSelectedPack(pack.id);
+                            setSelectedCategory(category);
+                          }}
+                        >
+                          {category}
+                        </TreeItem>
+                      ))}
+                  </div>
+                );
+              })}
             </nav>
           )}
 
@@ -379,7 +414,7 @@ export function LibraryPanel() {
               ))}
 
             {showingNodes &&
-              Object.values(NODES).map((def) => (
+              Object.values(nodeDefsParsed).map((def) => (
                 <NodeCard
                   key={def.id}
                   def={def}
@@ -537,32 +572,52 @@ function TileFrameGrid({
   );
 }
 
-/** A node's preview image URL, resolved via its tileset role (`ACTIVE_TILESET.tiles[def.tile]`) —
- *  matches how it actually renders in-game/in-editor. Today every node's role is a standalone `image`
- *  source (see `data/tileset.ts`'s `PIXEL_CRAWLER_TILESET.tiles`), so this always shows the exact
- *  sprite; a `sheetFrame` role (none currently) would show its whole sheet rather than one cropped
- *  frame — an acceptable simplification since the step only requires *a* tile-role preview. */
-function nodePreviewUrl(def: ResourceNodeDef): string {
-  const source = ACTIVE_TILESET.tiles[def.tile];
-  const path = source.kind === 'image' ? source.path : source.sheet;
-  return tilesetAssetUrl(ACTIVE_TILESET.id, path);
+/** A node's preview image URL — its default (first) skin's catalog sprite (plan 021 step 6), which
+ *  matches how it renders in-game/in-editor. A skin with a `region` crop would show its whole source
+ *  sheet here rather than the single cropped frame — an acceptable simplification since the palette
+ *  only needs *a* preview (the `_derived` node sprites are single-sprite images with no region).
+ *  Delegates the actual (never-throwing) resolve to `resolveSkinPreviewUrl` (`nodeTypesUi.ts`) rather
+ *  than inlining `parseAssetId` here — see that function's doc for why: it returns `null` for a skin
+ *  whose `asset` isn't resolvable (most notably the Node Types panel's `PLACEHOLDER_SKIN_ASSET`, which
+ *  every freshly-created def starts with), and keeping the resolver in a non-component module lets it
+ *  be unit-tested without giving this component file a stray non-component export (which would break
+ *  Vite Fast Refresh for it — discovered driving the Node Types panel end-to-end: the unguarded throw
+ *  this replaced took down the WHOLE Library panel, and a first fix that exported this function
+ *  directly from here broke Fast Refresh on every edit instead). */
+function nodePreviewUrl(def: ParsedNodeDef): string | null {
+  return resolveSkinPreviewUrl(def.skins[0].asset);
 }
 
 /** One "Nodes" pseudo-category entry (step 7) — click arms `armedNodeRef` for the Place tool. Nodes
- *  aren't favouritable (favourites are catalog asset ids; `NODES` refs are a different id space). */
+ *  aren't favouritable (favourites are catalog asset ids; `NODES` refs are a different id space). A
+ *  def whose default skin has no resolvable sprite yet (see `nodePreviewUrl`'s doc) falls back to a
+ *  flat swatch tinted with the def's own `color` instead of crashing. */
 function NodeCard({
   def,
   isArmed,
   onArm,
 }: {
-  def: ResourceNodeDef;
+  def: ParsedNodeDef;
   isArmed: boolean;
   onArm: () => void;
 }) {
   const url = nodePreviewUrl(def);
   return (
     <button className={libCardClass(isArmed)} title={def.id} onClick={onArm}>
-      <span className={libSwatchClass} style={{ backgroundImage: `url(${url})` }} />
+      {url ? (
+        <span className={libSwatchClass} style={{ backgroundImage: `url(${url})` }} />
+      ) : (
+        <span
+          className={cn(
+            libSwatchClass,
+            'flex items-center justify-center bg-none text-[0.6rem] font-semibold text-fg-dim',
+          )}
+          style={{ backgroundColor: colorToHex(def.color) }}
+          title="No sprite assigned yet — set one in the Node Types panel"
+        >
+          ?
+        </span>
+      )}
       <span className={libLabelClass}>{def.name}</span>
     </button>
   );

@@ -275,11 +275,15 @@ function DecorFields({ obj }: { obj: DecorObject }) {
 }
 
 function NodeFields({ obj }: { obj: NodeObject }) {
-  const update = (patch: Partial<Pick<NodeObject, 'col' | 'row'>>): void => {
+  const skinId = useId();
+  // Subscribe so the picker refreshes if the def's skins change while a node is selected.
+  const def = useEditorStore((s) => s.nodeDefsParsed[obj.ref]);
+  const update = (patch: Partial<Pick<NodeObject, 'col' | 'row' | 'skin'>>): void => {
     if (!useEditorStore.getState().updateNode(obj.id, patch)) {
       console.warn('[editor] node edit refused — would land on void/out-of-bounds');
     }
   };
+  const skins = def?.skins ?? [];
   return (
     <div className={fieldsWrapperClass}>
       <p className={placeholderClass}>Node: {obj.ref}</p>
@@ -287,6 +291,34 @@ function NodeFields({ obj }: { obj: NodeObject }) {
         <NumberField label="Col" value={obj.col} onCommit={(col) => update({ col })} />
         <NumberField label="Row" value={obj.row} onCommit={(row) => update({ row })} />
       </div>
+      {/* Skin override — placement rolls a weighted-random skin (plan 021 step 9); this picker (and the
+          'S' cycle shortcut) let you override it. Only shown when the def has a real choice (≥2 skins);
+          a single-skin def has nothing to pick. Value falls back to skins[0] when unset (the omitted
+          `skin` = the def's default). */}
+      {skins.length >= 2 && (
+        <div className={fieldClass}>
+          <Label htmlFor={skinId} className={fieldLabelClass}>
+            Skin
+          </Label>
+          <Select value={obj.skin ?? skins[0].id} onValueChange={(v) => update({ skin: v })}>
+            <SelectTrigger
+              id={skinId}
+              size="sm"
+              className={cn(fieldInputClass, 'w-full justify-between font-normal')}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {skins.map((s, i) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.id}
+                  {i === 0 ? ' (default)' : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
     </div>
   );
 }

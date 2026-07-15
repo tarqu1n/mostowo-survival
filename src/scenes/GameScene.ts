@@ -850,10 +850,9 @@ export class GameScene extends Phaser.Scene {
       this.player.body.setVelocity(0, 0);
       this.playerChar.faceTile(tree.col, tree.row); // swing toward the node, whatever side we stood on
       // Standing at the node → updatePlayerAnim plays the matching harvest anim: a bush is foraged
-      // (gather/Collect), a rock is mined (pickaxe), everything else is chopped (axe). Bush wins ahead
-      // of the rock/tree split via its `harvestAnim` def flag. See ResourceNodeDef.tile/harvestAnim.
-      this.harvestSwing =
-        tree.def.harvestAnim === 'gather' ? 'gather' : tree.def.tile === 'rock' ? 'mine' : 'chop';
+      // (gather/Collect), a rock is mined (pickaxe), everything else is chopped (axe). The swing is
+      // now authored directly per def (`harvestAnim`), defaulting to chop. See ResourceNodeDef.harvestAnim.
+      this.harvestSwing = tree.def.harvestAnim ?? 'chop';
       this.chopElapsed += delta;
       if (this.chopElapsed >= CHOP_INTERVAL_MS) {
         this.chopElapsed = 0;

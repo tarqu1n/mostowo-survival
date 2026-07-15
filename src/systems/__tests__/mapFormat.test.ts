@@ -21,6 +21,7 @@ interface RawObjectFixture {
   ref?: string;
   col?: number;
   row?: number;
+  skin?: string;
   asset?: string;
   x?: number;
   y?: number;
@@ -506,6 +507,50 @@ describe('parseMap', () => {
         });
         expect(() => parseMap(raw)).toThrow(/anim\.omit skips every frame/);
       });
+    });
+  });
+
+  /** `node_0001` (index 0 of the fixture's objects) has no `skin` — the base fixture's node. */
+  describe('node.skin (plan 021 step 4)', () => {
+    function nodeAt(map: MapFile, id: string) {
+      const obj = map.objects.find((o) => o.id === id);
+      if (!obj || obj.kind !== 'node') throw new Error(`expected a node object "${id}"`);
+      return obj;
+    }
+
+    it('parses a legacy node (no skin) and re-serializes byte-identical, WITHOUT a skin key', () => {
+      const raw = validRaw();
+      const map = parseMap(raw);
+      const node = nodeAt(map, 'node_0001');
+      expect(node.skin).toBeUndefined();
+      expect('skin' in node).toBe(false);
+
+      const json = serializeMap(map);
+      const parsedJson = JSON.parse(json) as { objects: Array<Record<string, unknown>> };
+      const nodeJson = parsedJson.objects.find((o) => o.id === 'node_0001');
+      expect(nodeJson && Object.prototype.hasOwnProperty.call(nodeJson, 'skin')).toBe(false);
+      // Byte-identical: reparse yields the exact same object AND re-serializing gives the same JSON.
+      expect(parseMap(JSON.parse(json))).toEqual(map);
+      expect(serializeMap(parseMap(JSON.parse(json)))).toBe(json);
+    });
+
+    it('parses + round-trips a skinned node ("oak"), surviving parse -> serialize -> parse', () => {
+      const raw = withRaw((r) => {
+        r.objects[0].skin = 'oak';
+      });
+      const map = parseMap(raw);
+      const node = nodeAt(map, 'node_0001');
+      expect(node.skin).toBe('oak');
+
+      const json = serializeMap(map);
+      const parsedJson = JSON.parse(json) as {
+        objects: Array<{ id: string; skin?: string }>;
+      };
+      const nodeJson = parsedJson.objects.find((o) => o.id === 'node_0001');
+      expect(nodeJson?.skin).toBe('oak');
+      const reparsed = parseMap(JSON.parse(json));
+      expect(reparsed).toEqual(map);
+      expect(nodeAt(reparsed, 'node_0001').skin).toBe('oak');
     });
   });
 });

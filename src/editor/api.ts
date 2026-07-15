@@ -43,6 +43,16 @@ export async function putMap(id: string, json: string): Promise<void> {
   );
 }
 
+/** Deletes `src/data/maps/<id>.map.json`; the middleware also best-effort removes the map's thumb
+ *  (`public/assets/maps/thumbs/<id>.png`) and regenerates `manifest.json` server-side. Does not
+ *  touch `world.json` — callers must migrate any placement referencing `id` themselves. */
+export async function deleteMap(id: string): Promise<void> {
+  await expectOk(
+    await fetch(`${BASE}/maps/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    `deleteMap(${id})`,
+  );
+}
+
 /** Raw JSON of `src/data/maps/world.json` — narrow with `parseWorldLayout` before use. */
 export async function getWorld(): Promise<unknown> {
   const res = await expectOk(await fetch(`${BASE}/world`), 'getWorld');
@@ -59,6 +69,27 @@ export async function putWorld(json: string): Promise<void> {
       body: json,
     }),
     'putWorld',
+  );
+}
+
+/** Raw JSON of `src/data/maps/nodes.json` (plan 021 step 7) — narrow with `parseNodeDefs` before
+ *  use. A net-new endpoint, not a reuse of `getWorld`'s — `nodes.json` isn't a map placement, so the
+ *  middleware never regenerates `manifest.json` around it (see `scripts/vite-editor-api.mjs`'s
+ *  module doc). */
+export async function getNodes(): Promise<unknown> {
+  const res = await expectOk(await fetch(`${BASE}/nodes`), 'getNodes');
+  return res.json();
+}
+
+/** Writes `json` to `src/data/maps/nodes.json`. No manifest regen (mirrors `getNodes`'s doc). */
+export async function putNodes(json: string): Promise<void> {
+  await expectOk(
+    await fetch(`${BASE}/nodes`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: json,
+    }),
+    'putNodes',
   );
 }
 

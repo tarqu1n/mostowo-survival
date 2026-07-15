@@ -10,7 +10,9 @@
 import { describe, it, expect } from 'vitest';
 import { migrateMap, type MapFile } from '../../../systems/mapFormat';
 import { parseWorldLayout, validateWorld } from '../../../systems/worldLayout';
+import { NODES } from '../../nodes';
 import worldJson from '../world.json';
+import catalogJson from '../../../../public/assets/asset-catalog.json';
 
 // Eager glob — the whole map payload is fine to pull into the test bundle (not the game bundle).
 const mapModules = import.meta.glob<unknown>('../*.map.json', {
@@ -44,5 +46,43 @@ describe('world integrity', () => {
       console.warn(`[world integrity] ${warnings.length} warning(s):\n  ${warnings.join('\n  ')}`);
     }
     expect(errors).toEqual([]);
+  });
+
+  // Node registry cross-refs (plan 021 step 6). `parseMap` is NODES-blind (it validates a node
+  // object's shape but not its `ref`/`skin` against the def registry — see NodeObject's doc), so
+  // these committed-content checks live here, where the test context can import NODES + the catalog.
+  it('every placed node references a known def, and any authored skin is one of that def’s skins', () => {
+    for (const [mapId, map] of Object.entries(maps)) {
+      for (const obj of map.objects) {
+        if (obj.kind !== 'node') continue;
+        const def = NODES[obj.ref];
+        expect(def, `map "${mapId}" node "${obj.id}" ref "${obj.ref}" ∉ NODES`).toBeDefined();
+        if (obj.skin !== undefined) {
+          const skinIds = def.skins.map((s) => s.id);
+          expect(
+            skinIds,
+            `map "${mapId}" node "${obj.id}" skin "${obj.skin}" ∉ def "${obj.ref}" skins [${skinIds.join(', ')}]`,
+          ).toContain(obj.skin);
+        }
+      }
+    }
+  });
+
+  it('every node-def skin (live + depleted) references an asset in the committed catalog', () => {
+    const catalogIds = new Set(catalogJson.assets.map((a) => a.id));
+    for (const def of Object.values(NODES)) {
+      for (const skin of def.skins) {
+        expect(
+          catalogIds,
+          `def "${def.id}" skin "${skin.id}" asset "${skin.asset}" ∉ catalog`,
+        ).toContain(skin.asset);
+        if (skin.depleted) {
+          expect(
+            catalogIds,
+            `def "${def.id}" skin "${skin.id}" depleted asset "${skin.depleted.asset}" ∉ catalog`,
+          ).toContain(skin.depleted.asset);
+        }
+      }
+    }
   });
 });

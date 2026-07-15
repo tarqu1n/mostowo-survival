@@ -19,6 +19,7 @@ import {
   type PlayerState,
 } from '../data/tileset';
 import { ITEMS } from '../data/items';
+import { NODES } from '../data/nodes';
 import { loadMapFile } from '../systems/mapRuntime';
 import type { MapFile } from '../systems/mapFormat';
 import { parseAssetId, tilesetAssetUrl } from '../render/assetPaths';
@@ -69,13 +70,12 @@ export class PreloadScene extends Phaser.Scene {
     const url = (relPath: string): string => encodeURI(`${base}/${relPath}`);
 
     // Terrain: load each distinct sheet once (deduped by path) as a TILE_SIZE spritesheet; load
-    // each standalone image tile (e.g. the extracted tree) once. GameScene reads them via resolveTile.
+    // each standalone image tile once. GameScene reads them via resolveTile. Node sprites
+    // (tree/rock/bush) are NO LONGER manifest roles (plan 021 step 6) — they load per-skin from the
+    // catalog in `queueMapTextures`, alongside decor, only for the defs the loaded map references.
     const tileSources: TileSource[] = [
       ...manifest.tiles.ground.map((g) => g.source),
       manifest.tiles.wall,
-      manifest.tiles.tree,
-      manifest.tiles.rock,
-      manifest.tiles.bush,
     ];
     const loadedSheets = new Set<string>();
     const loadedImages = new Set<string>();
@@ -191,12 +191,14 @@ export class PreloadScene extends Phaser.Scene {
 
   /**
    * Queue every texture the start map needs beyond the base ACTIVE_TILESET load — palette sources
-   * (deduped, honouring each entry's own `pack`) + decor sheets/images — via the runtime asset-path
-   * helpers, never `src/editor` (plan 018 guardrail). Mirrors `EditorScene.queueTextures`. Node
-   * objects render as their tile-role sprite (tree/rock/bush), all of which the base preload already
-   * loaded, so they need nothing here. Guards already-resident (`textures.exists`) and already-queued
-   * (`seen`) keys — for `test.map.json` the palette is `Floors_Tiles.png` (already resident), so in
-   * practice only decor is queued. Returns whether anything was queued (nothing → proceed at once).
+   * (deduped, honouring each entry's own `pack`) + decor sheets/images + node-skin sprites — via the
+   * runtime asset-path helpers, never `src/editor` (plan 018 guardrail). Mirrors
+   * `EditorScene.queueTextures`. Node objects render per skin from the catalog (plan 021 step 6):
+   * union each def's live + depleted skin assets so a placed skin OR its stump swap always has a
+   * resident texture. Scope differs by build: PRODUCTION loads only the defs the loaded map
+   * references (lean); DEV loads EVERY def, because the __test API + dev-menu randomiser place
+   * arbitrary defs at runtime (see the branch comment). Guards already-resident (`textures.exists`)
+   * and already-queued (`seen`) keys. Returns whether anything was queued (nothing → proceed at once).
    */
   private queueMapTextures(map: MapFile): boolean {
     const seen = new Set<string>();
@@ -229,6 +231,42 @@ export class PreloadScene extends Phaser.Scene {
         // A single malformed decor ref shouldn't abort the whole boot — warn and skip (matches the
         // editor). Its sprite simply won't render; DecorManager (A7) skips a missing texture too.
         console.warn(`[preload] skipping decor "${obj.id}": ${(e as Error).message}`);
+      }
+    }
+
+    // Node skins: a skin references a catalog asset the same way decor does (whole image or a region
+    // crop, never an anim — both share the plain `tileImageKey`). Load every skin (live + depleted)
+    // of every def any node references so both the placed skin and its regrow/deplete swap resolve.
+    const queueSkinAsset = (asset: string, ctx: string): void => {
+      try {
+        const { pack, path } = parseAssetId(asset);
+        addImage(tileImageKey(path), tilesetAssetUrl(pack, path));
+      } catch (e) {
+        console.warn(
+          `[preload] skipping node skin asset "${asset}" (${ctx}): ${(e as Error).message}`,
+        );
+      }
+    };
+    const queueDefSkins = (def: (typeof NODES)[string], ctxId: string): void => {
+      for (const skin of def.skins) {
+        queueSkinAsset(skin.asset, `${ctxId}/${skin.id}`);
+        if (skin.depleted) queueSkinAsset(skin.depleted.asset, `${ctxId}/${skin.id} depleted`);
+      }
+    };
+    if (import.meta.env.DEV) {
+      // DEV-only: the __test API (applyScenario) and the dev-menu world randomiser add nodes of ANY
+      // def at runtime, not just those the start map references — so preload EVERY def's skins here so
+      // a runtime-placed node always has a resident texture. `vite build` dead-code-eliminates this
+      // whole branch, so production stays lean: only the defs the loaded map references (below) load.
+      for (const def of Object.values(NODES)) queueDefSkins(def, def.id);
+    } else {
+      const seenNodeRefs = new Set<string>();
+      for (const obj of map.objects) {
+        if (obj.kind !== 'node' || seenNodeRefs.has(obj.ref)) continue;
+        seenNodeRefs.add(obj.ref);
+        const def = NODES[obj.ref];
+        if (!def) continue; // unknown ref — ResourceNodeManager warns + skips it at load
+        queueDefSkins(def, obj.ref);
       }
     }
 

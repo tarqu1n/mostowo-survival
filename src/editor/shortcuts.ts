@@ -38,6 +38,10 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ['↑ ↓ ← →'], action: 'Nudge the selection 1px (decor) for fine positioning' },
       { keys: ['Shift + ↑ ↓ ← →'], action: 'Move the selection one whole tile' },
       { keys: ['Delete', 'Backspace'], action: 'Delete the selected object(s)' },
+      {
+        keys: ['S'],
+        action: "Cycle the selected node's skin to the next variant (node with ≥2 skins)",
+      },
     ],
   },
   {

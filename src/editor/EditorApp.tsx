@@ -7,6 +7,7 @@ import { Toolbar } from './Toolbar';
 import { PhaserViewport } from './PhaserViewport';
 import { ObjectEditorTab } from './tabs/ObjectEditorTab';
 import { WorldViewTab } from './tabs/WorldViewTab';
+import { NodeTypesTab } from './tabs/NodeTypesTab';
 import { LibraryPanel } from './panels/LibraryPanel';
 import { LayersPanel } from './panels/LayersPanel';
 import { ZonesPanel } from './panels/ZonesPanel';
@@ -82,6 +83,20 @@ export function EditorApp() {
         useEditorStore.getState().toggleUnderlayVisible();
         return;
       }
+      // S = cycle the selected node's skin to the next in its def's list (plan 021 step 9). Plain 's'
+      // only, single node selected; the store action no-ops for defs with <2 skins. The INPUT/SELECT
+      // guard above means this never fires while editing a field.
+      if (e.key.toLowerCase() === 's' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const ids = useEditorStore.getState().selectedObjectIds;
+        if (ids.length === 1) {
+          const sel = useEditorStore.getState().map?.objects.find((o) => o.id === ids[0]);
+          if (sel?.kind === 'node') {
+            e.preventDefault();
+            useEditorStore.getState().cycleNodeSkin(ids[0]);
+          }
+        }
+        return;
+      }
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const ids = useEditorStore.getState().selectedObjectIds;
         if (ids.length > 0) {
@@ -149,7 +164,9 @@ export function EditorApp() {
                         ? 'Map'
                         : tab.kind === 'world'
                           ? 'World'
-                          : (tab.assetId.split('/').pop() ?? tab.assetId);
+                          : tab.kind === 'nodeTypes'
+                            ? 'Node Types'
+                            : (tab.assetId.split('/').pop() ?? tab.assetId);
                     return (
                       <button
                         key={tab.id}
@@ -240,6 +257,13 @@ export function EditorApp() {
                       return (
                         <div key={tab.id} className={panelClass}>
                           <WorldViewTab />
+                        </div>
+                      );
+                    }
+                    if (tab.kind === 'nodeTypes') {
+                      return (
+                        <div key={tab.id} className={panelClass}>
+                          <NodeTypesTab />
                         </div>
                       );
                     }

@@ -11,6 +11,8 @@
  *   PUT  /__editor/maps/:id        -> writes body to src/data/maps/<id>.map.json, regens manifest
  *   GET  /__editor/world           -> src/data/maps/world.json contents
  *   PUT  /__editor/world           -> writes body to world.json, regens manifest
+ *   GET  /__editor/nodes           -> src/data/maps/nodes.json contents
+ *   PUT  /__editor/nodes           -> writes body to nodes.json (NO manifest regen — not a placement)
  *   PUT  /__editor/maps/:id/thumb  -> writes PNG body to public/assets/maps/thumbs/<id>.png
  *   PUT  /__editor/asset-override  -> patches a pack.json asset override, reruns the asset pipeline
  *   PUT  /__editor/asset-regions   -> replaces a pack.json regions list, reruns the asset pipeline
@@ -77,6 +79,7 @@ import {
   openSync,
   readSync,
   closeSync,
+  rmSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -371,6 +374,7 @@ export function editorApiPlugin() {
       const root = server.config.root;
       const mapsDir = join(root, 'src/data/maps');
       const worldPath = join(mapsDir, 'world.json');
+      const nodesPath = join(mapsDir, 'nodes.json');
       const thumbsDir = join(root, 'public/assets/maps/thumbs');
       const tilesetsDir = join(root, 'public/assets/tilesets');
       const referencesDir = join(root, 'scripts/map-reference/out');
@@ -401,6 +405,25 @@ export function editorApiPlugin() {
             if (req.method === 'PUT') {
               writeFileSync(worldPath, await readBody(req));
               regenerateManifest(mapsDir);
+              sendJson(res, 200, { ok: true });
+              return;
+            }
+          }
+
+          if (path === '/__editor/nodes') {
+            // Node defs (plan 021 step 7) — a net-new endpoint, NOT a reuse of `/world`'s handler:
+            // `nodes.json` isn't a map placement, so a write here does NOT regenerate `manifest.json`
+            // (see module doc's endpoint list).
+            if (req.method === 'GET') {
+              if (!existsSync(nodesPath)) {
+                sendJson(res, 404, { error: 'nodes.json not found' });
+                return;
+              }
+              sendRawJsonFile(res, nodesPath);
+              return;
+            }
+            if (req.method === 'PUT') {
+              writeFileSync(nodesPath, await readBody(req));
               sendJson(res, 200, { ok: true });
               return;
             }
@@ -636,6 +659,21 @@ export function editorApiPlugin() {
             }
             if (!isThumb && req.method === 'PUT') {
               writeFileSync(mapPath, await readBody(req));
+              regenerateManifest(mapsDir);
+              sendJson(res, 200, { ok: true });
+              return;
+            }
+            if (!isThumb && req.method === 'DELETE') {
+              if (!existsSync(mapPath)) {
+                sendJson(res, 404, { error: `map "${id}" not found` });
+                return;
+              }
+              rmSync(mapPath);
+              // Best-effort: a map may not have a thumb yet.
+              const thumbPath = join(thumbsDir, `${id}.png`);
+              if (existsSync(thumbPath)) {
+                rmSync(thumbPath);
+              }
               regenerateManifest(mapsDir);
               sendJson(res, 200, { ok: true });
               return;

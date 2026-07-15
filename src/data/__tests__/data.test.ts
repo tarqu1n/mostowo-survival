@@ -32,6 +32,8 @@ describe('ITEMS', () => {
   });
 });
 
+// `NODES` is `parseNodeDefs(nodesJson)` (src/data/nodes.ts) — these assertions run against the
+// committed `src/data/maps/nodes.json`, parsed and validated by `parseNodeDefs` (plan 021 step 2).
 describe('NODES', () => {
   it('every entry is keyed by its own id', () => {
     for (const [key, node] of Object.entries(NODES)) {

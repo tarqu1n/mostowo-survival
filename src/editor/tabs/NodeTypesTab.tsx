@@ -1,0 +1,851 @@
+import { useEffect, useId, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { ITEMS } from '../../data/items';
+import type { DecorRegion } from '../../systems/mapFormat';
+import { parseNodeDefs, type AuthoredNodeDef, type NodeSkinDef } from '../../systems/nodeDefs';
+import { putNodes } from '../api';
+import type { AssetCatalog } from '../catalog';
+import { cn } from '../lib/utils';
+import { NodeSpritePickerDialog } from '../NodeSpritePickerDialog';
+import { colorToHex, hexToColor, validateNodeDefPatch } from '../nodeTypesUi';
+import { PLACEHOLDER_SKIN_ASSET, useEditorStore } from '../store/editorStore';
+import { tilesetAssetUrl } from '../textureLoading';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
+
+/**
+ * "Node Types" authoring panel (plan 021 step 8) — a permanent central-pane tab (alongside Map/
+ * World, mirroring `WorldViewTab`'s structure) that lets a user CREATE/duplicate/delete resource-node
+ * DEFS and author their stats + skins, replacing hand-editing `src/data/maps/nodes.json`. Two panes:
+ * a left def list (create/duplicate/delete) and a right detail view — a stats form (batched draft +
+ * explicit Save, validated live via `validateNodeDefPatch`, which runs the SAME `parseNodeDefs` choke
+ * point every other node-def mutation commits through) and a skin manager (add/remove/reorder skins;
+ * per-skin live + optional depleted sprite via `NodeSpritePickerDialog`, weight, optional sizing
+ * overrides). Persisting the whole registry to disk (`PUT /__editor/nodes`) is a separate top-bar
+ * "Save node types" button gated on `nodeDefsDirty`, mirroring `WorldViewTab`'s "Save world" button —
+ * the in-store create/duplicate/update/skin actions all commit to the LIVE store immediately (so the
+ * Library palette reflects them without a reload — see `LibraryPanel`'s module doc), independent of
+ * whether the user has written that registry to `nodes.json` yet.
+ *
+ * Visibility: like every tab panel (see `WorldViewTab`'s header note), this owns no show/hide —
+ * `EditorApp` mounts every panel at once and hides inactive ones with `invisible pointer-events-none`
+ * (never `display:none`).
+ */
+
+const headingClass = 'text-[0.85rem] uppercase tracking-[0.04em] text-fg-dim';
+const fieldClass = 'flex flex-col gap-[3px]';
+const fieldLabelClass = 'text-[0.8rem] font-normal text-fg-dim';
+const fieldInputClass =
+  'h-auto border-border bg-inset px-1.5 py-1 text-[0.8rem] text-fg shadow-none md:text-[0.8rem]';
+
+export function NodeTypesTab() {
+  const nodeDefs = useEditorStore((s) => s.nodeDefs);
+  const nodeDefsDirty = useEditorStore((s) => s.nodeDefsDirty);
+  const catalog = useEditorStore((s) => s.catalog);
+  // `map` is mutated in place by store commands (module convention — see LibraryPanel/InspectorPanel's
+  // doc), so subscribe to the revision counters purely as re-render triggers and read it live below.
+  // Both are threaded into `referencedDefIds`'s useMemo deps below (NOT `map` itself, whose reference
+  // never changes on an in-place mutation like `placeNode` — a `[map]` dep would silently never
+  // recompute after the first placement).
+  const docRevision = useEditorStore((s) => s.docRevision);
+  const mapEpoch = useEditorStore((s) => s.mapEpoch);
+  const map = useEditorStore.getState().map;
+
+  const [selectedId, setSelectedId] = useState<string | null>(nodeDefs[0]?.id ?? null);
+  const [saving, setSaving] = useState(false);
+
+  // If the selected def was deleted (by this panel or elsewhere), fall back to the first remaining def.
+  useEffect(() => {
+    if (selectedId !== null && !nodeDefs.some((d) => d.id === selectedId)) {
+      setSelectedId(nodeDefs[0]?.id ?? null);
+    }
+  }, [nodeDefs, selectedId]);
+
+  const selected = nodeDefs.find((d) => d.id === selectedId) ?? null;
+
+  const referencedDefIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (map) {
+      for (const obj of map.objects) {
+        if (obj.kind === 'node') ids.add(obj.ref);
+      }
+    }
+    return ids;
+    // Deliberately NOT `[map]` — see the field doc above: `map`'s reference never changes on an
+    // in-place mutation, so `docRevision`/`mapEpoch` are the real recompute signals.
+  }, [docRevision, mapEpoch]);
+
+  async function handleSaveNodeTypes(): Promise<void> {
+    setSaving(true);
+    try {
+      const json = `${JSON.stringify({ version: 1, defs: nodeDefs }, null, 2)}\n`;
+      parseNodeDefs(JSON.parse(json)); // validate the exact bytes before writing (mirrors handleSave in WorldViewTab)
+      await putNodes(json);
+      useEditorStore.getState().markNodeDefsSaved();
+      toast.success('Saved node types.');
+    } catch (e) {
+      toast.error(`Node types save failed: ${(e as Error).message}`, { duration: 5000 });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex h-full w-full">
+      <aside className="flex w-[240px] shrink-0 flex-col gap-2 overflow-auto border-r border-surface bg-raised p-3">
+        <div className="flex items-center justify-between">
+          <h2 className={headingClass}>Node types</h2>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              const id = useEditorStore.getState().createNodeDef();
+              if (id) setSelectedId(id);
+            }}
+          >
+            + New
+          </Button>
+        </div>
+        {nodeDefs.length === 0 && (
+          <p className="text-[0.85rem] text-muted-2">No node types defined.</p>
+        )}
+        <div className="flex flex-col gap-1">
+          {nodeDefs.map((def) => {
+            const referenced = referencedDefIds.has(def.id);
+            const active = def.id === selectedId;
+            return (
+              <div
+                key={def.id}
+                className={cn(
+                  'flex items-center gap-1 rounded-md border border-transparent p-1',
+                  active && 'border-gold-light bg-surface',
+                )}
+              >
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 truncate text-left text-[0.82rem] text-fg"
+                  title={def.id}
+                  onClick={() => setSelectedId(def.id)}
+                >
+                  {def.name || def.id}
+                  <span className="ml-1 text-[0.68rem] text-muted-2">{def.id}</span>
+                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={() => {
+                        const newId = useEditorStore.getState().duplicateNodeDef(def.id);
+                        if (newId) setSelectedId(newId);
+                      }}
+                    >
+                      ⧉
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Duplicate</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-xs"
+                        disabled={referenced}
+                        onClick={() => useEditorStore.getState().deleteNodeDef(def.id)}
+                      >
+                        ✕
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {referenced ? "Can't delete — placed in the open map" : 'Delete this node type'}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            );
+          })}
+        </div>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex flex-none items-center gap-3 border-b border-surface bg-raised px-3 py-1.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={saving || !nodeDefsDirty}
+                onClick={() => void handleSaveNodeTypes()}
+              >
+                Save node types
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {nodeDefsDirty
+                ? 'Write nodes.json (PUT /__editor/nodes)'
+                : 'No unsaved node-type changes'}
+            </TooltipContent>
+          </Tooltip>
+          {nodeDefsDirty && (
+            <span className="text-gold" title="Unsaved node-type changes">
+              ●
+            </span>
+          )}
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto p-3">
+          {!selected ? (
+            <p className="text-[0.9rem] text-muted-2">
+              No node type selected — create one to get started.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-4" key={selected.id}>
+              <NodeStatsForm def={selected} allDefs={nodeDefs} />
+              <SkinManager def={selected} catalog={catalog} map={map} />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type HarvestAnimOption = '' | 'chop' | 'gather' | 'mine';
+
+interface StatsDraft {
+  name: string;
+  maxHpText: string;
+  yieldItemId: string;
+  yieldPerHitText: string;
+  regrowMsText: string;
+  blocksPath: boolean;
+  harvestAnim: HarvestAnimOption;
+  colorHex: string;
+  stumpColorHex: string;
+  tilesTallText: string;
+  originXText: string;
+  originYText: string;
+}
+
+function draftOf(def: AuthoredNodeDef): StatsDraft {
+  return {
+    name: def.name,
+    maxHpText: String(def.maxHp),
+    yieldItemId: def.yieldItemId,
+    yieldPerHitText: String(def.yieldPerHit),
+    regrowMsText: String(def.regrowMs),
+    blocksPath: def.blocksPath,
+    harvestAnim: def.harvestAnim ?? '',
+    colorHex: colorToHex(def.color),
+    stumpColorHex: colorToHex(def.stumpColor),
+    tilesTallText: String(def.tilesTall),
+    originXText: String(def.originX),
+    originYText: String(def.originY),
+  };
+}
+
+/** Builds the `updateNodeDef` patch this draft represents. Numeric fields parse whatever text is
+ *  currently typed (including a mid-edit `NaN`, e.g. a lone "-") straight into the candidate —
+ *  `validateNodeDefPatch`/`parseNodeDefs` surface that as a normal inline error rather than this
+ *  component inventing its own numeric-parsing rules (single validation source of truth). */
+function draftToPatch(d: StatsDraft): Partial<Omit<AuthoredNodeDef, 'id' | 'skins'>> {
+  return {
+    name: d.name,
+    maxHp: Number(d.maxHpText),
+    yieldItemId: d.yieldItemId,
+    yieldPerHit: Number(d.yieldPerHitText),
+    regrowMs: Number(d.regrowMsText),
+    blocksPath: d.blocksPath,
+    harvestAnim: d.harvestAnim === '' ? undefined : d.harvestAnim,
+    color: hexToColor(d.colorHex),
+    stumpColor: hexToColor(d.stumpColorHex),
+    tilesTall: Number(d.tilesTallText),
+    originX: Number(d.originXText),
+    originY: Number(d.originYText),
+  };
+}
+
+function statsEqual(a: StatsDraft, b: StatsDraft): boolean {
+  return (
+    a.name === b.name &&
+    a.maxHpText === b.maxHpText &&
+    a.yieldItemId === b.yieldItemId &&
+    a.yieldPerHitText === b.yieldPerHitText &&
+    a.regrowMsText === b.regrowMsText &&
+    a.blocksPath === b.blocksPath &&
+    a.harvestAnim === b.harvestAnim &&
+    a.colorHex === b.colorHex &&
+    a.stumpColorHex === b.stumpColorHex &&
+    a.tilesTallText === b.tilesTallText &&
+    a.originXText === b.originXText &&
+    a.originYText === b.originYText
+  );
+}
+
+/** The def's stats form — a BATCHED draft (not per-field auto-commit like the Inspector's
+ *  `NumberField`): every field edit updates local state and re-validates live via
+ *  `validateNodeDefPatch`, but nothing commits to the store until "Save changes", which is disabled
+ *  while the draft is invalid OR unchanged. Remounted (via the parent's `key={selected.id}`) whenever
+ *  the selected def changes, so switching defs always starts from a clean draft. */
+function NodeStatsForm({ def, allDefs }: { def: AuthoredNodeDef; allDefs: AuthoredNodeDef[] }) {
+  const [draft, setDraft] = useState<StatsDraft>(() => draftOf(def));
+  const nameId = useId();
+  const yieldId = useId();
+  const harvestId = useId();
+
+  const patch = draftToPatch(draft);
+  const error = validateNodeDefPatch(allDefs, def.id, patch);
+  const dirty = !statsEqual(draft, draftOf(def));
+
+  function set<K extends keyof StatsDraft>(key: K, value: StatsDraft[K]): void {
+    setDraft((d) => ({ ...d, [key]: value }));
+  }
+
+  function save(): void {
+    if (error) return;
+    useEditorStore.getState().updateNodeDef(def.id, patch);
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-surface bg-inset p-3">
+      <div className="flex items-center justify-between">
+        <h3 className={headingClass}>Stats — {def.id}</h3>
+        <Button size="sm" disabled={!!error || !dirty} onClick={save}>
+          Save changes
+        </Button>
+      </div>
+
+      <div className={fieldClass}>
+        <Label htmlFor={nameId} className={fieldLabelClass}>
+          Name
+        </Label>
+        <Input
+          id={nameId}
+          className={fieldInputClass}
+          value={draft.name}
+          onChange={(e) => set('name', e.target.value)}
+        />
+      </div>
+
+      <div className="flex gap-2">
+        <div className={cn(fieldClass, 'flex-1')}>
+          <Label className={fieldLabelClass}>Max HP</Label>
+          <Input
+            type="number"
+            className={fieldInputClass}
+            value={draft.maxHpText}
+            onChange={(e) => set('maxHpText', e.target.value)}
+          />
+        </div>
+        <div className={cn(fieldClass, 'flex-1')}>
+          <Label className={fieldLabelClass}>Yield / hit</Label>
+          <Input
+            type="number"
+            className={fieldInputClass}
+            value={draft.yieldPerHitText}
+            onChange={(e) => set('yieldPerHitText', e.target.value)}
+          />
+        </div>
+        <div className={cn(fieldClass, 'flex-1')}>
+          <Label className={fieldLabelClass}>Regrow (ms)</Label>
+          <Input
+            type="number"
+            className={fieldInputClass}
+            value={draft.regrowMsText}
+            onChange={(e) => set('regrowMsText', e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className={fieldClass}>
+        <Label htmlFor={yieldId} className={fieldLabelClass}>
+          Yield item
+        </Label>
+        <Select value={draft.yieldItemId} onValueChange={(v) => set('yieldItemId', v)}>
+          <SelectTrigger id={yieldId} size="sm" className={cn(fieldInputClass, 'w-full')}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(ITEMS).map(([id, item]) => (
+              <SelectItem key={id} value={id}>
+                {item.name} ({id})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <label className="flex items-center gap-1.5 text-[0.8rem] text-fg-muted">
+          <input
+            type="checkbox"
+            checked={draft.blocksPath}
+            onChange={(e) => set('blocksPath', e.target.checked)}
+          />
+          Blocks path
+        </label>
+        <div className={fieldClass}>
+          <Label htmlFor={harvestId} className={fieldLabelClass}>
+            Harvest anim
+          </Label>
+          <Select
+            value={draft.harvestAnim || '__none__'}
+            onValueChange={(v) =>
+              set('harvestAnim', v === '__none__' ? '' : (v as HarvestAnimOption))
+            }
+          >
+            <SelectTrigger id={harvestId} size="sm" className={cn(fieldInputClass, 'w-[140px]')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">none</SelectItem>
+              <SelectItem value="chop">chop</SelectItem>
+              <SelectItem value="gather">gather</SelectItem>
+              <SelectItem value="mine">mine</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="flex gap-4">
+        <div className={fieldClass}>
+          <Label className={fieldLabelClass}>Color</Label>
+          <input
+            type="color"
+            className="h-8 w-14 rounded border border-border bg-inset"
+            value={draft.colorHex}
+            onChange={(e) => set('colorHex', e.target.value)}
+          />
+        </div>
+        <div className={fieldClass}>
+          <Label className={fieldLabelClass}>Stump color</Label>
+          <input
+            type="color"
+            className="h-8 w-14 rounded border border-border bg-inset"
+            value={draft.stumpColorHex}
+            onChange={(e) => set('stumpColorHex', e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <div className={cn(fieldClass, 'flex-1')}>
+          <Label className={fieldLabelClass}>Tiles tall</Label>
+          <Input
+            type="number"
+            className={fieldInputClass}
+            value={draft.tilesTallText}
+            onChange={(e) => set('tilesTallText', e.target.value)}
+          />
+        </div>
+        <div className={cn(fieldClass, 'flex-1')}>
+          <Label className={fieldLabelClass}>Origin X</Label>
+          <Input
+            type="number"
+            step={0.1}
+            className={fieldInputClass}
+            value={draft.originXText}
+            onChange={(e) => set('originXText', e.target.value)}
+          />
+        </div>
+        <div className={cn(fieldClass, 'flex-1')}>
+          <Label className={fieldLabelClass}>Origin Y</Label>
+          <Input
+            type="number"
+            step={0.1}
+            className={fieldInputClass}
+            value={draft.originYText}
+            onChange={(e) => set('originYText', e.target.value)}
+          />
+        </div>
+      </div>
+
+      {error && <p className="text-[0.78rem] text-danger">{error}</p>}
+    </div>
+  );
+}
+
+/** One 40px crop-or-whole thumbnail for a skin's `asset`/`region` — mirrors the crop math
+ *  `LibraryPanel`'s `AtlasSheetPicker`/`FavouriteItem` use for a static preview, kept self-contained
+ *  here rather than shared (see `NodeSpritePickerDialog`'s module doc on why extraction was skipped). */
+function SpriteThumb({
+  assetId,
+  region,
+  catalog,
+}: {
+  assetId: string;
+  region?: DecorRegion;
+  catalog: AssetCatalog | null;
+}) {
+  const size = 40;
+  if (assetId === PLACEHOLDER_SKIN_ASSET) {
+    return (
+      <div
+        className="flex items-center justify-center rounded-[2px] border border-dashed border-border bg-inset text-center text-[0.6rem] leading-tight text-muted-2"
+        style={{ width: size, height: size }}
+      >
+        unset
+      </div>
+    );
+  }
+  const asset = catalog?.assets.find((a) => a.id === assetId);
+  if (!asset) {
+    return (
+      <div
+        className="flex items-center justify-center rounded-[2px] border border-danger-strong bg-inset text-center text-[0.6rem] leading-tight text-danger"
+        style={{ width: size, height: size }}
+        title={assetId}
+      >
+        missing
+      </div>
+    );
+  }
+  const path = asset.source.kind === 'sheetFrame' ? asset.source.sheet : asset.source.path;
+  const url = tilesetAssetUrl(asset.pack, path);
+  if (region) {
+    const scale = size / Math.max(region.w, region.h);
+    return (
+      <div
+        className="pixelated overflow-hidden rounded-[2px] bg-inset"
+        style={{ width: size, height: size }}
+        title={assetId}
+      >
+        <div
+          className="bg-no-repeat"
+          style={{
+            width: asset.w * scale,
+            height: asset.h * scale,
+            backgroundImage: `url(${url})`,
+            backgroundPosition: `${-region.x * scale}px ${-region.y * scale}px`,
+            backgroundSize: `${asset.w * scale}px ${asset.h * scale}px`,
+          }}
+        />
+      </div>
+    );
+  }
+  return (
+    <div
+      className="pixelated rounded-[2px] bg-inset bg-contain bg-center bg-no-repeat"
+      style={{ width: size, height: size, backgroundImage: `url(${url})` }}
+      title={assetId}
+    />
+  );
+}
+
+type PickerTarget = { skinId: string; which: 'live' | 'depleted' };
+
+function SkinManager({
+  def,
+  catalog,
+  map,
+}: {
+  def: AuthoredNodeDef;
+  catalog: AssetCatalog | null;
+  map: ReturnType<typeof useEditorStore.getState>['map'];
+}) {
+  const [pickerFor, setPickerFor] = useState<PickerTarget | null>(null);
+
+  function skinReferenced(skinId: string): boolean {
+    if (!map) return false;
+    return map.objects.some((o) => o.kind === 'node' && o.ref === def.id && o.skin === skinId);
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-surface bg-inset p-3">
+      <div className="flex items-center justify-between">
+        <h3 className={headingClass}>Skins</h3>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => useEditorStore.getState().addSkin(def.id)}
+        >
+          + Add skin
+        </Button>
+      </div>
+      <div className="flex flex-col gap-2">
+        {def.skins.map((skin, index) => (
+          <SkinRow
+            key={skin.id}
+            def={def}
+            skin={skin}
+            index={index}
+            lastIndex={def.skins.length - 1}
+            catalog={catalog}
+            removeDisabled={def.skins.length <= 1 || skinReferenced(skin.id)}
+            removeDisabledReason={
+              def.skins.length <= 1
+                ? 'A node type needs at least one skin'
+                : "Can't remove — placed on a node in the open map"
+            }
+            onPickLive={() => setPickerFor({ skinId: skin.id, which: 'live' })}
+            onPickDepleted={() => setPickerFor({ skinId: skin.id, which: 'depleted' })}
+          />
+        ))}
+      </div>
+      <NodeSpritePickerDialog
+        open={pickerFor !== null}
+        onOpenChange={(open) => {
+          if (!open) setPickerFor(null);
+        }}
+        title={pickerFor?.which === 'depleted' ? 'Pick depleted sprite' : 'Pick live sprite'}
+        catalog={catalog}
+        onPick={(asset, region) => {
+          if (!pickerFor) return;
+          if (pickerFor.which === 'live') {
+            useEditorStore.getState().updateSkin(def.id, pickerFor.skinId, { asset, region });
+          } else {
+            useEditorStore
+              .getState()
+              .updateSkin(def.id, pickerFor.skinId, { depleted: { asset, region } });
+          }
+          setPickerFor(null);
+        }}
+      />
+    </div>
+  );
+}
+
+function SkinRow({
+  def,
+  skin,
+  index,
+  lastIndex,
+  catalog,
+  removeDisabled,
+  removeDisabledReason,
+  onPickLive,
+  onPickDepleted,
+}: {
+  def: AuthoredNodeDef;
+  skin: NodeSkinDef;
+  index: number;
+  lastIndex: number;
+  catalog: AssetCatalog | null;
+  removeDisabled: boolean;
+  removeDisabledReason: string;
+  onPickLive: () => void;
+  onPickDepleted: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-surface bg-raised p-2">
+      <div className="flex items-center gap-2">
+        <span className="text-[0.78rem] text-fg">{skin.id}</span>
+        {index === 0 && (
+          <span className="rounded-full bg-gold-light px-1.5 py-0.5 text-[0.65rem] font-semibold text-black">
+            Default
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                disabled={index === 0}
+                onClick={() => useEditorStore.getState().moveSkin(def.id, skin.id, index - 1)}
+              >
+                ▲
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Move up (earlier = higher pick priority order)</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                disabled={index === lastIndex}
+                onClick={() => useEditorStore.getState().moveSkin(def.id, skin.id, index + 1)}
+              >
+                ▼
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Move down</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  disabled={removeDisabled}
+                  onClick={() => useEditorStore.getState().removeSkin(def.id, skin.id)}
+                >
+                  ✕
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{removeDisabled ? removeDisabledReason : 'Remove skin'}</TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+
+      <div className="flex gap-3">
+        <div className="flex flex-col items-center gap-1">
+          <SpriteThumb assetId={skin.asset} region={skin.region} catalog={catalog} />
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-1.5 text-[0.68rem]"
+            onClick={onPickLive}
+          >
+            Live…
+          </Button>
+        </div>
+        <div className="flex flex-col items-center gap-1">
+          {skin.depleted ? (
+            <SpriteThumb
+              assetId={skin.depleted.asset}
+              region={skin.depleted.region}
+              catalog={catalog}
+            />
+          ) : (
+            <div
+              className="flex items-center justify-center rounded-[2px] border border-dashed border-border bg-inset text-center text-[0.6rem] leading-tight text-muted-2"
+              style={{ width: 40, height: 40 }}
+            >
+              none
+            </div>
+          )}
+          <div className="flex gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-1.5 text-[0.68rem]"
+              onClick={onPickDepleted}
+            >
+              Depleted…
+            </Button>
+            {skin.depleted && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-1.5 text-[0.68rem]"
+                onClick={() =>
+                  useEditorStore.getState().updateSkin(def.id, skin.id, { depleted: undefined })
+                }
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-1 flex-col gap-1.5">
+          <NumField
+            label="Weight"
+            value={skin.weight ?? 1}
+            onCommit={(weight) => useEditorStore.getState().updateSkin(def.id, skin.id, { weight })}
+          />
+          <div className="flex gap-1.5">
+            <OptionalNumField
+              label="Tiles tall (override)"
+              value={skin.tilesTall}
+              onCommit={(tilesTall) =>
+                useEditorStore.getState().updateSkin(def.id, skin.id, { tilesTall })
+              }
+            />
+            <OptionalNumField
+              label="Origin X (override)"
+              value={skin.originX}
+              onCommit={(originX) =>
+                useEditorStore.getState().updateSkin(def.id, skin.id, { originX })
+              }
+            />
+            <OptionalNumField
+              label="Origin Y (override)"
+              value={skin.originY}
+              onCommit={(originY) =>
+                useEditorStore.getState().updateSkin(def.id, skin.id, { originY })
+              }
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** A required numeric field that commits on blur/Enter — mirrors `InspectorPanel`'s `NumberField`
+ *  (uncontrolled, `key`-reset on external value change so a rejected/undone edit snaps back). */
+function NumField({
+  label,
+  value,
+  onCommit,
+}: {
+  label: string;
+  value: number;
+  onCommit: (n: number) => void;
+}) {
+  const id = useId();
+  return (
+    <div className={fieldClass}>
+      <Label htmlFor={id} className={cn(fieldLabelClass, 'text-[0.7rem]')}>
+        {label}
+      </Label>
+      <Input
+        id={id}
+        type="number"
+        defaultValue={value}
+        key={value}
+        className={cn(fieldInputClass, 'w-24')}
+        onBlur={(e) => {
+          const n = Number(e.target.value);
+          if (Number.isFinite(n) && n !== value) onCommit(n);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        }}
+      />
+    </div>
+  );
+}
+
+/** An OPTIONAL numeric override field (a skin's `tilesTall`/`originX`/`originY`) — blank commits
+ *  `undefined` ("use the def's default"), matching `NodeSkinDef`'s "omitted ⇒ inherit" semantics. */
+function OptionalNumField({
+  label,
+  value,
+  onCommit,
+}: {
+  label: string;
+  value: number | undefined;
+  onCommit: (n: number | undefined) => void;
+}) {
+  const id = useId();
+  return (
+    <div className={cn(fieldClass, 'flex-1')}>
+      <Label htmlFor={id} className={cn(fieldLabelClass, 'text-[0.7rem]')}>
+        {label}
+      </Label>
+      <Input
+        id={id}
+        type="number"
+        placeholder="default"
+        defaultValue={value ?? ''}
+        key={value ?? '__unset__'}
+        className={fieldInputClass}
+        onBlur={(e) => {
+          const raw = e.target.value.trim();
+          if (raw === '') {
+            if (value !== undefined) onCommit(undefined);
+            return;
+          }
+          const n = Number(raw);
+          if (Number.isFinite(n) && n !== value) onCommit(n);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        }}
+      />
+    </div>
+  );
+}
