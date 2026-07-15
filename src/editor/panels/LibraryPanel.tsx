@@ -14,6 +14,8 @@ import type { ResourceNodeDef } from '../../data/types';
 import type { DecorAnim, DecorRegion } from '../../systems/mapFormat';
 import { parseAssetId, tilesetAssetUrl } from '../textureLoading';
 import { loadCatalog } from '../catalogSource';
+import { loadTerrainCatalog } from '../terrainCatalogSource';
+import type { TerrainDef } from '../terrainCatalog';
 import {
   catalogTileCols,
   type AssetCatalog,
@@ -72,6 +74,16 @@ const PREVIEW_PX = TILE_SIZE * 2;
 const FAVOURITES = '__favourites__';
 /** Sentinel `selectedCategory` value for the Nodes pseudo-category (step 7). */
 const NODES_CATEGORY = '__nodes__';
+/** Sentinel `selectedCategory` value for the Terrains pseudo-category (step 10). */
+const TERRAINS_CATEGORY = '__terrains__';
+/** On-screen swatch size (px) for a terrain's cropped fill-frame preview — matches `libSwatchClass`'s
+ *  fixed `h-10 w-10` (2.5rem = 40px at the default root size) so the crop math lines up with the
+ *  rendered box exactly, unlike `PREVIEW_PX`'s bigger frame-grid swatches. */
+const TERRAIN_SWATCH_PX = 40;
+/** Fallback sheet column count for a terrain preview crop when the asset catalog hasn't resolved a
+ *  matching entry yet (a load-order race, not a normal steady state) — Floors/Wall sheets are 25 cols
+ *  @ TILE_SIZE (see `src/data/tileset.ts`'s module doc). */
+const TERRAIN_SHEET_COLS_FALLBACK = 25;
 /** Max on-screen width/height (px) for an atlas sheet preview (step 7b) — caps a dense sheet like
  *  `Furniture.png` (800×864) to something that fits the Library pane; hotspots scale down with it so
  *  they still land on the right sprite. Sheets already smaller than this render at native size. */
@@ -155,6 +167,8 @@ export function LibraryPanel() {
   const armedObjectAsset = useEditorStore((s) => s.armedObjectAsset);
   const armedNodeRef = useEditorStore((s) => s.armedNodeRef);
   const activeZoneId = useEditorStore((s) => s.activeZoneId);
+  const terrainCatalog = useEditorStore((s) => s.terrainCatalog);
+  const activeTerrainId = useEditorStore((s) => s.activeTerrainId);
   // Re-render triggers only — see module doc. The actual map/favourites are read fresh below.
   useEditorStore((s) => s.docRevision);
   useEditorStore((s) => s.mapEpoch);
@@ -165,6 +179,11 @@ export function LibraryPanel() {
     let cancelled = false;
     loadCatalog().catch((e: unknown) => {
       if (!cancelled) setError((e as Error).message);
+    });
+    // Terrain defs (plan 014 step 10) load independently — a failure here surfaces as an empty
+    // Terrains category (logged), not a Library-wide error, since it's a much smaller/newer surface.
+    loadTerrainCatalog().catch((e: unknown) => {
+      console.warn('[editor] terrain catalog failed to load:', (e as Error).message);
     });
     return () => {
       cancelled = true;
@@ -194,11 +213,13 @@ export function LibraryPanel() {
   const searchLower = search.trim().toLowerCase();
   const showingFavourites = searchLower.length === 0 && selectedCategory === FAVOURITES;
   const showingNodes = searchLower.length === 0 && selectedCategory === NODES_CATEGORY;
+  const showingTerrains = searchLower.length === 0 && selectedCategory === TERRAINS_CATEGORY;
   const showingCategory =
     searchLower.length === 0 &&
     selectedCategory !== null &&
     selectedCategory !== FAVOURITES &&
-    selectedCategory !== NODES_CATEGORY;
+    selectedCategory !== NODES_CATEGORY &&
+    selectedCategory !== TERRAINS_CATEGORY;
 
   const visibleAssets: CatalogAsset[] = useMemo(() => {
     if (!catalog) return [];
@@ -247,6 +268,13 @@ export function LibraryPanel() {
     s.setArmedNodeRef(ref);
     s.setActiveTool('place');
   }
+  /** Arms a terrain for the terrain brush (step 10) — mirrors `pickTile`/`armObject`/`armNode` each
+   *  switching to the tool their asset paints with. */
+  function armTerrain(id: string): void {
+    const s = useEditorStore.getState();
+    s.setActiveTerrainId(id);
+    s.setActiveTool('terrain');
+  }
   function toggleFavourite(assetId: string): void {
     useEditorStore.getState().toggleFavourite(assetId);
   }
@@ -293,6 +321,15 @@ export function LibraryPanel() {
                 }}
               >
                 🌲 Nodes
+              </TreeItem>
+              <TreeItem
+                active={selectedCategory === TERRAINS_CATEGORY}
+                onClick={() => {
+                  setSelectedPack(null);
+                  setSelectedCategory(TERRAINS_CATEGORY);
+                }}
+              >
+                🟩 Terrains
               </TreeItem>
               {catalog.packs.map((pack) => (
                 <div key={pack.id} className="mb-1">
@@ -349,6 +386,23 @@ export function LibraryPanel() {
                   isArmed={armedNodeRef === def.id}
                   onArm={() => armNode(def.id)}
                 />
+              ))}
+
+            {showingTerrains &&
+              (!terrainCatalog ? (
+                <p className="text-[0.9rem] text-muted-2">Loading terrains…</p>
+              ) : terrainCatalog.terrains.length === 0 ? (
+                <p className="text-[0.9rem] text-muted-2">No terrains defined.</p>
+              ) : (
+                terrainCatalog.terrains.map((def) => (
+                  <TerrainCard
+                    key={def.id}
+                    def={def}
+                    catalog={catalog}
+                    isArmed={activeTerrainId === def.id}
+                    onArm={() => armTerrain(def.id)}
+                  />
+                ))
               ))}
 
             {(showingCategory || searchLower.length > 0) &&
@@ -509,6 +563,48 @@ function NodeCard({
   return (
     <button className={libCardClass(isArmed)} title={def.id} onClick={onArm}>
       <span className={libSwatchClass} style={{ backgroundImage: `url(${url})` }} />
+      <span className={libLabelClass}>{def.name}</span>
+    </button>
+  );
+}
+
+/** One "Terrains" pseudo-category entry (step 10) — click arms the terrain brush. The preview crops
+ *  the terrain's `fillFrame` (the FULL_KEY / fully-surrounded interior tile — also what a big filled
+ *  area mostly reads as) out of its sheet, scaled to the swatch box; when the asset catalog hasn't
+ *  resolved a matching sheet entry yet (a load-order race — the two catalogs fetch independently, see
+ *  the mount effect) it falls back to a hardcoded column count rather than blocking the swatch. */
+function TerrainCard({
+  def,
+  catalog,
+  isArmed,
+  onArm,
+}: {
+  def: TerrainDef;
+  catalog: AssetCatalog;
+  isArmed: boolean;
+  onArm: () => void;
+}) {
+  const sheetAsset = catalog.assets.find(
+    (a) => a.pack === def.pack && a.source.kind === 'sheetFrame' && a.source.sheet === def.sheet,
+  );
+  const cols = sheetAsset ? catalogTileCols(sheetAsset, TILE_SIZE) : TERRAIN_SHEET_COLS_FALLBACK;
+  const rows = sheetAsset ? Math.max(1, Math.round(sheetAsset.h / TILE_SIZE)) : cols;
+  const url = tilesetAssetUrl(def.pack, def.sheet);
+  const col = def.fillFrame % cols;
+  const row = Math.floor(def.fillFrame / cols);
+  return (
+    <button className={libCardClass(isArmed)} title={def.id} onClick={onArm}>
+      <span
+        className={cn(libSwatchClass, 'pixelated')}
+        // Per-frame sprite crop — overrides libSwatchClass's whole-image bg-contain/bg-center via
+        // inline style's higher CSS precedence (mirrors TileFrameGrid's swatch math, at the fixed
+        // card-swatch size).
+        style={{
+          backgroundImage: `url(${url})`,
+          backgroundPosition: `-${col * TERRAIN_SWATCH_PX}px -${row * TERRAIN_SWATCH_PX}px`,
+          backgroundSize: `${cols * TERRAIN_SWATCH_PX}px ${rows * TERRAIN_SWATCH_PX}px`,
+        }}
+      />
       <span className={libLabelClass}>{def.name}</span>
     </button>
   );

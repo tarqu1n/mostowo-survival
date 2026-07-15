@@ -52,11 +52,23 @@ const TOOLS: Array<{ id: EditorTool; label: string; title: string }> = [
     title:
       "Carve the map's irregular shape (drag = void, Alt+drag = restore inside). Mode below picks brush/rect/fill.",
   },
+  {
+    id: 'terrain',
+    label: 'Terrain',
+    title:
+      'Paint an autotiled terrain onto the active layer (drag = paint, Alt+drag = erase). Arm a terrain in the Library first; mode below picks brush/rect/fill.',
+  },
 ];
 
-/** Tools that share the brush/rect/fill gesture selector (`paintMode`, step 8) instead of each
- *  gesture having its own `EditorTool` id like tile painting does — see the store's `PaintMode` doc. */
-const PAINT_MODE_TOOLS: ReadonlySet<EditorTool> = new Set(['collision', 'zone', 'shape']);
+/** Tools that share the brush/rect/fill gesture selector (`paintMode`, step 8, extended step 10)
+ *  instead of each gesture having its own `EditorTool` id like tile painting does — see the store's
+ *  `PaintMode` doc. */
+const PAINT_MODE_TOOLS: ReadonlySet<EditorTool> = new Set([
+  'collision',
+  'zone',
+  'shape',
+  'terrain',
+]);
 const PAINT_MODES: Array<{ id: PaintMode; label: string }> = [
   { id: 'brush', label: 'Brush' },
   { id: 'rect', label: 'Rect' },
@@ -108,6 +120,11 @@ export function Toolbar() {
     if (!current) return;
     setSaving(true);
     try {
+      // Full terrain rebake BEFORE serialize (plan 014 step 10, advisor rule: baked cells are
+      // canonical, the terrain mask is editor-only convenience) — a safety net that guarantees the
+      // saved `cells` can never silently drift from the authored mask, even if an incremental rebake
+      // ever missed a cell. A no-drift save (the common case) is a no-op.
+      useEditorStore.getState().rebakeTerrainsForSave();
       const json = serializeMap(current);
       parseMap(JSON.parse(json)); // validate the exact bytes we're about to write
       await putMap(current.meta.id, json);

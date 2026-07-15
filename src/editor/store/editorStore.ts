@@ -36,13 +36,16 @@ import {
   type PortalFacing,
   type PortalObject,
   type PortalRect,
+  type TerrainSection,
   type TileLayer,
   type ZoneDef,
 } from '../../systems/mapFormat';
 import type { TileSource } from '../../data/tileset';
+import type { Dims } from '../../systems/autotile';
 import type { MapPlacement, WorldLayout } from '../../systems/worldLayout';
 import { GROUND_CHUNK_ROWS } from '../../config';
 import type { AssetCatalog } from '../catalog';
+import type { TerrainCatalog, TerrainDef } from '../terrainCatalog';
 import { parseAssetId } from '../textureLoading';
 import {
   cellsToChanges,
@@ -55,6 +58,7 @@ import {
 import { footprintIsValid, nextObjectId } from '../objectOps';
 import { computeVoidCascade } from '../shapeOps';
 import { defaultZoneColour, nextFreeZoneId } from '../zoneOps';
+import { computeTerrainBake } from '../terrainOps';
 import { HistoryStack, type Command } from './history';
 
 /** A central-pane tab (plan 017 step 1). `map`/`world` are the two permanent, non-closable tabs; an
@@ -76,14 +80,17 @@ export type EditorTool =
   | 'collision'
   | 'zone'
   | 'shape'
+  | 'terrain'
   | 'place'
   | 'portal';
 
-/** Which gesture the `collision`/`zone`/`shape` tools paint with (plan 014 step 8) — mirrors the
- *  brush/rect/fill distinction that tile painting expresses as separate `EditorTool`s, but those
- *  three tools each write a DIFFERENT target grid rather than a tile layer, so one tool id covers all
- *  three gestures and `paintMode` picks the gesture. Tile painting (`brush`/`eraser`/`fill`/`rect`)
- *  ignores this field entirely — it keeps using `activeTool` as its own gesture selector. */
+/** Which gesture the `collision`/`zone`/`shape`/`terrain` tools paint with (plan 014 step 8, extended
+ *  step 10) — mirrors the brush/rect/fill distinction that tile painting expresses as separate
+ *  `EditorTool`s, but these tools each write a DIFFERENT target (a non-tile grid, or — for `terrain` —
+ *  an editor-only mask that then rebakes into a tile layer) rather than painting a tile layer
+ *  directly, so one tool id covers all three gestures and `paintMode` picks the gesture. Tile painting
+ *  (`brush`/`eraser`/`fill`/`rect`) ignores this field entirely — it keeps using `activeTool` as its
+ *  own gesture selector. */
 export type PaintMode = 'brush' | 'rect' | 'fill';
 
 /** A drag/commit delta for `translateObjects` — px for decor (`dxPx`/`dyPx`), tile steps for
@@ -166,6 +173,13 @@ export interface EditorState {
    *  actions). */
   worldDirty: boolean;
   catalog: EditorCatalog;
+  /** Loaded terrain-defs file (`terrains.json`, plan 014 step 10) — `null` until the Library's mount
+   *  fetch (`loadTerrainCatalog`) lands. The terrain brush (armed via `activeTerrainId`) and the
+   *  pre-save full rebake both read this to resolve a terrain id to its sheet + blob mapping. */
+  terrainCatalog: TerrainCatalog | null;
+  /** A `TerrainDef.id` armed for the `terrain` tool (step 10) — mirrors `activeZoneId`'s role for the
+   *  `zone` tool. `null` ⇒ the terrain tool is disarmed (painting/erasing both no-op with a warning). */
+  activeTerrainId: string | null;
   activeLayerId: string | null;
   activeTool: EditorTool;
   brushAsset: string | null;
@@ -247,6 +261,8 @@ export interface EditorState {
    *  create/teardown. See `bakeThumbnail`'s doc. */
   setBakeThumbnail(fn: (() => Promise<Blob | null>) | null): void;
   setCatalog(catalog: EditorCatalog): void;
+  setTerrainCatalog(catalog: TerrainCatalog | null): void;
+  setActiveTerrainId(id: string | null): void;
   markSaved(): void;
   applyCommand(cmd: Command): void;
   /** Applies a world-layout command through the SAME history stack as `applyCommand`, stamping
@@ -362,6 +378,30 @@ export interface EditorState {
   ): void;
   fillShapeFrom(col: number, row: number, inside: boolean): void;
   paintShapeRect(c0: number, r0: number, c1: number, r1: number, inside: boolean): void;
+
+  // ---- terrain (step 10) ----
+  /** Paints (or erases) `activeTerrainId`'s mask for the ACTIVE LAYER along a line segment (brush
+   *  stroke, `strokeId`-coalesced), inside cells only, then rebakes every currently-painted mask cell
+   *  into the layer's real `cells` via `computeTerrainBake` + append-only palette — mask edit + baked
+   *  cell changes land as ONE undoable command. `on=true` paints (armed terrain required); `on=false`
+   *  erases (same armed terrain required — it identifies WHICH section's mask/bake to touch). No-op
+   *  (with a console warning) if no terrain is armed. */
+  paintTerrainLine(
+    fromCol: number,
+    fromRow: number,
+    toCol: number,
+    toRow: number,
+    strokeId: string,
+    on: boolean,
+  ): void;
+  fillTerrainFrom(col: number, row: number, on: boolean): void;
+  paintTerrainRect(c0: number, r0: number, c1: number, r1: number, on: boolean): void;
+  /** Rebakes every `TerrainSection`'s mask into its layer's real `cells` IN FULL — the pre-save
+   *  canonicalization pass (advisor rule: baked cells are canonical, the mask is editor-only
+   *  convenience). Mutates the live map directly and is NOT pushed onto the undo stack (a
+   *  canonicalization pass, not a semantic edit); bumps `docRevision` only if something actually
+   *  changed. Returns whether anything changed. */
+  rebakeTerrainsForSave(): boolean;
 
   // ---- objects: place, transform, stack, portals (step 7) ----
   /** Places a `decor` object at `(x,y)` px with the default cosmetic transform (scale 1, rotation 0,
@@ -536,6 +576,89 @@ function buildShapeCommand(
   };
 }
 
+/**
+ * Builds the ONE undoable command for a terrain-paint operation touching `points` on `layer` (already
+ * filtered to `isInside`). Toggles `terrainId`'s `TerrainSection` mask for `layer.id` at `points` to
+ * `on`, materializing the section lazily on first paint (mirrors `buildShapeCommand` materializing
+ * `map.shape`), then rebakes via `computeTerrainBake`: every currently-painted mask cell's resolved
+ * frame (via `terrainDef.mapping` + append-only palette) diffed against `layer.cells`, PLUS an
+ * explicit clear-to-0 for any cell this edit just erased (mask 1->0). Returns `null` if nothing would
+ * change (every point already at `on`'s value). `existingSection` is a mutable closure variable (not a
+ * captured array index) so repeated undo/redo cycles correctly recreate/re-remove a section that
+ * didn't exist before this command, exactly like `buildShapeCommand` materializes/un-materializes
+ * `map.shape`.
+ */
+function buildTerrainCommand(
+  map: MapFile,
+  layer: TileLayer,
+  terrainId: string,
+  terrainDef: TerrainDef,
+  points: ReadonlyArray<{ col: number; row: number }>,
+  on: boolean,
+): Command | null {
+  const width = map.meta.width;
+  const height = map.meta.height;
+  const layerId = layer.id;
+  let existingSection: TerrainSection | undefined = map.terrain.find(
+    (t) => t.layerId === layerId && t.terrainId === terrainId,
+  );
+  const hadSectionBefore = !!existingSection;
+  const baseCells = existingSection
+    ? existingSection.cells
+    : (new Array(width * height).fill(0) as number[]);
+  const value = on ? 1 : 0;
+  const maskChanges = cellsToChanges(baseCells, width, points, value);
+  if (maskChanges.length === 0) return null;
+
+  const nextMask = baseCells.slice();
+  for (const c of maskChanges) nextMask[c.index] = value;
+  // Cells this edit just erased (1->0) — paintMask no longer reports them, so they need an explicit
+  // clear (see computeTerrainBake's doc).
+  const clearedIndices = new Set(
+    maskChanges.filter((c) => value === 0 && c.prev === 1).map((c) => c.index),
+  );
+
+  const dims: Dims = { cols: width, rows: height };
+  const resolveIndex = (frame: number): number =>
+    findOrAppendPaletteIndex(map, terrainDef.pack, {
+      kind: 'sheetFrame',
+      sheet: terrainDef.sheet,
+      frame,
+    });
+  const bakeChanges = computeTerrainBake(
+    nextMask,
+    dims,
+    terrainDef.mapping,
+    clearedIndices,
+    layer.cells,
+    resolveIndex,
+  );
+
+  return {
+    do: () => {
+      let section = existingSection;
+      if (!section) {
+        section = { layerId, terrainId, cells: baseCells.slice() };
+        map.terrain.push(section);
+        existingSection = section;
+      }
+      for (const c of maskChanges) section.cells[c.index] = value;
+      for (const c of bakeChanges) layer.cells[c.index] = c.next;
+    },
+    undo: () => {
+      for (const c of bakeChanges) layer.cells[c.index] = c.prev;
+      if (existingSection) {
+        for (const c of maskChanges) existingSection.cells[c.index] = c.prev;
+      }
+      if (!hadSectionBefore && existingSection) {
+        const i = map.terrain.indexOf(existingSection);
+        if (i >= 0) map.terrain.splice(i, 1);
+        existingSection = undefined; // a redo's `do` recreates it fresh, matching the first-run path
+      }
+    },
+  };
+}
+
 /** Next auto `layer_NNNN` id — scans existing ids so re-adding after deletes never collides. */
 function nextLayerId(map: MapFile): string {
   let max = 0;
@@ -618,6 +741,8 @@ export const useEditorStore = create<EditorState>()(
     worldRevision: 0,
     worldDirty: false,
     catalog: null,
+    terrainCatalog: null,
+    activeTerrainId: null,
     activeLayerId: null,
     activeTool: 'pan',
     brushAsset: null,
@@ -754,6 +879,8 @@ export const useEditorStore = create<EditorState>()(
     setBakeThumbnail: (fn) => set({ bakeThumbnail: fn }),
     setCatalog: (catalog) =>
       set((s) => ({ catalog, ...reconcileTabs(s.tabs, s.activeTabId, catalog) })),
+    setTerrainCatalog: (terrainCatalog) => set({ terrainCatalog }),
+    setActiveTerrainId: (activeTerrainId) => set({ activeTerrainId }),
     markSaved: () => set({ dirty: false }),
 
     applyCommand: (cmd) => {
@@ -1219,6 +1346,113 @@ export const useEditorStore = create<EditorState>()(
       if (!cmd) return;
       set({ pendingDirty: null });
       get().applyCommand(cmd);
+    },
+
+    // ---- terrain (step 10) ----
+    // A terrain paint/erase always requires an armed terrain (`activeTerrainId`) — unlike the zone
+    // tool's "erase clears regardless of which zone owned the cell", terrain sections are keyed by
+    // (layerId, terrainId) so erasing needs to know WHICH section's mask/bake to touch, same as
+    // painting does. Every path clears `pendingDirty` (forces EditorScene's full chunked-rebake
+    // fallback) rather than narrowing to a chunk list: a terrain rebake's affected cells can span the
+    // touched cell's whole 8-neighbour ring, potentially crossing a chunk boundary — see terrainOps.ts's
+    // module doc for why the bake itself always sweeps the full mask regardless.
+
+    paintTerrainLine: (fromCol, fromRow, toCol, toRow, strokeId, on) => {
+      const { map, activeLayerId, activeTerrainId, terrainCatalog } = get();
+      if (!map || !activeLayerId) return;
+      if (activeTerrainId === null) {
+        console.warn('[editor] terrain brush: no active terrain armed — pick one in the Library');
+        return;
+      }
+      const layer = map.layers.find((l) => l.id === activeLayerId);
+      const terrainDef = terrainCatalog?.terrains.find((t) => t.id === activeTerrainId);
+      if (!layer || !terrainDef) return;
+      const points = lineCells(fromCol, fromRow, toCol, toRow).filter(({ col, row }) =>
+        isInside(map, col, row),
+      );
+      const cmd = buildTerrainCommand(map, layer, activeTerrainId, terrainDef, points, on);
+      if (!cmd) return;
+      cmd.strokeId = strokeId;
+      set({ pendingDirty: null });
+      get().applyCommand(cmd);
+    },
+
+    fillTerrainFrom: (col, row, on) => {
+      const { map, activeLayerId, activeTerrainId, terrainCatalog } = get();
+      if (!map || !activeLayerId) return;
+      if (activeTerrainId === null) {
+        console.warn('[editor] terrain fill: no active terrain armed — pick one in the Library');
+        return;
+      }
+      const layer = map.layers.find((l) => l.id === activeLayerId);
+      const terrainDef = terrainCatalog?.terrains.find((t) => t.id === activeTerrainId);
+      if (!layer || !terrainDef) return;
+      const width = map.meta.width;
+      const height = map.meta.height;
+      const section = map.terrain.find(
+        (t) => t.layerId === activeLayerId && t.terrainId === activeTerrainId,
+      );
+      const baseCells = section ? section.cells : (new Array(width * height).fill(0) as number[]);
+      const changes = floodFill(baseCells, width, height, col, row, on ? 1 : 0, (c, r) =>
+        isInside(map, c, r),
+      );
+      if (changes.length === 0) return;
+      const points = changes.map((c) => ({
+        col: c.index % width,
+        row: Math.floor(c.index / width),
+      }));
+      const cmd = buildTerrainCommand(map, layer, activeTerrainId, terrainDef, points, on);
+      if (!cmd) return;
+      set({ pendingDirty: null });
+      get().applyCommand(cmd);
+    },
+
+    paintTerrainRect: (c0, r0, c1, r1, on) => {
+      const { map, activeLayerId, activeTerrainId, terrainCatalog } = get();
+      if (!map || !activeLayerId) return;
+      if (activeTerrainId === null) {
+        console.warn('[editor] terrain rect: no active terrain armed — pick one in the Library');
+        return;
+      }
+      const layer = map.layers.find((l) => l.id === activeLayerId);
+      const terrainDef = terrainCatalog?.terrains.find((t) => t.id === activeTerrainId);
+      if (!layer || !terrainDef) return;
+      const points = rectCells(c0, r0, c1, r1, (c, r) => isInside(map, c, r));
+      const cmd = buildTerrainCommand(map, layer, activeTerrainId, terrainDef, points, on);
+      if (!cmd) return;
+      set({ pendingDirty: null });
+      get().applyCommand(cmd);
+    },
+
+    rebakeTerrainsForSave: () => {
+      const { map, terrainCatalog } = get();
+      if (!map) return false;
+      const dims: Dims = { cols: map.meta.width, rows: map.meta.height };
+      let changed = false;
+      for (const section of map.terrain) {
+        const layer = map.layers.find((l) => l.id === section.layerId);
+        if (!layer) continue; // orphaned section (its layer was deleted) — nothing to bake into
+        const terrainDef = terrainCatalog?.terrains.find((t) => t.id === section.terrainId);
+        if (!terrainDef) continue; // unknown terrain id (catalog not loaded, or a stale id) — skip, don't crash
+        const resolveIndex = (frame: number): number =>
+          findOrAppendPaletteIndex(map, terrainDef.pack, {
+            kind: 'sheetFrame',
+            sheet: terrainDef.sheet,
+            frame,
+          });
+        const bakeChanges = computeTerrainBake(
+          section.cells,
+          dims,
+          terrainDef.mapping,
+          new Set(),
+          layer.cells,
+          resolveIndex,
+        );
+        for (const c of bakeChanges) layer.cells[c.index] = c.next;
+        if (bakeChanges.length > 0) changed = true;
+      }
+      if (changed) set((s) => ({ docRevision: s.docRevision + 1, pendingDirty: null }));
+      return changed;
     },
 
     // ---- layers ----

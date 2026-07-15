@@ -18,9 +18,11 @@ import { computeGhostStripCells, ghostBoundingBox, type GhostCell } from './worl
 import { queueDecorTexture, resolveDecorDraw } from '../render/decorSprites';
 import { objectFootprintCells } from './objectOps';
 
-/** Which target grid a `collision`/`zone`/`shape` tool gesture writes to (plan 014 step 8) — see
- *  `dispatchTargetPaint`. */
-type PaintTarget = 'collision' | 'zone' | 'shape';
+/** Which target a `collision`/`zone`/`shape`/`terrain` tool gesture writes to (plan 014 step 8,
+ *  extended step 10) — see `dispatchTargetPaint`. `terrain` writes an editor-only mask (rebaked into
+ *  the active tile layer's real cells) rather than a standalone grid, but shares the exact same
+ *  brush/rect/fill + on/off gesture shape as the other three, so it rides the same dispatch. */
+type PaintTarget = 'collision' | 'zone' | 'shape' | 'terrain';
 
 /**
  * The editor's single Phaser scene (plan 014 step 5). Renders the open map pixel-identically to the
@@ -72,6 +74,7 @@ const PORTAL_PREVIEW_COLOUR = 0x7aa6ff;
 const COLLISION_PREVIEW_COLOUR = 0xd06a5a;
 const ZONE_PREVIEW_COLOUR = 0x8fd67a;
 const SHAPE_PREVIEW_COLOUR = 0xfff05a;
+const TERRAIN_PREVIEW_COLOUR = 0x7ec87e;
 
 // Step 8 overlays.
 const WALKABILITY_TINT = 0xd04040;
@@ -1240,6 +1243,14 @@ export class EditorScene extends Phaser.Scene {
         this.dispatchTargetPaint('zone', col, row, !alt, state.paintMode);
         break;
       }
+      case 'terrain': {
+        // Default paints the armed terrain's mask; Alt erases it (clears the mask cell + rebakes),
+        // mirroring the collision/zone modifier convention. Both directions require an armed terrain
+        // (see paintTerrainLine's doc) — the store warns + no-ops otherwise.
+        const alt = pointer.event instanceof MouseEvent && pointer.event.altKey;
+        this.dispatchTargetPaint('terrain', col, row, !alt, state.paintMode);
+        break;
+      }
       default:
         break; // 'shape' is handled above, before the isInside gate
     }
@@ -1297,6 +1308,8 @@ export class EditorScene extends Phaser.Scene {
       store.paintWalkabilityLine(fromCol, fromRow, toCol, toRow, s.strokeId, s.on);
     } else if (s.target === 'zone') {
       store.paintZoneLine(fromCol, fromRow, toCol, toRow, s.strokeId, s.on);
+    } else if (s.target === 'terrain') {
+      store.paintTerrainLine(fromCol, fromRow, toCol, toRow, s.strokeId, s.on);
     } else {
       store.paintShapeLine(fromCol, fromRow, toCol, toRow, s.strokeId, s.on);
     }
@@ -1306,6 +1319,7 @@ export class EditorScene extends Phaser.Scene {
     const store = useEditorStore.getState();
     if (target === 'collision') store.fillWalkabilityFrom(col, row, on);
     else if (target === 'zone') store.fillZoneFrom(col, row, on);
+    else if (target === 'terrain') store.fillTerrainFrom(col, row, on);
     else store.fillShapeFrom(col, row, on);
   }
 
@@ -1320,12 +1334,14 @@ export class EditorScene extends Phaser.Scene {
     const store = useEditorStore.getState();
     if (target === 'collision') store.paintWalkabilityRect(startCol, startRow, col, row, on);
     else if (target === 'zone') store.paintZoneRect(startCol, startRow, col, row, on);
+    else if (target === 'terrain') store.paintTerrainRect(startCol, startRow, col, row, on);
     else store.paintShapeRect(startCol, startRow, col, row, on);
   }
 
   private targetPreviewColour(target: PaintTarget): number {
     if (target === 'collision') return COLLISION_PREVIEW_COLOUR;
     if (target === 'zone') return ZONE_PREVIEW_COLOUR;
+    if (target === 'terrain') return TERRAIN_PREVIEW_COLOUR;
     return SHAPE_PREVIEW_COLOUR;
   }
 
