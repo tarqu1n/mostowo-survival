@@ -1,6 +1,6 @@
 # Editor: Resize Map
 
-> Status: in review
+> Status: deployed
 
 ## Summary
 

@@ -1,9 +1,74 @@
 {
   "generatedFrom": [
+    "bat-fur",
+    "castle-environment",
+    "cave",
+    "desert",
+    "fairy-forest",
+    "forge",
+    "garden-environment",
+    "hideout",
+    "library",
     "mostowo-custom",
-    "pixel-crawler"
+    "pixel-crawler",
+    "sewer",
+    "small-bat"
   ],
   "packs": [
+    {
+      "id": "bat-fur",
+      "name": "Bat (Fur)",
+      "licence": "By Anokolisa (same author as the pixel-crawler packs). Free to use/alter in commercial, study or any project; credit optional; may NOT be resold/redistributed standalone. NOTE: no Terms.txt shipped in this download — licence assumed to match Anokolisa's other packs; confirm before any public release.",
+      "tileSize": 16
+    },
+    {
+      "id": "castle-environment",
+      "name": "Pixel Crawler - Castle Environment (v0.3)",
+      "licence": "Paid pack by Anokolisa. Free to use/alter in commercial, study or any project; credit optional; assets may NOT be resold or marketed standalone, even after alteration (see Terms.txt). Do not redistribute the raw assets if this repo/build ever goes public.",
+      "tileSize": 16
+    },
+    {
+      "id": "cave",
+      "name": "Pixel Crawler - Cave",
+      "licence": "Paid pack by Anokolisa. Free to use/alter in commercial, study or any project; credit optional; assets may NOT be resold or marketed standalone, even after alteration (see Terms.txt). Do not redistribute the raw assets if this repo/build ever goes public.",
+      "tileSize": 16
+    },
+    {
+      "id": "desert",
+      "name": "Pixel Crawler - Desert",
+      "licence": "Paid pack by Anokolisa. Free to use/alter in commercial, study or any project; credit optional; assets may NOT be resold or marketed standalone, even after alteration (see Terms.txt). Do not redistribute the raw assets if this repo/build ever goes public.",
+      "tileSize": 16
+    },
+    {
+      "id": "fairy-forest",
+      "name": "Pixel Crawler - Fairy Forest (v1.7)",
+      "licence": "Paid pack by Anokolisa. Free to use/alter in commercial, study or any project; credit optional; assets may NOT be resold or marketed standalone, even after alteration (see Terms.txt). Do not redistribute the raw assets if this repo/build ever goes public.",
+      "tileSize": 16
+    },
+    {
+      "id": "forge",
+      "name": "Pixel Crawler - Forge (v1.2)",
+      "licence": "Paid pack by Anokolisa. Free to use/alter in commercial, study or any project; credit optional; assets may NOT be resold or marketed standalone, even after alteration (see Terms.txt). Do not redistribute the raw assets if this repo/build ever goes public.",
+      "tileSize": 16
+    },
+    {
+      "id": "garden-environment",
+      "name": "Pixel Crawler - Garden Environment",
+      "licence": "Paid pack by Anokolisa. Free to use/alter in commercial, study or any project; credit optional; assets may NOT be resold or marketed standalone, even after alteration (see Terms.txt). Do not redistribute the raw assets if this repo/build ever goes public.",
+      "tileSize": 16
+    },
+    {
+      "id": "hideout",
+      "name": "Pixel Crawler - Hideout (v1.0)",
+      "licence": "Paid pack by Anokolisa. Free to use/alter in commercial, study or any project; credit optional; assets may NOT be resold or marketed standalone, even after alteration (see Terms.txt). Do not redistribute the raw assets if this repo/build ever goes public.",
+      "tileSize": 16
+    },
+    {
+      "id": "library",
+      "name": "Pixel Crawler - Library",
+      "licence": "Paid pack by Anokolisa. Free to use/alter in commercial, study or any project; credit optional; assets may NOT be resold or marketed standalone, even after alteration (see Terms.txt). Do not redistribute the raw assets if this repo/build ever goes public.",
+      "tileSize": 16
+    },
     {
       "id": "mostowo-custom",
       "name": "Mostowo Custom (self-made art)",
@@ -15,9 +80,6718 @@
       "name": "Pixel Crawler - Free Pack (v2.11)",
       "licence": "Free for commercial/study use, alter freely, credit optional, no reselling standalone (see Terms.txt)",
       "tileSize": 16
+    },
+    {
+      "id": "sewer",
+      "name": "Pixel Crawler - Sewer",
+      "licence": "Paid pack by Anokolisa. Free to use/alter in commercial, study or any project; credit optional; assets may NOT be resold or marketed standalone, even after alteration (see Terms.txt). Do not redistribute the raw assets if this repo/build ever goes public.",
+      "tileSize": 16
+    },
+    {
+      "id": "small-bat",
+      "name": "Small Bat",
+      "licence": "By Anokolisa (same author as the pixel-crawler packs). Free to use/alter in commercial, study or any project; credit optional; may NOT be resold/redistributed standalone. NOTE: no Terms.txt shipped in this download — licence assumed to match Anokolisa's other packs; confirm before any public release.",
+      "tileSize": 16
     }
   ],
   "assets": [
+    {
+      "id": "bat-fur/Attack_01/Attack_Down-Sheet.png",
+      "pack": "bat-fur",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Attack_01/Attack_Down-Sheet.png"
+      },
+      "w": 576,
+      "h": 96,
+      "category": "Attack_01",
+      "tags": [
+        "01",
+        "attack",
+        "down",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 6
+    },
+    {
+      "id": "bat-fur/Attack_01/Attack_Side-Sheet.png",
+      "pack": "bat-fur",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Attack_01/Attack_Side-Sheet.png"
+      },
+      "w": 576,
+      "h": 96,
+      "category": "Attack_01",
+      "tags": [
+        "01",
+        "attack",
+        "sheet",
+        "side"
+      ],
+      "origin": "pack",
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 6
+    },
+    {
+      "id": "bat-fur/Attack_01/Attack_Up-Sheet.png",
+      "pack": "bat-fur",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Attack_01/Attack_Up-Sheet.png"
+      },
+      "w": 576,
+      "h": 96,
+      "category": "Attack_01",
+      "tags": [
+        "01",
+        "attack",
+        "sheet",
+        "up"
+      ],
+      "origin": "pack",
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 6
+    },
+    {
+      "id": "bat-fur/Death/Death_Down-Sheet.png",
+      "pack": "bat-fur",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Death/Death_Down-Sheet.png"
+      },
+      "w": 576,
+      "h": 96,
+      "category": "Death",
+      "tags": [
+        "death",
+        "down",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 6
+    },
+    {
+      "id": "bat-fur/Death/Death_Side-Sheet.png",
+      "pack": "bat-fur",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Death/Death_Side-Sheet.png"
+      },
+      "w": 576,
+      "h": 96,
+      "category": "Death",
+      "tags": [
+        "death",
+        "sheet",
+        "side"
+      ],
+      "origin": "pack",
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 6
+    },
+    {
+      "id": "bat-fur/Death/Death_Up-Sheet.png",
+      "pack": "bat-fur",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Death/Death_Up-Sheet.png"
+      },
+      "w": 576,
+      "h": 96,
+      "category": "Death",
+      "tags": [
+        "death",
+        "sheet",
+        "up"
+      ],
+      "origin": "pack",
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 6
+    },
+    {
+      "id": "bat-fur/Hit/Hit_Down-Sheet.png",
+      "pack": "bat-fur",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Hit/Hit_Down-Sheet.png"
+      },
+      "w": 384,
+      "h": 96,
+      "category": "Hit",
+      "tags": [
+        "down",
+        "hit",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 4
+    },
+    {
+      "id": "bat-fur/Hit/Hit_Side-Sheet.png",
+      "pack": "bat-fur",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Hit/Hit_Side-Sheet.png"
+      },
+      "w": 384,
+      "h": 96,
+      "category": "Hit",
+      "tags": [
+        "hit",
+        "sheet",
+        "side"
+      ],
+      "origin": "pack",
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 4
+    },
+    {
+      "id": "bat-fur/Hit/Hit_Up-Sheet.png",
+      "pack": "bat-fur",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Hit/Hit_Up-Sheet.png"
+      },
+      "w": 384,
+      "h": 96,
+      "category": "Hit",
+      "tags": [
+        "hit",
+        "sheet",
+        "up"
+      ],
+      "origin": "pack",
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 4
+    },
+    {
+      "id": "bat-fur/Idle/Idle_Down-Sheet.png",
+      "pack": "bat-fur",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Idle/Idle_Down-Sheet.png"
+      },
+      "w": 384,
+      "h": 96,
+      "category": "Idle",
+      "tags": [
+        "down",
+        "idle",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 4
+    },
+    {
+      "id": "bat-fur/Idle/Idle_Side-Sheet.png",
+      "pack": "bat-fur",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Idle/Idle_Side-Sheet.png"
+      },
+      "w": 384,
+      "h": 96,
+      "category": "Idle",
+      "tags": [
+        "idle",
+        "sheet",
+        "side"
+      ],
+      "origin": "pack",
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 4
+    },
+    {
+      "id": "bat-fur/Idle/Idle_Up-Sheet.png",
+      "pack": "bat-fur",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Idle/Idle_Up-Sheet.png"
+      },
+      "w": 384,
+      "h": 96,
+      "category": "Idle",
+      "tags": [
+        "idle",
+        "sheet",
+        "up"
+      ],
+      "origin": "pack",
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 4
+    },
+    {
+      "id": "bat-fur/Move/Move_Down-Sheet.png",
+      "pack": "bat-fur",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Move/Move_Down-Sheet.png"
+      },
+      "w": 768,
+      "h": 96,
+      "category": "Move",
+      "tags": [
+        "down",
+        "move",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 8
+    },
+    {
+      "id": "bat-fur/Move/Move_Side-Sheet.png",
+      "pack": "bat-fur",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Move/Move_Side-Sheet.png"
+      },
+      "w": 768,
+      "h": 96,
+      "category": "Move",
+      "tags": [
+        "move",
+        "sheet",
+        "side"
+      ],
+      "origin": "pack",
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 8
+    },
+    {
+      "id": "bat-fur/Move/Move_Up-Sheet.png",
+      "pack": "bat-fur",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Move/Move_Up-Sheet.png"
+      },
+      "w": 768,
+      "h": 96,
+      "category": "Move",
+      "tags": [
+        "move",
+        "sheet",
+        "up"
+      ],
+      "origin": "pack",
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 8
+    },
+    {
+      "id": "castle-environment/Assets/Tiles.png",
+      "pack": "castle-environment",
+      "type": "tile",
+      "source": {
+        "kind": "sheetFrame",
+        "sheet": "Assets/Tiles.png",
+        "frame": 0
+      },
+      "w": 416,
+      "h": 400,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "tiles"
+      ],
+      "origin": "pack",
+      "frames": 650
+    },
+    {
+      "id": "castle-environment/Enemies/Royal Crew/Archer/Death-Sheet.png",
+      "pack": "castle-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Royal Crew/Archer/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Royal Crew/Archer",
+      "tags": [
+        "archer",
+        "crew",
+        "death",
+        "enemies",
+        "royal",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "castle-environment/Enemies/Royal Crew/Archer/Hit-Sheet.png",
+      "pack": "castle-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Royal Crew/Archer/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Royal Crew/Archer",
+      "tags": [
+        "archer",
+        "crew",
+        "enemies",
+        "hit",
+        "royal",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "castle-environment/Enemies/Royal Crew/Archer/Idle-Sheet.png",
+      "pack": "castle-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Royal Crew/Archer/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Royal Crew/Archer",
+      "tags": [
+        "archer",
+        "crew",
+        "enemies",
+        "idle",
+        "royal",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "castle-environment/Enemies/Royal Crew/Archer/Run-Sheet.png",
+      "pack": "castle-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Royal Crew/Archer/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Royal Crew/Archer",
+      "tags": [
+        "archer",
+        "crew",
+        "enemies",
+        "royal",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "castle-environment/Enemies/Royal Crew/Knight/Death-Sheet.png",
+      "pack": "castle-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Royal Crew/Knight/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Royal Crew/Knight",
+      "tags": [
+        "crew",
+        "death",
+        "enemies",
+        "knight",
+        "royal",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "castle-environment/Enemies/Royal Crew/Knight/Hit-Sheet.png",
+      "pack": "castle-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Royal Crew/Knight/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Royal Crew/Knight",
+      "tags": [
+        "crew",
+        "enemies",
+        "hit",
+        "knight",
+        "royal",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "castle-environment/Enemies/Royal Crew/Knight/Idle-Sheet.png",
+      "pack": "castle-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Royal Crew/Knight/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Royal Crew/Knight",
+      "tags": [
+        "crew",
+        "enemies",
+        "idle",
+        "knight",
+        "royal",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "castle-environment/Enemies/Royal Crew/Knight/Run-Sheet.png",
+      "pack": "castle-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Royal Crew/Knight/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Royal Crew/Knight",
+      "tags": [
+        "crew",
+        "enemies",
+        "knight",
+        "royal",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "castle-environment/Enemies/Royal Crew/Priest/Death-Sheet.png",
+      "pack": "castle-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Royal Crew/Priest/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Royal Crew/Priest",
+      "tags": [
+        "crew",
+        "death",
+        "enemies",
+        "priest",
+        "royal",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "castle-environment/Enemies/Royal Crew/Priest/Hit-Sheet.png",
+      "pack": "castle-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Royal Crew/Priest/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Royal Crew/Priest",
+      "tags": [
+        "crew",
+        "enemies",
+        "hit",
+        "priest",
+        "royal",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "castle-environment/Enemies/Royal Crew/Priest/Idle-Sheet.png",
+      "pack": "castle-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Royal Crew/Priest/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Royal Crew/Priest",
+      "tags": [
+        "crew",
+        "enemies",
+        "idle",
+        "priest",
+        "royal",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "castle-environment/Enemies/Royal Crew/Priest/Run-Sheet.png",
+      "pack": "castle-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Royal Crew/Priest/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Royal Crew/Priest",
+      "tags": [
+        "crew",
+        "enemies",
+        "priest",
+        "royal",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "castle-environment/Enemies/Royal Crew/Soldier/Death-Sheet.png",
+      "pack": "castle-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Royal Crew/Soldier/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Royal Crew/Soldier",
+      "tags": [
+        "crew",
+        "death",
+        "enemies",
+        "royal",
+        "sheet",
+        "soldier"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "castle-environment/Enemies/Royal Crew/Soldier/Hit-Sheet.png",
+      "pack": "castle-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Royal Crew/Soldier/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Royal Crew/Soldier",
+      "tags": [
+        "crew",
+        "enemies",
+        "hit",
+        "royal",
+        "sheet",
+        "soldier"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "castle-environment/Enemies/Royal Crew/Soldier/Idle-Sheet.png",
+      "pack": "castle-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Royal Crew/Soldier/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Royal Crew/Soldier",
+      "tags": [
+        "crew",
+        "enemies",
+        "idle",
+        "royal",
+        "sheet",
+        "soldier"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "castle-environment/Enemies/Royal Crew/Soldier/Run-Sheet.png",
+      "pack": "castle-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Royal Crew/Soldier/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Royal Crew/Soldier",
+      "tags": [
+        "crew",
+        "enemies",
+        "royal",
+        "run",
+        "sheet",
+        "soldier"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "castle-environment/Weapons/Weapons.png",
+      "pack": "castle-environment",
+      "type": "object",
+      "source": {
+        "kind": "image",
+        "path": "Weapons/Weapons.png"
+      },
+      "w": 240,
+      "h": 160,
+      "category": "Weapons",
+      "tags": [
+        "weapons"
+      ],
+      "origin": "pack",
+      "regions": [
+        {
+          "key": "64_0",
+          "x": 64,
+          "y": 0,
+          "w": 16,
+          "h": 160
+        },
+        {
+          "key": "128_0",
+          "x": 128,
+          "y": 0,
+          "w": 16,
+          "h": 64
+        },
+        {
+          "key": "0_1",
+          "x": 0,
+          "y": 1,
+          "w": 30,
+          "h": 159
+        },
+        {
+          "key": "165_5",
+          "x": 165,
+          "y": 5,
+          "w": 37,
+          "h": 25
+        },
+        {
+          "key": "212_5",
+          "x": 212,
+          "y": 5,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "229_5",
+          "x": 229,
+          "y": 5,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "80_16",
+          "x": 80,
+          "y": 16,
+          "w": 32,
+          "h": 144
+        },
+        {
+          "key": "144_16",
+          "x": 144,
+          "y": 16,
+          "w": 16,
+          "h": 48
+        },
+        {
+          "key": "212_21",
+          "x": 212,
+          "y": 21,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "229_21",
+          "x": 229,
+          "y": 21,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "34_32",
+          "x": 34,
+          "y": 32,
+          "w": 12,
+          "h": 32
+        },
+        {
+          "key": "165_35",
+          "x": 165,
+          "y": 35,
+          "w": 37,
+          "h": 28
+        },
+        {
+          "key": "212_37",
+          "x": 212,
+          "y": 37,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "229_37",
+          "x": 229,
+          "y": 37,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "117_38",
+          "x": 117,
+          "y": 38,
+          "w": 11,
+          "h": 90
+        },
+        {
+          "key": "51_39",
+          "x": 51,
+          "y": 39,
+          "w": 9,
+          "h": 25
+        },
+        {
+          "key": "212_53",
+          "x": 212,
+          "y": 53,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "229_53",
+          "x": 229,
+          "y": 53,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "132_69",
+          "x": 132,
+          "y": 69,
+          "w": 7,
+          "h": 27
+        },
+        {
+          "key": "165_69",
+          "x": 165,
+          "y": 69,
+          "w": 37,
+          "h": 24
+        },
+        {
+          "key": "212_69",
+          "x": 212,
+          "y": 69,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "229_69",
+          "x": 229,
+          "y": 69,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "150_76",
+          "x": 150,
+          "y": 76,
+          "w": 5,
+          "h": 20
+        },
+        {
+          "key": "16_80",
+          "x": 16,
+          "y": 80,
+          "w": 16,
+          "h": 80
+        },
+        {
+          "key": "212_85",
+          "x": 212,
+          "y": 85,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "229_85",
+          "x": 229,
+          "y": 85,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "32_87",
+          "x": 32,
+          "y": 87,
+          "w": 16,
+          "h": 73
+        },
+        {
+          "key": "51_100",
+          "x": 51,
+          "y": 100,
+          "w": 13,
+          "h": 60
+        },
+        {
+          "key": "151_101",
+          "x": 151,
+          "y": 101,
+          "w": 18,
+          "h": 5
+        },
+        {
+          "key": "181_103",
+          "x": 181,
+          "y": 103,
+          "w": 5,
+          "h": 18
+        },
+        {
+          "key": "130_105",
+          "x": 130,
+          "y": 105,
+          "w": 12,
+          "h": 23
+        },
+        {
+          "key": "146_112",
+          "x": 146,
+          "y": 112,
+          "w": 12,
+          "h": 16
+        },
+        {
+          "key": "165_117",
+          "x": 165,
+          "y": 117,
+          "w": 6,
+          "h": 7
+        },
+        {
+          "key": "193_128",
+          "x": 193,
+          "y": 128,
+          "w": 14,
+          "h": 32
+        },
+        {
+          "key": "168_130",
+          "x": 168,
+          "y": 130,
+          "w": 16,
+          "h": 28
+        },
+        {
+          "key": "135_131",
+          "x": 135,
+          "y": 131,
+          "w": 18,
+          "h": 27
+        },
+        {
+          "key": "116_133",
+          "x": 116,
+          "y": 133,
+          "w": 12,
+          "h": 27
+        }
+      ]
+    },
+    {
+      "id": "cave/Assets/Props.png",
+      "pack": "cave",
+      "type": "object",
+      "source": {
+        "kind": "image",
+        "path": "Assets/Props.png"
+      },
+      "w": 384,
+      "h": 256,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "props"
+      ],
+      "origin": "pack",
+      "regions": [
+        {
+          "key": "256_0",
+          "x": 256,
+          "y": 0,
+          "w": 32,
+          "h": 80
+        },
+        {
+          "key": "196_1",
+          "x": 196,
+          "y": 1,
+          "w": 53,
+          "h": 45
+        },
+        {
+          "key": "322_2",
+          "x": 322,
+          "y": 2,
+          "w": 27,
+          "h": 28
+        },
+        {
+          "key": "3_3",
+          "x": 3,
+          "y": 3,
+          "w": 87,
+          "h": 88
+        },
+        {
+          "key": "99_3",
+          "x": 99,
+          "y": 3,
+          "w": 87,
+          "h": 88
+        },
+        {
+          "key": "291_3",
+          "x": 291,
+          "y": 3,
+          "w": 27,
+          "h": 28
+        },
+        {
+          "key": "358_4",
+          "x": 358,
+          "y": 4,
+          "w": 20,
+          "h": 26
+        },
+        {
+          "key": "322_34",
+          "x": 322,
+          "y": 34,
+          "w": 27,
+          "h": 28
+        },
+        {
+          "key": "291_35",
+          "x": 291,
+          "y": 35,
+          "w": 27,
+          "h": 28
+        },
+        {
+          "key": "358_36",
+          "x": 358,
+          "y": 36,
+          "w": 20,
+          "h": 26
+        },
+        {
+          "key": "196_49",
+          "x": 196,
+          "y": 49,
+          "w": 53,
+          "h": 45
+        },
+        {
+          "key": "291_68",
+          "x": 291,
+          "y": 68,
+          "w": 10,
+          "h": 11
+        },
+        {
+          "key": "307_68",
+          "x": 307,
+          "y": 68,
+          "w": 10,
+          "h": 11
+        },
+        {
+          "key": "162_96",
+          "x": 162,
+          "y": 96,
+          "w": 60,
+          "h": 96
+        },
+        {
+          "key": "226_96",
+          "x": 226,
+          "y": 96,
+          "w": 60,
+          "h": 96
+        },
+        {
+          "key": "3_105",
+          "x": 3,
+          "y": 105,
+          "w": 72,
+          "h": 147
+        },
+        {
+          "key": "83_105",
+          "x": 83,
+          "y": 105,
+          "w": 72,
+          "h": 147
+        }
+      ]
+    },
+    {
+      "id": "cave/Assets/Tiles.png",
+      "pack": "cave",
+      "type": "tile",
+      "source": {
+        "kind": "sheetFrame",
+        "sheet": "Assets/Tiles.png",
+        "frame": 0
+      },
+      "w": 272,
+      "h": 304,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "tiles"
+      ],
+      "origin": "pack",
+      "frames": 323
+    },
+    {
+      "id": "cave/Enemies/Heavy Fungus/Death-Sheet.png",
+      "pack": "cave",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Heavy Fungus/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Heavy Fungus",
+      "tags": [
+        "death",
+        "enemies",
+        "fungus",
+        "heavy",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "cave/Enemies/Heavy Fungus/Hit-Sheet.png",
+      "pack": "cave",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Heavy Fungus/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Heavy Fungus",
+      "tags": [
+        "enemies",
+        "fungus",
+        "heavy",
+        "hit",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "cave/Enemies/Heavy Fungus/Idle-Sheet.png",
+      "pack": "cave",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Heavy Fungus/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Heavy Fungus",
+      "tags": [
+        "enemies",
+        "fungus",
+        "heavy",
+        "idle",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "cave/Enemies/Heavy Fungus/Run-Sheet.png",
+      "pack": "cave",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Heavy Fungus/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Heavy Fungus",
+      "tags": [
+        "enemies",
+        "fungus",
+        "heavy",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "cave/Enemies/Immature Fungus/Death-Sheet.png",
+      "pack": "cave",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Immature Fungus/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Immature Fungus",
+      "tags": [
+        "death",
+        "enemies",
+        "fungus",
+        "immature",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "cave/Enemies/Immature Fungus/Hit-Sheet.png",
+      "pack": "cave",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Immature Fungus/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Immature Fungus",
+      "tags": [
+        "enemies",
+        "fungus",
+        "hit",
+        "immature",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "cave/Enemies/Immature Fungus/Idle-Sheet.png",
+      "pack": "cave",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Immature Fungus/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Immature Fungus",
+      "tags": [
+        "enemies",
+        "fungus",
+        "idle",
+        "immature",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "cave/Enemies/Immature Fungus/Run-Sheet.png",
+      "pack": "cave",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Immature Fungus/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Immature Fungus",
+      "tags": [
+        "enemies",
+        "fungus",
+        "immature",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "cave/Enemies/Long Fungus/Death-Sheet.png",
+      "pack": "cave",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Long Fungus/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Long Fungus",
+      "tags": [
+        "death",
+        "enemies",
+        "fungus",
+        "long",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "cave/Enemies/Long Fungus/Hit-Sheet.png",
+      "pack": "cave",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Long Fungus/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Long Fungus",
+      "tags": [
+        "enemies",
+        "fungus",
+        "hit",
+        "long",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "cave/Enemies/Long Fungus/Idle-Sheet.png",
+      "pack": "cave",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Long Fungus/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Long Fungus",
+      "tags": [
+        "enemies",
+        "fungus",
+        "idle",
+        "long",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "cave/Enemies/Long Fungus/Run-Sheet.png",
+      "pack": "cave",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Long Fungus/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Long Fungus",
+      "tags": [
+        "enemies",
+        "fungus",
+        "long",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "cave/Enemies/Old Fungus/Death-Sheet.png",
+      "pack": "cave",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Old Fungus/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Old Fungus",
+      "tags": [
+        "death",
+        "enemies",
+        "fungus",
+        "old",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "cave/Enemies/Old Fungus/Hit-Sheet.png",
+      "pack": "cave",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Old Fungus/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Old Fungus",
+      "tags": [
+        "enemies",
+        "fungus",
+        "hit",
+        "old",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "cave/Enemies/Old Fungus/Idle-Sheet.png",
+      "pack": "cave",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Old Fungus/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Old Fungus",
+      "tags": [
+        "enemies",
+        "fungus",
+        "idle",
+        "old",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "cave/Enemies/Old Fungus/Run-Sheet.png",
+      "pack": "cave",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Old Fungus/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Old Fungus",
+      "tags": [
+        "enemies",
+        "fungus",
+        "old",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "cave/Weapons/Spore_Roots/Spore_Roots.png",
+      "pack": "cave",
+      "type": "object",
+      "source": {
+        "kind": "image",
+        "path": "Weapons/Spore_Roots/Spore_Roots.png"
+      },
+      "w": 192,
+      "h": 160,
+      "category": "Weapons/Spore_Roots",
+      "tags": [
+        "roots",
+        "spore",
+        "weapons"
+      ],
+      "origin": "pack",
+      "regions": [
+        {
+          "key": "64_0",
+          "x": 64,
+          "y": 0,
+          "w": 48,
+          "h": 160
+        },
+        {
+          "key": "115_0",
+          "x": 115,
+          "y": 0,
+          "w": 77,
+          "h": 96
+        },
+        {
+          "key": "0_1",
+          "x": 0,
+          "y": 1,
+          "w": 32,
+          "h": 159
+        },
+        {
+          "key": "36_5",
+          "x": 36,
+          "y": 5,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "53_5",
+          "x": 53,
+          "y": 5,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "36_20",
+          "x": 36,
+          "y": 20,
+          "w": 8,
+          "h": 6
+        },
+        {
+          "key": "52_20",
+          "x": 52,
+          "y": 20,
+          "w": 8,
+          "h": 6
+        },
+        {
+          "key": "35_32",
+          "x": 35,
+          "y": 32,
+          "w": 11,
+          "h": 32
+        },
+        {
+          "key": "52_36",
+          "x": 52,
+          "y": 36,
+          "w": 10,
+          "h": 28
+        },
+        {
+          "key": "172_65",
+          "x": 172,
+          "y": 65,
+          "w": 20,
+          "h": 95
+        },
+        {
+          "key": "115_69",
+          "x": 115,
+          "y": 69,
+          "w": 9,
+          "h": 59
+        },
+        {
+          "key": "148_72",
+          "x": 148,
+          "y": 72,
+          "w": 8,
+          "h": 24
+        },
+        {
+          "key": "33_88",
+          "x": 33,
+          "y": 88,
+          "w": 31,
+          "h": 72
+        },
+        {
+          "key": "148_102",
+          "x": 148,
+          "y": 102,
+          "w": 7,
+          "h": 19
+        },
+        {
+          "key": "128_103",
+          "x": 128,
+          "y": 103,
+          "w": 27,
+          "h": 55
+        },
+        {
+          "key": "160_112",
+          "x": 160,
+          "y": 112,
+          "w": 14,
+          "h": 16
+        },
+        {
+          "key": "165_132",
+          "x": 165,
+          "y": 132,
+          "w": 7,
+          "h": 8
+        },
+        {
+          "key": "116_133",
+          "x": 116,
+          "y": 133,
+          "w": 12,
+          "h": 27
+        },
+        {
+          "key": "162_144",
+          "x": 162,
+          "y": 144,
+          "w": 12,
+          "h": 16
+        }
+      ]
+    },
+    {
+      "id": "desert/Assets/Ground.png",
+      "pack": "desert",
+      "type": "tile",
+      "source": {
+        "kind": "sheetFrame",
+        "sheet": "Assets/Ground.png",
+        "frame": 0
+      },
+      "w": 240,
+      "h": 304,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "ground"
+      ],
+      "origin": "pack",
+      "frames": 285
+    },
+    {
+      "id": "desert/Assets/Props.png",
+      "pack": "desert",
+      "type": "object",
+      "source": {
+        "kind": "image",
+        "path": "Assets/Props.png"
+      },
+      "w": 160,
+      "h": 336,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "props"
+      ],
+      "origin": "pack",
+      "regions": [
+        {
+          "key": "0_7",
+          "x": 0,
+          "y": 7,
+          "w": 111,
+          "h": 169
+        },
+        {
+          "key": "97_8",
+          "x": 97,
+          "y": 8,
+          "w": 62,
+          "h": 24
+        },
+        {
+          "key": "97_40",
+          "x": 97,
+          "y": 40,
+          "w": 62,
+          "h": 24
+        },
+        {
+          "key": "115_74",
+          "x": 115,
+          "y": 74,
+          "w": 10,
+          "h": 22
+        },
+        {
+          "key": "129_83",
+          "x": 129,
+          "y": 83,
+          "w": 14,
+          "h": 13
+        },
+        {
+          "key": "147_83",
+          "x": 147,
+          "y": 83,
+          "w": 10,
+          "h": 13
+        },
+        {
+          "key": "115_103",
+          "x": 115,
+          "y": 103,
+          "w": 10,
+          "h": 9
+        },
+        {
+          "key": "130_104",
+          "x": 130,
+          "y": 104,
+          "w": 11,
+          "h": 8
+        },
+        {
+          "key": "148_104",
+          "x": 148,
+          "y": 104,
+          "w": 9,
+          "h": 8
+        },
+        {
+          "key": "2_140",
+          "x": 2,
+          "y": 140,
+          "w": 59,
+          "h": 109
+        },
+        {
+          "key": "67_148",
+          "x": 67,
+          "y": 148,
+          "w": 26,
+          "h": 28
+        },
+        {
+          "key": "68_176",
+          "x": 68,
+          "y": 176,
+          "w": 39,
+          "h": 48
+        },
+        {
+          "key": "113_178",
+          "x": 113,
+          "y": 178,
+          "w": 29,
+          "h": 46
+        },
+        {
+          "key": "132_212",
+          "x": 132,
+          "y": 212,
+          "w": 9,
+          "h": 12
+        },
+        {
+          "key": "66_256",
+          "x": 66,
+          "y": 256,
+          "w": 25,
+          "h": 29
+        },
+        {
+          "key": "0_262",
+          "x": 0,
+          "y": 262,
+          "w": 64,
+          "h": 74
+        }
+      ]
+    },
+    {
+      "id": "desert/Assets/Sand.png",
+      "pack": "desert",
+      "type": "tile",
+      "source": {
+        "kind": "sheetFrame",
+        "sheet": "Assets/Sand.png",
+        "frame": 0
+      },
+      "w": 288,
+      "h": 160,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "sand"
+      ],
+      "origin": "pack",
+      "frames": 180
+    },
+    {
+      "id": "desert/Enemy/Mummy - Base/Death/Death-Sheet.png",
+      "pack": "desert",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Mummy - Base/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Mummy - Base/Death",
+      "tags": [
+        "base",
+        "death",
+        "enemy",
+        "mummy",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "desert/Enemy/Mummy - Base/Idle/Idle-Sheet.png",
+      "pack": "desert",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Mummy - Base/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemy/Mummy - Base/Idle",
+      "tags": [
+        "base",
+        "enemy",
+        "idle",
+        "mummy",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "desert/Enemy/Mummy - Base/Run/Run-Sheet.png",
+      "pack": "desert",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Mummy - Base/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Mummy - Base/Run",
+      "tags": [
+        "base",
+        "enemy",
+        "mummy",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "desert/Enemy/Mummy - Mage/Death/Death-Sheet.png",
+      "pack": "desert",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Mummy - Mage/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Mummy - Mage/Death",
+      "tags": [
+        "death",
+        "enemy",
+        "mage",
+        "mummy",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "desert/Enemy/Mummy - Mage/Idle/Idle-Sheet.png",
+      "pack": "desert",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Mummy - Mage/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemy/Mummy - Mage/Idle",
+      "tags": [
+        "enemy",
+        "idle",
+        "mage",
+        "mummy",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "desert/Enemy/Mummy - Mage/Run/Run-Sheet.png",
+      "pack": "desert",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Mummy - Mage/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Mummy - Mage/Run",
+      "tags": [
+        "enemy",
+        "mage",
+        "mummy",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "desert/Enemy/Mummy - Rogue/Death/Death-Sheet.png",
+      "pack": "desert",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Mummy - Rogue/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Mummy - Rogue/Death",
+      "tags": [
+        "death",
+        "enemy",
+        "mummy",
+        "rogue",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "desert/Enemy/Mummy - Rogue/Idle/Idle-Sheet.png",
+      "pack": "desert",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Mummy - Rogue/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemy/Mummy - Rogue/Idle",
+      "tags": [
+        "enemy",
+        "idle",
+        "mummy",
+        "rogue",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "desert/Enemy/Mummy - Rogue/Run/Run-Sheet.png",
+      "pack": "desert",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Mummy - Rogue/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Mummy - Rogue/Run",
+      "tags": [
+        "enemy",
+        "mummy",
+        "rogue",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "desert/Enemy/Mummy - Warrior/Death/Death-Sheet.png",
+      "pack": "desert",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Mummy - Warrior/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Mummy - Warrior/Death",
+      "tags": [
+        "death",
+        "enemy",
+        "mummy",
+        "sheet",
+        "warrior"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "desert/Enemy/Mummy - Warrior/Idle/Idle-Sheet.png",
+      "pack": "desert",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Mummy - Warrior/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemy/Mummy - Warrior/Idle",
+      "tags": [
+        "enemy",
+        "idle",
+        "mummy",
+        "sheet",
+        "warrior"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "desert/Enemy/Mummy - Warrior/Run/Run-Sheet.png",
+      "pack": "desert",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Mummy - Warrior/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Mummy - Warrior/Run",
+      "tags": [
+        "enemy",
+        "mummy",
+        "run",
+        "sheet",
+        "warrior"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "desert/Weapons/Desert - gold/Desert-Gold.png",
+      "pack": "desert",
+      "type": "object",
+      "source": {
+        "kind": "image",
+        "path": "Weapons/Desert - gold/Desert-Gold.png"
+      },
+      "w": 176,
+      "h": 80,
+      "category": "Weapons/Desert - gold",
+      "tags": [
+        "desert",
+        "gold",
+        "weapons"
+      ],
+      "origin": "pack",
+      "regions": [
+        {
+          "key": "0_0",
+          "x": 0,
+          "y": 0,
+          "w": 48,
+          "h": 80
+        },
+        {
+          "key": "49_1",
+          "x": 49,
+          "y": 1,
+          "w": 95,
+          "h": 79
+        },
+        {
+          "key": "83_1",
+          "x": 83,
+          "y": 1,
+          "w": 12,
+          "h": 30
+        },
+        {
+          "key": "99_1",
+          "x": 99,
+          "y": 1,
+          "w": 12,
+          "h": 30
+        },
+        {
+          "key": "32_4",
+          "x": 32,
+          "y": 4,
+          "w": 16,
+          "h": 7
+        },
+        {
+          "key": "148_4",
+          "x": 148,
+          "y": 4,
+          "w": 8,
+          "h": 7
+        },
+        {
+          "key": "165_4",
+          "x": 165,
+          "y": 4,
+          "w": 8,
+          "h": 7
+        },
+        {
+          "key": "130_7",
+          "x": 130,
+          "y": 7,
+          "w": 12,
+          "h": 21
+        },
+        {
+          "key": "36_16",
+          "x": 36,
+          "y": 16,
+          "w": 8,
+          "h": 29
+        },
+        {
+          "key": "148_21",
+          "x": 148,
+          "y": 21,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "165_21",
+          "x": 165,
+          "y": 21,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "83_34",
+          "x": 83,
+          "y": 34,
+          "w": 11,
+          "h": 13
+        }
+      ]
+    },
+    {
+      "id": "fairy-forest/Assets/Light.png",
+      "pack": "fairy-forest",
+      "type": "object",
+      "source": {
+        "kind": "image",
+        "path": "Assets/Light.png"
+      },
+      "w": 208,
+      "h": 160,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "light"
+      ],
+      "origin": "pack",
+      "regions": [
+        {
+          "key": "161_2",
+          "x": 161,
+          "y": 2,
+          "w": 46,
+          "h": 46
+        },
+        {
+          "key": "5_5",
+          "x": 5,
+          "y": 5,
+          "w": 150,
+          "h": 150
+        }
+      ]
+    },
+    {
+      "id": "fairy-forest/Assets/Props.png",
+      "pack": "fairy-forest",
+      "type": "object",
+      "source": {
+        "kind": "image",
+        "path": "Assets/Props.png"
+      },
+      "w": 448,
+      "h": 384,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "props"
+      ],
+      "origin": "pack",
+      "regions": [
+        {
+          "key": "1_0",
+          "x": 1,
+          "y": 0,
+          "w": 111,
+          "h": 192
+        },
+        {
+          "key": "293_0",
+          "x": 293,
+          "y": 0,
+          "w": 38,
+          "h": 46
+        },
+        {
+          "key": "257_1",
+          "x": 257,
+          "y": 1,
+          "w": 31,
+          "h": 15
+        },
+        {
+          "key": "226_4",
+          "x": 226,
+          "y": 4,
+          "w": 13,
+          "h": 11
+        },
+        {
+          "key": "195_5",
+          "x": 195,
+          "y": 5,
+          "w": 7,
+          "h": 9
+        },
+        {
+          "key": "244_5",
+          "x": 244,
+          "y": 5,
+          "w": 10,
+          "h": 6
+        },
+        {
+          "key": "211_6",
+          "x": 211,
+          "y": 6,
+          "w": 11,
+          "h": 8
+        },
+        {
+          "key": "65_16",
+          "x": 65,
+          "y": 16,
+          "w": 47,
+          "h": 32
+        },
+        {
+          "key": "338_16",
+          "x": 338,
+          "y": 16,
+          "w": 28,
+          "h": 30
+        },
+        {
+          "key": "117_18",
+          "x": 117,
+          "y": 18,
+          "w": 40,
+          "h": 29
+        },
+        {
+          "key": "257_19",
+          "x": 257,
+          "y": 19,
+          "w": 14,
+          "h": 9
+        },
+        {
+          "key": "210_20",
+          "x": 210,
+          "y": 20,
+          "w": 29,
+          "h": 11
+        },
+        {
+          "key": "275_20",
+          "x": 275,
+          "y": 20,
+          "w": 10,
+          "h": 10
+        },
+        {
+          "key": "369_20",
+          "x": 369,
+          "y": 20,
+          "w": 27,
+          "h": 26
+        },
+        {
+          "key": "194_21",
+          "x": 194,
+          "y": 21,
+          "w": 11,
+          "h": 9
+        },
+        {
+          "key": "245_21",
+          "x": 245,
+          "y": 21,
+          "w": 10,
+          "h": 6
+        },
+        {
+          "key": "404_22",
+          "x": 404,
+          "y": 22,
+          "w": 22,
+          "h": 24
+        },
+        {
+          "key": "160_25",
+          "x": 160,
+          "y": 25,
+          "w": 30,
+          "h": 22
+        },
+        {
+          "key": "432_28",
+          "x": 432,
+          "y": 28,
+          "w": 16,
+          "h": 19
+        },
+        {
+          "key": "259_35",
+          "x": 259,
+          "y": 35,
+          "w": 28,
+          "h": 12
+        },
+        {
+          "key": "289_48",
+          "x": 289,
+          "y": 48,
+          "w": 45,
+          "h": 111
+        },
+        {
+          "key": "242_50",
+          "x": 242,
+          "y": 50,
+          "w": 12,
+          "h": 11
+        },
+        {
+          "key": "226_51",
+          "x": 226,
+          "y": 51,
+          "w": 9,
+          "h": 10
+        },
+        {
+          "key": "274_51",
+          "x": 274,
+          "y": 51,
+          "w": 10,
+          "h": 9
+        },
+        {
+          "key": "262_52",
+          "x": 262,
+          "y": 52,
+          "w": 8,
+          "h": 8
+        },
+        {
+          "key": "211_53",
+          "x": 211,
+          "y": 53,
+          "w": 7,
+          "h": 8
+        },
+        {
+          "key": "65_64",
+          "x": 65,
+          "y": 64,
+          "w": 47,
+          "h": 32
+        },
+        {
+          "key": "338_64",
+          "x": 338,
+          "y": 64,
+          "w": 91,
+          "h": 32
+        },
+        {
+          "key": "117_66",
+          "x": 117,
+          "y": 66,
+          "w": 40,
+          "h": 29
+        },
+        {
+          "key": "276_67",
+          "x": 276,
+          "y": 67,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "261_69",
+          "x": 261,
+          "y": 69,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "245_70",
+          "x": 245,
+          "y": 70,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "160_73",
+          "x": 160,
+          "y": 73,
+          "w": 30,
+          "h": 22
+        },
+        {
+          "key": "432_76",
+          "x": 432,
+          "y": 76,
+          "w": 16,
+          "h": 20
+        },
+        {
+          "key": "245_86",
+          "x": 245,
+          "y": 86,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "242_96",
+          "x": 242,
+          "y": 96,
+          "w": 11,
+          "h": 32
+        },
+        {
+          "key": "272_96",
+          "x": 272,
+          "y": 96,
+          "w": 16,
+          "h": 16
+        },
+        {
+          "key": "226_97",
+          "x": 226,
+          "y": 97,
+          "w": 12,
+          "h": 45
+        },
+        {
+          "key": "258_100",
+          "x": 258,
+          "y": 100,
+          "w": 11,
+          "h": 28
+        },
+        {
+          "key": "211_101",
+          "x": 211,
+          "y": 101,
+          "w": 10,
+          "h": 26
+        },
+        {
+          "key": "196_108",
+          "x": 196,
+          "y": 108,
+          "w": 8,
+          "h": 19
+        },
+        {
+          "key": "117_114",
+          "x": 117,
+          "y": 114,
+          "w": 40,
+          "h": 29
+        },
+        {
+          "key": "272_116",
+          "x": 272,
+          "y": 116,
+          "w": 15,
+          "h": 11
+        },
+        {
+          "key": "341_117",
+          "x": 341,
+          "y": 117,
+          "w": 22,
+          "h": 42
+        },
+        {
+          "key": "160_121",
+          "x": 160,
+          "y": 121,
+          "w": 31,
+          "h": 23
+        },
+        {
+          "key": "369_129",
+          "x": 369,
+          "y": 129,
+          "w": 24,
+          "h": 31
+        },
+        {
+          "key": "195_132",
+          "x": 195,
+          "y": 132,
+          "w": 11,
+          "h": 9
+        },
+        {
+          "key": "212_132",
+          "x": 212,
+          "y": 132,
+          "w": 10,
+          "h": 9
+        },
+        {
+          "key": "243_133",
+          "x": 243,
+          "y": 133,
+          "w": 9,
+          "h": 8
+        },
+        {
+          "key": "400_141",
+          "x": 400,
+          "y": 141,
+          "w": 15,
+          "h": 19
+        },
+        {
+          "key": "196_150",
+          "x": 196,
+          "y": 150,
+          "w": 8,
+          "h": 6
+        },
+        {
+          "key": "117_162",
+          "x": 117,
+          "y": 162,
+          "w": 40,
+          "h": 29
+        },
+        {
+          "key": "293_163",
+          "x": 293,
+          "y": 163,
+          "w": 18,
+          "h": 29
+        },
+        {
+          "key": "212_164",
+          "x": 212,
+          "y": 164,
+          "w": 7,
+          "h": 9
+        },
+        {
+          "key": "228_164",
+          "x": 228,
+          "y": 164,
+          "w": 8,
+          "h": 8
+        },
+        {
+          "key": "196_165",
+          "x": 196,
+          "y": 165,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "321_165",
+          "x": 321,
+          "y": 165,
+          "w": 15,
+          "h": 27
+        },
+        {
+          "key": "160_169",
+          "x": 160,
+          "y": 169,
+          "w": 31,
+          "h": 23
+        },
+        {
+          "key": "337_176",
+          "x": 337,
+          "y": 176,
+          "w": 13,
+          "h": 16
+        },
+        {
+          "key": "355_178",
+          "x": 355,
+          "y": 178,
+          "w": 11,
+          "h": 14
+        },
+        {
+          "key": "212_182",
+          "x": 212,
+          "y": 182,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "228_182",
+          "x": 228,
+          "y": 182,
+          "w": 8,
+          "h": 5
+        },
+        {
+          "key": "372_183",
+          "x": 372,
+          "y": 183,
+          "w": 8,
+          "h": 9
+        },
+        {
+          "key": "212_196",
+          "x": 212,
+          "y": 196,
+          "w": 7,
+          "h": 9
+        },
+        {
+          "key": "228_196",
+          "x": 228,
+          "y": 196,
+          "w": 8,
+          "h": 8
+        },
+        {
+          "key": "196_197",
+          "x": 196,
+          "y": 197,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "212_214",
+          "x": 212,
+          "y": 214,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "228_214",
+          "x": 228,
+          "y": 214,
+          "w": 8,
+          "h": 5
+        },
+        {
+          "key": "2_224",
+          "x": 2,
+          "y": 224,
+          "w": 45,
+          "h": 96
+        },
+        {
+          "key": "50_226",
+          "x": 50,
+          "y": 226,
+          "w": 43,
+          "h": 93
+        },
+        {
+          "key": "99_226",
+          "x": 99,
+          "y": 226,
+          "w": 76,
+          "h": 46
+        },
+        {
+          "key": "212_232",
+          "x": 212,
+          "y": 232,
+          "w": 42,
+          "h": 40
+        },
+        {
+          "key": "179_241",
+          "x": 179,
+          "y": 241,
+          "w": 28,
+          "h": 31
+        },
+        {
+          "key": "99_273",
+          "x": 99,
+          "y": 273,
+          "w": 76,
+          "h": 47
+        },
+        {
+          "key": "212_280",
+          "x": 212,
+          "y": 280,
+          "w": 42,
+          "h": 40
+        },
+        {
+          "key": "179_289",
+          "x": 179,
+          "y": 289,
+          "w": 28,
+          "h": 31
+        },
+        {
+          "key": "33_307",
+          "x": 33,
+          "y": 307,
+          "w": 14,
+          "h": 12
+        },
+        {
+          "key": "81_322",
+          "x": 81,
+          "y": 322,
+          "w": 14,
+          "h": 10
+        },
+        {
+          "key": "1_323",
+          "x": 1,
+          "y": 323,
+          "w": 14,
+          "h": 9
+        },
+        {
+          "key": "99_324",
+          "x": 99,
+          "y": 324,
+          "w": 10,
+          "h": 8
+        },
+        {
+          "key": "19_325",
+          "x": 19,
+          "y": 325,
+          "w": 10,
+          "h": 7
+        },
+        {
+          "key": "116_325",
+          "x": 116,
+          "y": 325,
+          "w": 8,
+          "h": 6
+        },
+        {
+          "key": "36_326",
+          "x": 36,
+          "y": 326,
+          "w": 8,
+          "h": 5
+        },
+        {
+          "key": "1_339",
+          "x": 1,
+          "y": 339,
+          "w": 14,
+          "h": 9
+        },
+        {
+          "key": "81_339",
+          "x": 81,
+          "y": 339,
+          "w": 14,
+          "h": 9
+        },
+        {
+          "key": "19_341",
+          "x": 19,
+          "y": 341,
+          "w": 10,
+          "h": 7
+        },
+        {
+          "key": "99_341",
+          "x": 99,
+          "y": 341,
+          "w": 10,
+          "h": 7
+        },
+        {
+          "key": "36_342",
+          "x": 36,
+          "y": 342,
+          "w": 8,
+          "h": 5
+        },
+        {
+          "key": "116_342",
+          "x": 116,
+          "y": 342,
+          "w": 8,
+          "h": 5
+        }
+      ]
+    },
+    {
+      "id": "fairy-forest/Assets/Shadown.png",
+      "pack": "fairy-forest",
+      "type": "object",
+      "source": {
+        "kind": "image",
+        "path": "Assets/Shadown.png"
+      },
+      "w": 160,
+      "h": 64,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "shadown"
+      ],
+      "origin": "pack",
+      "regions": [
+        {
+          "key": "112_5",
+          "x": 112,
+          "y": 5,
+          "w": 48,
+          "h": 16
+        },
+        {
+          "key": "1_16",
+          "x": 1,
+          "y": 16,
+          "w": 158,
+          "h": 48
+        }
+      ]
+    },
+    {
+      "id": "fairy-forest/Assets/Tiles.png",
+      "pack": "fairy-forest",
+      "type": "tile",
+      "source": {
+        "kind": "sheetFrame",
+        "sheet": "Assets/Tiles.png",
+        "frame": 0
+      },
+      "w": 208,
+      "h": 320,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "tiles"
+      ],
+      "origin": "pack",
+      "frames": 260
+    },
+    {
+      "id": "fairy-forest/Assets/Tree.png",
+      "pack": "fairy-forest",
+      "type": "object",
+      "source": {
+        "kind": "image",
+        "path": "Assets/Tree.png"
+      },
+      "w": 1248,
+      "h": 1664,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "tree"
+      ],
+      "origin": "pack",
+      "regions": [
+        {
+          "key": "2_9",
+          "x": 2,
+          "y": 9,
+          "w": 186,
+          "h": 215
+        },
+        {
+          "key": "626_9",
+          "x": 626,
+          "y": 9,
+          "w": 186,
+          "h": 215
+        },
+        {
+          "key": "198_30",
+          "x": 198,
+          "y": 30,
+          "w": 133,
+          "h": 194
+        },
+        {
+          "key": "822_30",
+          "x": 822,
+          "y": 30,
+          "w": 133,
+          "h": 194
+        },
+        {
+          "key": "336_78",
+          "x": 336,
+          "y": 78,
+          "w": 111,
+          "h": 146
+        },
+        {
+          "key": "960_78",
+          "x": 960,
+          "y": 78,
+          "w": 111,
+          "h": 146
+        },
+        {
+          "key": "471_134",
+          "x": 471,
+          "y": 134,
+          "w": 50,
+          "h": 90
+        },
+        {
+          "key": "1095_134",
+          "x": 1095,
+          "y": 134,
+          "w": 50,
+          "h": 90
+        },
+        {
+          "key": "531_165",
+          "x": 531,
+          "y": 165,
+          "w": 40,
+          "h": 59
+        },
+        {
+          "key": "1155_165",
+          "x": 1155,
+          "y": 165,
+          "w": 40,
+          "h": 59
+        },
+        {
+          "key": "584_192",
+          "x": 584,
+          "y": 192,
+          "w": 17,
+          "h": 32
+        },
+        {
+          "key": "1208_192",
+          "x": 1208,
+          "y": 192,
+          "w": 17,
+          "h": 32
+        },
+        {
+          "key": "611_198",
+          "x": 611,
+          "y": 198,
+          "w": 9,
+          "h": 10
+        },
+        {
+          "key": "1235_198",
+          "x": 1235,
+          "y": 198,
+          "w": 9,
+          "h": 10
+        },
+        {
+          "key": "2_233",
+          "x": 2,
+          "y": 233,
+          "w": 186,
+          "h": 215
+        },
+        {
+          "key": "626_233",
+          "x": 626,
+          "y": 233,
+          "w": 186,
+          "h": 215
+        },
+        {
+          "key": "198_254",
+          "x": 198,
+          "y": 254,
+          "w": 133,
+          "h": 194
+        },
+        {
+          "key": "822_254",
+          "x": 822,
+          "y": 254,
+          "w": 133,
+          "h": 194
+        },
+        {
+          "key": "336_302",
+          "x": 336,
+          "y": 302,
+          "w": 111,
+          "h": 146
+        },
+        {
+          "key": "960_302",
+          "x": 960,
+          "y": 302,
+          "w": 111,
+          "h": 146
+        },
+        {
+          "key": "471_358",
+          "x": 471,
+          "y": 358,
+          "w": 50,
+          "h": 90
+        },
+        {
+          "key": "1095_358",
+          "x": 1095,
+          "y": 358,
+          "w": 50,
+          "h": 90
+        },
+        {
+          "key": "531_389",
+          "x": 531,
+          "y": 389,
+          "w": 40,
+          "h": 59
+        },
+        {
+          "key": "1155_389",
+          "x": 1155,
+          "y": 389,
+          "w": 40,
+          "h": 59
+        },
+        {
+          "key": "584_416",
+          "x": 584,
+          "y": 416,
+          "w": 17,
+          "h": 32
+        },
+        {
+          "key": "1208_416",
+          "x": 1208,
+          "y": 416,
+          "w": 17,
+          "h": 32
+        },
+        {
+          "key": "611_422",
+          "x": 611,
+          "y": 422,
+          "w": 9,
+          "h": 10
+        },
+        {
+          "key": "1235_422",
+          "x": 1235,
+          "y": 422,
+          "w": 9,
+          "h": 10
+        },
+        {
+          "key": "2_457",
+          "x": 2,
+          "y": 457,
+          "w": 186,
+          "h": 215
+        },
+        {
+          "key": "626_457",
+          "x": 626,
+          "y": 457,
+          "w": 186,
+          "h": 215
+        },
+        {
+          "key": "198_478",
+          "x": 198,
+          "y": 478,
+          "w": 133,
+          "h": 194
+        },
+        {
+          "key": "822_478",
+          "x": 822,
+          "y": 478,
+          "w": 133,
+          "h": 194
+        },
+        {
+          "key": "336_526",
+          "x": 336,
+          "y": 526,
+          "w": 111,
+          "h": 146
+        },
+        {
+          "key": "960_526",
+          "x": 960,
+          "y": 526,
+          "w": 111,
+          "h": 146
+        },
+        {
+          "key": "471_582",
+          "x": 471,
+          "y": 582,
+          "w": 50,
+          "h": 90
+        },
+        {
+          "key": "1095_582",
+          "x": 1095,
+          "y": 582,
+          "w": 50,
+          "h": 90
+        },
+        {
+          "key": "531_613",
+          "x": 531,
+          "y": 613,
+          "w": 40,
+          "h": 59
+        },
+        {
+          "key": "1155_613",
+          "x": 1155,
+          "y": 613,
+          "w": 40,
+          "h": 59
+        },
+        {
+          "key": "584_640",
+          "x": 584,
+          "y": 640,
+          "w": 17,
+          "h": 32
+        },
+        {
+          "key": "1208_640",
+          "x": 1208,
+          "y": 640,
+          "w": 17,
+          "h": 32
+        },
+        {
+          "key": "611_646",
+          "x": 611,
+          "y": 646,
+          "w": 9,
+          "h": 10
+        },
+        {
+          "key": "1235_646",
+          "x": 1235,
+          "y": 646,
+          "w": 9,
+          "h": 10
+        },
+        {
+          "key": "2_681",
+          "x": 2,
+          "y": 681,
+          "w": 186,
+          "h": 215
+        },
+        {
+          "key": "626_681",
+          "x": 626,
+          "y": 681,
+          "w": 186,
+          "h": 215
+        },
+        {
+          "key": "198_702",
+          "x": 198,
+          "y": 702,
+          "w": 133,
+          "h": 194
+        },
+        {
+          "key": "822_702",
+          "x": 822,
+          "y": 702,
+          "w": 133,
+          "h": 194
+        },
+        {
+          "key": "336_750",
+          "x": 336,
+          "y": 750,
+          "w": 111,
+          "h": 146
+        },
+        {
+          "key": "960_750",
+          "x": 960,
+          "y": 750,
+          "w": 111,
+          "h": 146
+        },
+        {
+          "key": "471_806",
+          "x": 471,
+          "y": 806,
+          "w": 50,
+          "h": 90
+        },
+        {
+          "key": "1095_806",
+          "x": 1095,
+          "y": 806,
+          "w": 50,
+          "h": 90
+        },
+        {
+          "key": "531_837",
+          "x": 531,
+          "y": 837,
+          "w": 40,
+          "h": 59
+        },
+        {
+          "key": "1155_837",
+          "x": 1155,
+          "y": 837,
+          "w": 40,
+          "h": 59
+        },
+        {
+          "key": "584_864",
+          "x": 584,
+          "y": 864,
+          "w": 17,
+          "h": 32
+        },
+        {
+          "key": "1208_864",
+          "x": 1208,
+          "y": 864,
+          "w": 17,
+          "h": 32
+        },
+        {
+          "key": "611_870",
+          "x": 611,
+          "y": 870,
+          "w": 9,
+          "h": 10
+        },
+        {
+          "key": "1235_870",
+          "x": 1235,
+          "y": 870,
+          "w": 9,
+          "h": 10
+        },
+        {
+          "key": "2_905",
+          "x": 2,
+          "y": 905,
+          "w": 186,
+          "h": 215
+        },
+        {
+          "key": "626_905",
+          "x": 626,
+          "y": 905,
+          "w": 186,
+          "h": 215
+        },
+        {
+          "key": "198_926",
+          "x": 198,
+          "y": 926,
+          "w": 133,
+          "h": 194
+        },
+        {
+          "key": "822_926",
+          "x": 822,
+          "y": 926,
+          "w": 133,
+          "h": 194
+        },
+        {
+          "key": "336_974",
+          "x": 336,
+          "y": 974,
+          "w": 111,
+          "h": 146
+        },
+        {
+          "key": "960_974",
+          "x": 960,
+          "y": 974,
+          "w": 111,
+          "h": 146
+        },
+        {
+          "key": "471_1030",
+          "x": 471,
+          "y": 1030,
+          "w": 50,
+          "h": 90
+        },
+        {
+          "key": "1095_1030",
+          "x": 1095,
+          "y": 1030,
+          "w": 50,
+          "h": 90
+        },
+        {
+          "key": "531_1061",
+          "x": 531,
+          "y": 1061,
+          "w": 40,
+          "h": 59
+        },
+        {
+          "key": "1155_1061",
+          "x": 1155,
+          "y": 1061,
+          "w": 40,
+          "h": 59
+        },
+        {
+          "key": "584_1088",
+          "x": 584,
+          "y": 1088,
+          "w": 17,
+          "h": 32
+        },
+        {
+          "key": "1208_1088",
+          "x": 1208,
+          "y": 1088,
+          "w": 17,
+          "h": 32
+        },
+        {
+          "key": "611_1094",
+          "x": 611,
+          "y": 1094,
+          "w": 9,
+          "h": 10
+        },
+        {
+          "key": "1235_1094",
+          "x": 1235,
+          "y": 1094,
+          "w": 9,
+          "h": 10
+        },
+        {
+          "key": "2_1128",
+          "x": 2,
+          "y": 1128,
+          "w": 186,
+          "h": 215
+        },
+        {
+          "key": "626_1129",
+          "x": 626,
+          "y": 1129,
+          "w": 186,
+          "h": 215
+        },
+        {
+          "key": "198_1149",
+          "x": 198,
+          "y": 1149,
+          "w": 133,
+          "h": 194
+        },
+        {
+          "key": "822_1150",
+          "x": 822,
+          "y": 1150,
+          "w": 133,
+          "h": 194
+        },
+        {
+          "key": "336_1197",
+          "x": 336,
+          "y": 1197,
+          "w": 111,
+          "h": 146
+        },
+        {
+          "key": "960_1198",
+          "x": 960,
+          "y": 1198,
+          "w": 111,
+          "h": 146
+        },
+        {
+          "key": "471_1253",
+          "x": 471,
+          "y": 1253,
+          "w": 50,
+          "h": 90
+        },
+        {
+          "key": "1095_1254",
+          "x": 1095,
+          "y": 1254,
+          "w": 50,
+          "h": 90
+        },
+        {
+          "key": "531_1284",
+          "x": 531,
+          "y": 1284,
+          "w": 40,
+          "h": 59
+        },
+        {
+          "key": "1155_1285",
+          "x": 1155,
+          "y": 1285,
+          "w": 40,
+          "h": 59
+        },
+        {
+          "key": "584_1311",
+          "x": 584,
+          "y": 1311,
+          "w": 17,
+          "h": 32
+        },
+        {
+          "key": "1208_1312",
+          "x": 1208,
+          "y": 1312,
+          "w": 17,
+          "h": 32
+        },
+        {
+          "key": "611_1317",
+          "x": 611,
+          "y": 1317,
+          "w": 9,
+          "h": 10
+        },
+        {
+          "key": "1235_1318",
+          "x": 1235,
+          "y": 1318,
+          "w": 9,
+          "h": 10
+        },
+        {
+          "key": "244_1346",
+          "x": 244,
+          "y": 1346,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "324_1346",
+          "x": 324,
+          "y": 1346,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "404_1346",
+          "x": 404,
+          "y": 1346,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "484_1346",
+          "x": 484,
+          "y": 1346,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "564_1346",
+          "x": 564,
+          "y": 1346,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "644_1346",
+          "x": 644,
+          "y": 1346,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "14_1360",
+          "x": 14,
+          "y": 1360,
+          "w": 68,
+          "h": 96
+        },
+        {
+          "key": "727_1376",
+          "x": 727,
+          "y": 1376,
+          "w": 94,
+          "h": 96
+        },
+        {
+          "key": "919_1376",
+          "x": 919,
+          "y": 1376,
+          "w": 94,
+          "h": 96
+        },
+        {
+          "key": "1111_1376",
+          "x": 1111,
+          "y": 1376,
+          "w": 94,
+          "h": 96
+        },
+        {
+          "key": "105_1392",
+          "x": 105,
+          "y": 1392,
+          "w": 54,
+          "h": 64
+        },
+        {
+          "key": "163_1408",
+          "x": 163,
+          "y": 1408,
+          "w": 38,
+          "h": 48
+        },
+        {
+          "key": "244_1426",
+          "x": 244,
+          "y": 1426,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "324_1426",
+          "x": 324,
+          "y": 1426,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "404_1426",
+          "x": 404,
+          "y": 1426,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "484_1426",
+          "x": 484,
+          "y": 1426,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "564_1426",
+          "x": 564,
+          "y": 1426,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "1216_1444",
+          "x": 1216,
+          "y": 1444,
+          "w": 32,
+          "h": 8
+        },
+        {
+          "key": "1217_1460",
+          "x": 1217,
+          "y": 1460,
+          "w": 13,
+          "h": 8
+        },
+        {
+          "key": "1234_1460",
+          "x": 1234,
+          "y": 1460,
+          "w": 13,
+          "h": 8
+        },
+        {
+          "key": "14_1472",
+          "x": 14,
+          "y": 1472,
+          "w": 68,
+          "h": 96
+        },
+        {
+          "key": "1224_1476",
+          "x": 1224,
+          "y": 1476,
+          "w": 18,
+          "h": 9
+        },
+        {
+          "key": "727_1488",
+          "x": 727,
+          "y": 1488,
+          "w": 94,
+          "h": 48
+        },
+        {
+          "key": "919_1488",
+          "x": 919,
+          "y": 1488,
+          "w": 94,
+          "h": 48
+        },
+        {
+          "key": "1111_1488",
+          "x": 1111,
+          "y": 1488,
+          "w": 94,
+          "h": 48
+        },
+        {
+          "key": "1222_1492",
+          "x": 1222,
+          "y": 1492,
+          "w": 18,
+          "h": 9
+        },
+        {
+          "key": "105_1504",
+          "x": 105,
+          "y": 1504,
+          "w": 54,
+          "h": 64
+        },
+        {
+          "key": "244_1506",
+          "x": 244,
+          "y": 1506,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "324_1506",
+          "x": 324,
+          "y": 1506,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "404_1506",
+          "x": 404,
+          "y": 1506,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "484_1506",
+          "x": 484,
+          "y": 1506,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "564_1506",
+          "x": 564,
+          "y": 1506,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "1225_1507",
+          "x": 1225,
+          "y": 1507,
+          "w": 17,
+          "h": 11
+        },
+        {
+          "key": "163_1520",
+          "x": 163,
+          "y": 1520,
+          "w": 38,
+          "h": 48
+        },
+        {
+          "key": "1222_1523",
+          "x": 1222,
+          "y": 1523,
+          "w": 17,
+          "h": 11
+        },
+        {
+          "key": "1222_1541",
+          "x": 1222,
+          "y": 1541,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "1236_1541",
+          "x": 1236,
+          "y": 1541,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "682_1552",
+          "x": 682,
+          "y": 1552,
+          "w": 175,
+          "h": 108
+        },
+        {
+          "key": "874_1552",
+          "x": 874,
+          "y": 1552,
+          "w": 175,
+          "h": 108
+        },
+        {
+          "key": "1066_1552",
+          "x": 1066,
+          "y": 1552,
+          "w": 175,
+          "h": 108
+        },
+        {
+          "key": "28_1581",
+          "x": 28,
+          "y": 1581,
+          "w": 51,
+          "h": 19
+        },
+        {
+          "key": "244_1586",
+          "x": 244,
+          "y": 1586,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "324_1586",
+          "x": 324,
+          "y": 1586,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "404_1586",
+          "x": 404,
+          "y": 1586,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "484_1586",
+          "x": 484,
+          "y": 1586,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "564_1586",
+          "x": 564,
+          "y": 1586,
+          "w": 74,
+          "h": 74
+        },
+        {
+          "key": "118_1588",
+          "x": 118,
+          "y": 1588,
+          "w": 27,
+          "h": 12
+        },
+        {
+          "key": "174_1590",
+          "x": 174,
+          "y": 1590,
+          "w": 19,
+          "h": 10
+        },
+        {
+          "key": "14_1616",
+          "x": 14,
+          "y": 1616,
+          "w": 68,
+          "h": 32
+        },
+        {
+          "key": "105_1616",
+          "x": 105,
+          "y": 1616,
+          "w": 54,
+          "h": 32
+        },
+        {
+          "key": "163_1616",
+          "x": 163,
+          "y": 1616,
+          "w": 38,
+          "h": 16
+        },
+        {
+          "key": "215_1616",
+          "x": 215,
+          "y": 1616,
+          "w": 21,
+          "h": 16
+        }
+      ]
+    },
+    {
+      "id": "fairy-forest/Enemies/Elf - Base/Death/Death-Sheet.png",
+      "pack": "fairy-forest",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Elf - Base/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Elf - Base/Death",
+      "tags": [
+        "base",
+        "death",
+        "elf",
+        "enemies",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "fairy-forest/Enemies/Elf - Base/Hit/Hit-Sheet.png",
+      "pack": "fairy-forest",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Elf - Base/Hit/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Elf - Base/Hit",
+      "tags": [
+        "base",
+        "elf",
+        "enemies",
+        "hit",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "fairy-forest/Enemies/Elf - Base/Idle/Idle-Sheet.png",
+      "pack": "fairy-forest",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Elf - Base/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Elf - Base/Idle",
+      "tags": [
+        "base",
+        "elf",
+        "enemies",
+        "idle",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "fairy-forest/Enemies/Elf - Base/Run/Run-Sheet.png",
+      "pack": "fairy-forest",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Elf - Base/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Elf - Base/Run",
+      "tags": [
+        "base",
+        "elf",
+        "enemies",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "fairy-forest/Enemies/Elf - Druid/Death/Death-Sheet.png",
+      "pack": "fairy-forest",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Elf - Druid/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Elf - Druid/Death",
+      "tags": [
+        "death",
+        "druid",
+        "elf",
+        "enemies",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "fairy-forest/Enemies/Elf - Druid/Hit/Hit-Sheet.png",
+      "pack": "fairy-forest",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Elf - Druid/Hit/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Elf - Druid/Hit",
+      "tags": [
+        "druid",
+        "elf",
+        "enemies",
+        "hit",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "fairy-forest/Enemies/Elf - Druid/Idle/Idle-Sheet.png",
+      "pack": "fairy-forest",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Elf - Druid/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Elf - Druid/Idle",
+      "tags": [
+        "druid",
+        "elf",
+        "enemies",
+        "idle",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "fairy-forest/Enemies/Elf - Druid/Run/Run-Sheet.png",
+      "pack": "fairy-forest",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Elf - Druid/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Elf - Druid/Run",
+      "tags": [
+        "druid",
+        "elf",
+        "enemies",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "fairy-forest/Enemies/Elf - Hunter/Death/Death-Sheet.png",
+      "pack": "fairy-forest",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Elf - Hunter/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Elf - Hunter/Death",
+      "tags": [
+        "death",
+        "elf",
+        "enemies",
+        "hunter",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "fairy-forest/Enemies/Elf - Hunter/Hit/Hit-Sheet.png",
+      "pack": "fairy-forest",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Elf - Hunter/Hit/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Elf - Hunter/Hit",
+      "tags": [
+        "elf",
+        "enemies",
+        "hit",
+        "hunter",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "fairy-forest/Enemies/Elf - Hunter/Idle/Idle-Sheet.png",
+      "pack": "fairy-forest",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Elf - Hunter/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Elf - Hunter/Idle",
+      "tags": [
+        "elf",
+        "enemies",
+        "hunter",
+        "idle",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "fairy-forest/Enemies/Elf - Hunter/Run/Run-Sheet.png",
+      "pack": "fairy-forest",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Elf - Hunter/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Elf - Hunter/Run",
+      "tags": [
+        "elf",
+        "enemies",
+        "hunter",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "fairy-forest/Enemies/Elf - Ranger/Death/Death-Sheet.png",
+      "pack": "fairy-forest",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Elf - Ranger/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Elf - Ranger/Death",
+      "tags": [
+        "death",
+        "elf",
+        "enemies",
+        "ranger",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "fairy-forest/Enemies/Elf - Ranger/Hit/Hit-Sheet.png",
+      "pack": "fairy-forest",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Elf - Ranger/Hit/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Elf - Ranger/Hit",
+      "tags": [
+        "elf",
+        "enemies",
+        "hit",
+        "ranger",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "fairy-forest/Enemies/Elf - Ranger/Idle/Idle-Sheet.png",
+      "pack": "fairy-forest",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Elf - Ranger/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Elf - Ranger/Idle",
+      "tags": [
+        "elf",
+        "enemies",
+        "idle",
+        "ranger",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "fairy-forest/Enemies/Elf - Ranger/Run/Run-Sheet.png",
+      "pack": "fairy-forest",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Elf - Ranger/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Elf - Ranger/Run",
+      "tags": [
+        "elf",
+        "enemies",
+        "ranger",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "fairy-forest/Weapon/Elf_Weapon.png",
+      "pack": "fairy-forest",
+      "type": "object",
+      "source": {
+        "kind": "image",
+        "path": "Weapon/Elf_Weapon.png"
+      },
+      "w": 160,
+      "h": 80,
+      "category": "Weapon",
+      "tags": [
+        "elf",
+        "weapon"
+      ],
+      "origin": "pack",
+      "regions": [
+        {
+          "key": "0_0",
+          "x": 0,
+          "y": 0,
+          "w": 32,
+          "h": 78
+        },
+        {
+          "key": "66_0",
+          "x": 66,
+          "y": 0,
+          "w": 11,
+          "h": 47
+        },
+        {
+          "key": "82_0",
+          "x": 82,
+          "y": 0,
+          "w": 12,
+          "h": 31
+        },
+        {
+          "key": "113_0",
+          "x": 113,
+          "y": 0,
+          "w": 47,
+          "h": 16
+        },
+        {
+          "key": "97_1",
+          "x": 97,
+          "y": 1,
+          "w": 13,
+          "h": 46
+        },
+        {
+          "key": "32_4",
+          "x": 32,
+          "y": 4,
+          "w": 16,
+          "h": 7
+        },
+        {
+          "key": "49_16",
+          "x": 49,
+          "y": 16,
+          "w": 15,
+          "h": 64
+        },
+        {
+          "key": "34_18",
+          "x": 34,
+          "y": 18,
+          "w": 11,
+          "h": 29
+        },
+        {
+          "key": "118_19",
+          "x": 118,
+          "y": 19,
+          "w": 20,
+          "h": 26
+        },
+        {
+          "key": "83_34",
+          "x": 83,
+          "y": 34,
+          "w": 11,
+          "h": 13
+        },
+        {
+          "key": "32_49",
+          "x": 32,
+          "y": 49,
+          "w": 14,
+          "h": 29
+        },
+        {
+          "key": "69_50",
+          "x": 69,
+          "y": 50,
+          "w": 41,
+          "h": 28
+        },
+        {
+          "key": "117_53",
+          "x": 117,
+          "y": 53,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "132_53",
+          "x": 132,
+          "y": 53,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "116_70",
+          "x": 116,
+          "y": 70,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "133_70",
+          "x": 133,
+          "y": 70,
+          "w": 7,
+          "h": 6
+        }
+      ]
+    },
+    {
+      "id": "forge/Assets/Tiles.png",
+      "pack": "forge",
+      "type": "tile",
+      "source": {
+        "kind": "sheetFrame",
+        "sheet": "Assets/Tiles.png",
+        "frame": 0
+      },
+      "w": 400,
+      "h": 400,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "tiles"
+      ],
+      "origin": "pack",
+      "frames": 625
+    },
+    {
+      "id": "forge/Enemy/Stone - Base/Death/Death-Sheet.png",
+      "pack": "forge",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Stone - Base/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Stone - Base/Death",
+      "tags": [
+        "base",
+        "death",
+        "enemy",
+        "sheet",
+        "stone"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "forge/Enemy/Stone - Base/Idle/Idle-Sheet.png",
+      "pack": "forge",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Stone - Base/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemy/Stone - Base/Idle",
+      "tags": [
+        "base",
+        "enemy",
+        "idle",
+        "sheet",
+        "stone"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "forge/Enemy/Stone - Base/Run/Run-Sheet.png",
+      "pack": "forge",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Stone - Base/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Stone - Base/Run",
+      "tags": [
+        "base",
+        "enemy",
+        "run",
+        "sheet",
+        "stone"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "forge/Enemy/Stone - Broken/Death/Death-Sheet.png",
+      "pack": "forge",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Stone - Broken/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Stone - Broken/Death",
+      "tags": [
+        "broken",
+        "death",
+        "enemy",
+        "sheet",
+        "stone"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "forge/Enemy/Stone - Broken/Idle/Idle-Sheet.png",
+      "pack": "forge",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Stone - Broken/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemy/Stone - Broken/Idle",
+      "tags": [
+        "broken",
+        "enemy",
+        "idle",
+        "sheet",
+        "stone"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "forge/Enemy/Stone - Broken/Run/Run-Sheet.png",
+      "pack": "forge",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Stone - Broken/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Stone - Broken/Run",
+      "tags": [
+        "broken",
+        "enemy",
+        "run",
+        "sheet",
+        "stone"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "forge/Enemy/Stone - Golem/Death/Death-Sheet.png",
+      "pack": "forge",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Stone - Golem/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Stone - Golem/Death",
+      "tags": [
+        "death",
+        "enemy",
+        "golem",
+        "sheet",
+        "stone"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "forge/Enemy/Stone - Golem/Idle/Idle-Sheet.png",
+      "pack": "forge",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Stone - Golem/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemy/Stone - Golem/Idle",
+      "tags": [
+        "enemy",
+        "golem",
+        "idle",
+        "sheet",
+        "stone"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "forge/Enemy/Stone - Golem/Run/Run-Sheet.png",
+      "pack": "forge",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Stone - Golem/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Stone - Golem/Run",
+      "tags": [
+        "enemy",
+        "golem",
+        "run",
+        "sheet",
+        "stone"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "forge/Enemy/Stone - Lava/Death/Death-Sheet.png",
+      "pack": "forge",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Stone - Lava/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Stone - Lava/Death",
+      "tags": [
+        "death",
+        "enemy",
+        "lava",
+        "sheet",
+        "stone"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "forge/Enemy/Stone - Lava/Idle/Idle-Sheet.png",
+      "pack": "forge",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Stone - Lava/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemy/Stone - Lava/Idle",
+      "tags": [
+        "enemy",
+        "idle",
+        "lava",
+        "sheet",
+        "stone"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "forge/Enemy/Stone - Lava/Run/Run-Sheet.png",
+      "pack": "forge",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Stone - Lava/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Stone - Lava/Run",
+      "tags": [
+        "enemy",
+        "lava",
+        "run",
+        "sheet",
+        "stone"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "forge/Weapons/Fire Weapons/Fire Weapons.png",
+      "pack": "forge",
+      "type": "object",
+      "source": {
+        "kind": "image",
+        "path": "Weapons/Fire Weapons/Fire Weapons.png"
+      },
+      "w": 160,
+      "h": 80,
+      "category": "Weapons/Fire Weapons",
+      "tags": [
+        "fire",
+        "weapons"
+      ],
+      "origin": "pack",
+      "regions": [
+        {
+          "key": "0_0",
+          "x": 0,
+          "y": 0,
+          "w": 32,
+          "h": 79
+        },
+        {
+          "key": "48_0",
+          "x": 48,
+          "y": 0,
+          "w": 48,
+          "h": 80
+        },
+        {
+          "key": "114_0",
+          "x": 114,
+          "y": 0,
+          "w": 30,
+          "h": 80
+        },
+        {
+          "key": "82_1",
+          "x": 82,
+          "y": 1,
+          "w": 12,
+          "h": 47
+        },
+        {
+          "key": "99_1",
+          "x": 99,
+          "y": 1,
+          "w": 11,
+          "h": 46
+        },
+        {
+          "key": "32_4",
+          "x": 32,
+          "y": 4,
+          "w": 16,
+          "h": 7
+        },
+        {
+          "key": "132_5",
+          "x": 132,
+          "y": 5,
+          "w": 8,
+          "h": 7
+        },
+        {
+          "key": "148_5",
+          "x": 148,
+          "y": 5,
+          "w": 8,
+          "h": 7
+        },
+        {
+          "key": "35_16",
+          "x": 35,
+          "y": 16,
+          "w": 10,
+          "h": 30
+        },
+        {
+          "key": "132_20",
+          "x": 132,
+          "y": 20,
+          "w": 8,
+          "h": 8
+        },
+        {
+          "key": "148_20",
+          "x": 148,
+          "y": 20,
+          "w": 8,
+          "h": 8
+        },
+        {
+          "key": "32_50",
+          "x": 32,
+          "y": 50,
+          "w": 16,
+          "h": 29
+        },
+        {
+          "key": "98_54",
+          "x": 98,
+          "y": 54,
+          "w": 12,
+          "h": 21
+        }
+      ]
+    },
+    {
+      "id": "garden-environment/Assets/Tiles.png",
+      "pack": "garden-environment",
+      "type": "tile",
+      "source": {
+        "kind": "sheetFrame",
+        "sheet": "Assets/Tiles.png",
+        "frame": 0
+      },
+      "w": 480,
+      "h": 480,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "tiles"
+      ],
+      "origin": "pack",
+      "frames": 900
+    },
+    {
+      "id": "garden-environment/Enemies/Feminine/Death-Sheet.png",
+      "pack": "garden-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Feminine/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Feminine",
+      "tags": [
+        "death",
+        "enemies",
+        "feminine",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "garden-environment/Enemies/Feminine/Hit-Sheet.png",
+      "pack": "garden-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Feminine/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Feminine",
+      "tags": [
+        "enemies",
+        "feminine",
+        "hit",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "garden-environment/Enemies/Feminine/Idle-Sheet.png",
+      "pack": "garden-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Feminine/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Feminine",
+      "tags": [
+        "enemies",
+        "feminine",
+        "idle",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "garden-environment/Enemies/Feminine/Run-Sheet.png",
+      "pack": "garden-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Feminine/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Feminine",
+      "tags": [
+        "enemies",
+        "feminine",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "garden-environment/Enemies/Masculine/Death-Sheet.png",
+      "pack": "garden-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Masculine/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Masculine",
+      "tags": [
+        "death",
+        "enemies",
+        "masculine",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "garden-environment/Enemies/Masculine/Hit-Sheet.png",
+      "pack": "garden-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Masculine/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Masculine",
+      "tags": [
+        "enemies",
+        "hit",
+        "masculine",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "garden-environment/Enemies/Masculine/Idle-Sheet.png",
+      "pack": "garden-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Masculine/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Masculine",
+      "tags": [
+        "enemies",
+        "idle",
+        "masculine",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "garden-environment/Enemies/Masculine/Run-Sheet.png",
+      "pack": "garden-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Masculine/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Masculine",
+      "tags": [
+        "enemies",
+        "masculine",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "garden-environment/Enemies/Medusa/Death-Sheet.png",
+      "pack": "garden-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Medusa/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Medusa",
+      "tags": [
+        "death",
+        "enemies",
+        "medusa",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "garden-environment/Enemies/Medusa/Hit-Sheet.png",
+      "pack": "garden-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Medusa/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Medusa",
+      "tags": [
+        "enemies",
+        "hit",
+        "medusa",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "garden-environment/Enemies/Medusa/Idle-Sheet.png",
+      "pack": "garden-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Medusa/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Medusa",
+      "tags": [
+        "enemies",
+        "idle",
+        "medusa",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "garden-environment/Enemies/Medusa/Run-Sheet.png",
+      "pack": "garden-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Medusa/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Medusa",
+      "tags": [
+        "enemies",
+        "medusa",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "garden-environment/Enemies/Old/Death-Sheet.png",
+      "pack": "garden-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Old/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Old",
+      "tags": [
+        "death",
+        "enemies",
+        "old",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "garden-environment/Enemies/Old/Hit-Sheet.png",
+      "pack": "garden-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Old/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Old",
+      "tags": [
+        "enemies",
+        "hit",
+        "old",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "garden-environment/Enemies/Old/Idle-Sheet.png",
+      "pack": "garden-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Old/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Old",
+      "tags": [
+        "enemies",
+        "idle",
+        "old",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "garden-environment/Enemies/Old/Run-Sheet.png",
+      "pack": "garden-environment",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Old/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Old",
+      "tags": [
+        "enemies",
+        "old",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "garden-environment/Weapons/Weapons.png",
+      "pack": "garden-environment",
+      "type": "object",
+      "source": {
+        "kind": "image",
+        "path": "Weapons/Weapons.png"
+      },
+      "w": 208,
+      "h": 320,
+      "category": "Weapons",
+      "tags": [
+        "weapons"
+      ],
+      "origin": "pack",
+      "regions": [
+        {
+          "key": "128_0",
+          "x": 128,
+          "y": 0,
+          "w": 47,
+          "h": 80
+        },
+        {
+          "key": "64_1",
+          "x": 64,
+          "y": 1,
+          "w": 16,
+          "h": 319
+        },
+        {
+          "key": "0_3",
+          "x": 0,
+          "y": 3,
+          "w": 31,
+          "h": 157
+        },
+        {
+          "key": "19_16",
+          "x": 19,
+          "y": 16,
+          "w": 10,
+          "h": 48
+        },
+        {
+          "key": "82_17",
+          "x": 82,
+          "y": 17,
+          "w": 30,
+          "h": 143
+        },
+        {
+          "key": "35_32",
+          "x": 35,
+          "y": 32,
+          "w": 10,
+          "h": 32
+        },
+        {
+          "key": "116_37",
+          "x": 116,
+          "y": 37,
+          "w": 12,
+          "h": 91
+        },
+        {
+          "key": "53_42",
+          "x": 53,
+          "y": 42,
+          "w": 7,
+          "h": 22
+        },
+        {
+          "key": "178_44",
+          "x": 178,
+          "y": 44,
+          "w": 12,
+          "h": 36
+        },
+        {
+          "key": "197_53",
+          "x": 197,
+          "y": 53,
+          "w": 6,
+          "h": 7
+        },
+        {
+          "key": "133_68",
+          "x": 133,
+          "y": 68,
+          "w": 22,
+          "h": 26
+        },
+        {
+          "key": "194_73",
+          "x": 194,
+          "y": 73,
+          "w": 12,
+          "h": 23
+        },
+        {
+          "key": "167_85",
+          "x": 167,
+          "y": 85,
+          "w": 18,
+          "h": 5
+        },
+        {
+          "key": "32_90",
+          "x": 32,
+          "y": 90,
+          "w": 16,
+          "h": 70
+        },
+        {
+          "key": "135_96",
+          "x": 135,
+          "y": 96,
+          "w": 9,
+          "h": 48
+        },
+        {
+          "key": "156_97",
+          "x": 156,
+          "y": 97,
+          "w": 52,
+          "h": 46
+        },
+        {
+          "key": "50_105",
+          "x": 50,
+          "y": 105,
+          "w": 14,
+          "h": 55
+        },
+        {
+          "key": "116_133",
+          "x": 116,
+          "y": 133,
+          "w": 12,
+          "h": 27
+        },
+        {
+          "key": "0_163",
+          "x": 0,
+          "y": 163,
+          "w": 48,
+          "h": 157
+        },
+        {
+          "key": "18_176",
+          "x": 18,
+          "y": 176,
+          "w": 11,
+          "h": 48
+        },
+        {
+          "key": "81_177",
+          "x": 81,
+          "y": 177,
+          "w": 31,
+          "h": 111
+        },
+        {
+          "key": "34_192",
+          "x": 34,
+          "y": 192,
+          "w": 12,
+          "h": 32
+        },
+        {
+          "key": "114_194",
+          "x": 114,
+          "y": 194,
+          "w": 29,
+          "h": 94
+        },
+        {
+          "key": "53_202",
+          "x": 53,
+          "y": 202,
+          "w": 8,
+          "h": 22
+        },
+        {
+          "key": "129_225",
+          "x": 129,
+          "y": 225,
+          "w": 30,
+          "h": 47
+        },
+        {
+          "key": "50_262",
+          "x": 50,
+          "y": 262,
+          "w": 14,
+          "h": 58
+        },
+        {
+          "key": "135_275",
+          "x": 135,
+          "y": 275,
+          "w": 18,
+          "h": 9
+        },
+        {
+          "key": "196_277",
+          "x": 196,
+          "y": 277,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "180_278",
+          "x": 180,
+          "y": 278,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "196_292",
+          "x": 196,
+          "y": 292,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "181_293",
+          "x": 181,
+          "y": 293,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "180_309",
+          "x": 180,
+          "y": 309,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "197_309",
+          "x": 197,
+          "y": 309,
+          "w": 7,
+          "h": 6
+        }
+      ]
+    },
+    {
+      "id": "hideout/Assets/Light.png",
+      "pack": "hideout",
+      "type": "object",
+      "source": {
+        "kind": "image",
+        "path": "Assets/Light.png"
+      },
+      "w": 208,
+      "h": 144,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "light"
+      ],
+      "origin": "pack",
+      "regions": [
+        {
+          "key": "1_9",
+          "x": 1,
+          "y": 9,
+          "w": 78,
+          "h": 78
+        },
+        {
+          "key": "89_12",
+          "x": 89,
+          "y": 12,
+          "w": 110,
+          "h": 123
+        }
+      ]
+    },
+    {
+      "id": "hideout/Assets/Tiles.png",
+      "pack": "hideout",
+      "type": "tile",
+      "source": {
+        "kind": "sheetFrame",
+        "sheet": "Assets/Tiles.png",
+        "frame": 0
+      },
+      "w": 416,
+      "h": 400,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "tiles"
+      ],
+      "origin": "pack",
+      "frames": 650
+    },
+    {
+      "id": "hideout/Enemies/Baldits/Fighter/Death/Death-Sheet.png",
+      "pack": "hideout",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Baldits/Fighter/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Baldits/Fighter/Death",
+      "tags": [
+        "baldits",
+        "death",
+        "enemies",
+        "fighter",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "hideout/Enemies/Baldits/Fighter/Hit/Hit-Sheet.png",
+      "pack": "hideout",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Baldits/Fighter/Hit/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Baldits/Fighter/Hit",
+      "tags": [
+        "baldits",
+        "enemies",
+        "fighter",
+        "hit",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "hideout/Enemies/Baldits/Fighter/Idle/Idle-Sheet.png",
+      "pack": "hideout",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Baldits/Fighter/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Baldits/Fighter/Idle",
+      "tags": [
+        "baldits",
+        "enemies",
+        "fighter",
+        "idle",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "hideout/Enemies/Baldits/Fighter/Run/Run-Sheet.png",
+      "pack": "hideout",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Baldits/Fighter/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Baldits/Fighter/Run",
+      "tags": [
+        "baldits",
+        "enemies",
+        "fighter",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "hideout/Enemies/Baldits/Scout/Death/Death-Sheet.png",
+      "pack": "hideout",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Baldits/Scout/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Baldits/Scout/Death",
+      "tags": [
+        "baldits",
+        "death",
+        "enemies",
+        "scout",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "hideout/Enemies/Baldits/Scout/Hit/Hit-Sheet.png",
+      "pack": "hideout",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Baldits/Scout/Hit/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Baldits/Scout/Hit",
+      "tags": [
+        "baldits",
+        "enemies",
+        "hit",
+        "scout",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "hideout/Enemies/Baldits/Scout/Idle/Idle-Sheet.png",
+      "pack": "hideout",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Baldits/Scout/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Baldits/Scout/Idle",
+      "tags": [
+        "baldits",
+        "enemies",
+        "idle",
+        "scout",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "hideout/Enemies/Baldits/Scout/Run/Run-Sheet.png",
+      "pack": "hideout",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Baldits/Scout/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Baldits/Scout/Run",
+      "tags": [
+        "baldits",
+        "enemies",
+        "run",
+        "scout",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "hideout/Enemies/Baldits/Sorcerer/Death/Death-Sheet.png",
+      "pack": "hideout",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Baldits/Sorcerer/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Baldits/Sorcerer/Death",
+      "tags": [
+        "baldits",
+        "death",
+        "enemies",
+        "sheet",
+        "sorcerer"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "hideout/Enemies/Baldits/Sorcerer/Hit/Hit-Sheet.png",
+      "pack": "hideout",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Baldits/Sorcerer/Hit/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Baldits/Sorcerer/Hit",
+      "tags": [
+        "baldits",
+        "enemies",
+        "hit",
+        "sheet",
+        "sorcerer"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "hideout/Enemies/Baldits/Sorcerer/Idle/Idle-Sheet.png",
+      "pack": "hideout",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Baldits/Sorcerer/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Baldits/Sorcerer/Idle",
+      "tags": [
+        "baldits",
+        "enemies",
+        "idle",
+        "sheet",
+        "sorcerer"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "hideout/Enemies/Baldits/Sorcerer/Run/Run-Sheet.png",
+      "pack": "hideout",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Baldits/Sorcerer/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Baldits/Sorcerer/Run",
+      "tags": [
+        "baldits",
+        "enemies",
+        "run",
+        "sheet",
+        "sorcerer"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "hideout/Enemies/Baldits/Tracker/Death/Death-Sheet.png",
+      "pack": "hideout",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Baldits/Tracker/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Baldits/Tracker/Death",
+      "tags": [
+        "baldits",
+        "death",
+        "enemies",
+        "sheet",
+        "tracker"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "hideout/Enemies/Baldits/Tracker/hIT/Hit-Sheet.png",
+      "pack": "hideout",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Baldits/Tracker/hIT/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Baldits/Tracker/hIT",
+      "tags": [
+        "baldits",
+        "enemies",
+        "hit",
+        "sheet",
+        "tracker"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "hideout/Enemies/Baldits/Tracker/Idle/Idle-Sheet.png",
+      "pack": "hideout",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Baldits/Tracker/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Baldits/Tracker/Idle",
+      "tags": [
+        "baldits",
+        "enemies",
+        "idle",
+        "sheet",
+        "tracker"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "hideout/Enemies/Baldits/Tracker/Run/Run-Sheet.png",
+      "pack": "hideout",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Baldits/Tracker/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Baldits/Tracker/Run",
+      "tags": [
+        "baldits",
+        "enemies",
+        "run",
+        "sheet",
+        "tracker"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "hideout/Weapons/Rustic.png",
+      "pack": "hideout",
+      "type": "object",
+      "source": {
+        "kind": "image",
+        "path": "Weapons/Rustic.png"
+      },
+      "w": 224,
+      "h": 160,
+      "category": "Weapons",
+      "tags": [
+        "rustic",
+        "weapons"
+      ],
+      "origin": "pack",
+      "regions": [
+        {
+          "key": "64_0",
+          "x": 64,
+          "y": 0,
+          "w": 32,
+          "h": 160
+        },
+        {
+          "key": "131_0",
+          "x": 131,
+          "y": 0,
+          "w": 10,
+          "h": 64
+        },
+        {
+          "key": "3_2",
+          "x": 3,
+          "y": 2,
+          "w": 11,
+          "h": 62
+        },
+        {
+          "key": "196_5",
+          "x": 196,
+          "y": 5,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "213_5",
+          "x": 213,
+          "y": 5,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "20_16",
+          "x": 20,
+          "y": 16,
+          "w": 10,
+          "h": 48
+        },
+        {
+          "key": "147_16",
+          "x": 147,
+          "y": 16,
+          "w": 10,
+          "h": 48
+        },
+        {
+          "key": "196_21",
+          "x": 196,
+          "y": 21,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "213_21",
+          "x": 213,
+          "y": 21,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "99_25",
+          "x": 99,
+          "y": 25,
+          "w": 13,
+          "h": 135
+        },
+        {
+          "key": "37_32",
+          "x": 37,
+          "y": 32,
+          "w": 8,
+          "h": 32
+        },
+        {
+          "key": "116_32",
+          "x": 116,
+          "y": 32,
+          "w": 12,
+          "h": 96
+        },
+        {
+          "key": "164_32",
+          "x": 164,
+          "y": 32,
+          "w": 7,
+          "h": 32
+        },
+        {
+          "key": "196_37",
+          "x": 196,
+          "y": 37,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "213_37",
+          "x": 213,
+          "y": 37,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "53_38",
+          "x": 53,
+          "y": 38,
+          "w": 7,
+          "h": 26
+        },
+        {
+          "key": "181_40",
+          "x": 181,
+          "y": 40,
+          "w": 5,
+          "h": 24
+        },
+        {
+          "key": "196_53",
+          "x": 196,
+          "y": 53,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "213_53",
+          "x": 213,
+          "y": 53,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "0_69",
+          "x": 0,
+          "y": 69,
+          "w": 16,
+          "h": 91
+        },
+        {
+          "key": "151_69",
+          "x": 151,
+          "y": 69,
+          "w": 18,
+          "h": 5
+        },
+        {
+          "key": "181_71",
+          "x": 181,
+          "y": 71,
+          "w": 5,
+          "h": 18
+        },
+        {
+          "key": "130_72",
+          "x": 130,
+          "y": 72,
+          "w": 12,
+          "h": 24
+        },
+        {
+          "key": "146_80",
+          "x": 146,
+          "y": 80,
+          "w": 12,
+          "h": 16
+        },
+        {
+          "key": "18_83",
+          "x": 18,
+          "y": 83,
+          "w": 12,
+          "h": 77
+        },
+        {
+          "key": "165_85",
+          "x": 165,
+          "y": 85,
+          "w": 6,
+          "h": 7
+        },
+        {
+          "key": "33_96",
+          "x": 33,
+          "y": 96,
+          "w": 15,
+          "h": 64
+        },
+        {
+          "key": "128_96",
+          "x": 128,
+          "y": 96,
+          "w": 62,
+          "h": 47
+        },
+        {
+          "key": "52_109",
+          "x": 52,
+          "y": 109,
+          "w": 12,
+          "h": 51
+        },
+        {
+          "key": "130_114",
+          "x": 130,
+          "y": 114,
+          "w": 28,
+          "h": 46
+        },
+        {
+          "key": "116_133",
+          "x": 116,
+          "y": 133,
+          "w": 12,
+          "h": 27
+        }
+      ]
+    },
+    {
+      "id": "library/Assets/Tiles.png",
+      "pack": "library",
+      "type": "tile",
+      "source": {
+        "kind": "sheetFrame",
+        "sheet": "Assets/Tiles.png",
+        "frame": 0
+      },
+      "w": 400,
+      "h": 400,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "tiles"
+      ],
+      "origin": "pack",
+      "frames": 625
+    },
+    {
+      "id": "library/Enemies/Scholars/Cataloguer/Death-Sheet.png",
+      "pack": "library",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Scholars/Cataloguer/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Scholars/Cataloguer",
+      "tags": [
+        "cataloguer",
+        "death",
+        "enemies",
+        "scholars",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "library/Enemies/Scholars/Cataloguer/Hit-Sheet.png",
+      "pack": "library",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Scholars/Cataloguer/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Scholars/Cataloguer",
+      "tags": [
+        "cataloguer",
+        "enemies",
+        "hit",
+        "scholars",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "library/Enemies/Scholars/Cataloguer/Idle-Sheet.png",
+      "pack": "library",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Scholars/Cataloguer/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Scholars/Cataloguer",
+      "tags": [
+        "cataloguer",
+        "enemies",
+        "idle",
+        "scholars",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "library/Enemies/Scholars/Cataloguer/Run-Sheet.png",
+      "pack": "library",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Scholars/Cataloguer/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Scholars/Cataloguer",
+      "tags": [
+        "cataloguer",
+        "enemies",
+        "run",
+        "scholars",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "library/Enemies/Scholars/Censor/Death-Sheet.png",
+      "pack": "library",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Scholars/Censor/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Scholars/Censor",
+      "tags": [
+        "censor",
+        "death",
+        "enemies",
+        "scholars",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "library/Enemies/Scholars/Censor/Hit-Sheet.png",
+      "pack": "library",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Scholars/Censor/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Scholars/Censor",
+      "tags": [
+        "censor",
+        "enemies",
+        "hit",
+        "scholars",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "library/Enemies/Scholars/Censor/Idle-Sheet.png",
+      "pack": "library",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Scholars/Censor/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Scholars/Censor",
+      "tags": [
+        "censor",
+        "enemies",
+        "idle",
+        "scholars",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "library/Enemies/Scholars/Censor/Run-Sheet.png",
+      "pack": "library",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Scholars/Censor/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Scholars/Censor",
+      "tags": [
+        "censor",
+        "enemies",
+        "run",
+        "scholars",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "library/Enemies/Scholars/Director/Death-Sheet.png",
+      "pack": "library",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Scholars/Director/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Scholars/Director",
+      "tags": [
+        "death",
+        "director",
+        "enemies",
+        "scholars",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "library/Enemies/Scholars/Director/Hit-Sheet.png",
+      "pack": "library",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Scholars/Director/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Scholars/Director",
+      "tags": [
+        "director",
+        "enemies",
+        "hit",
+        "scholars",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "library/Enemies/Scholars/Director/Idle-Sheet.png",
+      "pack": "library",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Scholars/Director/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Scholars/Director",
+      "tags": [
+        "director",
+        "enemies",
+        "idle",
+        "scholars",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "library/Enemies/Scholars/Director/Run-Sheet.png",
+      "pack": "library",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Scholars/Director/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Scholars/Director",
+      "tags": [
+        "director",
+        "enemies",
+        "run",
+        "scholars",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "library/Enemies/Scholars/Researcher/Death-Sheet.png",
+      "pack": "library",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Scholars/Researcher/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Scholars/Researcher",
+      "tags": [
+        "death",
+        "enemies",
+        "researcher",
+        "scholars",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "library/Enemies/Scholars/Researcher/Hit-Sheet.png",
+      "pack": "library",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Scholars/Researcher/Hit-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Scholars/Researcher",
+      "tags": [
+        "enemies",
+        "hit",
+        "researcher",
+        "scholars",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "library/Enemies/Scholars/Researcher/Idle-Sheet.png",
+      "pack": "library",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Scholars/Researcher/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemies/Scholars/Researcher",
+      "tags": [
+        "enemies",
+        "idle",
+        "researcher",
+        "scholars",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "library/Enemies/Scholars/Researcher/Run-Sheet.png",
+      "pack": "library",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemies/Scholars/Researcher/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemies/Scholars/Researcher",
+      "tags": [
+        "enemies",
+        "researcher",
+        "run",
+        "scholars",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "library/Weapons/Weapons.png",
+      "pack": "library",
+      "type": "object",
+      "source": {
+        "kind": "image",
+        "path": "Weapons/Weapons.png"
+      },
+      "w": 208,
+      "h": 160,
+      "category": "Weapons",
+      "tags": [
+        "weapons"
+      ],
+      "origin": "pack",
+      "regions": [
+        {
+          "key": "0_0",
+          "x": 0,
+          "y": 0,
+          "w": 30,
+          "h": 160
+        },
+        {
+          "key": "64_0",
+          "x": 64,
+          "y": 0,
+          "w": 16,
+          "h": 160
+        },
+        {
+          "key": "130_0",
+          "x": 130,
+          "y": 0,
+          "w": 12,
+          "h": 64
+        },
+        {
+          "key": "196_5",
+          "x": 196,
+          "y": 5,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "164_6",
+          "x": 164,
+          "y": 6,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "180_6",
+          "x": 180,
+          "y": 6,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "18_16",
+          "x": 18,
+          "y": 16,
+          "w": 12,
+          "h": 48
+        },
+        {
+          "key": "81_16",
+          "x": 81,
+          "y": 16,
+          "w": 14,
+          "h": 144
+        },
+        {
+          "key": "145_16",
+          "x": 145,
+          "y": 16,
+          "w": 14,
+          "h": 48
+        },
+        {
+          "key": "196_20",
+          "x": 196,
+          "y": 20,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "164_21",
+          "x": 164,
+          "y": 21,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "181_21",
+          "x": 181,
+          "y": 21,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "101_26",
+          "x": 101,
+          "y": 26,
+          "w": 11,
+          "h": 134
+        },
+        {
+          "key": "36_28",
+          "x": 36,
+          "y": 28,
+          "w": 8,
+          "h": 36
+        },
+        {
+          "key": "115_32",
+          "x": 115,
+          "y": 32,
+          "w": 12,
+          "h": 96
+        },
+        {
+          "key": "164_32",
+          "x": 164,
+          "y": 32,
+          "w": 8,
+          "h": 32
+        },
+        {
+          "key": "176_35",
+          "x": 176,
+          "y": 35,
+          "w": 16,
+          "h": 45
+        },
+        {
+          "key": "52_37",
+          "x": 52,
+          "y": 37,
+          "w": 8,
+          "h": 27
+        },
+        {
+          "key": "134_68",
+          "x": 134,
+          "y": 68,
+          "w": 19,
+          "h": 7
+        },
+        {
+          "key": "165_69",
+          "x": 165,
+          "y": 69,
+          "w": 6,
+          "h": 7
+        },
+        {
+          "key": "130_80",
+          "x": 130,
+          "y": 80,
+          "w": 14,
+          "h": 80
+        },
+        {
+          "key": "146_80",
+          "x": 146,
+          "y": 80,
+          "w": 14,
+          "h": 78
+        },
+        {
+          "key": "163_83",
+          "x": 163,
+          "y": 83,
+          "w": 26,
+          "h": 26
+        },
+        {
+          "key": "33_88",
+          "x": 33,
+          "y": 88,
+          "w": 14,
+          "h": 72
+        },
+        {
+          "key": "51_97",
+          "x": 51,
+          "y": 97,
+          "w": 13,
+          "h": 63
+        },
+        {
+          "key": "162_116",
+          "x": 162,
+          "y": 116,
+          "w": 14,
+          "h": 40
+        },
+        {
+          "key": "117_131",
+          "x": 117,
+          "y": 131,
+          "w": 10,
+          "h": 29
+        }
+      ]
+    },
     {
       "id": "pixel-crawler/_derived/bush.png",
       "pack": "pixel-crawler",
@@ -10313,6 +17087,1110 @@
           "h": 28
         }
       ]
+    },
+    {
+      "id": "sewer/Assets/Props.png",
+      "pack": "sewer",
+      "type": "object",
+      "source": {
+        "kind": "image",
+        "path": "Assets/Props.png"
+      },
+      "w": 176,
+      "h": 256,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "props"
+      ],
+      "origin": "pack",
+      "regions": [
+        {
+          "key": "163_0",
+          "x": 163,
+          "y": 0,
+          "w": 10,
+          "h": 42
+        },
+        {
+          "key": "69_2",
+          "x": 69,
+          "y": 2,
+          "w": 7,
+          "h": 9
+        },
+        {
+          "key": "82_4",
+          "x": 82,
+          "y": 4,
+          "w": 12,
+          "h": 5
+        },
+        {
+          "key": "130_4",
+          "x": 130,
+          "y": 4,
+          "w": 28,
+          "h": 28
+        },
+        {
+          "key": "100_5",
+          "x": 100,
+          "y": 5,
+          "w": 9,
+          "h": 20
+        },
+        {
+          "key": "116_5",
+          "x": 116,
+          "y": 5,
+          "w": 9,
+          "h": 20
+        },
+        {
+          "key": "32_7",
+          "x": 32,
+          "y": 7,
+          "w": 32,
+          "h": 25
+        },
+        {
+          "key": "5_10",
+          "x": 5,
+          "y": 10,
+          "w": 6,
+          "h": 15
+        },
+        {
+          "key": "21_10",
+          "x": 21,
+          "y": 10,
+          "w": 6,
+          "h": 12
+        },
+        {
+          "key": "84_18",
+          "x": 84,
+          "y": 18,
+          "w": 9,
+          "h": 10
+        },
+        {
+          "key": "68_19",
+          "x": 68,
+          "y": 19,
+          "w": 9,
+          "h": 8
+        },
+        {
+          "key": "85_32",
+          "x": 85,
+          "y": 32,
+          "w": 8,
+          "h": 14
+        },
+        {
+          "key": "17_34",
+          "x": 17,
+          "y": 34,
+          "w": 13,
+          "h": 10
+        },
+        {
+          "key": "4_35",
+          "x": 4,
+          "y": 35,
+          "w": 8,
+          "h": 11
+        },
+        {
+          "key": "69_35",
+          "x": 69,
+          "y": 35,
+          "w": 7,
+          "h": 8
+        },
+        {
+          "key": "0_39",
+          "x": 0,
+          "y": 39,
+          "w": 80,
+          "h": 217
+        },
+        {
+          "key": "99_39",
+          "x": 99,
+          "y": 39,
+          "w": 59,
+          "h": 43
+        },
+        {
+          "key": "162_52",
+          "x": 162,
+          "y": 52,
+          "w": 12,
+          "h": 7
+        },
+        {
+          "key": "69_53",
+          "x": 69,
+          "y": 53,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "key": "86_57",
+          "x": 86,
+          "y": 57,
+          "w": 39,
+          "h": 25
+        },
+        {
+          "key": "5_67",
+          "x": 5,
+          "y": 67,
+          "w": 6,
+          "h": 9
+        },
+        {
+          "key": "164_68",
+          "x": 164,
+          "y": 68,
+          "w": 9,
+          "h": 7
+        },
+        {
+          "key": "112_80",
+          "x": 112,
+          "y": 80,
+          "w": 16,
+          "h": 4
+        },
+        {
+          "key": "86_103",
+          "x": 86,
+          "y": 103,
+          "w": 39,
+          "h": 18
+        },
+        {
+          "key": "129_103",
+          "x": 129,
+          "y": 103,
+          "w": 25,
+          "h": 18
+        },
+        {
+          "key": "112_119",
+          "x": 112,
+          "y": 119,
+          "w": 16,
+          "h": 4
+        },
+        {
+          "key": "114_132",
+          "x": 114,
+          "y": 132,
+          "w": 12,
+          "h": 6
+        },
+        {
+          "key": "130_132",
+          "x": 130,
+          "y": 132,
+          "w": 12,
+          "h": 6
+        },
+        {
+          "key": "146_132",
+          "x": 146,
+          "y": 132,
+          "w": 12,
+          "h": 6
+        },
+        {
+          "key": "162_132",
+          "x": 162,
+          "y": 132,
+          "w": 12,
+          "h": 6
+        },
+        {
+          "key": "98_144",
+          "x": 98,
+          "y": 144,
+          "w": 12,
+          "h": 16
+        },
+        {
+          "key": "114_144",
+          "x": 114,
+          "y": 144,
+          "w": 12,
+          "h": 16
+        },
+        {
+          "key": "130_144",
+          "x": 130,
+          "y": 144,
+          "w": 12,
+          "h": 16
+        },
+        {
+          "key": "146_144",
+          "x": 146,
+          "y": 144,
+          "w": 12,
+          "h": 16
+        },
+        {
+          "key": "84_147",
+          "x": 84,
+          "y": 147,
+          "w": 7,
+          "h": 9
+        },
+        {
+          "key": "162_150",
+          "x": 162,
+          "y": 150,
+          "w": 12,
+          "h": 10
+        },
+        {
+          "key": "99_164",
+          "x": 99,
+          "y": 164,
+          "w": 10,
+          "h": 12
+        },
+        {
+          "key": "115_164",
+          "x": 115,
+          "y": 164,
+          "w": 10,
+          "h": 12
+        },
+        {
+          "key": "131_164",
+          "x": 131,
+          "y": 164,
+          "w": 10,
+          "h": 12
+        },
+        {
+          "key": "147_164",
+          "x": 147,
+          "y": 164,
+          "w": 10,
+          "h": 12
+        },
+        {
+          "key": "16_165",
+          "x": 16,
+          "y": 165,
+          "w": 11,
+          "h": 38
+        },
+        {
+          "key": "163_168",
+          "x": 163,
+          "y": 168,
+          "w": 10,
+          "h": 8
+        },
+        {
+          "key": "100_181",
+          "x": 100,
+          "y": 181,
+          "w": 7,
+          "h": 11
+        },
+        {
+          "key": "116_181",
+          "x": 116,
+          "y": 181,
+          "w": 7,
+          "h": 11
+        },
+        {
+          "key": "132_181",
+          "x": 132,
+          "y": 181,
+          "w": 7,
+          "h": 11
+        },
+        {
+          "key": "148_181",
+          "x": 148,
+          "y": 181,
+          "w": 7,
+          "h": 11
+        },
+        {
+          "key": "164_186",
+          "x": 164,
+          "y": 186,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "key": "84_196",
+          "x": 84,
+          "y": 196,
+          "w": 7,
+          "h": 9
+        },
+        {
+          "key": "17_208",
+          "x": 17,
+          "y": 208,
+          "w": 5,
+          "h": 14
+        },
+        {
+          "key": "25_208",
+          "x": 25,
+          "y": 208,
+          "w": 5,
+          "h": 14
+        },
+        {
+          "key": "80_208",
+          "x": 80,
+          "y": 208,
+          "w": 16,
+          "h": 15
+        },
+        {
+          "key": "69_211",
+          "x": 69,
+          "y": 211,
+          "w": 6,
+          "h": 7
+        },
+        {
+          "key": "73_226",
+          "x": 73,
+          "y": 226,
+          "w": 23,
+          "h": 13
+        }
+      ]
+    },
+    {
+      "id": "sewer/Assets/Tiles.png",
+      "pack": "sewer",
+      "type": "tile",
+      "source": {
+        "kind": "sheetFrame",
+        "sheet": "Assets/Tiles.png",
+        "frame": 0
+      },
+      "w": 416,
+      "h": 336,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "tiles"
+      ],
+      "origin": "pack",
+      "frames": 546
+    },
+    {
+      "id": "sewer/Assets/Water.png",
+      "pack": "sewer",
+      "type": "tile",
+      "source": {
+        "kind": "sheetFrame",
+        "sheet": "Assets/Water.png",
+        "frame": 0
+      },
+      "w": 96,
+      "h": 192,
+      "category": "Assets",
+      "tags": [
+        "assets",
+        "water"
+      ],
+      "origin": "pack",
+      "frames": 72
+    },
+    {
+      "id": "sewer/Enemy/Rat - Base/Death/Death-Sheet.png",
+      "pack": "sewer",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Rat - Base/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Rat - Base/Death",
+      "tags": [
+        "base",
+        "death",
+        "enemy",
+        "rat",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "sewer/Enemy/Rat - Base/Idle/Idle-Sheet.png",
+      "pack": "sewer",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Rat - Base/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemy/Rat - Base/Idle",
+      "tags": [
+        "base",
+        "enemy",
+        "idle",
+        "rat",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "sewer/Enemy/Rat - Base/Run/Run-Sheet.png",
+      "pack": "sewer",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Rat - Base/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Rat - Base/Run",
+      "tags": [
+        "base",
+        "enemy",
+        "rat",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "sewer/Enemy/Rat - Mage/Death/Death-Sheet.png",
+      "pack": "sewer",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Rat - Mage/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Rat - Mage/Death",
+      "tags": [
+        "death",
+        "enemy",
+        "mage",
+        "rat",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "sewer/Enemy/Rat - Mage/Idle/Idle-Sheet.png",
+      "pack": "sewer",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Rat - Mage/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemy/Rat - Mage/Idle",
+      "tags": [
+        "enemy",
+        "idle",
+        "mage",
+        "rat",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "sewer/Enemy/Rat - Mage/Run/Run-Sheet.png",
+      "pack": "sewer",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Rat - Mage/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Rat - Mage/Run",
+      "tags": [
+        "enemy",
+        "mage",
+        "rat",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "sewer/Enemy/Rat - Rogue/Death/Death-Sheet.png",
+      "pack": "sewer",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Rat - Rogue/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Rat - Rogue/Death",
+      "tags": [
+        "death",
+        "enemy",
+        "rat",
+        "rogue",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "sewer/Enemy/Rat - Rogue/Idle/Idle-Sheet.png",
+      "pack": "sewer",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Rat - Rogue/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemy/Rat - Rogue/Idle",
+      "tags": [
+        "enemy",
+        "idle",
+        "rat",
+        "rogue",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "sewer/Enemy/Rat - Rogue/Run/Run-Sheet.png",
+      "pack": "sewer",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Rat - Rogue/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Rat - Rogue/Run",
+      "tags": [
+        "enemy",
+        "rat",
+        "rogue",
+        "run",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "sewer/Enemy/Rat - Warrior/Death/Death-Sheet.png",
+      "pack": "sewer",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Rat - Warrior/Death/Death-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Rat - Warrior/Death",
+      "tags": [
+        "death",
+        "enemy",
+        "rat",
+        "sheet",
+        "warrior"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "sewer/Enemy/Rat - Warrior/Idle/Idle-Sheet.png",
+      "pack": "sewer",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Rat - Warrior/Idle/Idle-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Enemy/Rat - Warrior/Idle",
+      "tags": [
+        "enemy",
+        "idle",
+        "rat",
+        "sheet",
+        "warrior"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "sewer/Enemy/Rat - Warrior/Run/Run-Sheet.png",
+      "pack": "sewer",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Enemy/Rat - Warrior/Run/Run-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Enemy/Rat - Warrior/Run",
+      "tags": [
+        "enemy",
+        "rat",
+        "run",
+        "sheet",
+        "warrior"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "sewer/Weapons/Poison Weapons/Poison Weapons.png",
+      "pack": "sewer",
+      "type": "object",
+      "source": {
+        "kind": "image",
+        "path": "Weapons/Poison Weapons/Poison Weapons.png"
+      },
+      "w": 144,
+      "h": 80,
+      "category": "Weapons/Poison Weapons",
+      "tags": [
+        "poison",
+        "weapons"
+      ],
+      "origin": "pack",
+      "regions": [
+        {
+          "key": "0_0",
+          "x": 0,
+          "y": 0,
+          "w": 48,
+          "h": 80
+        },
+        {
+          "key": "96_0",
+          "x": 96,
+          "y": 0,
+          "w": 44,
+          "h": 48
+        },
+        {
+          "key": "32_1",
+          "x": 32,
+          "y": 1,
+          "w": 64,
+          "h": 79
+        },
+        {
+          "key": "35_16",
+          "x": 35,
+          "y": 16,
+          "w": 10,
+          "h": 30
+        },
+        {
+          "key": "116_53",
+          "x": 116,
+          "y": 53,
+          "w": 8,
+          "h": 7
+        },
+        {
+          "key": "132_53",
+          "x": 132,
+          "y": 53,
+          "w": 8,
+          "h": 7
+        },
+        {
+          "key": "98_54",
+          "x": 98,
+          "y": 54,
+          "w": 12,
+          "h": 21
+        },
+        {
+          "key": "116_68",
+          "x": 116,
+          "y": 68,
+          "w": 8,
+          "h": 8
+        },
+        {
+          "key": "132_68",
+          "x": 132,
+          "y": 68,
+          "w": 8,
+          "h": 8
+        }
+      ]
+    },
+    {
+      "id": "small-bat/Attack_01/Attack_01_Down-Sheet.png",
+      "pack": "small-bat",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Attack_01/Attack_01_Down-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Attack_01",
+      "tags": [
+        "01",
+        "attack",
+        "down",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "small-bat/Attack_01/Attack_01_Side-Sheet.png",
+      "pack": "small-bat",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Attack_01/Attack_01_Side-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Attack_01",
+      "tags": [
+        "01",
+        "attack",
+        "sheet",
+        "side"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "small-bat/Attack_01/Attack_01_Up-Sheet.png",
+      "pack": "small-bat",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Attack_01/Attack_01_Up-Sheet.png"
+      },
+      "w": 384,
+      "h": 64,
+      "category": "Attack_01",
+      "tags": [
+        "01",
+        "attack",
+        "sheet",
+        "up"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 6
+    },
+    {
+      "id": "small-bat/Death/Death_Down-Sheet.png",
+      "pack": "small-bat",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Death/Death_Down-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Death",
+      "tags": [
+        "death",
+        "down",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "small-bat/Death/Death_Side-Sheet.png",
+      "pack": "small-bat",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Death/Death_Side-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Death",
+      "tags": [
+        "death",
+        "sheet",
+        "side"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "small-bat/Death/Death_Up-Sheet.png",
+      "pack": "small-bat",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Death/Death_Up-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Death",
+      "tags": [
+        "death",
+        "sheet",
+        "up"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "small-bat/Hit/Hit_Down-Sheet.png",
+      "pack": "small-bat",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Hit/Hit_Down-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Hit",
+      "tags": [
+        "down",
+        "hit",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "small-bat/Hit/Hit_Side-Sheet.png",
+      "pack": "small-bat",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Hit/Hit_Side-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Hit",
+      "tags": [
+        "hit",
+        "sheet",
+        "side"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "small-bat/Hit/Hit_Up-Sheet.png",
+      "pack": "small-bat",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Hit/Hit_Up-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Hit",
+      "tags": [
+        "hit",
+        "sheet",
+        "up"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "small-bat/Idle/Idle_Down-Sheet.png",
+      "pack": "small-bat",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Idle/Idle_Down-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Idle",
+      "tags": [
+        "down",
+        "idle",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "small-bat/Idle/Idle_Side-Sheet.png",
+      "pack": "small-bat",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Idle/Idle_Side-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Idle",
+      "tags": [
+        "idle",
+        "sheet",
+        "side"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "small-bat/Idle/Idle_Up-Sheet.png",
+      "pack": "small-bat",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Idle/Idle_Up-Sheet.png"
+      },
+      "w": 256,
+      "h": 64,
+      "category": "Idle",
+      "tags": [
+        "idle",
+        "sheet",
+        "up"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 4
+    },
+    {
+      "id": "small-bat/Move/Move_Down-Sheet.png",
+      "pack": "small-bat",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Move/Move_Down-Sheet.png"
+      },
+      "w": 512,
+      "h": 64,
+      "category": "Move",
+      "tags": [
+        "down",
+        "move",
+        "sheet"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 8
+    },
+    {
+      "id": "small-bat/Move/Move_Side-Sheet.png",
+      "pack": "small-bat",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Move/Move_Side-Sheet.png"
+      },
+      "w": 512,
+      "h": 64,
+      "category": "Move",
+      "tags": [
+        "move",
+        "sheet",
+        "side"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 8
+    },
+    {
+      "id": "small-bat/Move/Move_Up-Sheet.png",
+      "pack": "small-bat",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Move/Move_Up-Sheet.png"
+      },
+      "w": 512,
+      "h": 64,
+      "category": "Move",
+      "tags": [
+        "move",
+        "sheet",
+        "up"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 8
     }
   ]
 }

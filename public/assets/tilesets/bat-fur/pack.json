@@ -1,0 +1,23 @@
+{
+  "id": "bat-fur",
+  "name": "Bat (Fur)",
+  "author": "Anokolisa",
+  "sourceUrl": "https://anokolisa.itch.io/",
+  "licence": "By Anokolisa (same author as the pixel-crawler packs). Free to use/alter in commercial, study or any project; credit optional; may NOT be resold/redistributed standalone. NOTE: no Terms.txt shipped in this download — licence assumed to match Anokolisa's other packs; confirm before any public release.",
+  "tileSize": 16,
+  "rules": {
+    "tile": [],
+    "strip": [
+      "**/*-Sheet.png"
+    ],
+    "selfMade": [
+      "_derived/**"
+    ]
+  },
+  "overrides": {},
+  "exclude": [
+    "**/*.aseprite"
+  ],
+  "regionParams": {},
+  "regions": {}
+}

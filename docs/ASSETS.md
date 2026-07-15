@@ -252,6 +252,51 @@ files or editing a `pack.json`.
 `public/assets/tilesets/mostowo-custom/` is the (currently-empty) skeleton home for future self-made
 art — same `pack.json` shape, `licence: "original"`.
 
+### Additional Anokolisa packs (ingested for the editor Library)
+
+Nine more **paid** Anokolisa packs (bought on the "if it works out, buy more" note above) are staged
+alongside the free pack, each in its own `public/assets/tilesets/<id>/`: `castle-environment`, `cave`,
+`desert`, `fairy-forest`, `forge`, `garden-environment`, `hideout`, `library`, `sewer`. They're
+**ingested into the asset catalog** — browsable/placeable in the Map Builder Library. What that
+unlocks depends on the asset kind:
+
+- **Terrain + props/decor are usable in-game *now*, via map authoring** — no code change. `ACTIVE_TILESET`
+  (still `pixel-crawler`) is only the *base* load; `PreloadScene.queueMapTextures` additionally loads
+  every palette source + placed decor a loaded map references, honouring each entry's own `pack`
+  (`tilesetAssetUrl(pack, …)`). So paint a `fairy-forest` tile / drop a `cave` prop into a map, save it,
+  and the game loads those textures at boot. They're just invisible until some authored map references
+  them.
+- **Enemies need code+data wiring** — mobs aren't catalog-placeable map objects; they're spawned AI
+  actors defined in typed data + an `ActorRender`/`StripAnim` manifest (frame counts, anchors) + spawn
+  logic + `anims.create` (the plan-005/011 skeleton pattern). Ingesting an enemy pack makes its sheets
+  *available*; making one actually spawn is a per-enemy feature step.
+
+Two Anokolisa **mob packs** are ingested the same way — `bat-fur` and `small-bat` (directional
+Idle/Move/Attack/Death/Hit × Down/Side/Up strips, a richer rig than the free pack's single-orientation
+skeleton). Being enemies, they fall under the wiring caveat above. (Their downloads shipped **no
+`Terms.txt`** — licence assumed to match the other Anokolisa packs; confirm before any public release.)
+
+These paid packs use a **different internal layout** than the free pack, so each carries its own tuned
+`pack.json` (not the free pack's rules): terrain lives at `Assets/{Tiles,Ground,Sand,Water}.png`
+(classed `tile`, all 16-px-aligned) rather than `Environment/Tilesets/**`; enemy anims are the usual
+`**/*-Sheet.png` strips (Idle/Run/Death/Hit); `Weapons/**`, `Assets/Props.png`, `Assets/Tree.png`,
+`Assets/Light.png`/`Shadown.png` fall to `object` (region-detected atlases). Ingestion dropped the
+non-game files via `exclude`: `Social/**` (promo covers/mockups), `**/*.png~` (editor backups),
+`**/*.gif`, `**/*.aseprite` (source, per the PNG-only convention). Frame counts on the enemy strips are
+left to auto-detection for now — tune any that read wrong via the in-editor object editor (plan 017)
+when a pack is actually wired in.
+
+**Licence (paid):** same author terms as the free pack but **purchased** — free to use/alter in any
+project, credit optional, but the raw assets may **not** be resold or redistributed standalone, even
+altered (each pack's `Terms.txt` travels with it). If this repo/build ever goes public, the raw pack
+PNGs should not ship in a form that amounts to redistributing the paid assets.
+
+**Multi-pack region generation:** `scripts/pixel-crawler/gen_regions.py` now walks **every** pack dir
+carrying a `pack.json` (matching `asset-catalog.mjs`), writing one `regions.json` per pack; an optional
+pack-id argv restricts the run. It previously only did `pixel-crawler`. The two-command regen
+(`python3 scripts/pixel-crawler/gen_regions.py && npm run assets:catalog`) is unchanged and now covers
+all packs at once.
+
 ### Atlas sprite regions (plan 014 step 7a)
 
 Most `object`-type sheets are actually multi-sprite ATLASES (e.g. `Furniture.png` 800×864 holds ~50

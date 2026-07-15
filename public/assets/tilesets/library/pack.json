@@ -1,0 +1,31 @@
+{
+  "id": "library",
+  "name": "Pixel Crawler - Library",
+  "author": "Anokolisa",
+  "sourceUrl": "https://anokolisa.itch.io/",
+  "licence": "Paid pack by Anokolisa. Free to use/alter in commercial, study or any project; credit optional; assets may NOT be resold or marketed standalone, even after alteration (see Terms.txt). Do not redistribute the raw assets if this repo/build ever goes public.",
+  "tileSize": 16,
+  "rules": {
+    "tile": [
+      "Assets/Tiles.png",
+      "Assets/Ground.png",
+      "Assets/Sand.png",
+      "Assets/Water.png"
+    ],
+    "strip": [
+      "**/*-Sheet.png"
+    ],
+    "selfMade": [
+      "_derived/**"
+    ]
+  },
+  "overrides": {},
+  "exclude": [
+    "Social/**",
+    "**/*.png~",
+    "**/*.gif",
+    "**/*.aseprite"
+  ],
+  "regionParams": {},
+  "regions": {}
+}

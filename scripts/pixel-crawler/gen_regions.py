@@ -40,14 +40,17 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
-from compose import PC  # noqa: E402  (path-relative import, see sys.path.insert above)
+import compose  # noqa: E402  (path-relative import, see sys.path.insert above)
+from compose import PC  # noqa: E402
 from objects import components  # noqa: E402
 
 # Mirrors `components()`'s own defaults (scripts/pixel-crawler/objects.py) so an un-overridden sheet
 # in `regions.json` records exactly the params it was actually detected with.
 DEFAULT_PARAMS = {"alphaThresh": 8, "gap": 1, "minArea": 40}
 
-OUTPUT_PATH = os.path.join(PC, "regions.json")
+# Every pack dir lives under here (sibling of pixel-crawler) — `asset-catalog.mjs` already scans them
+# all, so this generator does too: one `regions.json` written per pack that carries a `pack.json`.
+TILESETS_DIR = os.path.dirname(PC)
 
 
 # ---- Glob matcher mirroring scripts/asset-catalog.mjs's globToRegExp byte-for-byte (`*` = within
@@ -89,8 +92,8 @@ def list_pngs(root):
     return out
 
 
-def load_pack():
-    with open(os.path.join(PC, "pack.json"), encoding="utf-8") as f:
+def load_pack(pack_dir):
+    with open(os.path.join(pack_dir, "pack.json"), encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -124,15 +127,32 @@ def boxes_to_regions(boxes):
     return regions
 
 
-def main():
-    pack = load_pack()
+def discover_packs():
+    """Every `public/assets/tilesets/<pack>/` dir carrying a `pack.json`, sorted for determinism —
+    the same set `asset-catalog.mjs` walks."""
+    out = []
+    for name in sorted(os.listdir(TILESETS_DIR)):
+        d = os.path.join(TILESETS_DIR, name)
+        if os.path.isfile(os.path.join(d, "pack.json")):
+            out.append(d)
+    return out
+
+
+def process_pack(pack_dir):
+    # Point compose's image loader at this pack (`sheet()`/`components()` read `compose.PC`), and
+    # drop the per-sheet cache so relpaths don't collide across packs.
+    compose.PC = pack_dir
+    compose._cache.clear()
+
+    pack = load_pack(pack_dir)
     rules = pack["rules"]
     exclude = pack.get("exclude", [])
     overrides = pack.get("overrides", {})
     region_param_overrides = pack.get("regionParams", {})
     region_overrides = pack.get("regions", {})
+    output_path = os.path.join(pack_dir, "regions.json")
 
-    all_pngs = list_pngs(PC)
+    all_pngs = list_pngs(pack_dir)
     kept = [rel for rel in all_pngs if not matches_any(exclude, rel)]
     object_sheets = sorted(rel for rel in kept if is_object_sheet(rel, rules, overrides))
 
@@ -166,16 +186,27 @@ def main():
         sheets[rel] = {"params": params, "regions": regions}
 
     out = {"schemaVersion": 1, "sheets": {rel: sheets[rel] for rel in sorted(sheets)}}
-    with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2)
         f.write("\n")
 
     for w in warnings:
-        print(f"[gen_regions] warn: {w}")
+        print(f"[gen_regions] warn: {os.path.basename(pack_dir)}/{w}")
     print(
-        f"[gen_regions] wrote {os.path.relpath(OUTPUT_PATH)}: "
+        f"[gen_regions] wrote {os.path.relpath(output_path)}: "
         f"{len(sheets)} sheets ({len(warnings)} warnings)"
     )
+
+
+def main():
+    # Optional pack-id args restrict the run; default is every pack with a pack.json.
+    ids = sys.argv[1:]
+    if ids:
+        packs = [os.path.join(TILESETS_DIR, i) for i in ids]
+    else:
+        packs = discover_packs()
+    for pack_dir in packs:
+        process_pack(pack_dir)
 
 
 if __name__ == "__main__":
