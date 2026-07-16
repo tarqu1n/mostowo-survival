@@ -6802,7 +6802,7 @@
         "frame": 0
       },
       "w": 96,
-      "h": 32,
+      "h": 48,
       "category": "Environment/Tilesets",
       "tags": [
         "diagonal",
@@ -6811,7 +6811,7 @@
         "water"
       ],
       "origin": "self-made",
-      "frames": 12
+      "frames": 16
     },
     {
       "id": "pixel-crawler/_derived/bush.png",
