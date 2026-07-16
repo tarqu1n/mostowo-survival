@@ -63,10 +63,21 @@ is reclaimed on **session inactivity** — measured by _chat_ activity, **not** 
 traffic. So editing quietly on your phone for a long stretch can let the session go idle and
 **lose anything uncommitted**.
 
-- Say **"save"** at checkpoints; Claude commits the changed map files (`src/data/maps/**`,
-  `world.json`, `nodes.json`, regenerated `manifest.json`, thumbnails) and pushes the branch.
-  `git` push works from the container (it uses a separate git proxy, not the TLS egress).
-- For long sessions, ask Claude to **auto-checkpoint** (commit every few minutes).
+**Auto-commit-on-save** solves this: run the editor with `EDITOR_AUTOCOMMIT=1` (the
+`scripts/phone-editor.sh` default) and **every editor Save is staged, committed, and pushed**
+to the current branch automatically — so each save lands on GitHub and the host can die
+without losing more than the edit in flight. Implemented in
+[`scripts/vite-editor-api.mjs`](../scripts/vite-editor-api.mjs) (the `/__editor/*` save
+middleware): a 2xx mutation schedules a debounced `git add`/`commit`/`push` of the editor's
+output paths (`src/data/maps/**`, thumbnails, `asset-catalog.json`, pack `regions`, captured
+references). Debounced so a save's map-write + thumbnail-write become one commit; serialized so
+bursts never race git; and **off by default** so a normal desktop `npm run editor` never
+auto-pushes. Knobs: `EDITOR_AUTOCOMMIT_PUSH=0` (commit locally, don't push),
+`EDITOR_AUTOCOMMIT_DEBOUNCE_MS`. `git` push works from the container because it uses a separate
+git proxy, not the TLS egress.
+
+Without auto-commit (e.g. `EDITOR_AUTOCOMMIT=0`), fall back to saying **"save"** to Claude at
+checkpoints, and ask for periodic **auto-checkpoints** on long sessions.
 
 ## Running the editor locally instead (no cloud, no Tailscale)
 

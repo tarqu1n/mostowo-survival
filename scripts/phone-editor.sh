@@ -71,10 +71,13 @@ sudo env HTTPS_PROXY="$PROXY" ALL_PROXY="$PROXY" \
 TS_IP="$(tailscale ip -4 | head -1)"
 
 # 4) Start the editor (Vite) on all interfaces if it isn't already up.
+#    EDITOR_AUTOCOMMIT=1 makes every editor Save stage/commit/push automatically, so the ephemeral
+#    host can die without losing work (set EDITOR_AUTOCOMMIT=0 before running to opt out).
 if ! curl -fsS -m 3 -o /dev/null "http://127.0.0.1:${PORT}/editor.html" 2>/dev/null; then
-  echo "==> starting the editor on :${PORT}"
+  echo "==> starting the editor on :${PORT} (autosave-commit ${EDITOR_AUTOCOMMIT:-1})"
   ( cd "$ROOT" && [[ -d node_modules ]] || npm ci )
-  ( cd "$ROOT" && nohup node_modules/.bin/vite --host 0.0.0.0 --port "$PORT" >/tmp/vite-editor.log 2>&1 & )
+  ( cd "$ROOT" && EDITOR_AUTOCOMMIT="${EDITOR_AUTOCOMMIT:-1}" \
+      nohup node_modules/.bin/vite --host 0.0.0.0 --port "$PORT" >/tmp/vite-editor.log 2>&1 & )
   sleep 3
 fi
 

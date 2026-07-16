@@ -70,6 +70,12 @@
  * imports THIS module at config-load time for prod builds too, where devDeps may be absent. A
  * name-clash without `overwrite:true` is a 409 `exists`; a second concurrent capture is a 409 `busy`
  * (serialised by the module-level `captureInFlight` flag); a capture that throws is a 502.
+ *
+ * Auto-commit-on-save (opt-in, `EDITOR_AUTOCOMMIT=1`): when set, a successful mutating request
+ * schedules a debounced `git add`/`commit`/`push` of the editor's output paths — the "every Save
+ * lands on GitHub" workflow for authoring from a phone against an ephemeral dev host. Off by
+ * default (normal desktop dev never auto-pushes). See the block above `editorApiPlugin` and
+ * docs/MOBILE-EDITOR-ACCESS.md.
  */
 import {
   mkdirSync,
@@ -369,6 +375,106 @@ function enqueueRegen(root) {
   return run;
 }
 
+// ---------------------------------------------------------------------------
+// Auto-commit-on-save (opt-in: EDITOR_AUTOCOMMIT=1) — the phone workflow.
+// When enabled, every SUCCESSFUL editor mutation (map/world/nodes/thumb/pack/
+// reference write or delete) stages the editor's output files, commits them, and
+// — unless EDITOR_AUTOCOMMIT_PUSH=0 — pushes the current branch. Debounced, so the
+// 2+ requests a single Save fires (map JSON + thumbnail) coalesce into ONE commit;
+// serialized through `autocommitQueue`, so a burst of saves can never race git.
+// OFF by default: plain `npm run editor` for local desktop dev never auto-pushes.
+// Rationale/usage: docs/MOBILE-EDITOR-ACCESS.md.
+// ---------------------------------------------------------------------------
+const AUTOCOMMIT = process.env.EDITOR_AUTOCOMMIT === '1';
+const AUTOCOMMIT_PUSH = process.env.EDITOR_AUTOCOMMIT_PUSH !== '0';
+const AUTOCOMMIT_DEBOUNCE_MS = Number(process.env.EDITOR_AUTOCOMMIT_DEBOUNCE_MS ?? 1500);
+// Only ever stage the editor's OWN output — never unrelated working-tree edits. A pathspec-scoped
+// `git add` + `git commit -- <paths>` keeps autosave commits to exactly these trees.
+const AUTOCOMMIT_PATHS = [
+  'src/data/maps',
+  'public/assets/maps/thumbs',
+  'public/assets/asset-catalog.json',
+  'public/assets/tilesets',
+  'scripts/map-reference/out',
+];
+
+let autocommitTimer = null;
+const autocommitLabels = new Set();
+let autocommitQueue = Promise.resolve();
+let autocommitIdentityEnsured = false;
+
+/** Commits need an author. If the repo (or its global config) has none — common in a fresh cloud
+ *  container — set a local, clearly-automated identity so the autosave commit doesn't fail. A repo
+ *  that already has an identity configured is left untouched. */
+async function ensureGitIdentity(root) {
+  if (autocommitIdentityEnsured) return;
+  const email = await execFileAsync('git', ['config', 'user.email'], { cwd: root });
+  if (!email.ok || !email.stdout.trim()) {
+    await execFileAsync('git', ['config', 'user.email', 'editor@mostowo.local'], { cwd: root });
+    await execFileAsync('git', ['config', 'user.name', 'Mostowo Map Builder'], { cwd: root });
+  }
+  autocommitIdentityEnsured = true;
+}
+
+/** Stage → commit → (optionally) push the editor's output paths. Never throws: a git failure is
+ *  logged and swallowed so a save's HTTP response (already sent) and the dev server stay healthy.
+ *  A commit lands even if the push later fails (network) — the work is at least durable in local
+ *  history, and the next successful save's push carries it up. */
+async function runAutoCommit(root, labels) {
+  const git = (args) => execFileAsync('git', args, { cwd: root });
+  try {
+    await ensureGitIdentity(root);
+    // Only stage paths that exist: `git add -- <pathspec>` aborts (staging nothing) if ANY pathspec
+    // matches no file — and some editor outputs are optional (e.g. scripts/map-reference/out only
+    // exists once a reference has been captured). `-A` so deletions (a deleted map) stage too. An
+    // existing-but-empty dir is fine for `git add` (unlike `git commit -- <dir>`, which errors).
+    const paths = AUTOCOMMIT_PATHS.filter((p) => existsSync(join(root, p)));
+    if (paths.length === 0) return;
+    await git(['add', '-A', '--', ...paths]);
+    // Commit the EXACT staged files (never directory pathspecs): `git commit -- <dir>` errors on a
+    // dir with no tracked files and can sweep in unrelated pre-staged content. `--name-only` lists
+    // real staged files (adds, mods, AND deletions) scoped to our paths — commit precisely those.
+    const namesOut = await git(['diff', '--cached', '--name-only', '-z', '--', ...paths]);
+    const names = namesOut.stdout.split('\0').filter(Boolean);
+    if (names.length === 0) return; // nothing changed (e.g. a save that rewrote identical bytes)
+    const message = `editor: autosave\n\n${labels.join('\n')}`;
+    const commit = await git(['commit', '-m', message, '--', ...names]);
+    if (!commit.ok) {
+      console.warn('[editor autocommit] commit failed:', commit.stderr.trim() || commit.stdout.trim());
+      return;
+    }
+    console.log('[editor autocommit] committed:', labels.join(', '));
+    if (AUTOCOMMIT_PUSH) {
+      const push = await git(['push', 'origin', 'HEAD']);
+      if (!push.ok) {
+        console.warn('[editor autocommit] push failed (saved locally, will retry next save):', push.stderr.trim());
+      } else {
+        console.log('[editor autocommit] pushed to origin');
+      }
+    }
+  } catch (err) {
+    // e.g. git not on PATH (ENOENT). Never break the editor over a bookkeeping step.
+    console.warn('[editor autocommit] skipped:', err && err.message ? err.message : String(err));
+  }
+}
+
+/** Debounce editor mutations into one commit and chain them through a queue so no two git runs
+ *  overlap. Called from the middleware's `res.finish` hook on any 2xx editor mutation. */
+function scheduleAutoCommit(root, label) {
+  if (!AUTOCOMMIT) return;
+  autocommitLabels.add(label);
+  if (autocommitTimer) clearTimeout(autocommitTimer);
+  autocommitTimer = setTimeout(() => {
+    autocommitTimer = null;
+    const labels = [...autocommitLabels];
+    autocommitLabels.clear();
+    autocommitQueue = autocommitQueue.then(
+      () => runAutoCommit(root, labels),
+      () => runAutoCommit(root, labels),
+    );
+  }, AUTOCOMMIT_DEBOUNCE_MS);
+}
+
 /** Vite plugin factory — `configureServer` only fires under `vite dev` (preview uses a separate
  *  `configurePreviewServer` hook this plugin doesn't implement, and build never starts a server),
  *  so this is inert outside the dev server regardless of how it's gated in `vite.config.ts`. */
@@ -390,6 +496,17 @@ export function editorApiPlugin() {
         if (!path.startsWith('/__editor/')) {
           next();
           return;
+        }
+
+        // Auto-commit-on-save (opt-in): once a mutating editor request has responded 2xx, its file
+        // writes are on disk — schedule a debounced stage/commit/push. Registered generically here
+        // so every current + future `/__editor/*` mutation is covered without touching each handler.
+        if (AUTOCOMMIT && (req.method === 'PUT' || req.method === 'POST' || req.method === 'DELETE')) {
+          res.once('finish', () => {
+            if (res.statusCode >= 200 && res.statusCode < 300) {
+              scheduleAutoCommit(root, `${req.method} ${path}`);
+            }
+          });
         }
 
         try {
