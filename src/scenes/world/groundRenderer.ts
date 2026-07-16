@@ -62,7 +62,16 @@ export function drawMapLayers(
           if (!entry) continue;
           const { key, frame } = resolveTile(entry.source);
           if (!scene.textures.exists(key)) continue; // texture failed to load — skip, don't crash
-          rt.batchDrawFrame(key, frame, col * TILE_SIZE, r * TILE_SIZE);
+          // stamp (not batchDrawFrame) so a rotated palette entry blits rotated; drawn about the tile
+          // CENTRE with origin 0.5 so angle 0 lands on the exact same pixels as the old top-left blit.
+          // Duplicated from EditorScene.bakeChunk by design (see this file's header) — keep in sync.
+          const angle = entry.rotation ?? 0;
+          rt.stamp(key, frame, col * TILE_SIZE + TILE_SIZE / 2, r * TILE_SIZE + TILE_SIZE / 2, {
+            angle,
+            originX: 0.5,
+            originY: 0.5,
+            skipBatch: true,
+          });
         }
       }
       rt.endDraw();

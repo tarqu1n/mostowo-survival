@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { TILE_SIZE, GROUND_CHUNK_ROWS } from '../config';
-import { resolveTile, sheetKey, tileImageKey } from '../data/tileset';
+import { resolveTile, sheetKey, tileImageKey, type TileSource } from '../data/tileset';
 import {
   cellIndex,
   getCell,
@@ -47,6 +47,7 @@ const PAN_MARGIN_TILES = 6;
 // Neighbour ghost strips (step 9): how deep into each placed neighbour to render, and at what alpha.
 const GHOST_STRIP_TILES = 12;
 const GHOST_ALPHA = 0.4;
+const BRUSH_GHOST_ALPHA = 0.6; // translucent preview of the armed (optionally rotated) brush tile
 
 // Reference-underlay tracing image (plan 022): a single fixed texture key (one underlay at a time),
 // removed + reloaded whenever the picked image changes (Phaser errors on a duplicate key).
@@ -129,6 +130,15 @@ export class EditorScene extends Phaser.Scene {
   private voidGfx?: Phaser.GameObjects.Graphics;
   private gridGfx?: Phaser.GameObjects.Graphics;
   private hoverGfx?: Phaser.GameObjects.Graphics;
+  /** Translucent preview of the armed tileset piece under the cursor, rotated to `brushRotation`
+   *  (plan 026). Only shown for the `brush` tool with an asset armed and the cursor inside the map. */
+  private brushGhost?: Phaser.GameObjects.Image;
+  /** Last tile the pointer hovered while inside the map, or null when off-map — lets the brush ghost
+   *  re-render on `brushRotation`/`brushAsset`/tool changes without waiting for a pointer move. */
+  private hoverTile: { col: number; row: number } | null = null;
+  /** Brush-ghost texture keys already load-requested, so a not-yet-loaded armed tile is fetched ONCE
+   *  (never re-queued every hover — a 404'd asset would otherwise loop). Never cleared. */
+  private ghostTexturesRequested = new Set<string>();
   private rectPreviewGfx?: Phaser.GameObjects.Graphics;
   private selectionGfx?: Phaser.GameObjects.Graphics;
   // ---- Step 8 overlays ----
@@ -204,6 +214,13 @@ export class EditorScene extends Phaser.Scene {
     this.gridGfx = this.add.graphics().setDepth(DEPTH_GRID);
     this.shapeBoundaryGfx = this.add.graphics().setDepth(DEPTH_SHAPE_BOUNDARY);
     this.hoverGfx = this.add.graphics().setDepth(DEPTH_HOVER);
+    // Brush ghost sits at the same depth as the hover outline but is added AFTER it, so the tile
+    // preview draws on top of the outline. Non-interactive (Image default) — never eats pointer events.
+    this.brushGhost = this.add
+      .image(0, 0, '__DEFAULT')
+      .setOrigin(0.5)
+      .setDepth(DEPTH_HOVER)
+      .setVisible(false);
     this.selectionGfx = this.add.graphics().setDepth(DEPTH_SELECTION);
     this.rectPreviewGfx = this.add.graphics().setDepth(DEPTH_RECT_PREVIEW);
 
@@ -256,7 +273,20 @@ export class EditorScene extends Phaser.Scene {
       // every tool switch so entering/leaving `shape` shows/hides it.
       useEditorStore.subscribe(
         (s) => s.activeTool,
-        () => this.redrawOverlays(),
+        () => {
+          this.redrawOverlays();
+          this.refreshBrushGhost(); // hide/show the tile preview when entering/leaving the brush tool
+        },
+      ),
+      // Brush ghost preview (plan 026): re-render when the armed asset or its pending rotation changes,
+      // so pressing R / re-arming updates the preview without needing a pointer move.
+      useEditorStore.subscribe(
+        (s) => s.brushRotation,
+        () => this.refreshBrushGhost(),
+      ),
+      useEditorStore.subscribe(
+        (s) => s.brushAsset,
+        () => this.refreshBrushGhost(),
       ),
       useEditorStore.subscribe(
         (s) => s.hiddenLayerIds,
@@ -326,6 +356,8 @@ export class EditorScene extends Phaser.Scene {
     this.gridGfx?.clear();
     this.shapeBoundaryGfx?.clear();
     this.hoverGfx?.clear();
+    this.hoverTile = null;
+    this.brushGhost?.setVisible(false);
     this.selectionGfx?.clear();
     this.rectPreviewGfx?.clear();
     // A full document reload invalidates any in-flight paint/object interaction (the layer/cells/
@@ -556,8 +588,15 @@ export class EditorScene extends Phaser.Scene {
         if (!entry) continue;
         const { key, frame } = resolveTile(entry.source);
         if (!this.textures.exists(key)) continue; // texture failed to load — skip, don't crash
-        // frame is undefined for standalone images → batchDrawFrame falls back to the base frame.
-        rt.batchDrawFrame(key, frame, col * TILE_SIZE, r * TILE_SIZE);
+        // stamp (not batchDrawFrame) so a rotated palette entry blits rotated; drawn about the tile
+        // CENTRE with origin 0.5 so angle 0 lands on the exact same pixels as the old top-left blit.
+        const angle = entry.rotation ?? 0;
+        rt.stamp(key, frame, col * TILE_SIZE + TILE_SIZE / 2, r * TILE_SIZE + TILE_SIZE / 2, {
+          angle,
+          originX: 0.5,
+          originY: 0.5,
+          skipBatch: true,
+        });
       }
     }
     rt.endDraw();
@@ -738,7 +777,11 @@ export class EditorScene extends Phaser.Scene {
     this.drawWalkabilityOverlay(map, overlays.walkability);
     this.drawZonesOverlay(map, overlays.zones);
     this.drawShapeBoundary(map, activeTool === 'shape');
-    if (!map) this.hoverGfx?.clear();
+    if (!map) {
+      this.hoverGfx?.clear();
+      this.hoverTile = null;
+      this.brushGhost?.setVisible(false);
+    }
   }
 
   /** Red ~40% tint on blocked base-terrain cells (`walkability.cells[i] === 1`), toggled by
@@ -890,11 +933,77 @@ export class EditorScene extends Phaser.Scene {
     if (!g) return;
     g.clear();
     const { map } = useEditorStore.getState();
-    if (!map) return;
+    if (!map) {
+      this.hoverTile = null;
+      this.refreshBrushGhost();
+      return;
+    }
     const { col, row } = this.pointerTile(pointer);
-    if (!isInside(map, col, row)) return; // reject the cursor on void / out-of-bounds cells
+    if (!isInside(map, col, row)) {
+      this.hoverTile = null; // reject the cursor on void / out-of-bounds cells
+      this.refreshBrushGhost();
+      return;
+    }
+    this.hoverTile = { col, row };
     g.lineStyle(1.5, HOVER_COLOUR, 0.9);
     g.strokeRect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    this.refreshBrushGhost();
+  }
+
+  /**
+   * Update the translucent brush-tile preview (plan 026). Shows a copy of the armed tileset piece —
+   * rotated to `brushRotation` — centred on the hovered tile, but only for the `brush` tool with an
+   * asset armed and the cursor inside the map; hidden otherwise. Resolves the texture via the same
+   * `parseAssetId → TileSource → resolveTile` chain the paint path uses; if the texture isn't loaded
+   * yet it is load-requested ONCE (see `ghostTexturesRequested`) and the ghost stays hidden until it
+   * arrives. A malformed armed id just hides the preview (the paint path already warns on it).
+   */
+  private refreshBrushGhost(): void {
+    const ghost = this.brushGhost;
+    if (!ghost) return;
+    const { map, activeTool, brushAsset, brushRotation } = useEditorStore.getState();
+    const tile = this.hoverTile;
+    if (!map || activeTool !== 'brush' || !brushAsset || !tile) {
+      ghost.setVisible(false);
+      return;
+    }
+    try {
+      const { pack, path, frame } = parseAssetId(brushAsset);
+      const source: TileSource =
+        frame === undefined ? { kind: 'image', path } : { kind: 'sheetFrame', sheet: path, frame };
+      const { key, frame: texFrame } = resolveTile(source);
+      if (!this.textures.exists(key)) {
+        // Not loaded yet (armed straight from the Library, never painted) — fetch it once, then the
+        // COMPLETE handler re-runs this method and the preview appears. Guard against re-queuing so a
+        // 404'd asset doesn't loop.
+        if (!this.ghostTexturesRequested.has(key)) {
+          this.ghostTexturesRequested.add(key);
+          if (source.kind === 'image') {
+            this.load.image(key, tilesetAssetUrl(pack, source.path));
+          } else {
+            this.load.spritesheet(key, tilesetAssetUrl(pack, source.sheet), {
+              frameWidth: TILE_SIZE,
+              frameHeight: TILE_SIZE,
+            });
+          }
+          this.load.once(Phaser.Loader.Events.COMPLETE, () => this.refreshBrushGhost());
+          this.load.start();
+        }
+        ghost.setVisible(false);
+        return;
+      }
+      if (texFrame === undefined) ghost.setTexture(key);
+      else ghost.setTexture(key, texFrame);
+      ghost.texture.setFilter(Phaser.Textures.FilterMode.NEAREST); // crisp pixels at any zoom
+      ghost
+        .setPosition(tile.col * TILE_SIZE + TILE_SIZE / 2, tile.row * TILE_SIZE + TILE_SIZE / 2)
+        .setOrigin(0.5)
+        .setAngle(brushRotation)
+        .setAlpha(BRUSH_GHOST_ALPHA)
+        .setVisible(true);
+    } catch {
+      ghost.setVisible(false);
+    }
   }
 
   /** The tile `(col,row)` the pointer is currently over, in world/map space. */
@@ -1145,7 +1254,14 @@ export class EditorScene extends Phaser.Scene {
         if (!entry) continue;
         const { key, frame } = resolveTile(entry.source);
         if (!this.textures.exists(key)) continue;
-        rt.batchDrawFrame(key, frame, dx, dy);
+        // stamp about the tile centre so rotated entries blit rotated (angle 0 = identical pixels).
+        const angle = entry.rotation ?? 0;
+        rt.stamp(key, frame, dx + TILE_SIZE / 2, dy + TILE_SIZE / 2, {
+          angle,
+          originX: 0.5,
+          originY: 0.5,
+          skipBatch: true,
+        });
       }
     }
     rt.endDraw();
@@ -1200,7 +1316,14 @@ export class EditorScene extends Phaser.Scene {
           if (!entry) continue;
           const { key, frame } = resolveTile(entry.source);
           if (!this.textures.exists(key)) continue;
-          full.batchDrawFrame(key, frame, col * TILE_SIZE, row * TILE_SIZE);
+          // stamp about the tile centre so rotated entries blit rotated (angle 0 = identical pixels).
+          const angle = entry.rotation ?? 0;
+          full.stamp(key, frame, col * TILE_SIZE + TILE_SIZE / 2, row * TILE_SIZE + TILE_SIZE / 2, {
+            angle,
+            originX: 0.5,
+            originY: 0.5,
+            skipBatch: true,
+          });
         }
       }
       full.endDraw();

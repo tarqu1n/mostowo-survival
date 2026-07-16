@@ -44,6 +44,11 @@ export interface MapShape {
 export interface TilePaletteEntry {
   pack: string;
   source: TileSource;
+  /** Clockwise rotation in degrees applied when this tile is blitted; absent = 0. A rotated tile is
+   *  a distinct palette slot (`pack + source + rotation`). Optional and always LAST in this interface
+   *  / every constructor so serialized key order stays stable; omitted entirely (not `0`) when
+   *  unrotated, so old maps round-trip byte-identical. */
+  rotation?: 0 | 90 | 180 | 270;
 }
 
 export interface TileLayer {
@@ -315,6 +320,16 @@ function parseTileSource(value: unknown, path: string): TileSource {
   fail(`${path}.kind must be 'image' or 'sheetFrame', got ${JSON.stringify(kind)}`);
 }
 
+/** Palette-entry clockwise rotation; absent ⇒ 0. Only the four 90° steps are valid. */
+function parseRotation(value: unknown, path: string): 0 | 90 | 180 | 270 | undefined {
+  if (value === undefined) return undefined;
+  const n = expectInt(value, path);
+  if (n !== 0 && n !== 90 && n !== 180 && n !== 270) {
+    fail(`${path} must be one of 0, 90, 180, 270, got ${JSON.stringify(value)}`);
+  }
+  return n;
+}
+
 function parseMeta(value: unknown, path: string): MapMeta {
   const obj = expectRecord(value, path);
   const schemaVersion = expectInt(obj.schemaVersion, `${path}.schemaVersion`);
@@ -366,9 +381,12 @@ function parsePalette(value: unknown, path: string): Array<TilePaletteEntry | nu
     }
     if (entry === null) fail(`${entryPath} must not be null (only index 0 is reserved)`);
     const obj = expectRecord(entry, entryPath);
+    const rotation = parseRotation(obj.rotation, `${entryPath}.rotation`);
     return {
       pack: expectString(obj.pack, `${entryPath}.pack`),
       source: parseTileSource(obj.source, `${entryPath}.source`),
+      // Constructed LAST and omitted when 0/absent so legacy maps round-trip byte-identical.
+      ...(rotation ? { rotation } : {}),
     };
   });
 }

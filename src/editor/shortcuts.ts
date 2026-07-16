@@ -54,6 +54,17 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     ],
   },
   {
+    title: 'Tile painting',
+    shortcuts: [
+      {
+        keys: ['R'],
+        action:
+          'Rotate the tile the Brush paints +90° (a rotated tile is a distinct palette entry)',
+      },
+      { keys: ['Shift + R'], action: 'Rotate the painted tile −90°' },
+    ],
+  },
+  {
     title: 'Collision / Zones / Shape / Terrain',
     shortcuts: [
       {

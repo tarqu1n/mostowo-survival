@@ -6793,6 +6793,27 @@
       ]
     },
     {
+      "id": "mostowo-custom/Environment/Tilesets/water_diagonal.png",
+      "pack": "mostowo-custom",
+      "type": "tile",
+      "source": {
+        "kind": "sheetFrame",
+        "sheet": "Environment/Tilesets/water_diagonal.png",
+        "frame": 0
+      },
+      "w": 96,
+      "h": 32,
+      "category": "Environment/Tilesets",
+      "tags": [
+        "diagonal",
+        "environment",
+        "tilesets",
+        "water"
+      ],
+      "origin": "self-made",
+      "frames": 12
+    },
+    {
       "id": "pixel-crawler/_derived/bush.png",
       "pack": "pixel-crawler",
       "type": "object",

@@ -254,4 +254,48 @@ describe('findOrAppendPaletteIndex', () => {
     expect(map.palette).toHaveLength(3); // 1 reserved + a + b, never re-appended
     expect(b).toBe(2);
   });
+
+  it('returns the SAME index for repeated calls with the same (pack, source, rotation)', () => {
+    const map = createEmptyMap('x', 'X', 2, 2);
+    const first = findOrAppendPaletteIndex(
+      map,
+      'pixel-crawler',
+      { kind: 'sheetFrame', sheet: 'Environment/Tilesets/Floors_Tiles.png', frame: 252 },
+      90,
+    );
+    const second = findOrAppendPaletteIndex(
+      map,
+      'pixel-crawler',
+      { kind: 'sheetFrame', sheet: 'Environment/Tilesets/Floors_Tiles.png', frame: 252 },
+      90,
+    );
+    expect(second).toBe(first);
+    expect(map.palette).toHaveLength(2); // no growth on the repeat
+  });
+
+  it('treats a different rotation on the same source as a distinct entry', () => {
+    const map = createEmptyMap('x', 'X', 2, 2);
+    const source = {
+      kind: 'sheetFrame' as const,
+      sheet: 'Environment/Tilesets/Floors_Tiles.png',
+      frame: 252,
+    };
+    const at90 = findOrAppendPaletteIndex(map, 'pixel-crawler', source, 90);
+    const at180 = findOrAppendPaletteIndex(map, 'pixel-crawler', source, 180);
+    expect(at90).not.toBe(at180);
+    expect(map.palette).toHaveLength(3);
+  });
+
+  it('treats an omitted rotation and an explicit rotation of 0 as equal', () => {
+    const map = createEmptyMap('x', 'X', 2, 2);
+    const source = {
+      kind: 'sheetFrame' as const,
+      sheet: 'Environment/Tilesets/Floors_Tiles.png',
+      frame: 252,
+    };
+    const omitted = findOrAppendPaletteIndex(map, 'pixel-crawler', source);
+    const explicitZero = findOrAppendPaletteIndex(map, 'pixel-crawler', source, 0);
+    expect(explicitZero).toBe(omitted);
+    expect(map.palette).toHaveLength(2); // no growth — omitted and 0 resolve to the same slot
+  });
 });

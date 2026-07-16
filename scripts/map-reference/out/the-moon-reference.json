@@ -1,0 +1,30 @@
+{
+  "name": "the-moon",
+  "source": "openstreetmap",
+  "center": {
+    "lat": 54.07271647469941,
+    "lon": 16.360120354608014
+  },
+  "grid": {
+    "w": 160,
+    "h": 160
+  },
+  "metresPerTile": 3,
+  "pxPerTile": 16,
+  "image": {
+    "w": 2560,
+    "h": 2560
+  },
+  "metresPerPixel": 0.1875,
+  "zoom": 18.902074850247313,
+  "bbox": {
+    "north": 54.07487242151939,
+    "south": 54.07056052787944,
+    "east": 16.36379469179609,
+    "west": 16.356446017419938
+  },
+  "extentMetres": {
+    "w": 480,
+    "h": 480
+  }
+}

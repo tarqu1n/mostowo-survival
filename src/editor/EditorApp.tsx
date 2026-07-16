@@ -97,6 +97,17 @@ export function EditorApp() {
         }
         return;
       }
+      // R = rotate the pending brush tile +90° (Shift+R = −90°), for the Brush tool with an asset
+      // armed (plan 026). Plain 'r'/'R' only; the store cycles through 0/90/180/270. The INPUT/SELECT
+      // guard above means it never fires while editing a field; no-op unless the brush is armed.
+      if (e.key.toLowerCase() === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const st = useEditorStore.getState();
+        if (st.activeTool === 'brush' && st.brushAsset) {
+          e.preventDefault();
+          st.rotateBrush(e.shiftKey ? -90 : 90);
+        }
+        return;
+      }
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const ids = useEditorStore.getState().selectedObjectIds;
         if (ids.length > 0) {

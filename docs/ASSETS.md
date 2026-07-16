@@ -249,8 +249,13 @@ Deterministic (packs/assets/tags all sorted, no timestamp) — re-running with n
 a byte-identical file. Never hand-edit the catalog; re-run the script after adding/removing pack
 files or editing a `pack.json`.
 
-`public/assets/tilesets/mostowo-custom/` is the (currently-empty) skeleton home for future self-made
-art — same `pack.json` shape, `licence: "original"`.
+`public/assets/tilesets/mostowo-custom/` is the home for self-made art — same `pack.json` shape,
+`licence: "original"`. First resident: `Environment/Tilesets/water_diagonal.png`, a synthesised 45°
+water/grass coast tileset (12 frames) — the pack ships no clean diagonal, so it's generated from the
+pack palette. **How to author terrain tiles that match a stock pack and tile seamlessly (the
+global-band + connector-tile technique, the seamlessness rules, and the wire-into-editor recipe):
+[TILE-AUTHORING.md](TILE-AUTHORING.md).** Generator:
+[`scripts/mostowo-custom/gen_water_diagonal.py`](../scripts/mostowo-custom/gen_water_diagonal.py).
 
 ### Additional Anokolisa packs (ingested for the editor Library)
 

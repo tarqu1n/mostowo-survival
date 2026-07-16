@@ -55,21 +55,41 @@ export interface AutoAlign {
 }
 
 /** Auto-align an underlay image against the tile grid. With a sidecar: `scale = tileSize /
- *  sidecar.pxPerTile` (typically `1`, since the capture tool authors `pxPerTile === TILE_SIZE`) and
- *  a zero offset — the image is assumed captured flush with the grid origin — plus a `warning` if
- *  the actually-loaded `imageW`/`imageH` disagree with what the sidecar recorded. Without a sidecar,
- *  fall back to an identity `{ scale: 1, offsetX: 0, offsetY: 0 }` (no warning — there's nothing to
- *  compare against). */
+ *  sidecar.pxPerTile` (typically `1`, since the capture tool authors `pxPerTile === TILE_SIZE`).
+ *
+ *  Offset: the capture tool centres its OSM slice on the author-supplied coordinate (see
+ *  `capture.mjs` — `center: [lon, lat]`, symmetric bbox), so that coordinate lives at the *middle* of
+ *  the reference image. To make it land at the middle of the *map* — the whole point of "the
+ *  coordinate is the map's centre" — we centre the reference's on-grid footprint over the map when
+ *  `mapWidth`/`mapHeight` (in TILES) are supplied: `offset = (mapTiles − refTiles) / 2`. The footprint
+ *  is derived from the *actual* loaded pixels (`imageW * scale / tileSize`), so a scaled or
+ *  wrong-sized image still centres on its true middle. Without map dims (or without a sidecar) we
+ *  fall back to a zero offset (image flush to the grid origin) — the legacy behaviour.
+ *
+ *  A `warning` is set if the actually-loaded `imageW`/`imageH` disagree with what the sidecar
+ *  recorded. Without a sidecar, everything falls back to identity `{ scale: 1, offsetX: 0, offsetY: 0
+ *  }` (no warning — there's nothing to compare against, and no known real-world centre to align). */
 export function computeAutoAlign(opts: {
   sidecar?: Sidecar | null;
   imageW: number;
   imageH: number;
   tileSize: number;
+  /** Map size in TILES. When supplied (with a sidecar) the reference is centred over the map so its
+   *  captured centre coordinate lands at the map's centre; omit to keep the legacy zero offset. */
+  mapWidth?: number;
+  mapHeight?: number;
 }): AutoAlign {
-  const { sidecar, imageW, imageH, tileSize } = opts;
+  const { sidecar, imageW, imageH, tileSize, mapWidth, mapHeight } = opts;
   if (!sidecar) return { scale: 1, offsetX: 0, offsetY: 0 };
 
-  const result: AutoAlign = { scale: tileSize / sidecar.pxPerTile, offsetX: 0, offsetY: 0 };
+  const scale = tileSize / sidecar.pxPerTile;
+  // On-grid footprint of the reference, in tiles (1 image px == scale/tileSize of a tile).
+  const refTilesW = (imageW * scale) / tileSize;
+  const refTilesH = (imageH * scale) / tileSize;
+  const offsetX = typeof mapWidth === 'number' ? (mapWidth - refTilesW) / 2 : 0;
+  const offsetY = typeof mapHeight === 'number' ? (mapHeight - refTilesH) / 2 : 0;
+
+  const result: AutoAlign = { scale, offsetX, offsetY };
   if (imageW !== sidecar.image.w || imageH !== sidecar.image.h) {
     result.warning =
       `Reference image is ${imageW}×${imageH}px but the sidecar expects ` +

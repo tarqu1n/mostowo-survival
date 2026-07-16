@@ -10,6 +10,7 @@ const BRUSH_B = 'pixel-crawler/Environment/Tilesets/Floors_Tiles.png#253';
 function reset(width = 4, height = 4): void {
   useEditorStore.getState().newMap('scratch', 'Scratch', width, height);
   useEditorStore.getState().setBrushAsset(BRUSH_A);
+  useEditorStore.getState().setBrushRotation(0); // brushRotation is sticky/module-singleton — don't leak across tests
 }
 
 describe('editorStore painting', () => {
@@ -269,6 +270,62 @@ describe('editorStore favourites', () => {
 
     useEditorStore.getState().undo();
     expect(map.zones.defs[0].favourites).toEqual([]);
+  });
+});
+
+describe('editorStore brush rotation (editor rotate-tile)', () => {
+  beforeEach(() => reset());
+
+  it('paintLine paints a cell whose palette entry carries the current brushRotation', () => {
+    useEditorStore.getState().setBrushRotation(90);
+    useEditorStore.getState().paintLine(0, 0, 0, 0, 'rot-1');
+
+    const map = useEditorStore.getState().map!;
+    const width = map.meta.width;
+    const paletteIndex = map.layers[0].cells[cellIndex(0, 0, width)];
+    expect(map.palette).toHaveLength(2); // reserved null + the one new rotated entry
+    expect(map.palette[paletteIndex]).toMatchObject({ rotation: 90 });
+  });
+
+  it('rotateBrush cycles 0 -> 90 -> 180 -> 270 -> 0', () => {
+    expect(useEditorStore.getState().brushRotation).toBe(0);
+    useEditorStore.getState().rotateBrush(90);
+    expect(useEditorStore.getState().brushRotation).toBe(90);
+    useEditorStore.getState().rotateBrush(90);
+    expect(useEditorStore.getState().brushRotation).toBe(180);
+    useEditorStore.getState().rotateBrush(90);
+    expect(useEditorStore.getState().brushRotation).toBe(270);
+    useEditorStore.getState().rotateBrush(90);
+    expect(useEditorStore.getState().brushRotation).toBe(0);
+  });
+
+  it('rotateBrush also cycles backwards: 0 -> 270 -> 180 -> 90 -> 0', () => {
+    useEditorStore.getState().rotateBrush(-90);
+    expect(useEditorStore.getState().brushRotation).toBe(270);
+    useEditorStore.getState().rotateBrush(-90);
+    expect(useEditorStore.getState().brushRotation).toBe(180);
+    useEditorStore.getState().rotateBrush(-90);
+    expect(useEditorStore.getState().brushRotation).toBe(90);
+    useEditorStore.getState().rotateBrush(-90);
+    expect(useEditorStore.getState().brushRotation).toBe(0);
+  });
+
+  it('fillFrom paints an angle-0 palette entry even when brushRotation is non-zero', () => {
+    useEditorStore.getState().setBrushRotation(90);
+    useEditorStore.getState().fillFrom(0, 0);
+
+    const map = useEditorStore.getState().map!;
+    const paletteIndex = map.layers[0].cells[cellIndex(0, 0, map.meta.width)];
+    expect(map.palette[paletteIndex]).not.toHaveProperty('rotation');
+  });
+
+  it('paintRectArea paints an angle-0 palette entry even when brushRotation is non-zero', () => {
+    useEditorStore.getState().setBrushRotation(180);
+    useEditorStore.getState().paintRectArea(0, 0, 1, 1);
+
+    const map = useEditorStore.getState().map!;
+    const paletteIndex = map.layers[0].cells[cellIndex(0, 0, map.meta.width)];
+    expect(map.palette[paletteIndex]).not.toHaveProperty('rotation');
   });
 });
 

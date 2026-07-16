@@ -245,6 +245,11 @@ export interface EditorState {
   activeLayerId: string | null;
   activeTool: EditorTool;
   brushAsset: string | null;
+  /** Pending clockwise rotation (deg) applied to the tileset piece painted by the `brush` tool. A
+   *  rotated tile becomes a distinct palette entry (see `findOrAppendPaletteIndex`). STICKY across
+   *  arming a new `brushAsset` (lay many rotated tiles without re-rotating). Brush-gesture only —
+   *  `fill`/`rect` paint at angle 0 this plan. */
+  brushRotation: 0 | 90 | 180 | 270;
   /** A catalog asset (+ optional chosen `region`/`anim`) clicked in the Library, "arming" `decor`
    *  placement for the `place` tool. Mutually exclusive with `armedNodeRef` (arming one clears the
    *  other — only one thing is ever armed at a time). */
@@ -312,6 +317,10 @@ export interface EditorState {
   setActiveLayer(layerId: string): void;
   setActiveTool(tool: EditorTool): void;
   setBrushAsset(asset: string | null): void;
+  /** Set the pending brush rotation directly (one of 0/90/180/270). */
+  setBrushRotation(deg: 0 | 90 | 180 | 270): void;
+  /** Cycle the pending brush rotation by ±90°, wrapping through the 0/90/180/270 set. */
+  rotateBrush(delta: 90 | -90): void;
   setArmedObjectAsset(armed: ArmedObjectAsset | null): void;
   setArmedNodeRef(ref: string | null): void;
   setSnapToTileCenter(enabled: boolean): void;
@@ -676,15 +685,20 @@ function reconcileActiveLayer(map: MapFile | null, activeLayerId: string | null)
 
 /** Resolve the current `brushAsset` (a catalog id, optionally `#frame`) to a palette index in `map`,
  *  find-or-appending as needed (mutates `map.palette` directly — NOT part of the undo/redo history,
- *  see `findOrAppendPaletteIndex`'s doc). No brush selected, or a malformed asset id, resolves to `0`
- *  (empty) — callers gate brush/rect on a brush being set in the UI; this is just a safe fallback. */
-function resolveBrushValue(map: MapFile, brushAsset: string | null): number {
+ *  see `findOrAppendPaletteIndex`'s doc). `rotation` (deg, default 0) selects a distinct palette slot
+ *  for a rotated tile. No brush selected, or a malformed asset id, resolves to `0` (empty) — callers
+ *  gate brush/rect on a brush being set in the UI; this is just a safe fallback. */
+function resolveBrushValue(
+  map: MapFile,
+  brushAsset: string | null,
+  rotation: 0 | 90 | 180 | 270 = 0,
+): number {
   if (!brushAsset) return 0;
   try {
     const { pack, path, frame } = parseAssetId(brushAsset);
     const source: TileSource =
       frame === undefined ? { kind: 'image', path } : { kind: 'sheetFrame', sheet: path, frame };
-    return findOrAppendPaletteIndex(map, pack, source);
+    return findOrAppendPaletteIndex(map, pack, source, rotation);
   } catch (e) {
     console.warn(`[editor] invalid brushAsset "${brushAsset}": ${(e as Error).message}`);
     return 0;
@@ -819,11 +833,16 @@ function buildTerrainCommand(
 
   const dims: Dims = { cols: width, rows: height };
   const resolveIndex = (frame: number): number =>
-    findOrAppendPaletteIndex(map, terrainDef.pack, {
-      kind: 'sheetFrame',
-      sheet: terrainDef.sheet,
-      frame,
-    });
+    findOrAppendPaletteIndex(
+      map,
+      terrainDef.pack,
+      {
+        kind: 'sheetFrame',
+        sheet: terrainDef.sheet,
+        frame,
+      },
+      0, // terrain autotile always bakes at angle 0 (brush-only rotation this plan)
+    );
   const bakeChanges = computeTerrainBake(
     nextMask,
     dims,
@@ -1070,6 +1089,7 @@ export const useEditorStore = create<EditorState>()(
     activeLayerId: null,
     activeTool: 'pan',
     brushAsset: null,
+    brushRotation: 0,
     armedObjectAsset: null,
     armedNodeRef: null,
     snapToTileCenter: true,
@@ -1182,7 +1202,13 @@ export const useEditorStore = create<EditorState>()(
       }),
     setActiveLayer: (layerId) => set({ activeLayerId: layerId }),
     setActiveTool: (activeTool) => set({ activeTool }),
+    // `brushRotation` is deliberately NOT reset here — it's sticky across arming a new asset.
     setBrushAsset: (brushAsset) => set({ brushAsset }),
+    setBrushRotation: (brushRotation) => set({ brushRotation }),
+    rotateBrush: (delta) =>
+      set((s): Partial<EditorState> => ({
+        brushRotation: ((((s.brushRotation + delta) % 360) + 360) % 360) as 0 | 90 | 180 | 270,
+      })),
     // Arming one kind clears the other — only one thing is ever armed at a time (see module doc).
     setArmedObjectAsset: (armedObjectAsset) =>
       set((s): Partial<EditorState> => ({
@@ -1232,11 +1258,16 @@ export const useEditorStore = create<EditorState>()(
         if (get().mapId !== mapId) return;
         const sidecarJson = await getMapReferenceSidecar(name);
         if (get().mapId !== mapId) return;
+        // Centre the reference over the map so the captured centre coordinate lands at the map's
+        // centre (the reference PNG is captured centred on that coordinate — see `capture.mjs`).
+        const meta = get().map?.meta;
         align = computeAutoAlign({
           sidecar: parseSidecar(sidecarJson),
           imageW: size.w,
           imageH: size.h,
           tileSize: TILE_SIZE,
+          mapWidth: meta?.width,
+          mapHeight: meta?.height,
         });
       } catch (e) {
         console.warn(`[editor] underlay auto-align failed for "${name}":`, e);
@@ -1953,12 +1984,13 @@ export const useEditorStore = create<EditorState>()(
     // ---- painting ----
 
     paintLine: (fromCol, fromRow, toCol, toRow, strokeId) => {
-      const { map, activeLayerId, brushAsset } = get();
+      const { map, activeLayerId, brushAsset, brushRotation } = get();
       if (!map || !activeLayerId) return;
       const layerIndex = map.layers.findIndex((l) => l.id === activeLayerId);
       const layer = map.layers[layerIndex];
       if (!layer) return;
-      const value = resolveBrushValue(map, brushAsset);
+      // Brush gesture carries the pending rotation; fill/rect stay angle-0 this plan.
+      const value = resolveBrushValue(map, brushAsset, brushRotation);
       const points = lineCells(fromCol, fromRow, toCol, toRow).filter(({ col, row }) =>
         isInside(map, col, row),
       );
@@ -1993,7 +2025,7 @@ export const useEditorStore = create<EditorState>()(
       const layerIndex = map.layers.findIndex((l) => l.id === activeLayerId);
       const layer = map.layers[layerIndex];
       if (!layer) return;
-      const value = resolveBrushValue(map, brushAsset);
+      const value = resolveBrushValue(map, brushAsset, 0); // fill stays angle-0 (brush-only rotation this plan)
       const changes = floodFill(
         layer.cells,
         map.meta.width,
@@ -2019,7 +2051,7 @@ export const useEditorStore = create<EditorState>()(
       const layerIndex = map.layers.findIndex((l) => l.id === activeLayerId);
       const layer = map.layers[layerIndex];
       if (!layer) return;
-      const value = resolveBrushValue(map, brushAsset);
+      const value = resolveBrushValue(map, brushAsset, 0); // rect stays angle-0 (brush-only rotation this plan)
       const points = rectCells(c0, r0, c1, r1, (c, r) => isInside(map, c, r));
       const changes = cellsToChanges(layer.cells, map.meta.width, points, value);
       const cmd = commandFromChanges(layer.cells, changes, value);
@@ -2365,11 +2397,16 @@ export const useEditorStore = create<EditorState>()(
         const terrainDef = terrainCatalog?.terrains.find((t) => t.id === section.terrainId);
         if (!terrainDef) continue; // unknown terrain id (catalog not loaded, or a stale id) — skip, don't crash
         const resolveIndex = (frame: number): number =>
-          findOrAppendPaletteIndex(map, terrainDef.pack, {
-            kind: 'sheetFrame',
-            sheet: terrainDef.sheet,
-            frame,
-          });
+          findOrAppendPaletteIndex(
+            map,
+            terrainDef.pack,
+            {
+              kind: 'sheetFrame',
+              sheet: terrainDef.sheet,
+              frame,
+            },
+            0, // terrain autotile always bakes at angle 0 (brush-only rotation this plan)
+          );
         const bakeChanges = computeTerrainBake(
           section.cells,
           dims,

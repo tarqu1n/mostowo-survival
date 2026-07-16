@@ -166,18 +166,31 @@ function tileSourceEquals(a: TileSource, b: TileSource): boolean {
 }
 
 /**
- * Find `map.palette`'s existing slot for `{pack, source}` (index >= 1 — index 0 is the reserved
- * empty slot), or APPEND a new one and return its index. Mutates `map.palette` directly and
- * immediately — this append is deliberately NOT part of the undo/redo history (advisor rule: the
+ * Find `map.palette`'s existing slot for `{pack, source, rotation}` (index >= 1 — index 0 is the
+ * reserved empty slot), or APPEND a new one and return its index. A rotated tile is a DISTINCT slot,
+ * so `rotation` joins the equality check (`0` and absent are equal). Mutates `map.palette` directly
+ * and immediately — this append is deliberately NOT part of the undo/redo history (advisor rule: the
  * palette is append-only and unused entries are tolerated; only cell VALUES are undone/redone, never
  * palette membership, so re-saves never renumber existing indices).
  */
-export function findOrAppendPaletteIndex(map: MapFile, pack: string, source: TileSource): number {
+export function findOrAppendPaletteIndex(
+  map: MapFile,
+  pack: string,
+  source: TileSource,
+  rotation: 0 | 90 | 180 | 270 = 0,
+): number {
   for (let i = 1; i < map.palette.length; i++) {
     const entry = map.palette[i];
-    if (entry && entry.pack === pack && tileSourceEquals(entry.source, source)) return i;
+    if (
+      entry &&
+      entry.pack === pack &&
+      tileSourceEquals(entry.source, source) &&
+      (entry.rotation ?? 0) === rotation
+    )
+      return i;
   }
-  const entry: TilePaletteEntry = { pack, source };
+  // `rotation` constructed LAST and omitted when 0 (mirror mapFormat) so serialized order stays stable.
+  const entry: TilePaletteEntry = { pack, source, ...(rotation ? { rotation } : {}) };
   map.palette.push(entry);
   return map.palette.length - 1;
 }

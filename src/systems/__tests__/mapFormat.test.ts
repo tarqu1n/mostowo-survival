@@ -553,6 +553,45 @@ describe('parseMap', () => {
       expect(nodeAt(reparsed, 'node_0001').skin).toBe('oak');
     });
   });
+
+  describe('palette rotation (editor rotate-tile)', () => {
+    it('round-trips a palette entry with rotation:90 through serializeMap -> JSON.parse -> parseMap', () => {
+      const raw = withRaw((r) => {
+        (r.palette[1] as { rotation?: number }).rotation = 90;
+      });
+      const map = parseMap(raw);
+      expect(map.palette[1]).toMatchObject({ rotation: 90 });
+
+      const json = serializeMap(map);
+      const parsedJson = JSON.parse(json) as { palette: Array<{ rotation?: number } | null> };
+      expect(parsedJson.palette[1]?.rotation).toBe(90);
+
+      const reparsed = parseMap(JSON.parse(json));
+      expect(reparsed).toEqual(map);
+    });
+
+    it('round-trips a palette entry with no rotation, serializing WITHOUT the key', () => {
+      const map = parseMap(validRaw()); // the base fixture never sets rotation
+      expect(map.palette[1]).not.toHaveProperty('rotation');
+
+      const json = serializeMap(map);
+      const parsedJson = JSON.parse(json) as { palette: Array<object | null> };
+      expect(Object.prototype.hasOwnProperty.call(parsedJson.palette[1] ?? {}, 'rotation')).toBe(
+        false,
+      );
+
+      const reparsed = parseMap(JSON.parse(json));
+      expect(reparsed).toEqual(map);
+      expect(reparsed.palette[1]).not.toHaveProperty('rotation');
+    });
+
+    it('rejects a palette entry rotation of 45 (not one of 0/90/180/270)', () => {
+      const raw = withRaw((r) => {
+        (r.palette[1] as { rotation?: number }).rotation = 45;
+      });
+      expect(() => parseMap(raw)).toThrow(/rotation/);
+    });
+  });
 });
 
 describe('migrateMap', () => {

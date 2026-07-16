@@ -105,6 +105,8 @@ export function Toolbar() {
   const canUndo = useEditorStore((s) => s.canUndo);
   const canRedo = useEditorStore((s) => s.canRedo);
   const activeTool = useEditorStore((s) => s.activeTool);
+  const brushAsset = useEditorStore((s) => s.brushAsset);
+  const brushRotation = useEditorStore((s) => s.brushRotation);
   const armedObjectAsset = useEditorStore((s) => s.armedObjectAsset);
   const armedNodeRef = useEditorStore((s) => s.armedNodeRef);
   const snapToTileCenter = useEditorStore((s) => s.snapToTileCenter);
@@ -271,6 +273,32 @@ export function Toolbar() {
               {mode.label}
             </Button>
           ))}
+        </div>
+      )}
+
+      {activeTool === 'brush' && (
+        <div className={groupClass} title="Rotate the tile the brush paints (R / Shift+R)">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!brushAsset}
+            title="Rotate the painted tile −90° (Shift+R)"
+            onClick={() => useEditorStore.getState().rotateBrush(-90)}
+          >
+            ⟲ −90°
+          </Button>
+          <span className="w-9 text-center text-[0.85rem] text-fg-muted tabular-nums">
+            {brushRotation}°
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!brushAsset}
+            title="Rotate the painted tile +90° (R)"
+            onClick={() => useEditorStore.getState().rotateBrush(90)}
+          >
+            ⟳ +90°
+          </Button>
         </div>
       )}
 
