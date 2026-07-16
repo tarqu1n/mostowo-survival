@@ -237,8 +237,11 @@ export const HUNGER_LETHAL = false;
 /** Map ID to load at game start (must match a key in maps/manifest.json). */
 export const START_MAP_ID = 'the-moon';
 
-/** Player spawn location within the start map, in tile coordinates (col, row). */
-export const SPAWN_TILE = { col: 21, row: 33 };
+/** Player spawn location within the start map, in tile coordinates (col, row). Must sit inside the
+ *  map's authored area — the-moon's camp is around col 112–118 / row 132–151, so spawn on the
+ *  walkable ground by the main bonfire. (The old {21,33} was empty void ~100 tiles away, so the
+ *  world rendered all-black around the player — the map was fine, the spawn just missed it.) */
+export const SPAWN_TILE = { col: 118, row: 140 };
 
 /**
  * Base zone size in tiles (width, height). The runtime base zone is a rect of this size centred on
