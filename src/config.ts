@@ -235,7 +235,7 @@ export const HUNGER_VIGNETTE_MAX_ALPHA = 0.5;
 export const HUNGER_LETHAL = false;
 
 /** Map ID to load at game start (must match a key in maps/manifest.json). */
-export const START_MAP_ID = 'test';
+export const START_MAP_ID = 'the-moon';
 
 /** Player spawn location within the start map, in tile coordinates (col, row). */
 export const SPAWN_TILE = { col: 21, row: 33 };

@@ -3,10 +3,10 @@
   "placements": [],
   "maps": [
     {
-      "id": "test",
-      "name": "test",
-      "width": 45,
-      "height": 80
+      "id": "the-moon",
+      "name": "The Moon",
+      "width": 245,
+      "height": 280
     }
   ]
 }
