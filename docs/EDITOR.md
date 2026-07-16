@@ -170,7 +170,7 @@ The ⚙ Regions editor is reachable on a **tile**-classed asset too, via an "Edi
 beside the Type dropdown — no type demotion. Regions drawn this way are tagged `role:'object'` on
 save (a per-selected-box badge shows the role), letting a mixed sheet's props (e.g. a fountain on a
 terrain sheet) become placeable while the sheet stays `tile` and terrain keeps tiling. Details +
-occlusion/invariant: [ASSETS.md](ASSETS.md#atlas-sprite-regions-plan-014-step-7a).
+occlusion/invariant: [ASSETS.md](assets-catalog.md#atlas-sprite-regions-plan-014-step-7a).
 
 ## Packs & catalog
 

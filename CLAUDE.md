@@ -61,18 +61,12 @@ vision in [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md).
 
 ## Docs
 
+Full grouped map: [docs/README.md](docs/README.md). Load the one leaf a task needs. Most-used directly:
+
 - [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md) — what the game *is* (premise, day/night loop, enemies, pillars, MVP)
-- [docs/STATUS.md](docs/STATUS.md) — what's **built so far** (feature/plan history)
-- [docs/LORE.md](docs/LORE.md) — intro story + real-Mostowo people/places/stories that theme the game
-- [docs/ASSETS.md](docs/ASSETS.md) — art pipeline: active pack, sprite extraction, what's wired, where assets live
-- [docs/EDITOR.md](docs/EDITOR.md) — dev-only **Map Builder** (`npm run editor`): panes, tools, map/world file format, generated artifacts, persistence contract
-- [docs/TILE-AUTHORING.md](docs/TILE-AUTHORING.md) — authoring **self-made terrain tiles** that match a stock pack + tile seamlessly (global-band + connector technique; wire-into-editor recipe)
-- [docs/CRAFTPIX.md](docs/CRAFTPIX.md) — importing **CraftPix.net** asset packs (scripted ingest): 4 theme packs, no-shadow variants, directional-sheet slicing, per-pack record
-- [docs/ASSET-EXPERIMENTS.md](docs/ASSET-EXPERIMENTS.md) — art R&D log: tileset candidates, AI-gen trials, Gemini pipeline
-- [scripts/gen-icons/README.md](scripts/gen-icons/README.md) — **item-icon generation pipeline** (Gemini): *when* to run it (add/replace an item icon), *how*, and the LAN-key gate — overview in [ASSETS.md](docs/ASSETS.md#item-icons-gemini-pipeline-plan-009)
-- [docs/GAME-MECHANICS.md](docs/GAME-MECHANICS.md) — tuned mechanics & numbers (costs, fuel, radii, base zone)
-- [docs/DECISIONS.md](docs/DECISIONS.md) — decision log (what we chose and why)
-- [docs/RENDERING.md](docs/RENDERING.md) — custom PostFX pipelines + "when to reach for a shader"
-- [docs/WORKFLOW.md](docs/WORKFLOW.md) — run / build / deploy / test commands + review gates
-- [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — code conventions (data-driven design, scene wiring, input gating, worker tasks)
-- [docs/STANDARDS.md](docs/STANDARDS.md) — tooling (lint/format/hooks), naming conventions, TS posture, commit style
+- [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — architecture patterns per `src/` seam (data-driven, scenes, input gating, worker tasks)
+- [docs/STANDARDS.md](docs/STANDARDS.md) — tooling (lint/format/hooks), naming, TS posture, commit style
+- [docs/WORKFLOW.md](docs/WORKFLOW.md) — run / build / deploy + review gates; tests → [docs/testing.md](docs/testing.md)
+- [docs/DECISIONS.md](docs/DECISIONS.md) — decision-log index (what we chose and why; links to topic shards)
+- [docs/STATUS.md](docs/STATUS.md) — current state of what's built, by subsystem
+- Art & assets pipeline (packs, catalog, tiles, icons, rendering) → [docs/README.md](docs/README.md#art--assets-pipeline)

@@ -78,7 +78,13 @@ const objTabClass = 'h-full w-full overflow-auto p-4 px-[18px]';
 const objTitleClass = 'mb-3 text-base text-fg-bright';
 const objIdClass = 'break-all text-[0.78rem] text-muted-2';
 const objInputClass = 'rounded-md border border-border bg-inset px-2 py-1 text-fg';
-const objActionsClass = 'flex gap-2 border-t border-surface pt-1';
+// The primary-action bar (Apply / Save regions / Reset). Stuck to the bottom of the tab's scroll
+// container (`objTabClass`, the nearest `overflow-auto` ancestor) so the buttons are ALWAYS reachable —
+// they used to scroll off the bottom on short viewports and on mobile. Negative margins bleed it to the
+// full tab width and cancel the container's `p-4` bottom padding so it sits flush at the very bottom;
+// `bg-background` (the tab's own colour) lets content scroll cleanly underneath.
+const objActionsClass =
+  'sticky bottom-0 z-10 -mx-[18px] -mb-4 flex gap-2 border-t border-surface bg-background px-[18px] pt-2.5 pb-3';
 
 /** `.editor-object-frame`: a per-frame click-to-omit swatch button reset to a bare pixel crop, with an
  *  omitted cell dimmed + desaturated + crossed out with a diagonal double-gradient (`after:`), matching
@@ -838,12 +844,22 @@ function RegionsEditor({
     }
   }
 
-  async function reset(): Promise<void> {
+  // "Auto-detect objects" — hand the segmentation back to the SERVER rather than reimplementing it
+  // client-side. `gen_regions.py` only runs a detection pass on `object`-classified sheets, so first
+  // force `type:object` if the sheet isn't one yet (e.g. the user just picked "object" in the dropdown
+  // but hasn't Saved), THEN PUT an empty regions list — which deletes the regions override so
+  // `objects.py` `components()` (the connected-component detector) repopulates it. The `loadCatalog`
+  // refetch re-seeds the boxes to the freshly detected set. In object-ROLE mode (a mixed `tile` sheet)
+  // the server never auto-detects, so there this same button just clears the hand-authored regions.
+  async function autoDetect(): Promise<void> {
     setBusy(true);
     setErr(null);
     try {
-      // Empty list deletes the override server-side → the sheet falls back to auto-detection.
-      const result = await putAssetRegions(asset.pack, assetRelPath(asset), []);
+      const relPath = assetRelPath(asset);
+      if (!objectRoleRegions && asset.type !== 'object') {
+        await putAssetOverride(asset.pack, relPath, { type: 'object' });
+      }
+      const result = await putAssetRegions(asset.pack, relPath, []);
       setWarnings(result.warnings);
       await loadCatalog();
     } catch (e) {
@@ -1052,8 +1068,8 @@ function RegionsEditor({
         <Button type="button" disabled={busy} onClick={() => void save()}>
           {busy ? 'Saving…' : 'Save regions'}
         </Button>
-        <Button type="button" variant="outline" disabled={busy} onClick={() => void reset()}>
-          Reset to auto-detect
+        <Button type="button" variant="outline" disabled={busy} onClick={() => void autoDetect()}>
+          {objectRoleRegions ? 'Clear all regions' : 'Auto-detect objects'}
         </Button>
       </div>
     </div>

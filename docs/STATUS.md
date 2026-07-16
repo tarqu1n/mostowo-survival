@@ -1,291 +1,193 @@
 # Status — what's built so far
 
-The feature/plan history for Mostowo Survival, newest work at the bottom of each block. The root
-[CLAUDE.md](../CLAUDE.md) carries the one-line summary + architecture map; this is the detail behind
-it. The *why* behind each choice lives in [DECISIONS.md](DECISIONS.md).
+Current-state summary of Mostowo Survival's shipped subsystems: what exists now and how it behaves.
+[CLAUDE.md](../CLAUDE.md) carries the one-line summary + architecture map; the frozen detail behind
+each entry lives in the referenced `plans/NNN-*.md`; the *why* lives in [DECISIONS.md](DECISIONS.md).
 
 ## Core loop + worker task system (plans 001–002)
 
-Tap a tree → the worker **pathfinds** to it (A*, routing around walls + trees) → multi-hit chop →
-wood into a character `Inventory`. Orders **queue** (tap = act now / clear; **long-press = append**);
-**Build** places a passable *blueprint* and the worker walks over and **builds it over time** into a
-solid, blocking wall. **Cancel** clears the queue (blueprints survive). Data-driven items/nodes/buildables
-(`src/data/`), pure systems (`src/systems/`: `pathfind`, `tasks`, `grid`, `Inventory`), decoupled
-`UIScene` HUD. On the **Phaser 3 + TypeScript + Vite** mobile-first scaffold (Boot→Preload→MainMenu→Game +
-UI overlay), GitHub Pages auto-deploy. Verified via headless smoke (`npm run smoke`).
+Tap a tree → worker **pathfinds** (A*, routes around walls/trees) → multi-hit chop → yield into a
+character `Inventory`. Orders **queue**: tap = act now / clear, **long-press = append**. **Build**
+places a passable *blueprint*; the worker walks over and builds it into a solid, blocking wall over
+time. **Cancel** clears the queue (blueprints survive). Data-driven content (`src/data/`), pure
+systems (`src/systems/`: `pathfind`, `tasks`, `grid`, `Inventory`), decoupled `UIScene` HUD. On the
+Phaser 3 + TypeScript + Vite scaffold (Boot→Preload→MainMenu→Game + UI overlay), GitHub Pages
+auto-deploy.
 
-## Basic combat + first enemy (plan 003)
+## Combat + monsters (plans 003, 011)
 
-A shared `BaseStats`/`CombatantStats`/`ObjectStats` schema (`src/data/types.ts`) + pure
-`systems/combat.ts` resolve melee damage/hit-chance uniformly for Punch and enemy attacks. Three
-mutually-exclusive HUD-toggled input modes — **Command** (tap-to-pathfind, unchanged), **Combat**
-(virtual movepad + Punch button, direct real-time control, bypasses the pathfinder), **Inspect** (tap
-any tree/wall/zombie for a stats panel). The first enemy, a **kid zombie** (data id `kidZombie`), has
-minimal idle→chasing AI and contact damage; player HP reaching 0 restarts the scene (no save system
-yet, so "restart" = back to spawn with the world reset). The worker/task/pathfinding core is the seam
-both the zombie's AI and the eventual NPC companions plug into.
+Shared `BaseStats`/`CombatantStats`/`ObjectStats` schema (`src/data/types.ts`) + pure
+`systems/combat.ts` resolve melee damage/hit-chance uniformly for player and enemy attacks. Three
+HUD-toggled input modes: **Command** (tap-to-pathfind), **Combat** (virtual movepad + Punch button,
+direct real-time control, bypasses pathfinder), **Inspect** (tap any tree/wall/zombie for a stats
+panel). Player HP reaching 0 restarts the scene (no save system — restart = respawn with world reset).
 
-## Active art swapped to Pixel Crawler (plan 005)
+The enemy (data id `kidZombie`) is a **generic, data-driven monster** driven by a pure FSM
+(`src/systems/monsterAI.ts`): `idle`/`wander`/`patrol`/`chase` off radius-only aggro (`EnemyDef.vision`)
+and distance-only de-aggro with a "losing the scent" veer band; `GameScene.updateZombies` persists the
+`MonsterState` and moves toward `targetTile`. Tuning in `config.ts` ("Monster AI tuning"). Each
+skeleton spawns holding a **club** (2 dmg, ~1500ms) or **knife** (1 dmg, ~750ms) rolled from
+`EnemyDef.weaponPool` (`MONSTER_WEAPONS`, `src/data/weapons.ts`), held via **runtime anchor-pinning**
+(no baked art) synced each tick by pure `weaponTransform` (`src/systems/attachment.ts`); the attack is
+a coded swing tween. Supersedes plan 010's anchor-stamp tool. See
+[ASSETS.md](wired-art.md#weapon-attachment-runtime-pinning-plan-011).
 
-`ACTIVE_TILESET` in `src/data/tileset.ts` is now the **Pixel Crawler** pack — the Zombie Apocalypse
-pack is retired to reference-only under `public/assets/`. A Skeleton (Base) mob sprite stands in for
-the kid zombie (data id/name unchanged); the player has full 3-way directional facing (enemy flips by
-movement-x only). See [ASSETS.md](ASSETS.md) and [DECISIONS.md](DECISIONS.md) for the full picture.
+### Footprint vs hurtbox
 
-## Post-005 polish
+A creature's *footprint* (occupancy, one tile) is separate from its *hurtbox* (targeting extent;
+`Hurtbox` in `src/data/types.ts`, `src/systems/hurtbox.ts`) so tall sprites are hittable by their
+torso, not only their feet tile. Player and kid-zombie both use `{width:1,height:2}`. See
+[CONVENTIONS.md](CONVENTIONS.md) ("Footprint vs hurtbox").
 
-Player **chop** (Slice) + **punch** (Crush) directional action swings; ground baked into one
-`RenderTexture` to kill the fractional-zoom (150%) tile-seam bleed; workers chop/build from a
-resource's **base** tile and **face** the target (`faceTile`, `TREE_BASE_STAND_OFFSETS`). Queued trees
-now wear a **soft silhouette glow** — a **baked** halo texture (`src/render/glowTexture.ts`) drawn
-behind the tree, head-of-queue pulses via an alpha tween. This replaced the plan-006 per-frame WebGL
-PostFX pipeline (`OutlinePipeline`, retired): a tree's silhouette is static, so the halo is baked once
-per species instead of shaded every frame — same look on WebGL *and* Canvas (no fallback fork), no
-shader in the frame loop; see [RENDERING.md](RENDERING.md). See [DECISIONS.md](DECISIONS.md)
-(2026-07-12).
+## Combat feel + feedback
 
-**Crisp actors at every zoom:** actors now render at native `render.scale = 1` and camera zoom is
-integer-only (`ZOOM_STEP = 1`; `setZoom` rounds every path). Same root cause as the ground bake — a
-fractional on-screen texel scale (`render.scale × zoom`) makes nearest-neighbour uneven — but a small
-framed sprite can't hide it behind a continuous texture the way the baked ground does. The player had
-rendered at `scale 0.5`, crisp only at the even default 200% and stretched/clipping at 300%
-(`0.5 × 3 = 1.5`). See [RENDERING.md](RENDERING.md) ("Pixel-art scale must be integer") and
-[DECISIONS.md](DECISIONS.md) (2026-07-12).
+- **Hit reactions:** on a landed hit both actors flash red (`HitFlashPipeline` PostFX on WebGL,
+  `setTintFill` fallback on Canvas — [render/hitFlashPipeline.ts](../src/render/hitFlashPipeline.ts))
+  and squash-flinch in lockstep. Logic stays keyed to `col`/`row`; feedback is purely visual.
+- **Enemy attack tell:** the skeleton's bite is a coded **lunge** (`zombieLungeAt`) moving the Arcade
+  body via `body.reset` out-and-back during the stationary contact phase.
+- **Hit clarity:** camera kick (firm on player bitten, light on landing a punch) + a **damage
+  vignette** — `render/vignetteTexture.ts` bakes a red radial edge-glow once, UIScene pulses it on a
+  `player:hit` event. Kept off starvation drain.
+- **Attack commitment:** while a Punch swing is in progress, move speed drops to `ATTACK_MOVE_SLOW`
+  (20%) via `effectiveMoveSpeed()`, applied to pathfinder and Combat movepad (movepad vector stored as
+  `combatMoveVec`, re-applied each frame).
+- **Death animations:** player `death` state (`Death_Base`, 3-way) and skeleton `Death-Sheet` play as
+  one-shot collapses at `DEATH_ANIM_FRAMERATE`. A killed zombie leaves the AI set at once but lingers
+  as a **corpse** until anim + `DEATH_HOLD_MS` (`killZombie`). Player death routes through `killPlayer`:
+  a `playerDying` flag freezes the world, then `scene.restart()` fires on a delayed call.
 
-The larger character then drove two follow-ups: trees scaled up (`TREE_TILES_TALL` 2.6 → 5) so a pine
-towers over it, and a **data-driven hurtbox** so tall sprites are hittable by their drawn torso, not
-only their feet tile — a creature's *footprint* (occupancy, one tile) is now separate from its
-*hurtbox* (targeting extent; `Hurtbox` in `src/data/types.ts`, `src/systems/hurtbox.ts`). Both the
-player and kid-zombie use `{width:1,height:2}`; future large/small monsters just declare their own.
-See [CONVENTIONS.md](CONVENTIONS.md) ("Footprint vs hurtbox").
-
-Finally the **map was decoupled from the viewport and doubled** (`MAP_WIDTH`/`MAP_HEIGHT` = 2× base, a
-45×80-tile world; `BASE_*` stays the viewport/HUD size) so the world gives room to roam/build
-proportional to the bigger actors — the camera now scrolls/follows at every zoom. Doubling the ground
-bake exposed a per-tile `drawFrame` flush that took ~25s on the headless renderer; the ground is now
-baked in one batched `beginDraw…endDraw` pass (~160ms). See [DECISIONS.md](DECISIONS.md) (2026-07-12).
-
-## Three-tier test harness landed (plan 007)
-
-The fragile live-game smoke is retired for **Tier 1** Vitest unit tests over the pure systems + data
-(`npm test`, plain Node), **Tier 2** deterministic Playwright scenarios (`npm run e2e`) driven by a
-DEV-only `window.game.__test` scenario/fixed-step API on `GameScene` (`applyScenario` builds a known
-world from a declarative spec; `step(ms)` advances gameplay with zero wall-clock), and **Tier 3** a
-thin boot canary (`npm run smoke`). Two-speed dev loop (`npm run test:watch` inner, full sweep at
-wrap-up) — see [WORKFLOW.md](WORKFLOW.md).
-
-## Menu UI on a Container-based UI kit
-
-**Menu UI stays in Phaser (no DOM overlay)**, on a small Container-based UI kit (`src/ui/`: `Button`,
-`Panel`, `arrangeRow/Column/Grid`, shared `theme`). The HUD (`UIScene`) is refactored onto it; build
-inventory/build-menu panels from these primitives. Rationale in [DECISIONS.md](DECISIONS.md)
-(2026-07-12).
-
-## Inventory stacking + rock/stone node (plan 008)
-
-The throwaway wood counter is now a real **inventory**: `Inventory` is **slot-backed** (a bounded
-`Array<Slot>`), items **stack** to a per-item `maxStack` and **spill** into the next free slot, and
-the bag can genuinely **fill up** — surfaced as an always-visible **hotbar** (`src/ui/SlotGrid.ts`,
-bottom-centre, hidden in combat) plus an **ITEMS**-toggled full **INVENTORY** grid Panel. `maxStack`
-is injected (`maxStackOf`), so the pure system stays data-agnostic and plain-Node testable.
-Harvesting into a **full bag blocks and aborts the order** (guarded in both `beginCurrent` and
-`runHarvest`) so the worker never swings forever on a node it can't fell.
-
-## Item-icon generation pipeline (plan 009)
-
-The plan-008 placeholder item icons are now **real art**. `scripts/gen-icons/` generates them with
-Gemini (`gemini-2.5-flash-image`) from a **shared style preamble + per-item prompt manifest**
-(`prompts.py` — adding an item is one line), then PIL post-processes each: key out the flat
-chroma-key background → square-crop → downscale to **32×32** → optional palette quantise.
-`wood`/`stone`/`berries` are generated + committed and render in the hotbar/inventory grid.
-Generation is **gated on `GEMINI_API_KEY`** (LAN-only, pulled over Tailscale) and decoupled from the
-build — raw ~1024px generations are gitignored scratch, only the processed 32×32 PNGs are committed,
-and the game falls back to the item `color` rect if an icon is ever missing (so it always ships
-green). `--dry-run` composes prompts with no key/spend. Pipeline + "how to add an item":
-[ASSETS.md](ASSETS.md#item-icons-gemini-pipeline-plan-009) /
-[ASSET-EXPERIMENTS.md](ASSET-EXPERIMENTS.md#gemini-asset-generation-via-guppi).
-
-**Stone is a real resource:** the tree/node machinery is generalised (`woodItemId/woodPerHit` →
-`yieldItemId/yieldPerHit`, plus per-species render fields so a rock isn't sized/anchored like a pine),
-and a **rock node** (`NODES.rock`, grey boulder extracted from the pack's `Rocks` sheet) yields
-**stone** — mining reuses the chop interaction/anim. Item icons are **32×32 placeholders** this slice;
-the repeatable **Gemini icon-generation pipeline** that replaces them with real art is **plan 009**
-(gated on a LAN-only key, so the mechanic ships green on placeholders). New Tier-1 stacking tests +
-Tier-2 `mine`/`block-full` scenarios.
+Tuning: `HIT_FLASH_*` / `ZOMBIE_LUNGE_*` / `*_SHAKE_*` / `DAMAGE_VIGNETTE_*` / `DEATH_*` /
+`ATTACK_MOVE_SLOW` in `config.ts`. Still open: non-linear movement (accel/decel).
 
 ## Day/night + hunger survival slice (plan 004)
 
-A real-time **day/night cycle** (`src/systems/daynight.ts`, pure): a continuous clock drives a
-map-sized tint overlay (smooth dawn/dusk ramps, flat mid-day/night) and a queryable `day`/`night`
-phase, surfaced as a passive `Day N` HUD readout. **Night is tint + phase state only** this slice —
-no enemy waves yet (they layer on later via the same phase state).
+Real-time **day/night cycle** (`src/systems/daynight.ts`, pure): a continuous clock drives a map-sized
+tint overlay (smooth dawn/dusk ramps, flat mid-day/night) and a queryable `day`/`night` phase,
+surfaced as a passive `Day N` HUD readout. **Night is tint + phase state only** — no enemy waves yet
+(they layer on later via the same phase state).
 
-**Hunger** (`src/systems/needs.ts`, pure) drains continuously and, at zero, **cascades into
-combat-owned `playerHp`** (`damagePlayer`, plan 003) on a fixed interval — reusing combat's existing
-death/restart path rather than a second health system. A new forageable **berry bush** (`berryBush`
-node, non-blocking, `blocksPath:false`) yields **`berries`** (a first edible item, `nutrition`) via a
-new **gather** player state (`Collect_Base` strips), distinct from the chop/mine swings. A **Health &
-Wellbeing** screen (STATUS button → Panel) shows hunger/health meters, read-only player stats, and an
-**available-to-eat** list wired to a `needs:eat` event; the inventory view is unchanged, reusing plan
-008's existing panel (no throwaway "Equipped" shell — deferred to plan 010). Survival state is **not
-persisted**. New Tier-1 `daynight`/`needs` unit tests + three Tier-2 scenarios
-(`survival-{daynight,hunger,forage}`).
+**Hunger** (`src/systems/needs.ts`, pure) drains continuously and at zero cascades into combat-owned
+`playerHp` (`damagePlayer`) on a fixed interval, reusing combat's death/restart path. A forageable
+**berry bush** (`berryBush` node, `blocksPath:false`) yields **`berries`** (edible, `nutrition`) via a
+**gather** player state (`Collect_Base` strips), distinct from chop/mine. A **Health & Wellbeing**
+screen (STATUS button) shows hunger/health meters, read-only stats, and an available-to-eat list wired
+to a `needs:eat` event. Survival state is **not persisted**.
 
-## Combat hit feedback + enemy attack tell
+## Inventory + resource nodes (plan 008)
 
-Combat now *reads*. On a landed hit, both the player and a zombie **flash red and squash-"flinch"**:
-one tween over a plain `{ t }` object (1→0) drives a live **`HitFlashPipeline`** PostFX (WebGL; a
-`setTintFill` fallback on Canvas — see [render/hitFlashPipeline.ts](../src/render/hitFlashPipeline.ts) +
-docs/RENDERING.md) *and* a scale-only squash, so flash and flinch decay in lockstep and the squash
-never fights the actor's Arcade body. The skeleton ships **no attack strip**, so a zombie's bite is a
-coded **lunge** toward its target (`GameScene.zombieLungeAt`) — it moves the Arcade **body** via
-`body.reset` (a `sprite.x` tween would be stomped by physics each frame) out-and-back, only during the
-stationary contact phase, settling well inside the contact cooldown. All feedback is purely visual:
-logic stays keyed to `col`/`row`. Tuning lives in `config.ts` (`HIT_FLASH_*`, `ZOMBIE_LUNGE_*`);
-`debugState` surfaces `playerFlash` + `{player,zombie}HitFlashes`/`zombieAttacks` counters, asserted by
-two new Tier-2 `combat` scenarios (the boot canary's real-WebGL run compiles the shader as a free check).
+`Inventory` is **slot-backed** (bounded `Array<Slot>`): items **stack** to a per-item `maxStack` and
+**spill** into the next free slot; the bag can **fill up**. Surfaced as an always-visible **hotbar**
+(`src/ui/SlotGrid.ts`, hidden in combat) plus an **ITEMS**-toggled full **INVENTORY** grid Panel.
+`maxStack` is injected (`maxStackOf`) so the pure system stays data-agnostic. Harvesting into a full
+bag **blocks and aborts the order** (guarded in `beginCurrent` and `runHarvest`).
 
-## Death animations (both actors)
+Node machinery is generalised (`yieldItemId`/`yieldPerHit` + per-species render fields). A **rock node**
+(`NODES.rock`) yields **stone** (mining reuses the chop interaction/anim).
 
-Death now *plays* instead of blinking out. The player's `death` `PlayerState` (`Death_Base`, 3-way)
-and the skeleton's `Death-Sheet` (single-orientation) are wired as one-shot collapses at a slower
-`DEATH_ANIM_FRAMERATE`. A **killed zombie** leaves the AI set at once (so nothing chases/counts it) but
-its sprite lingers as a **corpse** playing the collapse, removed only after the anim + `DEATH_HOLD_MS`
-(`GameScene.killZombie`; the old path `destroy()`-ed on the same frame). **Player death** routes
-through `killPlayer`: a `playerDying` flag freezes the world (update() early-returns, further
-bites/starve ticks are swallowed) while the collapse plays, then the existing "Death = restart"
-`scene.restart()` fires on a `delayedCall`. Combat-FX/dying resets live in `resetCombatFx()` (shared by
-create() + the scenario reset). `debugState` adds `corpses` + `playerDying`; a new Tier-2 `combat`
-scenario proves the corpse is gated on the animation, and the existing `death` spec still covers the
-freeze→restart (its `'restarting'` log now lives inside `killPlayer`, so it exercises the new path).
-Tuning: `DEATH_ANIM_FRAMERATE` / `DEATH_HOLD_MS` in `config.ts`.
+## Item-icon generation pipeline (plan 009)
 
-## Combat feel: attack commitment (move-slow while swinging)
+`scripts/gen-icons/` generates real item art with Gemini (`gemini-2.5-flash-image`) from a shared
+style preamble + per-item prompt manifest (`prompts.py` — adding an item is one line), then PIL
+post-processes: chroma-key out background → square-crop → downscale to **32×32** → optional palette
+quantise. `wood`/`stone`/`berries` are generated + committed. **Gated on `GEMINI_API_KEY`** (LAN-only,
+over Tailscale) and decoupled from the build; raw ~1024px generations are gitignored, only processed
+32×32 PNGs are committed, and the game falls back to the item `color` rect if an icon is missing.
+`--dry-run` composes prompts with no key/spend. See
+[ASSETS.md](ASSETS.md#item-icons-gemini-pipeline-plan-009).
 
-First pass at making combat feel weightier: while a Punch swing is in progress (the punch-lock window)
-the player's move speed drops to `ATTACK_MOVE_SLOW` (20%) of normal, so you plant and commit to the
-swing instead of gliding through it. Implemented via `GameScene.effectiveMoveSpeed()`, applied to both
-the pathfinder (`advancePath`) and the Combat movepad. The movepad only emits on press/drag, so its
-vector is now stored (`combatMoveVec`) and re-applied each frame in `update()` — that per-frame
-re-evaluation is what lets the slow engage the instant a swing starts and release when it ends, with no
-fresh pad input. `debugState` exposes `px`/`py` (world position) so a Tier-2 `combat` scenario can prove
-a mid-swing drive covers ~20% of the ground a free drive does. (Still open on the combat-feel list:
-clearer hit reactions, and non-linear movement — accel/decel — since movement currently feels rigid.)
-
-## Combat feel: hit clarity
-
-Getting hit is now unmissable. The per-sprite reaction is stronger — brighter/longer red flash
-(`HIT_FLASH_PEAK` 0.9, `HIT_FLASH_MS` 260, brighter shader red) and a deeper squash flinch
-(`HIT_FLASH_SQUASH`) on both actors — and it's backed by a **camera kick**: a firm shake when the
-player is bitten (`PLAYER_HIT_SHAKE_*`), a light one when you land a punch (`ENEMY_HIT_SHAKE_*`). The
-big new cue is a **damage vignette**: `render/vignetteTexture.ts` bakes a red radial edge-glow (clear
-centre → red rim) once; UIScene draws it full-viewport at rest-alpha 0 and pulses it on a `player:hit`
-event GameScene emits from the bite site (`onPlayerHurt`) — a peripheral red flash reads far better
-than a tint on the screen-centred, easily-missed player sprite. Kept off the starvation drain (a
-passive tick, not an impact). Tuning: the `HIT_*` / `*_SHAKE_*` / `DAMAGE_VIGNETTE_*` block in
-`config.ts`. A Tier-2 `combat` scenario asserts a landed bite emits `player:hit`; the boot canary bakes
-the vignette clean. (Still open: non-linear movement — accel/decel — since movement still feels rigid.)
-
-## Generic monster AI + swappable weapons (plan 011)
-
-The single-behaviour kid zombie is now a **generic, data-driven monster**. A pure, unit-tested FSM
-(`src/systems/monsterAI.ts`, 13 Tier-1 tests) drives `idle`/`wander`/`patrol`/`chase` off
-radius-only aggro (`EnemyDef.vision`) and distance-only de-aggro with a "losing the scent" veer band
-near the chase-drop radius (tuning in `config.ts`'s "Monster AI tuning" block); `GameScene.updateZombies`
-just persists the FSM's `MonsterState` and moves toward its `targetTile`. New Tier-2 `monster`
-scenarios cover radius-acquire→chase, chase→give-up, and patrol waypoint cycling.
-
-Each skeleton now spawns holding a **club** (2 dmg, ~1500ms) or **knife** (1 dmg, ~750ms), rolled
-from `EnemyDef.weaponPool` (`MONSTER_WEAPONS`, `src/data/weapons.ts`) and wired to real
-damage/cadence. The weapon is held via **runtime anchor-pinning** — no baked per-frame art — synced
-every tick by the pure `weaponTransform` (`src/systems/attachment.ts`); the attack "animation" is a
-coded swing tween since the pack ships no mob attack strip. Also wired the pack's real 4-frame Idle
-bob (32px canvas, its own render footprint), so a calm, stationary zombie no longer freeze-frames on
-Run frame 0. See [ASSETS.md](ASSETS.md#weapon-attachment-runtime-pinning-plan-011) and
-[DECISIONS.md](DECISIONS.md) — this supersedes plan 010's anchor-stamp tool for rigid attachments.
-
-## GameScene OOP refactor + tooling (plan 013)
-
-`GameScene.ts` (2,448 lines) is decomposed into a `src/entities/` actor hierarchy (`Character` →
-`PlayerCharacter`/`MonsterCharacter`) and scene managers (`BuildManager`, `TaskGlowRenderer`,
-`CombatFxManager`, `PointerInputController`, `scenes/testApi.ts`) — a composition root + task loop +
-spawning/world-gen + mode/inspect glue remain (1,385 lines); no gameplay change, pinned by a new
-`refactor-tripwire` Tier-2 spec. Landed alongside the project's first lint/format/markdownlint +
-pre-commit hook tooling. See [DECISIONS.md](DECISIONS.md) (2026-07-13).
-
-## GameScene decomposition part 2 (plan 015)
-
-Extracted the 5 state-owning world subsystems (`ResourceNodeManager`/`EnemyManager`/`SurvivalClock`/
-`VisionController`/`ScenePicker`, all under `src/scenes/world/` + `fx/`/`input/`) + 2 free-fn setup
-helpers (`world/actorAnims.ts`'s `registerActorAnims`, `world/groundRenderer.ts`'s `drawGround`) out
-of `GameScene`; 1385→~877 lines. The task-loop/combat spine (order/enqueue/beginCurrent/
-completeCurrent/runHarvest/runBuild/repath, ~260 lines) is a deliberate keep, not a miss — see
-[DECISIONS.md](DECISIONS.md) (2026-07-13). No gameplay change; the `refactor-tripwire` golden
-snapshot still holds.
-
-## Buildable campfire + generalised build/palette (plan 012)
+## Buildable campfire + build palette (plans 012, 016)
 
 The wall-hardcoded build path is generalised into a build **palette** (BUILD opens a panel listing
-every `BUILDABLES` entry with cost/affordability; picking one selects it for placement) and gains its
-first non-wall buildable, the **campfire** — a base-zone-only light + vision source with continuous
-fuel drain and tap-to-feed refuelling, owned by its own `CampfireManager` per the 013/015 manager
-pattern. Tuned numbers + the full mechanic write-up: [GAME-MECHANICS.md](GAME-MECHANICS.md).
+every `BUILDABLES` entry with cost/affordability; pick one to select for placement). First non-wall
+buildable is the **campfire** — a base-zone-only light + vision source with fuel drain, owned by
+`CampfireManager` per the 013/015 manager pattern. Flame sprite **and** its light/vision radius
+**scale with fuel** (single sprite scaled) so the fire grows as fed and dims as it burns down.
+Refuelling is a **queued worker order** (`refuel` Action): tap the fire, worker walks over and tends
+it one wood at a time, self-terminating when topped up or out of wood. A tap on the fire always
+resolves to `refuel` (column-hit-tested over its whole tile stack). Tuned numbers:
+[GAME-MECHANICS.md](GAME-MECHANICS.md).
 
-## Campfire fuel-scaled flame/light + queueable refuel (plan 016)
+## Rendering (art, glow, crisp actors)
 
-Post-playtest fix pass on the campfire. The flame sprite **and** its light/vision radius now **scale
-with fuel** (a single consistent sprite scaled — the Bonfire_0x sheets aren't a clean intensity ramp),
-so the fire visibly grows as you feed it and shrinks + dims as it burns down. Refuelling is now a
-**queued worker order** (`refuel` Action) — tap the fire and the worker walks over and tends it one
-wood at a time with the yellow queued outline, self-terminating when topped up or out of wood — instead
-of the old instant tap-to-feed. A tap on the fire always resolves to `refuel` (column-hit-tested over
-its whole tile stack), so it can no longer fall through to a move that walks the worker into the
-blocking fire tile. Details: [GAME-MECHANICS.md](GAME-MECHANICS.md).
+- **Active art is Pixel Crawler** (plan 005): `ACTIVE_TILESET` in `src/data/tileset.ts`; the Zombie
+  Apocalypse pack is retired to reference-only. A Skeleton (Base) sprite stands in for the kid zombie;
+  player has 3-way directional facing, enemy flips by movement-x. Real 4-frame Idle bob wired
+  (plan 011). See [ASSETS.md](ASSETS.md).
+- **Baked glow, not shaders:** queued trees wear a **baked** halo texture (`src/render/glowTexture.ts`)
+  behind the tree, head-of-queue pulses via an alpha tween — same on WebGL and Canvas, no per-frame
+  shader. Replaced the retired plan-006 `OutlinePipeline`. See [RENDERING.md](RENDERING.md).
+- **Ground bake:** baked into one `RenderTexture` in a single batched `beginDraw…endDraw` pass to kill
+  fractional-zoom tile-seam bleed.
+- **Crisp actors at every zoom:** actors render at native `render.scale = 1`, camera zoom integer-only
+  (`ZOOM_STEP = 1`; `setZoom` rounds). See [RENDERING.md](RENDERING.md) ("Pixel-art scale must be
+  integer").
+- Player **chop** (Slice) + **punch** (Crush) directional swings; workers act from a resource's **base**
+  tile and **face** the target (`faceTile`, `TREE_BASE_STAND_OFFSETS`). `TREE_TILES_TALL` = 5.
 
-## Editor: tabbed central pane + object-editor tab (plan 017)
+## Menu / UI kit
 
-The Map Builder's central pane became a **tabbed container**: a permanent Map (and placeholder World)
-tab plus on-demand, closable **object-editor tabs** (one per asset, opened from the Library's ⚙). The
-always-mounted Phaser canvas survives tab switches (panels hide via `visibility`, never `display`), and
-global shortcuts (undo/redo/Delete/nudge) are gated to the Map tab. The object-editor tab hosts the
-reclassify UI — type dropdown, grid fields, and a **correctly cropped per-frame preview** (fixing the
-old squished multi-row swatch) — and, for `object` sheets, a **manual region editor** (draw / select /
-move+resize / grid-slice) that writes `pack.json` `regions` so tightly-packed atlases the
-connected-component detector can't split (e.g. Farm.png's touching crop rows) can be separated by hand.
-**Animated-strip authoring** (step 6) then **decoupled grid geometry from the played frame set**: a
-strip is authored as free **Columns × Rows** with arbitrary per-cell **omission** (`omit`), so a sheet
-like the 2×11 Alchemy table (22 cells, blank last cell) plays its 21 real frames. This step reached
-**game-runtime code** — `DecorAnim`/`parseDecorAnim` (`mapFormat.ts`) and the decor renderer
-(`decorSprites.ts`, which folds `frames`+`omit` into the anim cache key) — unlike the editor-only rest
-of the plan; existing catalog data and strip overrides regenerate byte-for-byte (backward-compatible).
+Menu UI stays in Phaser (no DOM overlay), on a Container-based UI kit (`src/ui/`: `Button`, `Panel`,
+`arrangeRow/Column/Grid`, shared `theme`). The HUD (`UIScene`) and build/inventory panels are built
+from these primitives. Rationale in [DECISIONS.md](DECISIONS.md) (2026-07-12).
 
-## Runtime map loader — boots into an authored map (plan 018)
+## GameScene decomposition (plans 013, 015)
 
-The game no longer generates its world procedurally: it **boots straight into one authored map**
-(`START_MAP_ID`, currently `test`). `PreloadScene` loads the map file + its textures, then
-`GameScene.buildWorld()` bakes the authored tile layers (`drawMapLayers`), renders decor
-(`DecorManager`), hydrates resource nodes from authored `node` objects (`loadNodes`), and derives
-camera/physics bounds + a spawn-anchored base zone from the map's geometry. Map loading lives in
-`src/systems/mapRuntime.ts` (eager manifest/world + lazy per-map chunks via `import.meta.glob`);
-walkability composites the map's authored cells under runtime obstacles. Enemies stay procedural;
-portals are parsed-and-held (no transitions yet). The old procedural `drawGround`/`spawnTrees` path
-and the fixed `MAP_WIDTH`/`MAP_HEIGHT`/`BASE_ZONE` consts are gone. **Temp:** hunger is non-lethal
-(`HUNGER_LETHAL=false`) until the start map carries authored food. Adjacent-ring streaming is
-[plan 019](../plans/019-l1-map-streaming.md).
+`GameScene.ts` (was 2,448 lines, now ~877) is decomposed into a `src/entities/` actor hierarchy
+(`Character` → `PlayerCharacter`/`MonsterCharacter`) and scene managers: `BuildManager`,
+`TaskGlowRenderer`, `CombatFxManager`, `PointerInputController`, `scenes/testApi.ts` (plan 013); plus
+5 state-owning world subsystems `ResourceNodeManager`/`EnemyManager`/`SurvivalClock`/`VisionController`/
+`ScenePicker` (under `src/scenes/world/` + `fx/`/`input/`) and free-fn setup helpers `registerActorAnims`
+(`world/actorAnims.ts`) + `drawGround` (`world/groundRenderer.ts`) (plan 015). The task-loop/combat
+spine (~260 lines) is a deliberate keep. No gameplay change; pinned by the `refactor-tripwire` Tier-2
+golden snapshot. Landed alongside the project's first lint/format/markdownlint + pre-commit tooling.
+See [DECISIONS.md](DECISIONS.md) (2026-07-13).
 
-## Map Builder — dev-only in-repo map editor (plan 014)
+## Test harness (plan 007)
+
+Three tiers: **Tier 1** Vitest unit tests over pure systems + data (`npm test`, plain Node); **Tier 2**
+deterministic Playwright scenarios (`npm run e2e`) driven by a DEV-only `window.game.__test`
+scenario/fixed-step API on `GameScene` (`applyScenario` builds a known world from a declarative spec;
+`step(ms)` advances gameplay with zero wall-clock); **Tier 3** a thin boot canary (`npm run smoke`;
+its real-WebGL run compiles the shaders as a free check). Two-speed dev loop (`npm run test:watch`
+inner, full sweep at wrap-up) — see [WORKFLOW.md](WORKFLOW.md).
+
+## Map Builder — dev-only editor (plans 014, 017)
 
 A React-chrome-over-Phaser map editor (`editor.html` → `src/editor/`, excluded from the prod build)
 for authoring the custom-JSON maps the runtime loader (plan 018) consumes. Paints tile layers, an
-**autotile terrain brush** (8-neighbour blob logic ported from `autotile.py` → `src/systems/autotile.ts`),
-places/transforms scenery (region-cropped atlas sprites + animated strips), paints walkability, zones,
-and the irregular **shape mask**; undo/redo throughout. A **World tab** positions maps in one global
-tile coordinate space (`world.json`); exports a 1px-per-tile thumbnail per map. Saves via a dev-only
-Vite middleware that regenerates `manifest.json`. The map/world **file format + validators** are pure
-modules (`src/systems/mapFormat.ts` / `worldLayout.ts`), reused by both editor and game; the game
-consumes maps through the lazy `mapRuntime.ts` registry. Zones have a runtime read path
-(`src/systems/mapZones.ts` `zoneAt`, exposed on `GameScene` + the `__test` seam), a CI world-integrity
-test (`src/data/maps/__tests__/world.test.ts`), and a placeholder `MapConnections` type. Full detail:
-[EDITOR.md](EDITOR.md); how-to for packs/catalog: [ASSETS.md](ASSETS.md). **Still to author:** the
-test-content maps that exercise every feature end-to-end (plan 014 step 12) — which is what unblocks
+**autotile terrain brush** (8-neighbour blob logic, `src/systems/autotile.ts`), scenery (region-cropped
+atlas sprites + animated strips), walkability, zones, and an irregular **shape mask**; undo/redo
+throughout. A **World tab** positions maps in one global tile coordinate space (`world.json`) and
+exports a 1px-per-tile thumbnail per map. Saves via a dev-only Vite middleware that regenerates
+`manifest.json`. The map/world **file format + validators** are pure modules (`src/systems/mapFormat.ts`
+/ `worldLayout.ts`), reused by editor and game. Zones have a runtime read path
+(`src/systems/mapZones.ts` `zoneAt`) and a CI world-integrity test
+(`src/data/maps/__tests__/world.test.ts`). Full detail: [EDITOR.md](EDITOR.md).
+
+**Tabbed central pane (plan 017):** the central pane is a tabbed container — a permanent Map (and
+placeholder World) tab plus on-demand, closable **object-editor tabs** (one per asset, from the
+Library's ⚙); the Phaser canvas survives tab switches (panels hide via `visibility`), global shortcuts
+gated to the Map tab. The object-editor tab hosts the reclassify UI (type dropdown, grid fields,
+per-frame preview) and, for `object` sheets, a **manual region editor** (draw / select / move+resize /
+grid-slice) writing `pack.json` `regions` to split tightly-packed atlases the connected-component
+detector can't. **Animated-strip authoring** decouples grid geometry from the played frame set: strips
+are authored as free **Columns × Rows** with per-cell **omission** (`omit`) — reaching game-runtime
+code via `DecorAnim`/`parseDecorAnim` (`mapFormat.ts`) and the decor renderer (`decorSprites.ts`,
+folding `frames`+`omit` into the anim cache key).
+
+## Runtime map loader (plan 018)
+
+The game **boots straight into one authored map** (`START_MAP_ID`, currently `test`) — no procedural
+world gen. `PreloadScene` loads the map file + textures; `GameScene.buildWorld()` bakes authored tile
+layers (`drawMapLayers`), renders decor (`DecorManager`), hydrates resource nodes from authored `node`
+objects (`loadNodes`), and derives camera/physics bounds + a spawn-anchored base zone from the map
+geometry. Map loading lives in `src/systems/mapRuntime.ts` (eager manifest/world + lazy per-map chunks
+via `import.meta.glob`); walkability composites authored cells under runtime obstacles. Enemies stay
+procedural; portals are parsed-and-held (no transitions yet). The old procedural
+`drawGround`/`spawnTrees` path and fixed `MAP_WIDTH`/`MAP_HEIGHT`/`BASE_ZONE` consts are gone.
+
+**Temp:** hunger is non-lethal (`HUNGER_LETHAL=false`) until the start map carries authored food.
+Adjacent-ring streaming is [plan 019](../plans/019-l1-map-streaming.md). **Still to author:** the
+test-content maps that exercise every feature end-to-end (plan 014 step 12) — which unblocks
 re-enabling lethal hunger and plan 019's second placement.

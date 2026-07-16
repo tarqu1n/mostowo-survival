@@ -1,0 +1,189 @@
+# Gameplay decisions
+
+Combat/hurtbox, campfire, day/night + hunger, monster AI, input modes, and worker/action behaviour.
+
+Part of the [decision log index](../DECISIONS.md). Newest first.
+
+---
+
+## 2026-07-14 — [DECIDED] Campfire fixes (plan 016): refuel is a worker order, flame scales (not sheet-swaps), outline is a rect
+
+Post-playtest fixes to the plan-012 campfire. Four boundary calls (advisor-consulted before build):
+
+- **Refuel is a queued `refuel` worker order, not an instant tap.** Tapping the fire enqueues an order
+  (walk adjacent → tend one wood per `CAMPFIRE_FEED_INTERVAL_MS`), mirroring harvest, with the yellow
+  queued outline and toggle-off-on-re-tap. Chosen over the old instant tap-to-feed so refuelling reads
+  as work (and shares the task-queue spine). The order self-terminates on *conditions* (topped up: a
+  full wood won't fit; or bag empty) since a fire persists — never on entity death.
+- **Tap→action resolves in `ScenePicker.actionAt` (campfire → `refuel`), and the fire is column-hit-
+  tested over its whole tile stack.** This structurally kills the "tap falls through to a move and the
+  worker walks into the blocking fire tile" bug — a tap on the fire can never become a move — and the
+  column test keeps it tappable regardless of the flickering flame's opaque pixels.
+- **Flame grows/shrinks by SCALING one consistent sprite, not swapping the Bonfire_0x sheets.** Those
+  sheets aren't a clean embers→roaring ramp (01/02/04 are braziers, 06/08 bare flames), so swapping
+  them morphs the fire's *structure*. One sprite (Bonfire_07) scaled by `fuelFrac` reads coherently.
+  The advisor's original objections to scaling (alpha-pick instability, glow re-sync) don't apply here
+  because picking is column-based and the outline is a rect, not a sprite-following glow.
+- **Queued outline is a stroked rect, not a baked-glow silhouette like queued trees.** `bakeGlowTexture`
+  reads the whole multi-frame sheet (a 4-tile-wide smear) and the fire animates/scales — a rect over
+  the tile column matches the queued-*site* style with none of that. The tree's soft glow was **not**
+  reused for the fire.
+
+**Deferred (logged, not done):** a general path-stall watchdog in `advancePath` — a move order beside
+any wall can still corner-cut into a static collider and stall. Refuel removes the campfire trigger;
+the general fix (no waypoint progress for N ms → repath/complete) is out of scope for plan 016.
+
+## 2026-07-13 — [DECIDED] Buildable campfire + generalised build/palette (plan 012): four boundary calls
+
+- **Base zone is a fixed rect for now.** `BASE_ZONE` (`config.ts`) is a hardcoded tile rectangle,
+  explicitly a placeholder — expected to move to a dynamic/player-claimed base later.
+- **Buildable selection via a build palette**, chosen over a cycle-through-buildables control or a
+  dedicated button per buildable — scales cleanly as more buildables are added, and reuses the
+  existing UI kit (`Panel`/`Button`/`arrangeColumn`).
+- **Campfires get their own `CampfireManager`**, per the 013/015 world-manager pattern (a built
+  campfire is a live, per-frame-simulated object — fuel drain, lit flips — not a placement-lifecycle
+  concern like `BuildManager`). Lighting is wired via a single scene-mediated `lightSources()` closure
+  (renamed from `litCampfires()` — see the de-ossification entry above) handed to both `SurvivalClock`
+  (night-overlay mask) and `VisionController` (fog reveal) — no manager↔manager edge.
+- **Enemy fog-gating is deferred** to the night-waves plan. This plan's "reveal" is purely the
+  night-overlay hole the lit campfire cuts — enemies aren't vision-gated at all today (only the
+  player is), so nothing new is hidden/shown about them.
+
+Full mechanic write-up: [GAME-MECHANICS.md](../GAME-MECHANICS.md).
+
+## 2026-07-12 — [DECIDED] Generic monster AI (pure FSM) + weapons via runtime anchor-pinning — supersedes plan 010's stamp tool for rigid slots (plan 011)
+
+Turned the single-behaviour kid zombie into a data-driven monster, in two parts.
+
+**AI** is a pure, unit-tested FSM (`src/systems/monsterAI.ts`: `stepMonster`) with four modes —
+`idle`/`wander`/`patrol`/`chase` — driven by **radius-only aggro** (`EnemyDef.vision`, no
+line-of-sight/wall occlusion) and **distance-only de-aggro** (no timeout): past
+`MONSTER_CHASE_DROP_RADIUS_PX` the monster gives up, with a "losing the scent" **veer band** just
+inside that radius (`MONSTER_VEER_BAND_PX`/`MONSTER_VEER_MAX_TILES`) that injects growing path noise
+as the chase gets marginal, rather than a hard binary snap. `wander` = aimless roam with pauses
+(`MONSTER_WANDER_RADIUS_TILES`/`MONSTER_IDLE_MS_MIN/MAX`); `patrol` = a fixed route with a pause at
+each waypoint (`MONSTER_PATROL_PAUSE_MS`) — real content authoring a route is future work,
+test/scenario-only for now. Zero Phaser imports in the FSM; `GameScene` just persists the returned
+`.mode`/`targetTile`/`repath` onto each zombie.
+
+**Weapons** are held via **runtime anchor-pinning**, not baked per-frame strips — the live pilot of
+plan 010's own critique finding #3 (which floated pinning a single icon at runtime instead of
+committing 26-frame stamped strips). An `AttachPoint {x,y,rot?}` per animation frame lives on
+`StripAnim.anchors.mainHand` (co-located with the strip it's relative to); the pure
+`weaponTransform` (`src/systems/attachment.ts`) resolves it through the strip's render footprint
+into a world offset **every tick** — not on `animationupdate`, since lunge/veer tweens slide the
+sprite between frame changes. One weapon sprite is pinned per monster and swapped/randomised at zero
+art cost; the attack "animation" is a coded tween swing (rotate about the grip) since the pack ships
+no mob attack strip. Each skeleton spawns with a **club** (2 dmg, ~1500ms) or **knife** (1 dmg,
+~750ms) rolled from `EnemyDef.weaponPool`, stats owned solely by `src/data/weapons.ts`
+(`MONSTER_WEAPONS`) — art (source/pivot/z) stays in the manifest, joined by a shared id, the same
+art-vs-gameplay split the codebase already uses elsewhere.
+
+**Supersedes, not merely diverges from, plan 010's anchor-stamp tool + rigid-slot baked strips**
+(its critique findings #2/#3): runtime pinning is now the chosen path for *rigid* attachments
+generally — the monster weapon today, and 010's player rigid slots (helmet/mainHand/offHand) later.
+The stamp-and-bake tool and per-frame committed strips for rigid slots are now **redundant**; only
+010's **deformable `chest`/`legs`** (cloth/mail that must bend with the body) still need
+matching-pack or hand-drawn strips, since a pinned rigid icon can't deform. The two approaches
+deliberately **share their low-level primitives** (`AttachPoint`, `weaponTransform`), so 010's rigid
+slots can adopt pinning later as a **refactor**, not a rewrite. `plans/010-layered-equipment-system.md`'s
+header is updated to record this so a future session doesn't resume the dead stamp tool.
+
+## 2026-07-12 — [DECIDED] Day/night + hunger survival slice (plan 004): real-time cycle, hunger→health cascade, inventory reuse defers "Equipped"
+
+**Day/night** is a continuous real-time clock (not tied to player action), driving a smooth tint
+overlay + a queryable phase. **Night this slice is tint + phase state only** — no enemy waves; waves
+layer on later off the same phase state, so the clock doesn't need revisiting when they land.
+
+**Hunger** is a core ticking pressure (Don't-Starve-style) that, at zero, drains **combat-owned
+`playerHp`** via plan 003's `damagePlayer` rather than a parallel health system — starvation death
+reuses the existing scene-restart path for free. **Survival state (hunger/clock/phase) is not
+persisted** — resets on every restart/reload, consistent with there being no save system yet.
+
+**Eating happens via the Health & Wellbeing screen**, which also surfaces read-only player stats — a
+deliberate superset of the design doc's "meters + eat list." **The inventory view is unchanged**,
+reusing plan 008's existing panel/hotbar; the "Equipped" section from the original design sketch is
+**deferred entirely to plan 010** rather than shipping a throwaway shell now.
+
+**Bushes forage, trees/rocks chop/mine:** a new `gather` player state (`Collect_Base` strips) plays
+for berry bushes, distinct from the existing chop/mine swings. `ResourceNodeDef` gained a required
+`blocksPath` flag (bushes: `false`, non-blocking — the worker routes through and forages from an
+adjacent tile; trees/rocks stay blocking) so build-placement and pathing gate on data, not a
+tile-role special case.
+
+## 2026-07-12 — [DECIDED] Data-driven hurtbox (footprint ≠ hurtbox); world props sized to the actor
+
+Follow-on from the native-scale decision below. With the character now ~2 tiles tall, two problems
+surfaced: (1) it dwarfed the trees, and (2) tall sprites + single-tile hit-testing meant you could be
+next to an enemy's *drawn* torso yet whiff, because targeting only matched its feet tile.
+
+**Decided:** separate a creature's **footprint** (movement/occupancy — always the single feet tile,
+unchanged) from its **hurtbox** (combat targeting — a data-driven tile extent). `Hurtbox { width,
+height }` on `CombatantStats` (`src/data/types.ts`), anchored at the feet tile, centred horizontally
+and rising upward to match the drawn silhouette; pure helpers in `src/systems/hurtbox.ts`
+(`hurtboxContains`/`hurtboxTiles`, `DEFAULT_HURTBOX = {1,1}`). Player and kid-zombie both declare
+`{1,2}`. Consumed by `GameScene.zombieAt` (Punch + Inspect hit-tests) and by contact damage (a zombie
+in melee reach of any player-body tile connects). For a `{1,1}` hurtbox every path reduces to the old
+exact-tile behaviour, so it's a clean generalisation. Chosen over hardcoding "+1 tile" so future large
+(`{2,3}` ogre) or small (`{1,1}` critter) monsters just declare their size — no targeting-code change.
+
+Also bumped `TREE_TILES_TALL` 2.6 → 5 so a pine towers over the ~2-tile character (scaling the *world*
+up, never the crisp actor down). Rule captured in [CONVENTIONS.md](../CONVENTIONS.md) ("Footprint vs
+hurtbox"). Verified: 8 new Tier-1 hurtbox unit tests + a Tier-2 "punch the overhang tile" regression.
+
+## 2026-07-12 — [DECIDED] Workers chop/build from a resource's base tile, facing the target
+
+Harvest prefers a *base* stand tile (the trunk row + the row below — `TREE_BASE_STAND_OFFSETS`; never
+the canopy tiles directly above), falling back to any reachable adjacent tile if the base is walled
+off. While working in place the worker turns to face the target (`faceTile`), so the chop/build swing
+points at the tree/blueprint regardless of approach direction or a stale facing. Fixes: (a) chopping
+from a canopy tile ~2 squares above the trunk, and (b) chopping while facing away when already stood
+next to the tree. `reachableAdjacent` gained an optional candidate-offsets arg for (a). Rationale: a
+tall sprite (2.6-tile pine) overhangs upward but only blocks its trunk tile, so "any adjacent" read
+wrong — the base is where you'd actually chop. (Answers "do interactables need a target coordinate?":
+yes, in effect — encode where the worker stands + which way it faces, per resource.)
+
+## 2026-07-12 — [DECIDED] Player action swings: chop = Slice, punch = Crush (reskinnable stand-ins)
+
+The player now plays directional action animations: **chop** = Pixel Crawler `Slice_Base` (loops
+while felling in place), **punch** = `Crush_Base` (one-shot per Punch press). Wired as two extra
+`PlayerState`s (`chop`/`punch`) alongside `idle`/`walk`, sharing the same `playerAnimKey`/render
+footprint; action swings run at `ACTION_ANIM_FRAMERATE` (20 fps ⇒ ≈ one chop per `CHOP_INTERVAL_MS`).
+A one-shot punch owns the sprite via a `punchLockUntil` time-gate in `updatePlayerAnim`; the swing
+fires on every press (even a whiff) so input always feels heard. Rationale: the Body_A rig ships no
+literal chop/punch strip, so Slice (axe-like side swing) and Crush (overhead smash) are the closest
+melee motions — consistent with the plan-005 "fantasy mobs/actions as reskinnable stand-ins" stance.
+The Skeleton mob has no attack strip (Idle/Run/Death only), so the enemy side of "fighting" is still
+just contact damage with no dedicated attack pose — a future add.
+
+## 2026-07-11 — [DECIDED] Object inspection scope: trees + walls only, no new placeholder entity
+
+Inspect mode (plan 003) covers trees, walls, zombies, and the player — no new crate/box entity was
+added just to have a third kind of inspectable object. Rationale: nothing in the game creates such
+an entity yet; adding one purely for the inspector would be speculative scaffolding.
+
+## 2026-07-11 — [DECIDED] Tap-on-entity resolution: a dedicated Inspect mode, not tap/long-press overload
+
+Viewing an entity's stats is a distinct HUD-toggled mode (tap anything while in Inspect mode), not
+an overload of Command mode's existing tap (act now) / long-press (queue) semantics. Rationale:
+Command-mode tap behaviour needed to stay exactly as-is (trees/build-sites/move), and overloading a
+third meaning onto the same gesture would make it ambiguous which one fires.
+
+## 2026-07-11 — [DECIDED] Three mutually-exclusive input modes: Command / Combat / Inspect
+
+One HUD toggle pair switches between **Command** (default tap-to-pathfind, unchanged), **Combat**
+(virtual movepad + Punch button, direct real-time control, bypasses the pathfinder/task queue), and
+**Inspect** (tap anything for a stats panel, issues no commands). Only one non-Command mode is
+active at a time; toggling one on flips the other off. Rationale: Combat's direct real-time control
+and Command's tap-to-pathfind are fundamentally different input schemes that shouldn't both be live
+at once — letting both interpret the same tap would fight over the player's movement.
+
+## 2026-07-11 — [DECIDED] Premise & core loop: zombie apocalypse at Mostowo, day/night cycle
+
+Camping at Mostowo when a zombie apocalypse hits (intro short story). Four pillars: base building,
+survival, crafting, base defense. **Day** = scavenge camp/forest/surroundings for resources;
+**base phase** = fortify (walls/traps), craft, unlock crafting stations; **night** = zombie animals,
+humans, creatures come through the map. **Enemies are roaming (don't attack unless aggro'd) or
+attacking** — this deliberately punishes staying out at night and makes "get home and defend" the
+correct play. Full detail in GAME-DESIGN.md. Rationale: gives the day/night cycle real risk/reward
+teeth and a clear emotional arc each cycle.
