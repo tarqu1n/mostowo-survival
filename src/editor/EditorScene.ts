@@ -1614,7 +1614,20 @@ export class EditorScene extends Phaser.Scene {
     // Multi-touch arbitration (plan 027 step 3): track touch pointers; the moment two are down the
     // camera gesture owns the interaction and no tool fires. A mouse pointer is `wasTouch === false`,
     // never tracked here, so it can never reach two — desktop input is unchanged.
-    if (pointer.wasTouch) this.touchIdsDown.add(pointer.id);
+    if (pointer.wasTouch) {
+      // Self-heal against a stranded phantom finger (see `liveTouchCount`): if the browser reports at
+      // most one finger physically down as this tap lands, we cannot be in a multi-touch gesture, so
+      // any lingering tracking is stale — drop it before counting. Without this, a `touchend` swallowed
+      // by the closing Library/Inspector drawer leaves a phantom that makes the very next single tap
+      // register as a two-finger pinch, jamming the editor in zoom mode. `null` (unknown source event)
+      // leaves state untouched, preserving today's behaviour where the count can't be read.
+      const live = EditorScene.liveTouchCount(pointer);
+      if (live !== null && live <= 1) {
+        this.touchIdsDown.clear();
+        this.gesture = null;
+      }
+      this.touchIdsDown.add(pointer.id);
+    }
     if (this.gesture || this.touchIdsDown.size >= 2) {
       this.beginGesture(); // (re)snapshot the pinch baseline; cancels any in-progress tool
       return;
@@ -1995,7 +2008,14 @@ export class EditorScene extends Phaser.Scene {
 
   private handlePointerUp(pointer: Phaser.Input.Pointer): void {
     const wasTouch = pointer.wasTouch;
-    if (wasTouch) this.touchIdsDown.delete(pointer.id);
+    if (wasTouch) {
+      this.touchIdsDown.delete(pointer.id);
+      // When the browser reports no fingers left, drop any phantom id whose own release was swallowed
+      // while this (real) finger's release did come through. Only the SET is cleared here — the gesture
+      // teardown below then sees size 0 and ends the gesture WITHOUT dispatching a tool release (which
+      // is the correct end-of-pinch behaviour; nulling the gesture here would misroute it into a paint).
+      if (EditorScene.liveTouchCount(pointer) === 0) this.touchIdsDown.clear();
+    }
     if (this.gesture) {
       // A finger lifted mid-gesture: if two are still down, re-seat the baseline so the remaining
       // pair continues without a jump; otherwise the gesture ends. The still-down finger fires no new
@@ -2132,6 +2152,19 @@ export class EditorScene extends Phaser.Scene {
   private static pointerAlt(pointer: Phaser.Input.Pointer): boolean {
     const ev = pointer.event as { altKey?: boolean } | undefined;
     return ev?.altKey === true;
+  }
+
+  /** Fingers PHYSICALLY on the screen right now, read from the triggering native `TouchEvent.touches`
+   *  (the browser's authoritative live list), or `null` when the source event isn't a touch event so
+   *  the count is unknown. This is the only trustworthy finger count: our own `touchIdsDown` set (and
+   *  even Phaser's `pointer.isDown`) desync when a modal DOM overlay swallows a release — a Radix Sheet
+   *  such as the Library drawer calls `preventDefault()` on the closing tap's `touchend`, so Phaser's
+   *  window listener bails (`!event.defaultPrevented`) and never marks that finger up. That stranded
+   *  phantom is what jams the editor in pinch-zoom (a later single tap counts as "two fingers"). Reading
+   *  the real `touches` list side-steps every missed/prevented end event. */
+  private static liveTouchCount(pointer: Phaser.Input.Pointer): number | null {
+    const ev = pointer.event as Event | undefined;
+    return ev && 'touches' in ev ? (ev as TouchEvent).touches.length : null;
   }
 
   /** The idle (non-drag) cursor for the active tool: the eyedropper pipette when the `eyedropper`
