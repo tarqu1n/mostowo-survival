@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useDefaultLayout } from 'react-resizable-panels';
-import { PanelLeftOpen, PanelRightOpen } from 'lucide-react';
 import { TILE_SIZE } from '../config';
 import { cn } from './lib/utils';
 import { useIsCompact } from './hooks/useIsCompact';
@@ -392,23 +391,6 @@ export function EditorApp() {
               <div className="relative min-h-0 w-full flex-1">
                 <CenterPane />
 
-                <button
-                  type="button"
-                  aria-label="Open Library"
-                  className="absolute top-1/2 left-0 z-10 -translate-y-1/2 rounded-r-md border border-l-0 border-surface bg-raised/90 px-1 py-4 text-fg-muted shadow-md hover:text-fg-bright"
-                  onClick={() => setLibraryOpen(true)}
-                >
-                  <PanelLeftOpen className="size-5" />
-                </button>
-                <button
-                  type="button"
-                  aria-label="Open Inspector"
-                  className="absolute top-1/2 right-0 z-10 -translate-y-1/2 rounded-l-md border border-r-0 border-surface bg-raised/90 px-1 py-4 text-fg-muted shadow-md hover:text-fg-bright"
-                  onClick={() => setInspectorOpen(true)}
-                >
-                  <PanelRightOpen className="size-5" />
-                </button>
-
                 <Sheet open={libraryOpen} onOpenChange={setLibraryOpen}>
                   {/* Full-width: the drawer is a modal picker, not a persistent panel — trading canvas
                       visibility for touch-friendly tap targets is the explicit ask (plan 030 Step 5). */}
@@ -439,7 +421,10 @@ export function EditorApp() {
                 </Sheet>
               </div>
 
-              <ContextBar />
+              <ContextBar
+                onOpenLibrary={() => setLibraryOpen(true)}
+                onOpenInspector={() => setInspectorOpen(true)}
+              />
             </div>
           ) : (
             // ── Desktop shell: today's exact layout — Library ↔ centre resizable split (persisted via
