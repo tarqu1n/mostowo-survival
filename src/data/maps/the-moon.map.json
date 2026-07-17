@@ -2532,37 +2532,6 @@
       "row": 157
     },
     {
-      "id": "node_0006",
-      "kind": "node",
-      "ref": "rock",
-      "col": 115,
-      "row": 157,
-      "skin": "skin"
-    },
-    {
-      "id": "node_0007",
-      "kind": "node",
-      "ref": "rock",
-      "col": 118,
-      "row": 157
-    },
-    {
-      "id": "node_0008",
-      "kind": "node",
-      "ref": "rock",
-      "col": 118,
-      "row": 158,
-      "skin": "skin_2"
-    },
-    {
-      "id": "node_0009",
-      "kind": "node",
-      "ref": "rock",
-      "col": 116,
-      "row": 158,
-      "skin": "skin_3"
-    },
-    {
       "id": "decor_0024",
       "kind": "decor",
       "asset": "craftpix-nature/Bushes/Fern2_1.png",
