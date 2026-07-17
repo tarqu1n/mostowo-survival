@@ -284,7 +284,7 @@ export function ContextBar({
               variant="outline"
               size="icon-lg"
               aria-label="Zoom out"
-              title="Zoom out (also: pinch, or scroll-wheel down)"
+              title="Zoom out"
               onClick={() => st().zoomViewport?.(-1)}
             >
               <ZoomOut />
@@ -293,7 +293,7 @@ export function ContextBar({
               variant="outline"
               size="icon-lg"
               aria-label="Zoom in"
-              title="Zoom in (also: pinch, or scroll-wheel up)"
+              title="Zoom in"
               onClick={() => st().zoomViewport?.(1)}
             >
               <ZoomIn />
