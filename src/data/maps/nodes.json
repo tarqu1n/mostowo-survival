@@ -156,6 +156,14 @@
           "depleted": {
             "asset": "craftpix-nature/Rocks/Rock1_5_no_shadow.png"
           }
+        },
+        {
+          "id": "skin_2",
+          "asset": "craftpix-nature/Rocks/Rock1_3_no_shadow.png",
+          "weight": 1,
+          "depleted": {
+            "asset": "craftpix-nature/Rocks/Rock1_5_no_shadow.png"
+          }
         }
       ]
     },
