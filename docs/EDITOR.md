@@ -35,8 +35,9 @@ bindings here).
 ## Touch / mobile (plan 027)
 
 > **Actually running it on a phone?** See [MOBILE-EDITOR-ACCESS.md](MOBILE-EDITOR-ACCESS.md) —
-> how to reach the editor from your phone during a cloud Claude session (Tailscale node +
-> `scripts/phone-editor.sh`), plus the save-often contract for the ephemeral container.
+> it's hosted on guppi over Tailscale (just open the URL), plus how autosave reaches GitHub, the
+> git-conflict playbook when a phone Claude Code session also touches `master`, and the
+> cloud-container fallback.
 
 Below a compact breakpoint (`src/editor/hooks/useIsCompact.ts`,
 `(max-width: 960px), (pointer: coarse) and (max-width: 1200px)`) the shell goes full-bleed: Library

@@ -22,7 +22,7 @@ surface stays lean — load the one leaf a task needs, not the whole set.
 - [WORKFLOW.md](WORKFLOW.md) — run / build / deploy commands, Hermes skills, review gates
 - [testing.md](testing.md) — three-tier harness, scenario API, boot determinism, how to add a test
 - [EDITOR.md](EDITOR.md) — dev-only Map Builder (`npm run editor`): panes, tools, map/world file format, persistence contract
-- [MOBILE-EDITOR-ACCESS.md](MOBILE-EDITOR-ACCESS.md) — reach the editor **from your phone** during a cloud Claude session (Tailscale node + [`scripts/phone-editor.sh`](../scripts/phone-editor.sh); why tunnels don't work there; autosave-commit + save-often contract)
+- [MOBILE-EDITOR-ACCESS.md](MOBILE-EDITOR-ACCESS.md) — working on the game **from your phone**: the editor hosted on guppi over Tailscale, how autosave reaches GitHub, the **git-conflict playbook** (editor clone vs a phone Claude Code clone both on `master`), and the cloud-container fallback ([`scripts/phone-editor.sh`](../scripts/phone-editor.sh))
 
 ## Art & assets pipeline
 
