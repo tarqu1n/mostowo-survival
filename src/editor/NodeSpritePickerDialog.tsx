@@ -19,7 +19,9 @@ import { useIsCompact } from './hooks/useIsCompact';
  * identically to a placed decor object with the same asset+region.
  *
  * Two steps, mirroring the Library's own two-shape split (step 7b):
- *  1. A searchable thumbnail grid of every catalog asset. Clicking an asset with NO detected
+ *  1. A searchable thumbnail grid of catalog assets — `role:'actor'` sprites (creatures/NPCs) are
+ *     hidden by default (a node's sprite is object-ish decor, not a character), behind an "Actors"
+ *     toggle, mirroring the Library palette's actor-hiding (plan 032). Clicking an asset with NO detected
  *     `regions` picks it immediately (whole image, no crop) — matches `AssetCard`'s behaviour.
  *  2. Clicking an asset WITH `regions` (an atlas sheet, e.g. `Rocks.png`) drills into a region step:
  *     the whole sheet at a fixed fit-to-width scale with each region as a clickable hotspot — mirrors
@@ -50,27 +52,34 @@ export function NodeSpritePickerDialog({
 }) {
   const isCompact = useIsCompact();
   const [search, setSearch] = useState('');
+  const [showActors, setShowActors] = useState(false);
   const [drillInto, setDrillInto] = useState<CatalogAsset | null>(null);
 
-  // Reset transient state whenever the dialog closes, so reopening it always starts fresh.
+  // Reset transient state whenever the dialog closes, so reopening it always starts fresh (actors
+  // hidden again).
   useEffect(() => {
     if (!open) {
       setSearch('');
+      setShowActors(false);
       setDrillInto(null);
     }
   }, [open]);
 
   const assets = useMemo(() => {
     if (!catalog) return [];
+    // Actors (creature/NPC sprites) are excluded by default — a node skin is object-ish decor, not a
+    // character — unless the "Actors" toggle is on. Applied before the text filter so the count and
+    // the "No matches" state both reflect the role gate.
+    const base = showActors ? catalog.assets : catalog.assets.filter((a) => a.role !== 'actor');
     const q = search.trim().toLowerCase();
-    if (q.length === 0) return catalog.assets;
-    return catalog.assets.filter(
+    if (q.length === 0) return base;
+    return base.filter(
       (a) =>
         a.id.toLowerCase().includes(q) ||
         a.category.toLowerCase().includes(q) ||
         a.tags.some((t) => t.toLowerCase().includes(q)),
     );
-  }, [catalog, search]);
+  }, [catalog, search, showActors]);
 
   function pickWhole(asset: CatalogAsset): void {
     onPick(asset.id, undefined);
@@ -109,13 +118,30 @@ export function NodeSpritePickerDialog({
           />
         ) : (
           <>
-            <Input
-              autoFocus
-              className={cn(isCompact && 'h-11')}
-              placeholder="Search assets by id / category / tag…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                autoFocus
+                className={cn('flex-1', isCompact && 'h-11')}
+                placeholder="Search assets by id / category / tag…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              {/* Actors are hidden by default (see the `assets` memo); this reveals them. Styled like
+                  the Library's role-filter chips (plan 032) for a consistent active-look. */}
+              <button
+                type="button"
+                aria-pressed={showActors}
+                onClick={() => setShowActors((v) => !v)}
+                title="Show character/creature (actor) sprites — hidden by default"
+                className={cn(
+                  'flex-none rounded-md border border-transparent bg-inset px-2 py-1 text-[0.75rem] text-fg-muted hover:bg-surface',
+                  showActors && 'border-gold-light bg-surface text-fg-bright',
+                  isCompact && 'min-h-11 px-3 py-2 text-[0.85rem]',
+                )}
+              >
+                Actors
+              </button>
+            </div>
             <div
               className={cn(
                 'grid grid-cols-4 gap-2 overflow-y-auto pr-1',

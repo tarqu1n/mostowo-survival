@@ -28,7 +28,8 @@ governs the whole browse surface (search, Recent, Favourites, category tree, plu
 category under Objects and Terrains under Tiles); empty packs/categories are hidden. **Actors are hidden
 by default** and never auto-selected: creature/NPC sprites (packs tagged `rules.actor` in `pack.json`)
 stay out of the placement palette, and clicking one can't arm it for placement (there's no actor editor
-yet).
+yet). The Node Types tab's **sprite picker** (`NodeSpritePickerDialog`) likewise hides `role:'actor'`
+assets by default, behind an **Actors** toggle — a node skin is object-ish decor, not a character.
 
 ## Tools & shortcuts
 
