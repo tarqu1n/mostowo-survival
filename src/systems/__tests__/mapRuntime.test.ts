@@ -9,12 +9,17 @@ describe('mapRuntime', () => {
   });
 
   it('builds a WORLD_INDEX from the eager manifest (no map files loaded)', () => {
-    // Nothing is placed in world.json/manifest.json yet, so no tile resolves to a map.
+    // the-moon is placed at {78,230}; tile (0,0) sits outside its footprint, so it resolves to no map.
     expect(WORLD_INDEX.mapAt(0, 0)).toBeNull();
   });
 
-  it("originOf('the-moon') falls back to {col:0,row:0} — the L0 start map is unplaced", () => {
-    expect(originOf('the-moon')).toEqual({ col: 0, row: 0 });
+  it("originOf('the-moon') returns its world.json placement", () => {
+    // Derive the expectation from the placement rather than hard-coding coordinates: the-moon is
+    // authored/repositioned from the World view, and a hard-coded origin would re-break this test —
+    // and with it the Pages deploy gate — every time the map is nudged.
+    const placement = WORLD.placements.find((p) => p.mapId === 'the-moon');
+    expect(placement).toBeDefined();
+    expect(originOf('the-moon')).toEqual(placement?.origin);
   });
 
   it('originOf returns {col:0,row:0} for an unknown map id too', () => {
