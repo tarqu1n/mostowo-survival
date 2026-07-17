@@ -144,7 +144,18 @@
       "skins": [
         {
           "id": "default",
-          "asset": "pixel-crawler/_derived/rock.png"
+          "asset": "craftpix-nature/Rocks/Rock1_2_no_shadow.png",
+          "depleted": {
+            "asset": "craftpix-nature/Rocks/Rock1_5_no_shadow.png"
+          }
+        },
+        {
+          "id": "skin",
+          "asset": "craftpix-nature/Rocks/Rock1_1_no_shadow.png",
+          "weight": 1,
+          "depleted": {
+            "asset": "craftpix-nature/Rocks/Rock1_5_no_shadow.png"
+          }
         }
       ]
     },
