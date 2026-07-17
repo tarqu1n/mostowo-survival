@@ -51,7 +51,7 @@ When Matt asks a Claude Code cloud session to *"get on guppi and work on the edi
 path that **works today** (verified 2026-07-17). It does **not** need Tailscale SSH enabled on guppi —
 guppi's sshd accepts **password** auth for the `guppi` user, and the session already has the password.
 
-**What the session has out of the box**
+### What the session has out of the box
 
 - `GUPPI_USERNAME` / `GUPPI_PASSWORD` env vars. Note the SSH **login user is `guppi`**, not the value
   of `GUPPI_USERNAME` (that's `matt`, the account/sudo name — `matt` has no SSH login).
@@ -62,7 +62,7 @@ guppi's sshd accepts **password** auth for the `guppi` user, and the session alr
 - Nothing else: the cloud sandbox has **no `ssh`, no `tailscale`, no TUN device**, and reaches guppi
   only via the Tailnet.
 
-**The recipe**
+### The recipe
 
 ```bash
 # 1. tooling (root sandbox; nothing preinstalled)
@@ -97,7 +97,7 @@ MagicDNS name so SNI/cert match — the Tailscale cert validates, no `-k`:
 curl -sS --socks5-hostname localhost:1055 https://guppi-eq.tailfba8be.ts.net:8444/editor.html
 ```
 
-**Working on the build directly on guppi (the point of doing this)**
+### Working on the build directly on guppi (the point of doing this)
 
 guppi's editor clone **is** the running dev server, so editing it there is the deploy — no rsync, no
 rebuild, Vite HMR reflects the change live. The clone is at `/home/guppi/mostowo-editor/repo` on the
