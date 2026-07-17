@@ -352,6 +352,13 @@ export interface EditorState {
   mapEpoch: number;
   /** In-place-edit signal (see module doc). */
   docRevision: number;
+  /** Bumped to tell `EditorScene` to drop any in-flight touch/gesture tracking. The compact drawers
+   *  (Library/Inspector) are modal DOM overlays; opening/closing one can swallow a finger's `touchend`
+   *  (a Radix Sheet `preventDefault`s it), stranding a phantom in the scene's touch set — which then
+   *  makes a later single tap register as a two-finger pinch and jams the editor in zoom. EditorApp
+   *  bumps this on every drawer toggle (the exact desync boundary) so the scene resets deterministically,
+   *  rather than the scene guessing from an unreliable native touch count. */
+  pointerGestureResetNonce: number;
   canUndo: boolean;
   canRedo: boolean;
   /** Thumbnail-bake capability (plan 014 step 9) — `EditorScene` is the only thing with every tile
@@ -460,6 +467,8 @@ export interface EditorState {
   /** Installs (or clears, with `null`) the thumbnail-bake capability — called by `EditorScene` on
    *  create/teardown. See `bakeThumbnail`'s doc. */
   setBakeThumbnail(fn: (() => Promise<Blob | null>) | null): void;
+  /** Signal `EditorScene` to clear its touch/gesture tracking — see `pointerGestureResetNonce`. */
+  resetPointerGesture(): void;
   setCatalog(catalog: EditorCatalog): void;
   setTerrainCatalog(catalog: TerrainCatalog | null): void;
   setActiveTerrainId(id: string | null): void;
@@ -1206,6 +1215,7 @@ export const useEditorStore = create<EditorState>()(
     pendingDirty: null,
     mapEpoch: 0,
     docRevision: 0,
+    pointerGestureResetNonce: 0,
     canUndo: false,
     canRedo: false,
     bakeThumbnail: null,
@@ -1546,6 +1556,8 @@ export const useEditorStore = create<EditorState>()(
       set((s) => ({ world, worldDirty: false, worldRevision: s.worldRevision + 1 })),
     markWorldSaved: () => set({ worldDirty: false }),
     setBakeThumbnail: (fn) => set({ bakeThumbnail: fn }),
+    resetPointerGesture: () =>
+      set((s) => ({ pointerGestureResetNonce: s.pointerGestureResetNonce + 1 })),
     setCatalog: (catalog) =>
       set((s) => ({ catalog, ...reconcileTabs(s.tabs, s.activeTabId, catalog) })),
     setTerrainCatalog: (terrainCatalog) => set({ terrainCatalog }),

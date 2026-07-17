@@ -258,6 +258,15 @@ export function EditorApp() {
     if (activeTabId.startsWith('object:')) setLibraryOpen(false);
   }, [activeTabId]);
 
+  // Opening/closing a compact drawer is exactly where a finger's `touchend` can get swallowed by the
+  // modal Sheet, stranding a phantom touch that later jams `EditorScene` in pinch-zoom (see the store's
+  // `pointerGestureResetNonce` doc). Bump the reset nonce on every toggle so the scene drops that stale
+  // tracking deterministically. Runs on both edges (and harmlessly once on mount, when there's nothing
+  // to clear).
+  useEffect(() => {
+    useEditorStore.getState().resetPointerGesture();
+  }, [libraryOpen, inspectorOpen]);
+
   // Load the asset catalog + terrain/node defs on editor BOOT, not lazily when the Library first opens
   // (plan 021 / plan 030): every surface that renders sprites — the Node Types tab's skin thumbnails,
   // the Inspector's node preview, object-editor tabs — reads the catalog from the store, so it must be
