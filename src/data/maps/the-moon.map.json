@@ -2566,6 +2566,15 @@
       "flipX": false,
       "flipY": false,
       "depth": 0
+    },
+    {
+      "id": "node_0010",
+      "kind": "node",
+      "ref": "tree",
+      "col": 109,
+      "row": 147,
+      "skin": "default",
+      "rotation": 326.3866414888742
     }
   ]
 }
