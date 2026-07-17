@@ -56,6 +56,13 @@ const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
 const PAN_MARGIN_TILES = 6;
 
+/** Master switch for the two-finger camera gesture (pinch-zoom + two-finger pan). Disabled for now:
+ *  on touch it was intermittently hijacking single taps into a zoom (a stranded phantom finger faking
+ *  a two-finger gesture), so every touch is treated as a plain single-finger tool interaction until
+ *  toolbar zoom buttons land. Flip back to `true` to restore the gesture; all the gesture code below
+ *  stays intact behind this flag. Wheel-zoom (desktop) is unaffected. */
+const TWO_FINGER_GESTURE_ENABLED = false;
+
 // Neighbour ghost strips (step 9): how deep into each placed neighbour to render, and at what alpha.
 const GHOST_STRIP_TILES = 12;
 const GHOST_ALPHA = 0.4;
@@ -1619,13 +1626,15 @@ export class EditorScene extends Phaser.Scene {
   private handlePointerDown(pointer: Phaser.Input.Pointer): void {
     // Multi-touch arbitration (plan 027 step 3): track touch pointers; the moment two are down the
     // camera gesture owns the interaction and no tool fires. A mouse pointer is `wasTouch === false`,
-    // never tracked here, so it can never reach two — desktop input is unchanged. Stranded phantoms
-    // (a drawer swallowing a `touchend`) are handled out-of-band by `resetTouchGesture` on drawer
-    // toggle, not by second-guessing the finger count here — that broke real pinch-zoom.
-    if (pointer.wasTouch) this.touchIdsDown.add(pointer.id);
-    if (this.gesture || this.touchIdsDown.size >= 2) {
-      this.beginGesture(); // (re)snapshot the pinch baseline; cancels any in-progress tool
-      return;
+    // never tracked here, so it can never reach two — desktop input is unchanged. Gated off for now
+    // (see `TWO_FINGER_GESTURE_ENABLED`): with the gesture disabled every touch falls straight through
+    // to the tool, so a phantom finger can never turn a tap into a zoom.
+    if (TWO_FINGER_GESTURE_ENABLED) {
+      if (pointer.wasTouch) this.touchIdsDown.add(pointer.id);
+      if (this.gesture || this.touchIdsDown.size >= 2) {
+        this.beginGesture(); // (re)snapshot the pinch baseline; cancels any in-progress tool
+        return;
+      }
     }
 
     const state = useEditorStore.getState();
