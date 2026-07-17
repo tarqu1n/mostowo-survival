@@ -2553,6 +2553,19 @@
       "col": 116,
       "row": 158,
       "skin": "skin_3"
+    },
+    {
+      "id": "decor_0024",
+      "kind": "decor",
+      "asset": "craftpix-nature/Bushes/Fern2_1.png",
+      "x": 1768,
+      "y": 2360,
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 0,
+      "flipX": false,
+      "flipY": false,
+      "depth": 0
     }
   ]
 }
