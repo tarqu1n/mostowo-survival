@@ -361,6 +361,9 @@ export class EditorScene extends Phaser.Scene {
     // is store-only — no scene ref in React; see editorStore's `bakeThumbnail` doc). Cleared on
     // teardown so a torn-down scene (StrictMode double-mount / HMR) never leaves a dangling closure.
     useEditorStore.getState().setBakeThumbnail(() => this.bakeThumbnailBlob());
+    // Install the viewport-zoom capability the on-screen zoom buttons (ContextBar) invoke through the
+    // store — same store-only bridge as the thumbnail bake above. Cleared on teardown.
+    useEditorStore.getState().setZoomViewport((delta) => this.zoomByStep(delta));
 
     this.syncDocument();
   }
@@ -371,6 +374,7 @@ export class EditorScene extends Phaser.Scene {
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     if (useEditorStore.getState().bakeThumbnail) useEditorStore.getState().setBakeThumbnail(null);
+    if (useEditorStore.getState().zoomViewport) useEditorStore.getState().setZoomViewport(null);
     this.clearGhosts();
     this.destroyUnderlay();
   }
@@ -1521,6 +1525,15 @@ export class EditorScene extends Phaser.Scene {
     );
     this.zoomAnchored(next, pointer.x, pointer.y);
     this.updateHover(pointer);
+  }
+
+  /** Step the integer zoom by `delta` (+1 in, −1 out), anchored on the viewport centre — the on-screen
+   *  button equivalent of a wheel notch (which anchors on the cursor). Clamped to MIN..MAX; a step at a
+   *  bound is a no-op (`zoomAnchored` early-returns when the level doesn't change). Installed on the
+   *  store as `zoomViewport` for the ContextBar buttons to call. */
+  private zoomByStep(delta: number): void {
+    const next = Phaser.Math.Clamp(Math.round(this.cameras.main.zoom) + delta, MIN_ZOOM, MAX_ZOOM);
+    this.zoomAnchored(next, this.scale.width / 2, this.scale.height / 2);
   }
 
   /**

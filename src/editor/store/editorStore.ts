@@ -370,6 +370,12 @@ export interface EditorState {
    *  torn down (StrictMode double-mount, HMR) — callers must treat a `null` capability, or a `null`
    *  Blob result, as "skip the thumbnail export", never as a save failure. */
   bakeThumbnail: (() => Promise<Blob | null>) | null;
+  /** Viewport-zoom capability — same React↔Phaser bridge shape as `bakeThumbnail`. The camera lives in
+   *  `EditorScene`, so the on-screen zoom buttons (ContextBar) can't touch it directly; the scene
+   *  installs this closure on create (stepping the integer zoom by `delta`, anchored on the viewport
+   *  centre, clamped to the MIN..MAX range) and clears it to `null` on teardown. `null` before the
+   *  scene mounts / after it tears down — callers no-op on `null`. */
+  zoomViewport: ((delta: number) => void) | null;
 
   // ---- actions (all document mutations route through the history stack) ----
   newMap(id: string, name: string, width: number, height: number): void;
@@ -467,6 +473,9 @@ export interface EditorState {
   /** Installs (or clears, with `null`) the thumbnail-bake capability — called by `EditorScene` on
    *  create/teardown. See `bakeThumbnail`'s doc. */
   setBakeThumbnail(fn: (() => Promise<Blob | null>) | null): void;
+  /** Installs (or clears, with `null`) the viewport-zoom capability — called by `EditorScene` on
+   *  create/teardown. See `zoomViewport`'s doc. */
+  setZoomViewport(fn: ((delta: number) => void) | null): void;
   /** Signal `EditorScene` to clear its touch/gesture tracking — see `pointerGestureResetNonce`. */
   resetPointerGesture(): void;
   setCatalog(catalog: EditorCatalog): void;
@@ -1219,6 +1228,7 @@ export const useEditorStore = create<EditorState>()(
     canUndo: false,
     canRedo: false,
     bakeThumbnail: null,
+    zoomViewport: null,
 
     newMap: (id, name, width, height) => {
       const map = createEmptyMap(id, name, width, height);
@@ -1556,6 +1566,7 @@ export const useEditorStore = create<EditorState>()(
       set((s) => ({ world, worldDirty: false, worldRevision: s.worldRevision + 1 })),
     markWorldSaved: () => set({ worldDirty: false }),
     setBakeThumbnail: (fn) => set({ bakeThumbnail: fn }),
+    setZoomViewport: (fn) => set({ zoomViewport: fn }),
     resetPointerGesture: () =>
       set((s) => ({ pointerGestureResetNonce: s.pointerGestureResetNonce + 1 })),
     setCatalog: (catalog) =>

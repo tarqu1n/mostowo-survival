@@ -10,7 +10,7 @@ import { loadCatalog } from './catalogSource';
 import { loadTerrainCatalog } from './terrainCatalogSource';
 import { loadNodeDefs } from './nodeDefsSource';
 import { Toolbar } from './Toolbar';
-import { ContextBar } from './ContextBar';
+import { ContextBar, SelectionBar } from './ContextBar';
 import { PhaserViewport } from './PhaserViewport';
 import { ObjectEditorTab } from './tabs/ObjectEditorTab';
 import { WorldViewTab } from './tabs/WorldViewTab';
@@ -478,6 +478,9 @@ export function EditorApp() {
                 </Sheet>
               </div>
 
+              {/* Selection-operations bar: a second bottom bar stacked above the ContextBar, shown only
+                  while something is selected (it self-hides otherwise). */}
+              <SelectionBar />
               <ContextBar
                 onOpenLibrary={() => setLibraryOpen(true)}
                 onOpenInspector={() => setInspectorOpen(true)}

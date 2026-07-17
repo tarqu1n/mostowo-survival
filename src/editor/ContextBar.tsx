@@ -4,20 +4,23 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
+  BringToFront,
   CopyPlus,
   Eraser,
   Eye,
   EyeOff,
   LibraryBig,
-  Move,
   Palette,
   Pipette,
   Redo2,
   RotateCcw,
   RotateCw,
+  SendToBack,
   SlidersHorizontal,
   Trash2,
   Undo2,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import { TILE_SIZE } from '../config';
 import { cn } from './lib/utils';
@@ -131,7 +134,6 @@ export function ContextBar({
   const armedNodeRef = useEditorStore((s) => s.armedNodeRef);
   const placeRotation = useEditorStore((s) => s.placeRotation);
   const eraseActive = useEditorStore((s) => s.eraseActive);
-  const freePixelActive = useEditorStore((s) => s.freePixelActive);
   const multiSelectActive = useEditorStore((s) => s.multiSelectActive);
   const selectedObjectIds = useEditorStore((s) => s.selectedObjectIds);
   const underlay = useEditorStore((s) => s.underlay);
@@ -143,7 +145,6 @@ export function ContextBar({
   // none). The Library / Inspector edge buttons, though, live on every tab — so the bar frame always
   // renders and only the middle tool cluster is gated to the Map tab.
   const showTools = activeTabId === 'map' && !!map;
-  const hasSelection = selectedObjectIds.length > 0;
   // A single selected node exposes the skin-cycle action (the 'S' shortcut).
   const singleNode =
     map && selectedObjectIds.length === 1
@@ -253,18 +254,6 @@ export function ContextBar({
               </>
             )}
 
-            {/* Place / Select: free-pixel placement toggle (decor only — same as holding Alt). */}
-            {(activeTool === 'place' || activeTool === 'select') && (
-              <ToggleButton
-                active={freePixelActive}
-                title="Place/drag decor at free pixels instead of snapping to tile centre (same as holding Alt). Nodes/portals are always tile-snapped."
-                onClick={() => st().setFreePixelActive(!freePixelActive)}
-              >
-                <Move />
-                Free px
-              </ToggleButton>
-            )}
-
             {/* Place: rotation wheel for the next placed decor/node (arbitrary angle). */}
             {activeTool === 'place' && (armedObjectAsset || armedNodeRef) && (
               <RotationWheel
@@ -275,75 +264,40 @@ export function ContextBar({
               />
             )}
 
-            {/* Select: multi-select toggle + Delete + tile-step nudge. */}
+            {/* Select: multi-select toggle. The delete / nudge / rotate / depth actions live in the
+                SelectionBar (the second bottom bar), shown above this one whenever anything is selected. */}
             {activeTool === 'select' && (
-              <>
-                <ToggleButton
-                  active={multiSelectActive}
-                  title="Add to the selection instead of replacing it (same as holding Shift)"
-                  onClick={() => st().setMultiSelectActive(!multiSelectActive)}
-                >
-                  <CopyPlus />
-                  Multi
-                </ToggleButton>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  disabled={!hasSelection}
-                  title="Delete the selected object(s) (Delete)"
-                  onClick={() => hasSelection && st().deleteObjects(selectedObjectIds)}
-                >
-                  <Trash2 />
-                  Delete
-                </Button>
-                <div className={groupClass}>
-                  <Button
-                    variant="outline"
-                    size="icon-lg"
-                    aria-label="Nudge left"
-                    title="Nudge one tile left (Shift+←)"
-                    disabled={!hasSelection}
-                    onClick={() => nudge(-1, 0)}
-                  >
-                    <ArrowLeft />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon-lg"
-                    aria-label="Nudge up"
-                    title="Nudge one tile up (Shift+↑)"
-                    disabled={!hasSelection}
-                    onClick={() => nudge(0, -1)}
-                  >
-                    <ArrowUp />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon-lg"
-                    aria-label="Nudge down"
-                    title="Nudge one tile down (Shift+↓)"
-                    disabled={!hasSelection}
-                    onClick={() => nudge(0, 1)}
-                  >
-                    <ArrowDown />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon-lg"
-                    aria-label="Nudge right"
-                    title="Nudge one tile right (Shift+→)"
-                    disabled={!hasSelection}
-                    onClick={() => nudge(1, 0)}
-                  >
-                    <ArrowRight />
-                  </Button>
-                </div>
-              </>
+              <ToggleButton
+                active={multiSelectActive}
+                title="Add to the selection instead of replacing it (same as holding Shift)"
+                onClick={() => st().setMultiSelectActive(!multiSelectActive)}
+              >
+                <CopyPlus />
+                Multi
+              </ToggleButton>
             )}
           </div>
 
-          {/* Persistent-when-relevant: underlay visibility + selected-node skin-cycle. */}
+          {/* Persistent-when-relevant: zoom out/in + underlay visibility + selected-node skin-cycle. */}
           <div className={cn(groupClass, 'shrink-0')}>
+            <Button
+              variant="outline"
+              size="icon-lg"
+              aria-label="Zoom out"
+              title="Zoom out (also: pinch, or scroll-wheel down)"
+              onClick={() => st().zoomViewport?.(-1)}
+            >
+              <ZoomOut />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon-lg"
+              aria-label="Zoom in"
+              title="Zoom in (also: pinch, or scroll-wheel up)"
+              onClick={() => st().zoomViewport?.(1)}
+            >
+              <ZoomIn />
+            </Button>
             {underlay && (
               <Button
                 variant="outline"
@@ -379,6 +333,132 @@ export function ContextBar({
         label="Inspector"
         onClick={onOpenInspector}
       />
+    </div>
+  );
+}
+
+/**
+ * Selection operations bar — the SECOND compact bottom bar, stacked directly above the {@link ContextBar}
+ * and shown ONLY while one or more objects are selected on the Map tab. It surfaces the most-reached
+ * per-object edits (nudge, rotate, restack, delete) on-screen so a phone user can move/rotate/delete a
+ * selection without bouncing into the Inspector drawer — the awkward map↔inspector round-trip this bar
+ * exists to kill. Compact-only, like the ContextBar (EditorApp mounts both only in the `isCompact` branch).
+ *
+ * Enablement mirrors the Inspector's batch buttons: rotate is decor-only (`rotateObjects` skips nodes/
+ * portals), restack (bring forward / send back) applies to decor + nodes (`bumpDepth`), and nudge/delete
+ * work on any selection. Rotate is a SINGLE button that cycles +90° per tap (the phone doesn't want the
+ * desktop's ∓90° pair).
+ */
+export function SelectionBar() {
+  const activeTabId = useEditorStore((s) => s.activeTabId);
+  const map = useEditorStore((s) => s.map);
+  const selectedObjectIds = useEditorStore((s) => s.selectedObjectIds);
+  // `map` is mutated in place by store commands (see InspectorPanel's re-render note) — subscribe to the
+  // revision counters so kind-derived enablement (rotate/restack) refreshes after an edit, not just a
+  // selection change.
+  useEditorStore((s) => s.docRevision);
+  useEditorStore((s) => s.mapEpoch);
+
+  const st = useEditorStore.getState;
+
+  // Nothing selected (or not on the Map tab) → the whole bar collapses, yielding its row back to the map.
+  if (activeTabId !== 'map' || !map || selectedObjectIds.length === 0) return null;
+
+  const selected = map.objects.filter((o) => selectedObjectIds.includes(o.id));
+  const hasDecor = selected.some((o) => o.kind === 'decor');
+  const canRestack = selected.some((o) => o.kind === 'decor' || o.kind === 'node');
+  const ids = selectedObjectIds;
+
+  return (
+    // Sits above the ContextBar (which owns the bottom safe-area inset), so no bottom inset padding here.
+    <div className="flex items-center gap-1.5 overflow-x-auto border-t border-surface bg-raised/95 px-2 py-1.5 backdrop-blur">
+      {/* 4-way tile-step nudge (mirrors the Shift+arrow keyboard nudge). */}
+      <div className={groupClass}>
+        <Button
+          variant="outline"
+          size="icon-lg"
+          aria-label="Nudge left"
+          title="Nudge one tile left (Shift+←)"
+          onClick={() => nudge(-1, 0)}
+        >
+          <ArrowLeft />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon-lg"
+          aria-label="Nudge up"
+          title="Nudge one tile up (Shift+↑)"
+          onClick={() => nudge(0, -1)}
+        >
+          <ArrowUp />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon-lg"
+          aria-label="Nudge down"
+          title="Nudge one tile down (Shift+↓)"
+          onClick={() => nudge(0, 1)}
+        >
+          <ArrowDown />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon-lg"
+          aria-label="Nudge right"
+          title="Nudge one tile right (Shift+→)"
+          onClick={() => nudge(1, 0)}
+        >
+          <ArrowRight />
+        </Button>
+      </div>
+
+      {/* Rotate — one button cycling +90° per tap (decor only). */}
+      <Button
+        variant="outline"
+        size="icon-lg"
+        aria-label="Rotate 90°"
+        title="Rotate the selected decor 90°"
+        disabled={!hasDecor}
+        onClick={() => st().rotateObjects(ids, 90)}
+      >
+        <RotateCw />
+      </Button>
+
+      {/* Restack — bring forward / send back (decor via depth, nodes via depth-bias). */}
+      <div className={groupClass}>
+        <Button
+          variant="outline"
+          size="icon-lg"
+          aria-label="Bring forward"
+          title="Bring forward (stack on top)"
+          disabled={!canRestack}
+          onClick={() => st().bumpDepth(ids, 1)}
+        >
+          <BringToFront />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon-lg"
+          aria-label="Send back"
+          title="Send back (stack underneath)"
+          disabled={!canRestack}
+          onClick={() => st().bumpDepth(ids, -1)}
+        >
+          <SendToBack />
+        </Button>
+      </div>
+
+      {/* Delete the selection (moved off the ContextBar). Pushed to the far end. */}
+      <Button
+        variant="outline"
+        size="icon-lg"
+        aria-label="Delete selection"
+        title="Delete the selected object(s) (Delete)"
+        className="ml-auto"
+        onClick={() => st().deleteObjects(ids)}
+      >
+        <Trash2 />
+      </Button>
     </div>
   );
 }

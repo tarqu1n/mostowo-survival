@@ -63,10 +63,17 @@ compact tray drawer is view-only on touch.
 
 A per-tool **context bar** (`src/editor/ContextBar.tsx`, compact-only, bottom/thumb-reach) mirrors
 the keyboard vocabulary on-screen: persistent Undo/Redo; brush rotate ∓90°; a paint-mode gesture
-picker + erase/invert toggle for collision/zone/shape/terrain; free-pixel toggle for place/select;
-multi-select toggle + Delete + 4-way nudge for select; underlay-visibility and skin-cycle when
-applicable. Its erase/free-pixel/multi-select toggles are sticky store flags, independent of the
-desktop-only momentary Alt/Shift modifiers they mirror.
+picker + erase/invert toggle for collision/zone/shape/terrain; multi-select toggle for select;
+persistent zoom out/in buttons (call the scene's `zoomViewport` store capability — same store-only
+React↔Phaser bridge as the thumbnail bake), plus underlay-visibility and skin-cycle when applicable.
+Its erase/multi-select toggles are sticky store flags, independent of the desktop-only momentary
+Alt/Shift modifiers they mirror.
+
+Above it sits a second compact bar, the **selection bar** (`SelectionBar` in the same file), shown
+only while ≥1 object is selected on the Map tab (it self-hides otherwise). It carries the most-reached
+per-object edits so a phone user needn't open the Inspector drawer to touch a selection: 4-way tile
+nudge, a single rotate button that cycles +90°/tap (decor only), bring-forward / send-back restack
+(decor + nodes), and Delete. Enablement mirrors the Inspector's batch buttons.
 
 **Toolbar actions:**
 
