@@ -16,6 +16,7 @@ import { detectRegionAt, sanitiseClientRegions, seedRegions, sliceBox, type Box 
 import { useIsCompact } from '../hooks/useIsCompact';
 import { useEditorStore } from '../store/editorStore';
 import { Button } from '../ui/button';
+import { NumberInput } from '../ui/numberInput';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Slider } from '../ui/slider';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
@@ -264,21 +265,19 @@ function ObjectEditorForm({ asset }: { asset: CatalogAsset }) {
             {isStrip && (
               <>
                 <ObjField label="Columns">
-                  <input
-                    type="number"
+                  <NumberInput
                     min={1}
                     value={cols}
                     className={cn(objInputClass, 'w-20')}
-                    onChange={(e) => changeCols(Number(e.target.value))}
+                    onValue={changeCols}
                   />
                 </ObjField>
                 <ObjField label="Rows">
-                  <input
-                    type="number"
+                  <NumberInput
                     min={1}
                     value={rows}
                     className={cn(objInputClass, 'w-20')}
-                    onChange={(e) => changeRows(Number(e.target.value))}
+                    onValue={changeRows}
                   />
                 </ObjField>
               </>
@@ -820,9 +819,9 @@ function RegionsEditor({
     setSelected(null);
   }
 
-  function updateSelected(field: keyof Box, raw: string): void {
+  function updateSelected(field: keyof Box, raw: number): void {
     if (selected === null) return;
-    const v = Math.max(0, Math.round(Number(raw) || 0));
+    const v = Math.max(0, Math.round(raw));
     setBoxes((bs) =>
       bs.map((b, i) => {
         if (i !== selected) return b;
@@ -1064,12 +1063,11 @@ function RegionsEditor({
               <div className="grid grid-cols-2 gap-2">
                 {(['x', 'y', 'w', 'h'] as const).map((f) => (
                   <ObjField key={f} label={f}>
-                    <input
-                      type="number"
+                    <NumberInput
                       min={f === 'w' || f === 'h' ? 1 : 0}
                       value={selectedBox[f]}
                       className={cn(objInputClass, 'w-full')}
-                      onChange={(e) => updateSelected(f, e.target.value)}
+                      onValue={(n) => updateSelected(f, n)}
                     />
                   </ObjField>
                 ))}
@@ -1096,26 +1094,20 @@ function RegionsEditor({
               <div className="flex flex-col gap-1">
                 <span className="text-[0.72rem] text-muted-2">Grid-slice into</span>
                 <div className="flex items-center gap-1.5">
-                  <input
-                    type="number"
+                  <NumberInput
                     min={1}
                     aria-label="Columns"
                     value={sliceCols}
                     className={cn(objInputClass, 'w-[52px] px-1.5')}
-                    onChange={(e) =>
-                      setSliceCols(Math.max(1, Math.round(Number(e.target.value) || 1)))
-                    }
+                    onValue={(n) => setSliceCols(Math.max(1, Math.round(n)))}
                   />
                   <span>×</span>
-                  <input
-                    type="number"
+                  <NumberInput
                     min={1}
                     aria-label="Rows"
                     value={sliceRows}
                     className={cn(objInputClass, 'w-[52px] px-1.5')}
-                    onChange={(e) =>
-                      setSliceRows(Math.max(1, Math.round(Number(e.target.value) || 1)))
-                    }
+                    onValue={(n) => setSliceRows(Math.max(1, Math.round(n)))}
                   />
                   <Button type="button" size="sm" onClick={gridSlice}>
                     Slice
