@@ -142,6 +142,13 @@ describe('parseNodeDefs', () => {
     expect(() => parseNodeDefs(raw)).toThrow(/skins\[1\]\.maxHp must be > 0/);
   });
 
+  it('rejects a fractional per-skin maxHp override (HP is a whole hit count)', () => {
+    const raw = withRaw((r) => {
+      r.defs[0].skins[1].maxHp = 2.5;
+    });
+    expect(() => parseNodeDefs(raw)).toThrow(/skins\[1\]\.maxHp must be an integer/);
+  });
+
   it('rejects a non-string per-skin name override', () => {
     const raw = withRaw((r) => {
       (r.defs[0].skins[1] as unknown as Record<string, unknown>).name = 42;

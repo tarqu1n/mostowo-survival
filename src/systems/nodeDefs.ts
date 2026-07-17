@@ -34,8 +34,9 @@ export interface NodeSkinDef {
   /** Alternate look while this node instance is depleted (post-harvest, pre-regrow). */
   depleted?: { asset: string; region?: DecorRegion };
   /** Per-skin max-HP OVERRIDE (a node's HP = its total harvest hits, so a smaller tree with a lower
-   *  `maxHp` yields less wood over its life). Omitted ⇒ inherit the def's `maxHp`; must be > 0 when
-   *  present. Applied at spawn/regrow by `ResourceNodeManager` (see its `addNode`). */
+   *  `maxHp` yields less wood over its life). Omitted ⇒ inherit the def's `maxHp`; must be a positive
+   *  integer when present (HP is a whole hit count). Applied at spawn/regrow by `ResourceNodeManager`
+   *  (see its `addNode`). */
   maxHp?: number;
   /** Relative random-pick weight (see `pickWeighted`); omitted ⇒ defaults to 1. */
   weight?: number;
@@ -218,7 +219,7 @@ function parseNodeSkin(value: unknown, path: string): NormalizedNodeSkinDef {
     if (weight <= 0) fail(`${path}.weight must be > 0 (got ${weight})`);
   }
 
-  const maxHp = obj.maxHp === undefined ? undefined : expectNumber(obj.maxHp, `${path}.maxHp`);
+  const maxHp = obj.maxHp === undefined ? undefined : expectInt(obj.maxHp, `${path}.maxHp`);
   if (maxHp !== undefined && maxHp <= 0) fail(`${path}.maxHp must be > 0 (got ${maxHp})`);
 
   const scale = obj.scale === undefined ? undefined : expectNumber(obj.scale, `${path}.scale`);
