@@ -244,6 +244,15 @@ export function EditorApp() {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
 
+  // Opening an object-editor tab from the Library's ⚙ (any of its call sites) activates an
+  // `object:<id>` tab. On compact the Library is a full-screen modal drawer, so the freshly-opened
+  // editor tab would otherwise stay hidden behind it — close the drawer when an object tab becomes
+  // active so the edit surface is what you actually see. No-op on desktop (the drawer isn't rendered).
+  const activeTabId = useEditorStore((s) => s.activeTabId);
+  useEffect(() => {
+    if (activeTabId.startsWith('object:')) setLibraryOpen(false);
+  }, [activeTabId]);
+
   // react-resizable-panels v4 persistence: restores the Library/centre split on load and saves it
   // after each drag (localStorage). Replaces the old hand-rolled pixel-width + localStorage logic.
   const layout = useDefaultLayout({ id: 'mostowo-editor-layout', storage: localStorage });

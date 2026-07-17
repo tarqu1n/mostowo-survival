@@ -13,6 +13,7 @@ import {
   suggestGrids,
 } from '../reclassify';
 import { detectRegionAt, sanitiseClientRegions, seedRegions, sliceBox, type Box } from '../regions';
+import { useIsCompact } from '../hooks/useIsCompact';
 import { useEditorStore } from '../store/editorStore';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -211,68 +212,80 @@ function ObjectEditorForm({ asset }: { asset: CatalogAsset }) {
     }
   }
 
+  // A control row is only needed for the strip grid (cols/rows) or a tile's object-region toggle —
+  // for a plain `object`/`tile` sheet everything lives in the header row, so the row is suppressed
+  // entirely rather than left as an empty gap.
+  const hasControlsRow = isStrip || isTile;
+
   return (
     <div className={objTabClass}>
-      <h2 className={objTitleClass}>{filenameOf(asset)}</h2>
-      <p className={objIdClass}>
-        {relPath} · {asset.w}×{asset.h}
-      </p>
+      {/* Single header row (plan 031): filename + path/dims + the Type select all on one line, so the
+          mobile viewport isn't eaten by three stacked rows. Wraps gracefully on very narrow widths;
+          the Type control pushes to the right on roomy ones (`ml-auto`). */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <h2 className="text-base text-fg-bright">{filenameOf(asset)}</h2>
+        <span className={objIdClass}>
+          {relPath} · {asset.w}×{asset.h}
+        </span>
+        <div className="ml-auto flex items-center gap-1.5">
+          <span className="text-[0.72rem] text-muted-2">Type</span>
+          <Select value={type} onValueChange={(v) => setType(v as CatalogAssetType)}>
+            <SelectTrigger size="sm" className="w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="tile">tile</SelectItem>
+              <SelectItem value="strip">Animated strip</SelectItem>
+              <SelectItem value="object">object</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
       <div className="mt-4 flex flex-col gap-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <ObjField label="Type">
-            <Select value={type} onValueChange={(v) => setType(v as CatalogAssetType)}>
-              <SelectTrigger size="sm" className="w-[150px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tile">tile</SelectItem>
-                <SelectItem value="strip">Animated strip</SelectItem>
-                <SelectItem value="object">object</SelectItem>
-              </SelectContent>
-            </Select>
-          </ObjField>
-
-          {/* plan 028: a mixed `tile` sheet can author `object`-role prop regions without becoming an
-              object. Toggling this swaps the frame-grid preview for the Regions editor while the type
-              stays `tile` (Save writes object-role regions, no demotion). */}
-          {isTile && (
-            <ObjField label="Object regions">
-              <Button
-                type="button"
-                variant={regionMode ? 'default' : 'outline'}
-                size="sm"
-                aria-pressed={regionMode}
-                onClick={() => setRegionMode((v) => !v)}
-              >
-                {regionMode ? 'Editing regions' : 'Edit regions'}
-              </Button>
-            </ObjField>
-          )}
-
-          {isStrip && (
-            <>
-              <ObjField label="Columns">
-                <input
-                  type="number"
-                  min={1}
-                  value={cols}
-                  className={cn(objInputClass, 'w-20')}
-                  onChange={(e) => changeCols(Number(e.target.value))}
-                />
+        {hasControlsRow && (
+          <div className="flex flex-wrap items-end gap-3">
+            {/* plan 028: a mixed `tile` sheet can author `object`-role prop regions without becoming an
+                object. Toggling this swaps the frame-grid preview for the Regions editor while the type
+                stays `tile` (Save writes object-role regions, no demotion). */}
+            {isTile && (
+              <ObjField label="Object regions">
+                <Button
+                  type="button"
+                  variant={regionMode ? 'default' : 'outline'}
+                  size="sm"
+                  aria-pressed={regionMode}
+                  onClick={() => setRegionMode((v) => !v)}
+                >
+                  {regionMode ? 'Editing regions' : 'Edit regions'}
+                </Button>
               </ObjField>
-              <ObjField label="Rows">
-                <input
-                  type="number"
-                  min={1}
-                  value={rows}
-                  className={cn(objInputClass, 'w-20')}
-                  onChange={(e) => changeRows(Number(e.target.value))}
-                />
-              </ObjField>
-            </>
-          )}
-        </div>
+            )}
+
+            {isStrip && (
+              <>
+                <ObjField label="Columns">
+                  <input
+                    type="number"
+                    min={1}
+                    value={cols}
+                    className={cn(objInputClass, 'w-20')}
+                    onChange={(e) => changeCols(Number(e.target.value))}
+                  />
+                </ObjField>
+                <ObjField label="Rows">
+                  <input
+                    type="number"
+                    min={1}
+                    value={rows}
+                    className={cn(objInputClass, 'w-20')}
+                    onChange={(e) => changeRows(Number(e.target.value))}
+                  />
+                </ObjField>
+              </>
+            )}
+          </div>
+        )}
 
         {/* type:object → the Regions editor (plan 017 step 4); strip/tile keep the step-3 frame-grid
             preview. Branches on the DRAFT type, so picking `object` in the dropdown makes the sheet's
@@ -514,8 +527,13 @@ function RegionsEditor({
   const [err, setErr] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
 
+  const isCompact = useIsCompact();
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
+  // plan 031: a sticky pan toggle. Middle-mouse / hold-Space pan needs a mouse + keyboard, so on touch
+  // there was no way to pan at all — a drag just drew or moved a box. With this on, ANY left/touch drag
+  // pans the viewport instead (see `isPanTrigger`). Defaults off so drawing is still the primary drag.
+  const [panMode, setPanMode] = useState(false);
   const hoveringRef = useRef(false);
 
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -653,10 +671,11 @@ function RegionsEditor({
     canvasRef.current?.focus();
   }
 
-  /** Middle mouse (any target) or left+Space starts a pan instead of the usual draw/move/resize —
-   *  checked ahead of those so it works whether the drag starts on empty sheet, a box, or a handle. */
+  /** Middle mouse (any target), left+Space, or the sticky Pan toggle (`panMode`, the touch path) starts
+   *  a pan instead of the usual draw/move/resize — checked ahead of those so it works whether the drag
+   *  starts on empty sheet, a box, or a handle. `e.button === 0` covers a touch pointerdown too. */
   function isPanTrigger(e: React.PointerEvent): boolean {
-    return e.button === 1 || (e.button === 0 && spaceHeld);
+    return e.button === 1 || (e.button === 0 && (spaceHeld || panMode));
   }
 
   function startPan(e: React.PointerEvent): void {
@@ -919,18 +938,37 @@ function RegionsEditor({
           </Tooltip>
           <span className="min-w-6 flex-none text-right text-[0.7rem] text-fg-dim">{zoom}×</span>
         </div>
+        {/* Pan toggle (plan 031) — the touch-friendly equivalent of middle-mouse / hold-Space. While
+            on, a drag anywhere pans instead of drawing/moving a box. A real tap target on compact. */}
+        <Button
+          type="button"
+          variant={panMode ? 'default' : 'outline'}
+          size={isCompact ? 'default' : 'sm'}
+          aria-pressed={panMode}
+          className="shrink-0"
+          onClick={() => setPanMode((v) => !v)}
+        >
+          {panMode ? '✋ Panning' : '✋ Pan'}
+        </Button>
         {!selectedBox && (
           <p className="grow shrink basis-[260px] text-right text-[0.78rem] leading-[1.4] text-muted-2">
             Double-click a sprite to auto-detect a box around it. Drag on the sheet to draw one by
             hand. Click a box to select it (then move, resize its handles, grid-slice, or Delete).
-            Middle-mouse-drag or hold Space and drag to pan when zoomed in.
+            Toggle <span className="text-fg-dim">✋ Pan</span> (or middle-mouse-drag / hold Space)
+            and drag to pan when zoomed in.
           </p>
         )}
       </div>
 
       <div className="flex flex-wrap items-start gap-4">
         <div
-          className="h-[74vh] max-h-[74vh] min-w-[280px] grow shrink basis-[420px] overflow-auto rounded-[3px] bg-inset"
+          className={cn(
+            'min-w-[280px] grow shrink basis-[420px] overflow-auto rounded-[3px] bg-inset',
+            // On compact the selected-box controls wrap BELOW this pane; a 74vh canvas pushed them a
+            // full screen off the bottom (plan 031). A shorter canvas keeps x/y/w/h + Delete + slice
+            // reachable with a short scroll while still leaving room to pan/zoom the sheet.
+            isCompact ? 'h-[44vh] max-h-[44vh]' : 'h-[74vh] max-h-[74vh]',
+          )}
           ref={viewportRef}
           onPointerEnter={() => {
             hoveringRef.current = true;
@@ -943,7 +981,7 @@ function RegionsEditor({
             ref={canvasRef}
             className={cn(
               'pixelated relative cursor-crosshair overflow-hidden rounded-[3px] bg-inset bg-no-repeat outline-none touch-none',
-              spaceHeld && 'cursor-grab',
+              (spaceHeld || panMode) && 'cursor-grab',
               isPanning && 'cursor-grabbing',
             )}
             tabIndex={0}
@@ -993,7 +1031,14 @@ function RegionsEditor({
         </div>
 
         {selectedBox && (
-          <div className="flex min-w-[180px] max-w-[260px] grow shrink basis-[200px] flex-col gap-3">
+          <div
+            className={cn(
+              'flex min-w-[180px] grow shrink basis-[200px] flex-col gap-3',
+              // Desktop: a slim side column beside the canvas. Compact: full-width under it (the canvas
+              // takes the whole row first), so the box fields aren't squeezed into a narrow gutter.
+              isCompact ? 'basis-full' : 'max-w-[260px]',
+            )}
+          >
             <div className="flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-2">
                 {(['x', 'y', 'w', 'h'] as const).map((f) => (
