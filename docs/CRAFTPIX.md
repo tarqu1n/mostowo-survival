@@ -89,6 +89,18 @@ to the ingest boundary; the core only ever sees one convention.
   <cellW> <cellH> up,down,left,right`.
 - **Single-row sheets aren't sliced** (Guildmaster, Talking*, Reader) — they're already strips.
 
+#### Column-animation Fx sheets are sliced too (the transpose case)
+
+Some **Home/Fx ambient anims** pack the *other* way: each animation is a **vertical column**
+whose frames run **top-to-bottom**, several columns side by side (`cat_animation.png` is one column;
+`Trees_animation.png` is a 9×13 grid of 64×80 cells — 9 tree anims × 13 sway frames). That's the
+transpose of a directional sheet, so the same normalise-at-ingest rule applies: `slice.py`'s
+`slice_columns` (the complement of `slice_directional`) **transposes each column into a horizontal
+strip** — column `c`'s frames become one `<base>_<label>.png` clip. `Trees_animation.png` → 9 strips
+(`Trees_animation_{green,apple,dark}_{lg,md,sm}.png`), labels = 3 species × 3 sizes. Cells are
+non-square (64×80), so each strip gets a `frames: 13` override exactly like the mage's 64×52 rows.
+Driven by `ingest.py` (`slice_into(..., by_column=True)`); raw sheet kept in `Home/Fx/_src/`.
+
 ## What was imported (record)
 
 Licence for all: free personal/commercial, alterable, **no reselling/redistributing standalone**
@@ -106,7 +118,7 @@ assets.
 ||GuildHall|6 env + 2 fx + 14 sliced + 6 passthrough|characters no-shadow, sliced to per-direction strips|
 ||Chapel|5 env + 4 props + 58 char strips|monks/priest pre-separated per-direction (no slicing); Parishioner packed sheets skipped|
 ||Workshop|6 env + 2 fx + 4 NPC sheets|forge + glassblower NPCs; Master is a packed sheet (grid-tune in-editor)|
-||Home|5 env + 5 fx|player-home/base set (walls/floor/interior + ambient bird/cat/tree/smoke anims)|
+||Home|5 env + 4 fx + 9 tree strips|player-home/base set (walls/floor/interior + ambient bird/cat/smoke anims); `Trees_animation` column-sliced into 9 per-tree sway strips|
 ||Traps|86 (Spikes/Barricades/Lightning/Barrel)|base-defense props; barricades have build/destroy + D/S/U facings; kept as objects|
 |`craftpix-creatures`|Fox/Boar/Deer/Hare/Black_grouse (wildlife)|104 strips|32px, 26 sheets × 4 dirs, sliced, no-shadow|
 ||Orc1-3 + Slime1-3 (mobs)|168 strips|64px, 42 sheets × 4 dirs, sliced, no-shadow|
@@ -118,6 +130,8 @@ assets.
 - **Actors need wiring.** animals + guild `Characters/` are ingested (browsable) but not spawnable —
   needs typed data + `ActorRender`/`StripAnim` + spawn logic + `anims.create`, per the skeleton/bat
   pattern. Confirm each species' row→facing (esp. grouse `Flight`) when wiring.
-- **Fx/animation sheets** (undead `Animation*`, guild `Fire`/`Flags_animation`) catalog as 1 unsliced
-  frame (the benign warnings); set their grids in the in-editor object editor when used.
+- **Fx/animation sheets** (undead `Animation*`, guild `Fire`/`Flags_animation`, and the remaining Home
+  `bird_*`/`cat`/`Smoke` anims) catalog as 1 unsliced frame (the benign warnings); set their grids in
+  the in-editor object editor when used, or — for the vertical-column ones like `cat_animation` — slice
+  them with `slice_columns` as `Trees_animation` now is (see the transpose case above).
 - **Shadow-strip the horror set** (undead/cursed/rocky-area) if a shadowless look is wanted there too.

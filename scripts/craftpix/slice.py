@@ -58,12 +58,54 @@ def slice_directional(src, dest_dir, base, cell_w, cell_h, dirs):
     return out
 
 
+def slice_columns(src, dest_dir, base, cell_w, cell_h, labels):
+    """Cut a COLUMN-animation sheet into one horizontal `<base>_<label>.png` strip per column.
+
+    The complement of `slice_directional`: some CraftPix sheets (the Home/Fx
+    ambient anims — trees, cat) pack each animation as a VERTICAL column with its
+    frames running TOP-TO-BOTTOM, several such animations side by side. Our
+    StripAnim model is one-file = one-HORIZONTAL-strip = one clip, so we transpose
+    each column into a horizontal strip: column `c`'s `rows` frames become a
+    `rows*cell_w` wide x `cell_h` tall strip, frame `r` placed at x = r*cell_w.
+
+    `labels` names the columns left-to-right (e.g. tree species/size). Returns
+    [(rel_filename, frames, non_square)] — mirroring `slice_directional` so the
+    caller emits the same `frames` override for non-square cells (a transposed
+    strip's cell keeps the source `cell_w`x`cell_h`, so trees' 64x80 cells need a
+    `frames` override just like the mage's 64x52 rows do).
+    """
+    im = Image.open(src).convert("RGBA")
+    w, h = im.size
+    if w % cell_w or h % cell_h:
+        raise ValueError(f"{src}: {w}x{h} not divisible by cell {cell_w}x{cell_h}")
+    cols, rows = w // cell_w, h // cell_h
+    if cols != len(labels):
+        raise ValueError(f"{src}: {cols} columns but {len(labels)} labels {labels}")
+    os.makedirs(dest_dir, exist_ok=True)
+    out = []
+    for c, label in enumerate(labels):
+        strip = Image.new("RGBA", (rows * cell_w, cell_h), (0, 0, 0, 0))
+        for r in range(rows):
+            cell = im.crop((c * cell_w, r * cell_h, (c + 1) * cell_w, (r + 1) * cell_h))
+            strip.paste(cell, (r * cell_w, 0))
+        name = f"{base}_{label}.png"
+        strip.save(os.path.join(dest_dir, name))
+        out.append((name, rows, cell_w != cell_h))
+    return out
+
+
 if __name__ == "__main__":
-    # Manual re-slice from a committed _src sheet:
-    #   slice.py <src.png> <dest_dir> <base> <cellW> <cellH> up,down,left,right
-    src, dest_dir, base, cw, ch, dirs = sys.argv[1:7]
-    for name, cols, non_square in slice_directional(
-        src, dest_dir, base, int(cw), int(ch), dirs.split(",")
-    ):
-        flag = f"  (non-square: needs frames:{cols})" if non_square else ""
-        print(f"  wrote {name}  frames={cols}{flag}")
+    # Manual re-slice from a committed _src sheet. Two modes:
+    #   rows  (directional): slice.py <src.png> <dest> <base> <cellW> <cellH> up,down,left,right
+    #   cols  (column anims): slice.py --columns <src.png> <dest> <base> <cellW> <cellH> lbl0,lbl1,...
+    if sys.argv[1:2] == ["--columns"]:
+        src, dest_dir, base, cw, ch, labels = sys.argv[2:8]
+        fn, unit = slice_columns, "frames"
+        rows_or_dirs = labels.split(",")
+    else:
+        src, dest_dir, base, cw, ch, dirs = sys.argv[1:7]
+        fn, unit = slice_directional, "frames"
+        rows_or_dirs = dirs.split(",")
+    for name, n, non_square in fn(src, dest_dir, base, int(cw), int(ch), rows_or_dirs):
+        flag = f"  (non-square: needs frames:{n})" if non_square else ""
+        print(f"  wrote {name}  {unit}={n}{flag}")

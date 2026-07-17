@@ -61,6 +61,33 @@
     },
     "GuildHall/Characters/Mage4_up.png": {
       "frames": 7
+    },
+    "Home/Fx/Trees_animation_green_lg.png": {
+      "frames": 13
+    },
+    "Home/Fx/Trees_animation_green_md.png": {
+      "frames": 13
+    },
+    "Home/Fx/Trees_animation_green_sm.png": {
+      "frames": 13
+    },
+    "Home/Fx/Trees_animation_apple_lg.png": {
+      "frames": 13
+    },
+    "Home/Fx/Trees_animation_apple_md.png": {
+      "frames": 13
+    },
+    "Home/Fx/Trees_animation_apple_sm.png": {
+      "frames": 13
+    },
+    "Home/Fx/Trees_animation_dark_lg.png": {
+      "frames": 13
+    },
+    "Home/Fx/Trees_animation_dark_md.png": {
+      "frames": 13
+    },
+    "Home/Fx/Trees_animation_dark_sm.png": {
+      "frames": 13
     }
   },
   "exclude": [

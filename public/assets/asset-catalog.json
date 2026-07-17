@@ -18900,26 +18900,220 @@
       "frames": 6
     },
     {
-      "id": "craftpix-dungeon/Home/Fx/Trees_animation.png",
+      "id": "craftpix-dungeon/Home/Fx/Trees_animation_apple_lg.png",
       "pack": "craftpix-dungeon",
       "type": "strip",
       "source": {
         "kind": "image",
-        "path": "Home/Fx/Trees_animation.png"
+        "path": "Home/Fx/Trees_animation_apple_lg.png"
       },
-      "w": 576,
-      "h": 1040,
+      "w": 832,
+      "h": 80,
+      "category": "Home/Fx",
+      "tags": [
+        "animation",
+        "apple",
+        "fx",
+        "home",
+        "lg",
+        "trees"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 80,
+      "frames": 13
+    },
+    {
+      "id": "craftpix-dungeon/Home/Fx/Trees_animation_apple_md.png",
+      "pack": "craftpix-dungeon",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Home/Fx/Trees_animation_apple_md.png"
+      },
+      "w": 832,
+      "h": 80,
+      "category": "Home/Fx",
+      "tags": [
+        "animation",
+        "apple",
+        "fx",
+        "home",
+        "md",
+        "trees"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 80,
+      "frames": 13
+    },
+    {
+      "id": "craftpix-dungeon/Home/Fx/Trees_animation_apple_sm.png",
+      "pack": "craftpix-dungeon",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Home/Fx/Trees_animation_apple_sm.png"
+      },
+      "w": 832,
+      "h": 80,
+      "category": "Home/Fx",
+      "tags": [
+        "animation",
+        "apple",
+        "fx",
+        "home",
+        "sm",
+        "trees"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 80,
+      "frames": 13
+    },
+    {
+      "id": "craftpix-dungeon/Home/Fx/Trees_animation_dark_lg.png",
+      "pack": "craftpix-dungeon",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Home/Fx/Trees_animation_dark_lg.png"
+      },
+      "w": 832,
+      "h": 80,
+      "category": "Home/Fx",
+      "tags": [
+        "animation",
+        "dark",
+        "fx",
+        "home",
+        "lg",
+        "trees"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 80,
+      "frames": 13
+    },
+    {
+      "id": "craftpix-dungeon/Home/Fx/Trees_animation_dark_md.png",
+      "pack": "craftpix-dungeon",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Home/Fx/Trees_animation_dark_md.png"
+      },
+      "w": 832,
+      "h": 80,
+      "category": "Home/Fx",
+      "tags": [
+        "animation",
+        "dark",
+        "fx",
+        "home",
+        "md",
+        "trees"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 80,
+      "frames": 13
+    },
+    {
+      "id": "craftpix-dungeon/Home/Fx/Trees_animation_dark_sm.png",
+      "pack": "craftpix-dungeon",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Home/Fx/Trees_animation_dark_sm.png"
+      },
+      "w": 832,
+      "h": 80,
+      "category": "Home/Fx",
+      "tags": [
+        "animation",
+        "dark",
+        "fx",
+        "home",
+        "sm",
+        "trees"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 80,
+      "frames": 13
+    },
+    {
+      "id": "craftpix-dungeon/Home/Fx/Trees_animation_green_lg.png",
+      "pack": "craftpix-dungeon",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Home/Fx/Trees_animation_green_lg.png"
+      },
+      "w": 832,
+      "h": 80,
       "category": "Home/Fx",
       "tags": [
         "animation",
         "fx",
+        "green",
         "home",
+        "lg",
         "trees"
       ],
       "origin": "pack",
-      "frameWidth": 576,
-      "frameHeight": 1040,
-      "frames": 1
+      "frameWidth": 64,
+      "frameHeight": 80,
+      "frames": 13
+    },
+    {
+      "id": "craftpix-dungeon/Home/Fx/Trees_animation_green_md.png",
+      "pack": "craftpix-dungeon",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Home/Fx/Trees_animation_green_md.png"
+      },
+      "w": 832,
+      "h": 80,
+      "category": "Home/Fx",
+      "tags": [
+        "animation",
+        "fx",
+        "green",
+        "home",
+        "md",
+        "trees"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 80,
+      "frames": 13
+    },
+    {
+      "id": "craftpix-dungeon/Home/Fx/Trees_animation_green_sm.png",
+      "pack": "craftpix-dungeon",
+      "type": "strip",
+      "source": {
+        "kind": "image",
+        "path": "Home/Fx/Trees_animation_green_sm.png"
+      },
+      "w": 832,
+      "h": 80,
+      "category": "Home/Fx",
+      "tags": [
+        "animation",
+        "fx",
+        "green",
+        "home",
+        "sm",
+        "trees"
+      ],
+      "origin": "pack",
+      "frameWidth": 64,
+      "frameHeight": 80,
+      "frames": 13
     },
     {
       "id": "craftpix-dungeon/Traps/Barrel/1.png",

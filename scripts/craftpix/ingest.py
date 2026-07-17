@@ -21,7 +21,7 @@ import os
 import re
 import shutil
 
-from slice import ANIMALS_DIRS, GUILD_DIRS, slice_directional
+from slice import ANIMALS_DIRS, GUILD_DIRS, slice_columns, slice_directional
 
 STAGE = ("/private/tmp/claude-502/-Users-matthew-langley-Work-mostowo-survival/"
          "5a901376-08be-4a80-a4a8-acbfad5056af/scratchpad/craftpix-stage")
@@ -138,20 +138,25 @@ def write_pack(pid, name, source_url, rules, exclude=None, overrides=None,
 
 
 def slice_into(src_sheet, pack_id, src_rel_dir, out_rel_dir, base, cw, ch, dirs,
-               overrides):
-    """Copy raw sheet to `_src` (re-slice source) and write per-direction strips.
+               overrides, *, by_column=False):
+    """Copy raw sheet to `_src` (re-slice source) and write per-clip strips.
 
-    Records a frames override for any non-square-cell strip.
+    `by_column=False` (default) slices ROWS into per-direction strips
+    (`slice_directional`, rows = facings); `by_column=True` transposes COLUMNS
+    into per-column horizontal strips (`slice_columns`, cols = separate anims,
+    frames run top-to-bottom). Either way, records a `frames` override for any
+    non-square-cell strip so the catalog plays the right frame count.
     """
     pack_dir = os.path.join(DEST_ROOT, pack_id)
     src_keep = os.path.join(pack_dir, src_rel_dir)
     os.makedirs(src_keep, exist_ok=True)
     shutil.copy2(src_sheet, os.path.join(src_keep, os.path.basename(src_sheet)))
     out_dir = os.path.join(pack_dir, out_rel_dir)
-    for name, cols, non_square in slice_directional(src_sheet, out_dir, base, cw, ch, dirs):
+    cut = slice_columns if by_column else slice_directional
+    for name, frames, non_square in cut(src_sheet, out_dir, base, cw, ch, dirs):
         if non_square:
             rel = os.path.join(out_rel_dir, name)
-            overrides[rel] = {"frames": cols}
+            overrides[rel] = {"frames": frames}
 
 
 # ---- wipe old craftpix packs (the 11 flat ones + any prior 4-pack run) -----
@@ -281,7 +286,16 @@ copy_named(dhome, os.path.join(DEST_ROOT, "craftpix-dungeon", "Home/Env"),
             "Interior.png", "walls_floor.png"])
 copy_named(dhome, os.path.join(DEST_ROOT, "craftpix-dungeon", "Home/Fx"),
            ["bird_fly_animation.png", "bird_jump_animation.png", "cat_animation.png",
-            "Smoke_animation.png", "Trees_animation.png"])
+            "Smoke_animation.png"])
+# Trees_animation.png packs 9 tree anims as VERTICAL columns (each column's 13
+# sway frames run top-to-bottom) on a 9x13 grid of 64x80 cells — the opposite of
+# our horizontal-strip model. Transpose each column into a per-tree horizontal
+# strip (labels = 3 species x 3 sizes). Raw sheet kept under Home/Fx/_src.
+TREE_LABELS = ["green_lg", "green_md", "green_sm", "apple_lg", "apple_md",
+               "apple_sm", "dark_lg", "dark_md", "dark_sm"]
+slice_into(os.path.join(dhome, "Trees_animation.png"), "craftpix-dungeon",
+           "Home/Fx/_src", "Home/Fx", "Trees_animation", 64, 80, TREE_LABELS,
+           dungeon_overrides, by_column=True)
 # Magic & Traps — base-defense props (spikes, barricades w/ build-destroy, lightning,
 # barrels). Numbered source folders renamed to clean names; kept as objects.
 dmagic = content_root("magic")
