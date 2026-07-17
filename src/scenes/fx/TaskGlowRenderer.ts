@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { COLORS } from '../../config';
 import { tileToWorldCenter } from '../../systems/grid';
+import { SUB_ROW_EPSILON } from '../../systems/mapFormat';
 import { bakeGlowTexture } from '../../render/glowTexture';
 import type { Action } from '../../systems/tasks';
 import type { TreeNode, BuildSite, CampfireUnit } from '../../entities/types';
@@ -122,8 +123,13 @@ export class TaskGlowRenderer {
         tree.sprite.displayOriginY + glow.pad,
       )
       .setScale(tree.sprite.scaleX, tree.sprite.scaleY)
-      .setDepth(tree.sprite.depth - 0.5); // 0.5 below its own node — relative, so it tracks the node's
-    // base-row y-sort depth (~0.5 + row fraction) and always sits just under that node.
+      // One sub-row epsilon below its own node — relative, so it tracks the node's base-row y-sort
+      // depth and sits just under that node while staying INSIDE the node's own row slot. A larger
+      // offset (this used to be a full 0.5) drops the halo below the integer tile-layer band: a node
+      // near the top of the map sits at depth ~1.0x, so `-0.5` landed the halo at ~0.5x — under the
+      // depth-1 ground layer — and shoreline/ground tiles drew over it (the halo read as "behind the
+      // tiles"). Mirrors CampfireManager stacking its flame `+ SUB_ROW_EPSILON` above its base.
+      .setDepth(tree.sprite.depth - SUB_ROW_EPSILON);
     this.glowSprites.set(tree.id, img);
     if (pulse) {
       img.setAlpha(0.65);
