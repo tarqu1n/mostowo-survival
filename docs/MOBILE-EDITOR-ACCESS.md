@@ -8,7 +8,17 @@ own machine). This is the "test the editor on my phone" workflow.
 auth key**, and Claude runs [`scripts/phone-editor.sh`](../scripts/phone-editor.sh). It
 joins the container to your Tailnet and gives you an IP URL to open on your phone.
 
-## Why it needs a trick
+## Alternative: run it on an always-on box (no cloud session)
+
+If you have a machine that's always on and already on your Tailnet, host the editor **there**
+instead of inside an ephemeral cloud session — then it's just "open the URL", no auth-key dance and
+no losing work when a chat goes idle. That's the recommended setup: the editor runs as a Docker
+container behind `tailscale serve` (HTTPS), with `EDITOR_AUTOCOMMIT=1` so every save still lands on
+GitHub. The `EDITOR_ALLOWED_HOSTS` env var (see `vite.config.ts`) whitelists the proxy's hostname so
+Vite doesn't block it. Home-server runbook lives with that box's infra, not here. The rest of this
+doc covers the harder **cloud-container** case.
+
+## Why it needs a trick (cloud container only)
 
 The cloud container is a locked box:
 

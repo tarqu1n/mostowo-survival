@@ -27,6 +27,18 @@ export default defineConfig(({ command }) => ({
     },
   },
   server: {
+    // Hosts the dev server will answer to, beyond the always-allowed localhost/IP. Vite's
+    // dev-server host check (a DNS-rebinding guard) otherwise returns "Blocked request." for an
+    // unknown Host header — which is exactly what a reverse proxy in front of the editor sends.
+    // Off (undefined) for normal desktop dev; set `EDITOR_ALLOWED_HOSTS` (comma-separated) when
+    // fronting the editor with a proxy — e.g. running it on guppi behind `tailscale serve`, where
+    // the phone hits `https://<host>.ts.net:<port>` and the Host header is that MagicDNS name.
+    // See docs/MOBILE-EDITOR-ACCESS.md.
+    allowedHosts: process.env.EDITOR_ALLOWED_HOSTS
+      ? process.env.EDITOR_ALLOWED_HOSTS.split(',')
+          .map((h) => h.trim())
+          .filter(Boolean)
+      : undefined,
     watch: {
       // The Map Builder editor (dev-only) writes these on Save: map/world/nodes JSON + the
       // regenerated manifest.json (`scripts/vite-editor-api.mjs`), the thumbnail PNGs, and captured
