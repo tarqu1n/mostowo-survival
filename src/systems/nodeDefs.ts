@@ -24,12 +24,19 @@ import { ITEMS } from '../data/items';
  *  present it must be a positive number. */
 export interface NodeSkinDef {
   id: string;
+  /** Optional display-name override — the Node Types panel and Inspector label a skin by this when
+   *  present, else fall back to its `id`. Purely cosmetic (labelling), never gameplay. */
+  name?: string;
   /** Asset-catalog id (same id space as `DecorObject.asset` in `mapFormat.ts`). */
   asset: string;
   /** Static atlas-sprite crop into `asset`'s source PNG — same shape as `DecorObject.region`. */
   region?: DecorRegion;
   /** Alternate look while this node instance is depleted (post-harvest, pre-regrow). */
   depleted?: { asset: string; region?: DecorRegion };
+  /** Per-skin max-HP OVERRIDE (a node's HP = its total harvest hits, so a smaller tree with a lower
+   *  `maxHp` yields less wood over its life). Omitted ⇒ inherit the def's `maxHp`; must be > 0 when
+   *  present. Applied at spawn/regrow by `ResourceNodeManager` (see its `addNode`). */
+  maxHp?: number;
   /** Relative random-pick weight (see `pickWeighted`); omitted ⇒ defaults to 1. */
   weight?: number;
   /** Display-scale override (see `AuthoredNodeDef.scale`); omitted ⇒ inherit the def's default. */
@@ -178,9 +185,11 @@ function parseDepleted(value: unknown, path: string): { asset: string; region?: 
 
 const NODE_SKIN_KEYS = [
   'id',
+  'name',
   'asset',
   'region',
   'depleted',
+  'maxHp',
   'weight',
   'scale',
   'originX',
@@ -193,6 +202,7 @@ function parseNodeSkin(value: unknown, path: string): NormalizedNodeSkinDef {
 
   const id = expectString(obj.id, `${path}.id`);
   if (id.length === 0) fail(`${path}.id must be a non-empty string`);
+  const name = obj.name === undefined ? undefined : expectString(obj.name, `${path}.name`);
   const asset = expectNonEmptyString(obj.asset, `${path}.asset`);
 
   const region =
@@ -208,6 +218,9 @@ function parseNodeSkin(value: unknown, path: string): NormalizedNodeSkinDef {
     if (weight <= 0) fail(`${path}.weight must be > 0 (got ${weight})`);
   }
 
+  const maxHp = obj.maxHp === undefined ? undefined : expectNumber(obj.maxHp, `${path}.maxHp`);
+  if (maxHp !== undefined && maxHp <= 0) fail(`${path}.maxHp must be > 0 (got ${maxHp})`);
+
   const scale = obj.scale === undefined ? undefined : expectNumber(obj.scale, `${path}.scale`);
   if (scale !== undefined && scale <= 0) fail(`${path}.scale must be > 0 (got ${scale})`);
   const originX =
@@ -217,9 +230,11 @@ function parseNodeSkin(value: unknown, path: string): NormalizedNodeSkinDef {
 
   return {
     id,
+    ...(name === undefined ? {} : { name }),
     asset,
     ...(region === undefined ? {} : { region }),
     ...(depleted === undefined ? {} : { depleted }),
+    ...(maxHp === undefined ? {} : { maxHp }),
     weight,
     ...(scale === undefined ? {} : { scale }),
     ...(originX === undefined ? {} : { originX }),

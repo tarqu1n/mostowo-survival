@@ -1,7 +1,6 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ITEMS } from '../../data/items';
-import type { DecorRegion } from '../../systems/mapFormat';
 import { parseNodeDefs, type AuthoredNodeDef, type NodeSkinDef } from '../../systems/nodeDefs';
 import { putNodes } from '../api';
 import type { AssetCatalog } from '../catalog';
@@ -9,12 +8,12 @@ import { cn } from '../lib/utils';
 import { NodeSpritePickerDialog } from '../NodeSpritePickerDialog';
 import { useIsCompact } from '../hooks/useIsCompact';
 import { colorToHex, hexToColor, validateNodeDefPatch } from '../nodeTypesUi';
-import { PLACEHOLDER_SKIN_ASSET, useEditorStore } from '../store/editorStore';
-import { tilesetAssetUrl } from '../textureLoading';
+import { useEditorStore } from '../store/editorStore';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { SkinThumb } from '../ui/SkinThumb';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 
 /**
@@ -509,77 +508,6 @@ function NodeStatsForm({ def, allDefs }: { def: AuthoredNodeDef; allDefs: Author
   );
 }
 
-/** One 40px crop-or-whole thumbnail for a skin's `asset`/`region` — mirrors the crop math
- *  `LibraryPanel`'s `AtlasSheetPicker`/`FavouriteItem` use for a static preview, kept self-contained
- *  here rather than shared (see `NodeSpritePickerDialog`'s module doc on why extraction was skipped). */
-function SpriteThumb({
-  assetId,
-  region,
-  catalog,
-}: {
-  assetId: string;
-  region?: DecorRegion;
-  catalog: AssetCatalog | null;
-}) {
-  const size = 40;
-  if (assetId === PLACEHOLDER_SKIN_ASSET) {
-    return (
-      <div
-        className="flex items-center justify-center rounded-[2px] border border-dashed border-border bg-inset text-center text-[0.6rem] leading-tight text-muted-2"
-        style={{ width: size, height: size }}
-      >
-        unset
-      </div>
-    );
-  }
-  const asset = catalog?.assets.find((a) => a.id === assetId);
-  if (!asset) {
-    return (
-      <div
-        className="flex items-center justify-center rounded-[2px] border border-danger-strong bg-inset text-center text-[0.6rem] leading-tight text-danger"
-        style={{ width: size, height: size }}
-        title={assetId}
-      >
-        missing
-      </div>
-    );
-  }
-  const path = asset.source.kind === 'sheetFrame' ? asset.source.sheet : asset.source.path;
-  const url = tilesetAssetUrl(asset.pack, path);
-  if (region) {
-    // Scale so the region's LARGER dimension fits the 40px slot, then clip to the region's own
-    // scaled size (NOT a fixed 40×40) — a fixed square clip on a non-square region (e.g. a tall,
-    // narrow tree) leaves the box wider/taller than the region and reveals adjacent sheet content
-    // (the neighbouring sprite). The region-sized crop is centred in the 40px slot.
-    const scale = size / Math.max(region.w, region.h);
-    return (
-      <div
-        className="flex items-center justify-center rounded-[2px] bg-inset"
-        style={{ width: size, height: size }}
-        title={assetId}
-      >
-        <div
-          className="pixelated overflow-hidden bg-no-repeat"
-          style={{
-            width: region.w * scale,
-            height: region.h * scale,
-            backgroundImage: `url(${url})`,
-            backgroundPosition: `${-region.x * scale}px ${-region.y * scale}px`,
-            backgroundSize: `${asset.w * scale}px ${asset.h * scale}px`,
-          }}
-        />
-      </div>
-    );
-  }
-  return (
-    <div
-      className="pixelated rounded-[2px] bg-inset bg-contain bg-center bg-no-repeat"
-      style={{ width: size, height: size, backgroundImage: `url(${url})` }}
-      title={assetId}
-    />
-  );
-}
-
 type PickerTarget = { skinId: string; which: 'live' | 'depleted' };
 
 function SkinManager({
@@ -623,7 +551,7 @@ function SkinManager({
         {!expanded && (
           <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
             {def.skins.map((skin) => (
-              <SpriteThumb
+              <SkinThumb
                 key={skin.id}
                 assetId={skin.asset}
                 region={skin.region}
@@ -714,7 +642,8 @@ function SkinRow({
   return (
     <div className="flex flex-col gap-2 rounded-md border border-surface bg-raised p-2">
       <div className="flex items-center gap-2">
-        <span className="text-[0.78rem] text-fg">{skin.id}</span>
+        <span className="text-[0.78rem] text-fg">{skin.name || skin.id}</span>
+        {skin.name && <span className="text-[0.68rem] text-muted-2">{skin.id}</span>}
         {index === 0 && (
           <span className="rounded-full bg-gold-light px-1.5 py-0.5 text-[0.65rem] font-semibold text-black">
             Default
@@ -770,7 +699,7 @@ function SkinRow({
 
       <div className="flex gap-3">
         <div className="flex flex-col items-center gap-1">
-          <SpriteThumb assetId={skin.asset} region={skin.region} catalog={catalog} />
+          <SkinThumb assetId={skin.asset} region={skin.region} catalog={catalog} />
           <Button
             size="sm"
             variant="outline"
@@ -782,7 +711,7 @@ function SkinRow({
         </div>
         <div className="flex flex-col items-center gap-1">
           {skin.depleted ? (
-            <SpriteThumb
+            <SkinThumb
               assetId={skin.depleted.asset}
               region={skin.depleted.region}
               catalog={catalog}
@@ -820,11 +749,25 @@ function SkinRow({
         </div>
 
         <div className="flex flex-1 flex-col gap-1.5">
-          <NumField
-            label="Weight"
-            value={skin.weight ?? 1}
-            onCommit={(weight) => useEditorStore.getState().updateSkin(def.id, skin.id, { weight })}
+          <OptionalTextField
+            label="Name (override)"
+            value={skin.name}
+            onCommit={(name) => useEditorStore.getState().updateSkin(def.id, skin.id, { name })}
           />
+          <div className="flex gap-1.5">
+            <NumField
+              label="Weight"
+              value={skin.weight ?? 1}
+              onCommit={(weight) =>
+                useEditorStore.getState().updateSkin(def.id, skin.id, { weight })
+              }
+            />
+            <OptionalNumField
+              label="Max HP (override)"
+              value={skin.maxHp}
+              onCommit={(maxHp) => useEditorStore.getState().updateSkin(def.id, skin.id, { maxHp })}
+            />
+          </div>
           <div className="flex gap-1.5">
             <OptionalNumField
               label="Scale (override)"
@@ -919,6 +862,43 @@ function OptionalNumField({
           }
           const n = Number(raw);
           if (Number.isFinite(n) && n !== value) onCommit(n);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        }}
+      />
+    </div>
+  );
+}
+
+/** An OPTIONAL text override field (a skin's display `name`) — blank commits `undefined` ("fall back
+ *  to the skin id"), matching `NodeSkinDef.name`'s "omitted ⇒ inherit the id-based label" semantics.
+ *  The text mirror of `OptionalNumField`. */
+function OptionalTextField({
+  label,
+  value,
+  onCommit,
+}: {
+  label: string;
+  value: string | undefined;
+  onCommit: (v: string | undefined) => void;
+}) {
+  const id = useId();
+  return (
+    <div className={cn(fieldClass, 'flex-1')}>
+      <Label htmlFor={id} className={cn(fieldLabelClass, 'text-[0.7rem]')}>
+        {label}
+      </Label>
+      <Input
+        id={id}
+        placeholder="default"
+        defaultValue={value ?? ''}
+        key={value ?? '__unset__'}
+        className={fieldInputClass}
+        onBlur={(e) => {
+          const raw = e.target.value.trim();
+          const next = raw === '' ? undefined : raw;
+          if (next !== value) onCommit(next);
         }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur();

@@ -6,9 +6,11 @@ import { parseNodeDefs, type NodeDefsFile } from '../nodeDefs';
  *  `AuthoredNodeDef`/`NodeSkinDef` types those values are meant to violate. */
 interface RawSkinFixture {
   id: string;
+  name?: string;
   asset: string;
   region?: { x: number; y: number; w: number; h: number };
   depleted?: { asset: string; region?: { x: number; y: number; w: number; h: number } };
+  maxHp?: number;
   weight?: number;
   scale?: number;
   originX?: number;
@@ -65,9 +67,11 @@ function validRaw(): RawFileFixture {
           { id: 'pine', asset: 'pixel-crawler/pine.png' },
           {
             id: 'oak',
+            name: 'Grand Oak',
             asset: 'pixel-crawler/oak.png',
             region: { x: 0, y: 0, w: 32, h: 48 },
             depleted: { asset: 'pixel-crawler/oak-stump.png' },
+            maxHp: 6,
             weight: 2,
             scale: 1.5,
             originX: 0.5,
@@ -120,6 +124,29 @@ describe('parseNodeDefs', () => {
     expect(oak.region).toEqual({ x: 0, y: 0, w: 32, h: 48 });
     expect(oak.depleted).toEqual({ asset: 'pixel-crawler/oak-stump.png' });
     expect(oak.scale).toBe(1.5);
+  });
+
+  it('passes through optional per-skin name + maxHp overrides, omitting them when absent', () => {
+    const result = parseNodeDefs(validRaw());
+    const [pine, oak] = result.tree.skins;
+    expect(pine.name).toBeUndefined(); // omitted -> inherit the id-based label
+    expect(pine.maxHp).toBeUndefined(); // omitted -> inherit the def's maxHp
+    expect(oak.name).toBe('Grand Oak');
+    expect(oak.maxHp).toBe(6);
+  });
+
+  it('rejects a non-positive per-skin maxHp override', () => {
+    const raw = withRaw((r) => {
+      r.defs[0].skins[1].maxHp = 0;
+    });
+    expect(() => parseNodeDefs(raw)).toThrow(/skins\[1\]\.maxHp must be > 0/);
+  });
+
+  it('rejects a non-string per-skin name override', () => {
+    const raw = withRaw((r) => {
+      (r.defs[0].skins[1] as unknown as Record<string, unknown>).name = 42;
+    });
+    expect(() => parseNodeDefs(raw)).toThrow(/skins\[1\]\.name must be a string/);
   });
 
   it('defaults a def scale to 1.0 (native) when omitted', () => {

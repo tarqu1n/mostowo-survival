@@ -12,6 +12,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { RotationWheel } from '../ui/RotationWheel';
+import { SkinThumb } from '../ui/SkinThumb';
 import { cn } from '../lib/utils';
 import { useIsCompact } from '../hooks/useIsCompact';
 
@@ -300,8 +301,9 @@ function DecorFields({ obj }: { obj: DecorObject }) {
 function NodeFields({ obj }: { obj: NodeObject }) {
   const skinId = useId();
   const isCompact = useIsCompact();
-  // Subscribe so the picker refreshes if the def's skins change while a node is selected.
+  // Subscribe so the picker/preview refresh if the def's skins change while a node is selected.
   const def = useEditorStore((s) => s.nodeDefsParsed[obj.ref]);
+  const catalog = useEditorStore((s) => s.catalog);
   const update = (
     patch: Partial<Pick<NodeObject, 'col' | 'row' | 'skin' | 'rotation' | 'depthBias'>>,
   ): void => {
@@ -310,9 +312,40 @@ function NodeFields({ obj }: { obj: NodeObject }) {
     }
   };
   const skins = def?.skins ?? [];
+  // The skin this instance actually renders: its explicit `skin` override, else the def's default
+  // (first skin) — the same fallback `ResourceNodeManager.resolveSkin` uses at runtime. Drives the
+  // preview image + its caption.
+  const currentSkin = skins.find((s) => s.id === (obj.skin ?? skins[0]?.id)) ?? skins[0];
+  const effectiveMaxHp = currentSkin?.maxHp ?? def?.maxHp;
   return (
     <div className={fieldsWrapperClass}>
-      <p className={placeholderClass}>Node: {obj.ref}</p>
+      <p className={placeholderClass}>Node: {def?.name || obj.ref}</p>
+      {/* Live preview of the selected node's actual skin (plan: "see the image when selecting a tree").
+          Cropped/anchored like the Node Types swatches; the caption names the skin + its effective HP. */}
+      {currentSkin && (
+        <div className="flex items-center gap-2">
+          <SkinThumb
+            assetId={currentSkin.asset}
+            region={currentSkin.region}
+            catalog={catalog}
+            size={isCompact ? 80 : 64}
+            className="border border-surface"
+          />
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="truncate text-[0.82rem] text-fg">
+              {currentSkin.name || currentSkin.id}
+            </span>
+            {effectiveMaxHp !== undefined && (
+              <span className={cn(placeholderClass, 'text-[0.72rem]')}>
+                Max HP {effectiveMaxHp}
+                {currentSkin.maxHp !== undefined && def && currentSkin.maxHp !== def.maxHp
+                  ? ' (skin override)'
+                  : ''}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
       <div className={rowClass}>
         <NumberField label="Col" value={obj.col} onCommit={(col) => update({ col })} />
         <NumberField label="Row" value={obj.row} onCommit={(row) => update({ row })} />
@@ -360,7 +393,7 @@ function NodeFields({ obj }: { obj: NodeObject }) {
             <SelectContent>
               {skins.map((s, i) => (
                 <SelectItem key={s.id} value={s.id} className={cn(isCompact && 'py-2.5 text-base')}>
-                  {s.id}
+                  {s.name || s.id}
                   {i === 0 ? ' (default)' : ''}
                 </SelectItem>
               ))}

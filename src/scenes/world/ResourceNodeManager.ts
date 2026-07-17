@@ -116,6 +116,9 @@ export class ResourceNodeManager {
     depthBias = 0,
   ): void {
     const skin = this.resolveSkin(def, skinId);
+    // Per-skin HP override (a smaller tree yields less): the chosen skin's `maxHp` if it set one, else
+    // the def's. Stored on the node so the depletion fraction + regrow reset use the same value.
+    const maxHp = skin.maxHp ?? def.maxHp;
     // Seed `add.image` with the skin's own (preloaded) texture — `applySkinAppearance` below then
     // sizes/anchors it. Falls back to Phaser's always-present `__WHITE` if the asset can't be
     // resolved (a content error the world-integrity test + editor validation catch upstream) so a
@@ -139,7 +142,8 @@ export class ResourceNodeManager {
       id: `${def.id}-${this.nextTreeId++}`,
       sprite,
       def,
-      hp: def.maxHp,
+      hp: maxHp,
+      maxHp,
       alive: true,
       col,
       row,
@@ -259,7 +263,7 @@ export class ResourceNodeManager {
       restY: tileToWorldCenter(tree.row),
       baseScale: base,
       baseAngle: tree.rotation, // recoil/tremble around the authored rotation, not 0 (keeps placement rotation)
-      depletion: (tree.def.maxHp - Math.max(0, tree.hp)) / tree.def.maxHp,
+      depletion: (tree.maxHp - Math.max(0, tree.hp)) / tree.maxHp,
       facing: facing ?? { dCol: 0, dRow: 0 },
     });
     if (tree.hp <= 0) {
@@ -301,7 +305,7 @@ export class ResourceNodeManager {
         // scene clock running), so guard against a sprite destroyed during the regrow window — the
         // breadcrumb'd `spriteAlive:false` case is exactly the shape of a use-after-destroy crash.
         breadcrumb('node', `regrow ${tree.def.id} ${tree.id}`, { spriteAlive: tree.sprite.active });
-        tree.hp = tree.def.maxHp;
+        tree.hp = tree.maxHp;
         tree.alive = true;
         // Restore the live sprite (undoes either the depleted-texture swap or the stumpColor tint).
         this.applySkinAppearance(tree.sprite, tree.def, skin, 'live');

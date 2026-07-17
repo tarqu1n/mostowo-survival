@@ -18,6 +18,10 @@ export interface TreeNode {
    *  path can resolve {@link skin}'s live/depleted sprite without a `NODES` re-lookup (plan 021 step 5). */
   def: ParsedNodeDef;
   hp: number;
+  /** Effective max HP for THIS instance — the chosen {@link skin}'s `maxHp` override when it has one,
+   *  else the def's `maxHp` (plan: per-skin HP so a smaller tree yields less). Total harvest hits =
+   *  this value; drives spawn hp, the chop depletion fraction, and the regrow reset. */
+  maxHp: number;
   alive: boolean;
   col: number;
   row: number;
