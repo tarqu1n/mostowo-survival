@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { serializeMap, parseMap, migrateMap } from '../systems/mapFormat';
 import { getMap, putMap, putThumb } from './api';
 import {
@@ -12,7 +12,24 @@ import { OpenMapDialog } from './OpenMapDialog';
 import { EditMapDialog } from './EditMapDialog';
 import { ShortcutsDialog } from './ShortcutsDialog';
 import { toast } from 'sonner';
-import { ChevronDown, SlidersHorizontal } from 'lucide-react';
+import {
+  Ban,
+  ChevronDown,
+  DoorOpen,
+  Eraser,
+  Hand,
+  Mountain,
+  MousePointer2,
+  PaintBucket,
+  Paintbrush,
+  Pipette,
+  Scissors,
+  SlidersHorizontal,
+  Square,
+  SquareDashed,
+  Stamp,
+  type LucideIcon,
+} from 'lucide-react';
 import { Button } from './ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import {
@@ -30,52 +47,74 @@ import { cn } from './lib/utils';
 
 /** The paint tools + pan + the step-7 object tools + the step-8 collision/zone/shape tools, in
  *  display order. */
-const TOOLS: Array<{ id: EditorTool; label: string; title: string }> = [
-  { id: 'pan', label: 'Pan', title: 'Pan the viewport (also: middle-drag or Space+drag)' },
+const TOOLS: Array<{ id: EditorTool; label: string; title: string; icon: LucideIcon }> = [
+  {
+    id: 'pan',
+    label: 'Pan',
+    title: 'Pan the viewport (also: middle-drag or Space+drag)',
+    icon: Hand,
+  },
   {
     id: 'select',
     label: 'Select',
     title: 'Pick objects (click, shift-click for multi-select), drag to move, Delete to remove',
+    icon: MousePointer2,
   },
-  { id: 'brush', label: 'Brush', title: 'Paint the selected Library asset (drag)' },
-  { id: 'eraser', label: 'Eraser', title: 'Clear cells to empty (drag)' },
-  { id: 'fill', label: 'Fill', title: 'Flood-fill same-value cells' },
-  { id: 'rect', label: 'Rect', title: 'Paint a rectangle (drag)' },
+  {
+    id: 'brush',
+    label: 'Brush',
+    title: 'Paint the selected Library asset (drag)',
+    icon: Paintbrush,
+  },
+  { id: 'eraser', label: 'Eraser', title: 'Clear cells to empty (drag)', icon: Eraser },
+  { id: 'fill', label: 'Fill', title: 'Flood-fill same-value cells', icon: PaintBucket },
+  { id: 'rect', label: 'Rect', title: 'Paint a rectangle (drag)', icon: Square },
   {
     id: 'eyedropper',
     label: 'Pick',
     title:
       'Eyedropper — click a tile or object to sample it and arm it (then switches to the matching paint tool). On desktop: Alt+click with a tile-paint tool.',
+    icon: Pipette,
   },
   {
     id: 'place',
     label: 'Place',
     title: 'Place the object armed in the Library (arm a decor/node asset first)',
+    icon: Stamp,
   },
-  { id: 'portal', label: 'Portal', title: 'Draw a tile rect, then name it + set its facing' },
+  {
+    id: 'portal',
+    label: 'Portal',
+    title: 'Draw a tile rect, then name it + set its facing',
+    icon: DoorOpen,
+  },
   {
     id: 'collision',
     label: 'Collision',
     title:
       'Paint base-terrain walkability (drag = blocked, Alt+drag = walkable). Mode below picks brush/rect/fill.',
+    icon: Ban,
   },
   {
     id: 'zone',
     label: 'Zone',
     title:
       'Paint the active zone (drag = assign, Alt+drag = clear). Select a zone in the Zones panel first.',
+    icon: SquareDashed,
   },
   {
     id: 'shape',
     label: 'Shape',
     title:
       "Carve the map's irregular shape (drag = void, Alt+drag = restore inside). Mode below picks brush/rect/fill.",
+    icon: Scissors,
   },
   {
     id: 'terrain',
     label: 'Terrain',
     title:
       'Paint an autotiled terrain onto the active layer (drag = paint, Alt+drag = erase). Arm a terrain in the Library first; mode below picks brush/rect/fill.',
+    icon: Mountain,
   },
 ];
 
@@ -109,6 +148,101 @@ const OVERLAYS: Array<{ id: keyof EditorOverlays; label: string; title: string }
 /** `.editor-toolbar-group` (plan 020 Step 6) — a row of related controls within the toolbar; every
  *  group shares the same gap/alignment. */
 const groupClass = 'flex items-center gap-1.5';
+
+/** How long a finger must rest on a tool before its name pops (touch has no hover). */
+const LONG_PRESS_MS = 400;
+/** A drag past this many px is a scroll/pan, not a hold — cancels the pending long-press. */
+const LONG_PRESS_MOVE_TOLERANCE_PX = 10;
+
+/**
+ * One tool as an icon button for the compact tool bar (mobile). A tap selects the tool; a
+ * press-and-hold pops a tooltip naming it — the touch stand-in for desktop hover — and the hold
+ * suppresses the follow-up select so reading a tool's name never switches to it. The tooltip is
+ * controlled (`open`) rather than left to Radix's hover/focus, because a coarse pointer has neither.
+ */
+function ToolIconButton({
+  tool,
+  active,
+  disabled,
+  onSelect,
+}: {
+  tool: (typeof TOOLS)[number];
+  active: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const heldRef = useRef(false);
+  const timerRef = useRef<number | undefined>(undefined);
+  const startRef = useRef<{ x: number; y: number } | null>(null);
+  const Icon = tool.icon;
+
+  const clearTimer = (): void => {
+    if (timerRef.current !== undefined) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = undefined;
+    }
+  };
+
+  return (
+    <Tooltip open={open} onOpenChange={setOpen}>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon-lg"
+          aria-label={tool.label}
+          aria-pressed={active}
+          disabled={disabled}
+          className={cn(
+            active ? 'bg-active text-fg-bright hover:bg-active' : 'text-fg-muted hover:bg-surface',
+          )}
+          onPointerDown={(e) => {
+            heldRef.current = false;
+            startRef.current = { x: e.clientX, y: e.clientY };
+            clearTimer();
+            timerRef.current = window.setTimeout(() => {
+              heldRef.current = true;
+              setOpen(true);
+            }, LONG_PRESS_MS);
+          }}
+          onPointerMove={(e) => {
+            const start = startRef.current;
+            if (
+              start &&
+              Math.hypot(e.clientX - start.x, e.clientY - start.y) > LONG_PRESS_MOVE_TOLERANCE_PX
+            ) {
+              clearTimer();
+            }
+          }}
+          onPointerUp={clearTimer}
+          onPointerLeave={() => {
+            clearTimer();
+            setOpen(false);
+          }}
+          onPointerCancel={() => {
+            clearTimer();
+            setOpen(false);
+          }}
+          onClick={() => {
+            // A press-and-hold popped the tooltip — consume the trailing click so the tool doesn't
+            // also switch. Leave the tooltip up to read; the next tap anywhere dismisses it.
+            if (heldRef.current) {
+              heldRef.current = false;
+              return;
+            }
+            setOpen(false);
+            onSelect();
+          }}
+        >
+          <Icon />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="max-w-[240px]">
+        <span className="font-medium">{tool.label}</span> — {tool.title}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 /**
  * Top toolbar (plan 014 step 5, extended step 6): New / Open / Save, Undo / Redo, a paint-tool strip,
@@ -386,56 +520,74 @@ export function Toolbar() {
     </>
   );
 
-  // ── Compact (phone/tablet) shell: File collapses to a menu, the tool strip becomes a scrollable
-  //    rail, and the standalone View checkboxes + Keys button fold into the overflow menu. ──
+  // ── Compact (phone/tablet) shell: File collapses to a menu; the tool strip drops off the top row
+  //    entirely and becomes its own full-width icon bar underneath (below), so the tools are no
+  //    longer crammed into a tiny scrollable box; the View checkboxes + Keys button fold into the
+  //    overflow menu. ──
   if (isCompact) {
     return (
-      <header className="flex items-center gap-2 border-b border-surface bg-raised px-2 py-1.5">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="secondary" size="sm" className="shrink-0">
-              File
-              <ChevronDown />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem onSelect={() => setShowNew(true)}>New…</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setShowOpen(true)}>Open…</DropdownMenuItem>
-            <DropdownMenuItem disabled={!map || saving} onSelect={() => void handleSave()}>
-              Save
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled={!map} onSelect={() => setShowEdit(true)}>
-              Edit map…
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <>
+        <header className="flex items-center gap-2 border-b border-surface bg-raised px-2 py-1.5">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="secondary" size="sm" className="shrink-0">
+                File
+                <ChevronDown />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onSelect={() => setShowNew(true)}>New…</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setShowOpen(true)}>Open…</DropdownMenuItem>
+              <DropdownMenuItem disabled={!map || saving} onSelect={() => void handleSave()}>
+                Save
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={!map} onSelect={() => setShowEdit(true)}>
+                Edit map…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-        {undoRedoGroup}
+          {undoRedoGroup}
 
-        {/* Active-tool indicator — always visible even when the rail is scrolled off. */}
-        <span className="shrink-0 text-[0.8rem] font-medium text-fg-bright">
-          {activeToolMeta?.label ?? '—'}
-        </span>
+          {/* Active-tool name — the icon bar below highlights it, this spells it out. */}
+          <span className="shrink-0 text-[0.8rem] font-medium text-fg-bright">
+            {activeToolMeta?.label ?? '—'}
+          </span>
 
-        {/* Horizontally-scrollable tool rail. The tool-contextual controls (paint-mode gesture,
-            brush rotation) live in the bottom ContextBar on compact (plan 027 Step 9), not here. */}
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">{toolStrip}</div>
+          {/* Map name + dirty dot, pushed to the right (truncated to fit). */}
+          <span className="ml-auto flex shrink items-center gap-1 overflow-hidden text-[0.8rem]">
+            {map ? (
+              <>
+                <span className="truncate text-fg-muted">{map.meta.name}</span>
+                {dirty && <span className="shrink-0 text-gold">●</span>}
+              </>
+            ) : (
+              <span className="text-muted-2">No map</span>
+            )}
+          </span>
 
-        {/* Map name + dirty dot stays visible (truncated). */}
-        <span className="flex shrink items-center gap-1 overflow-hidden text-[0.8rem]">
-          {map ? (
-            <>
-              <span className="truncate text-fg-muted">{map.meta.name}</span>
-              {dirty && <span className="shrink-0 text-gold">●</span>}
-            </>
-          ) : (
-            <span className="text-muted-2">No map</span>
-          )}
-        </span>
+          {overflowMenu(true)}
+        </header>
 
-        {overflowMenu(true)}
+        {/* Second bar (plan: mobile toolbar): the full tool set as icon buttons on their own
+            full-width row. Tap to select; press-and-hold pops the tool's name (touch has no hover).
+            Wraps to as many rows as needed so every tool is reachable without a scroll. The
+            tool-contextual controls (paint-mode gesture, brush rotation) live in the bottom
+            ContextBar on compact (plan 027 Step 9), not here. */}
+        <div className="flex flex-wrap items-center gap-1 border-b border-surface bg-raised px-2 py-1.5">
+          {TOOLS.map((tool) => (
+            <ToolIconButton
+              key={tool.id}
+              tool={tool}
+              active={activeTool === tool.id}
+              disabled={!map || (tool.id === 'place' && !armedObjectAsset && !armedNodeRef)}
+              onSelect={() => useEditorStore.getState().setActiveTool(tool.id)}
+            />
+          ))}
+        </div>
+
         {dialogs}
-      </header>
+      </>
     );
   }
 
