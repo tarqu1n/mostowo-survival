@@ -1,6 +1,6 @@
 # Editor Library: role-based placement filtering
 
-> Status: in review
+> Status: deployed
 
 ## Summary
 
