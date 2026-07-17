@@ -144,6 +144,7 @@ export class ResourceNodeManager {
       col,
       row,
       skin: skin.id,
+      rotation, // the true rest angle — chop fx recoils/topples around it (see NodeFxManager)
     });
   }
 
@@ -257,6 +258,7 @@ export class ResourceNodeManager {
       restX: tileToWorldCenter(tree.col),
       restY: tileToWorldCenter(tree.row),
       baseScale: base,
+      baseAngle: tree.rotation, // recoil/tremble around the authored rotation, not 0 (keeps placement rotation)
       depletion: (tree.def.maxHp - Math.max(0, tree.hp)) / tree.def.maxHp,
       facing: facing ?? { dCol: 0, dRow: 0 },
     });
@@ -285,6 +287,7 @@ export class ResourceNodeManager {
             x: tree.sprite.x,
             y: tree.sprite.y,
             scale: base,
+            baseAngle: tree.rotation, // clone starts at the node's authored rotation and topples from it
             originX: skin.originX ?? tree.def.originX,
             originY: skin.originY ?? tree.def.originY,
             depth: tree.sprite.depth,

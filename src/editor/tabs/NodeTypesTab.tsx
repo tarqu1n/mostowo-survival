@@ -7,6 +7,7 @@ import { putNodes } from '../api';
 import type { AssetCatalog } from '../catalog';
 import { cn } from '../lib/utils';
 import { NodeSpritePickerDialog } from '../NodeSpritePickerDialog';
+import { useIsCompact } from '../hooks/useIsCompact';
 import { colorToHex, hexToColor, validateNodeDefPatch } from '../nodeTypesUi';
 import { PLACEHOLDER_SKIN_ASSET, useEditorStore } from '../store/editorStore';
 import { tilesetAssetUrl } from '../textureLoading';
@@ -56,6 +57,9 @@ export function NodeTypesTab() {
 
   const [selectedId, setSelectedId] = useState<string | null>(nodeDefs[0]?.id ?? null);
   const [saving, setSaving] = useState(false);
+  // Collapse state for the list-on-top layout (plan 030 step 7). Selecting a def collapses the list
+  // to reveal its controls; with nothing selected the list is forced open (see `listOpen` below).
+  const [listExpanded, setListExpanded] = useState(false);
 
   // If the selected def was deleted (by this panel or elsewhere), fall back to the first remaining def.
   useEffect(() => {
@@ -93,123 +97,157 @@ export function NodeTypesTab() {
     }
   }
 
+  // Force the list open whenever nothing is selected (show the empty-state list), else honour the
+  // collapse toggle. Selecting a def (list click / New / duplicate) collapses to reveal its controls.
+  const listOpen = selected === null || listExpanded;
+  function selectDef(id: string): void {
+    setSelectedId(id);
+    setListExpanded(false);
+  }
+
   return (
-    <div className="flex h-full w-full">
-      <aside className="flex w-[240px] shrink-0 flex-col gap-2 overflow-auto border-r border-surface bg-raised p-3">
-        <div className="flex items-center justify-between">
-          <h2 className={headingClass}>Node types</h2>
+    <div className="flex h-full w-full flex-col">
+      {/* Collapsible "Node types" list (plan 030 step 7) — full-width on top, on desktop and compact.
+          Selecting a def collapses this to a summary header ("Node types — {name}") and reveals that
+          def's controls below; tapping the header re-expands to switch. Mirrors LibraryPanel's pack
+          expander (▾/▸). The collapse toggle is disabled with nothing selected (list stays open). */}
+      <div className="flex-none border-b border-surface bg-raised">
+        <div className="flex items-center gap-2 p-3">
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-center gap-1.5 text-left disabled:cursor-default"
+            aria-expanded={listOpen}
+            disabled={selected === null}
+            onClick={() => setListExpanded((v) => !v)}
+          >
+            <span className="flex-none text-[0.7rem] text-border-muted">
+              {listOpen ? '▾' : '▸'}
+            </span>
+            <h2 className={headingClass}>Node types</h2>
+            {!listOpen && selected && (
+              <span className="min-w-0 truncate text-[0.82rem] text-fg-muted">
+                — {selected.name || selected.id}
+              </span>
+            )}
+          </button>
           <Button
             size="sm"
             variant="outline"
             onClick={() => {
               const id = useEditorStore.getState().createNodeDef();
-              if (id) setSelectedId(id);
+              if (id) selectDef(id);
             }}
           >
             + New
           </Button>
         </div>
-        {nodeDefs.length === 0 && (
-          <p className="text-[0.85rem] text-muted-2">No node types defined.</p>
-        )}
-        <div className="flex flex-col gap-1">
-          {nodeDefs.map((def) => {
-            const referenced = referencedDefIds.has(def.id);
-            const active = def.id === selectedId;
-            return (
-              <div
-                key={def.id}
-                className={cn(
-                  'flex items-center gap-1 rounded-md border border-transparent p-1',
-                  active && 'border-gold-light bg-surface',
-                )}
-              >
-                <button
-                  type="button"
-                  className="min-w-0 flex-1 truncate text-left text-[0.82rem] text-fg"
-                  title={def.id}
-                  onClick={() => setSelectedId(def.id)}
-                >
-                  {def.name || def.id}
-                  <span className="ml-1 text-[0.68rem] text-muted-2">{def.id}</span>
-                </button>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
+        {listOpen && (
+          <div className="max-h-[40vh] overflow-auto px-3 pb-3">
+            {nodeDefs.length === 0 && (
+              <p className="text-[0.85rem] text-muted-2">No node types defined.</p>
+            )}
+            <div className="flex flex-col gap-1">
+              {nodeDefs.map((def) => {
+                const referenced = referencedDefIds.has(def.id);
+                const active = def.id === selectedId;
+                return (
+                  <div
+                    key={def.id}
+                    className={cn(
+                      'flex items-center gap-1 rounded-md border border-transparent p-1',
+                      active && 'border-gold-light bg-surface',
+                    )}
+                  >
+                    <button
                       type="button"
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={() => {
-                        const newId = useEditorStore.getState().duplicateNodeDef(def.id);
-                        if (newId) setSelectedId(newId);
-                      }}
+                      className="min-w-0 flex-1 truncate text-left text-[0.82rem] text-fg"
+                      title={def.id}
+                      onClick={() => selectDef(def.id)}
                     >
-                      ⧉
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Duplicate</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        disabled={referenced}
-                        onClick={() => useEditorStore.getState().deleteNodeDef(def.id)}
-                      >
-                        ✕
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {referenced ? "Can't delete — placed in the open map" : 'Delete this node type'}
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            );
-          })}
-        </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex flex-none items-center gap-3 border-b border-surface bg-raised px-3 py-1.5">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={saving || !nodeDefsDirty}
-                onClick={() => void handleSaveNodeTypes()}
-              >
-                Save node types
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {nodeDefsDirty
-                ? 'Write nodes.json (PUT /__editor/nodes)'
-                : 'No unsaved node-type changes'}
-            </TooltipContent>
-          </Tooltip>
-          {nodeDefsDirty && (
-            <span className="text-gold" title="Unsaved node-type changes">
-              ●
-            </span>
-          )}
-        </div>
-        <div className="min-h-0 flex-1 overflow-auto p-3">
-          {!selected ? (
-            <p className="text-[0.9rem] text-muted-2">
-              No node type selected — create one to get started.
-            </p>
-          ) : (
-            <div className="flex flex-col gap-4" key={selected.id}>
-              <NodeStatsForm def={selected} allDefs={nodeDefs} />
-              <SkinManager def={selected} catalog={catalog} map={map} />
+                      {def.name || def.id}
+                      <span className="ml-1 text-[0.68rem] text-muted-2">{def.id}</span>
+                    </button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => {
+                            const newId = useEditorStore.getState().duplicateNodeDef(def.id);
+                            if (newId) selectDef(newId);
+                          }}
+                        >
+                          ⧉
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Duplicate</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            disabled={referenced}
+                            onClick={() => useEditorStore.getState().deleteNodeDef(def.id)}
+                          >
+                            ✕
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {referenced
+                          ? "Can't delete — placed in the open map"
+                          : 'Delete this node type'}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                );
+              })}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
+
+      {/* Save bar — the global registry save (nodes.json), always visible below the list. */}
+      <div className="flex flex-none items-center gap-3 border-b border-surface bg-raised px-3 py-1.5">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={saving || !nodeDefsDirty}
+              onClick={() => void handleSaveNodeTypes()}
+            >
+              Save node types
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {nodeDefsDirty
+              ? 'Write nodes.json (PUT /__editor/nodes)'
+              : 'No unsaved node-type changes'}
+          </TooltipContent>
+        </Tooltip>
+        {nodeDefsDirty && (
+          <span className="text-gold" title="Unsaved node-type changes">
+            ●
+          </span>
+        )}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-auto p-3">
+        {!selected ? (
+          <p className="text-[0.9rem] text-muted-2">
+            No node type selected — create one to get started.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-4" key={selected.id}>
+            <NodeStatsForm def={selected} allDefs={nodeDefs} />
+            <SkinManager def={selected} catalog={catalog} map={map} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -553,7 +591,13 @@ function SkinManager({
   catalog: AssetCatalog | null;
   map: ReturnType<typeof useEditorStore.getState>['map'];
 }) {
+  const isCompact = useIsCompact();
   const [pickerFor, setPickerFor] = useState<PickerTarget | null>(null);
+  // Collapsible Skins section (plan 030 step 8): default expanded on desktop, collapsed on compact so
+  // the phone view leads with the stats form and a skin summary bar. Remounts per selected def (parent
+  // `key={selected.id}`), so switching defs re-applies the default. Committed skin edits live in the
+  // store, so collapsing mid-edit loses nothing.
+  const [expanded, setExpanded] = useState(!isCompact);
 
   function skinReferenced(skinId: string): boolean {
     if (!map) return false;
@@ -562,36 +606,67 @@ function SkinManager({
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-surface bg-inset p-3">
-      <div className="flex items-center justify-between">
-        <h3 className={headingClass}>Skins</h3>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => useEditorStore.getState().addSkin(def.id)}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="flex flex-none items-center gap-1.5 text-left"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((v) => !v)}
         >
-          + Add skin
-        </Button>
+          <span className="flex-none text-[0.7rem] text-border-muted">{expanded ? '▾' : '▸'}</span>
+          <h3 className={headingClass}>Skins</h3>
+          <span className="text-[0.7rem] text-muted-2">({def.skins.length})</span>
+        </button>
+        {/* Collapsed: an at-a-glance thumbnail summary (each skin's live sprite), scrolling rather than
+            overflowing when a def has many skins. Kept outside the toggle button so it can scroll on
+            touch without the button swallowing the gesture. */}
+        {!expanded && (
+          <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+            {def.skins.map((skin) => (
+              <SpriteThumb
+                key={skin.id}
+                assetId={skin.asset}
+                region={skin.region}
+                catalog={catalog}
+              />
+            ))}
+          </div>
+        )}
+        {expanded && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto"
+            onClick={() => useEditorStore.getState().addSkin(def.id)}
+          >
+            + Add skin
+          </Button>
+        )}
       </div>
-      <div className="flex flex-col gap-2">
-        {def.skins.map((skin, index) => (
-          <SkinRow
-            key={skin.id}
-            def={def}
-            skin={skin}
-            index={index}
-            lastIndex={def.skins.length - 1}
-            catalog={catalog}
-            removeDisabled={def.skins.length <= 1 || skinReferenced(skin.id)}
-            removeDisabledReason={
-              def.skins.length <= 1
-                ? 'A node type needs at least one skin'
-                : "Can't remove — placed on a node in the open map"
-            }
-            onPickLive={() => setPickerFor({ skinId: skin.id, which: 'live' })}
-            onPickDepleted={() => setPickerFor({ skinId: skin.id, which: 'depleted' })}
-          />
-        ))}
-      </div>
+      {expanded && (
+        <div className="flex flex-col gap-2">
+          {def.skins.map((skin, index) => (
+            <SkinRow
+              key={skin.id}
+              def={def}
+              skin={skin}
+              index={index}
+              lastIndex={def.skins.length - 1}
+              catalog={catalog}
+              removeDisabled={def.skins.length <= 1 || skinReferenced(skin.id)}
+              removeDisabledReason={
+                def.skins.length <= 1
+                  ? 'A node type needs at least one skin'
+                  : "Can't remove — placed on a node in the open map"
+              }
+              onPickLive={() => setPickerFor({ skinId: skin.id, which: 'live' })}
+              onPickDepleted={() => setPickerFor({ skinId: skin.id, which: 'depleted' })}
+            />
+          ))}
+        </div>
+      )}
+      {/* Always mounted (not inside the expanded branch) so an open picker keeps working even if the
+          section is toggled; its only open trigger is a SkinRow button, which exists only when expanded. */}
       <NodeSpritePickerDialog
         open={pickerFor !== null}
         onOpenChange={(open) => {

@@ -45,6 +45,16 @@ and the tabbed Inspector/Layers/Zones/Reference column collapse into slide-in **
 (edge-handle buttons), and the World tab's map tray becomes a drawer too. Above it, desktop is
 **unchanged** (resizable Library split, fixed Inspector column).
 
+**Library on touch (plan 030):** the compact Library/Inspector drawers are **full-width**. Picking any
+asset **auto-closes** the Library drawer so you can paint immediately. A **Recent strip** at the top of
+the panel (desktop + compact) re-picks recently-used assets in one tap — all tiles grouped into one
+horizontally-scrolling swatch row, decor/node/terrain after. On compact, the category tree **drills
+down**: picking a category hides the tree and gives the results grid the full height, with a `‹ Back`
+control; and favouriting is **long-press** (tap = pick, long-press = toggle favourite + toast) with no
+heart overlay — desktop keeps its visible ♥ click. Recent + browse state (search/category/expansion)
+are view-state, persisted per-map to localStorage (see the persistence contract); favourites are
+unchanged (per-zone/map in the `.map.json`).
+
 Map viewport gestures: single-finger = the active tool's paint/place (same as left-click drag);
 two-finger = pan by midpoint + pinch-zoom (integer ×1–4, snapped). World tab: two-finger pinch-zoom
 about the midpoint only (no two-finger pan there); desktop mouse-drag-to-place + wheel-zoom
@@ -107,6 +117,11 @@ sprites drawn from the asset catalog, each with a live sprite, an optional match
 per-skin sizing overrides. **Duplicate** a def to spin up a yield **tier** (e.g. a bigger tree worth
 more wood) with its own skins. Delete is blocked while any map still references the def.
 
+**Layout (plan 030, desktop + compact):** a stacked view — a full-width **collapsible list on top**
+(selecting a def collapses it to a `Node types — {name}` summary and shows that def's controls below;
+tap the header to switch), then the stats form, then a **collapsible Skins** section (collapsed shows a
+thumbnail summary bar + count; default expanded on desktop, collapsed on compact).
+
 Three independent axes: **tier** = a separate def (gameplay), **skin** = which sprite a placed node
 uses (aesthetics), **state** = live↔depleted (runtime, never authored/serialized). On placement a
 skin is rolled **weighted-random** and persisted on the node (`NodeObject.skin`); override it in the
@@ -166,8 +181,13 @@ Each authored file has its own bespoke dev-middleware handler in `scripts/vite-e
 migration — writes `<newId>.map.json` **first**, migrates in-memory + localStorage state, re-bakes
 the thumb under the new id, saves the world layout if the map is placed (rewriting that placement's
 `mapId`), then **DELETE**s `<oldId>.map.json` + its thumb **last** (write-new-before-delete-old, so a
-failure never orphans the live map). Also migrates the `mostowo-editor-underlay:settings:<id>`
-localStorage key old→new.
+failure never orphans the live map). Also migrates the `mostowo-editor-underlay:settings:<id>` and the
+Library view-state keys (below) old→new.
+
+**Library view-state (plan 030):** the Recent strip and browse state persist **per-map to
+localStorage** (never in `.map.json`) under `mostowo-editor-library:recents:<mapId>` and
+`…:browse:<mapId>` (`src/editor/libraryViewStore.ts`). `browse` excludes `search` (transient,
+store-only — survives close/reopen, not a reload). Both keys migrate on rename and reset on map close.
 
 ## Regions on tile assets (plan 028)
 

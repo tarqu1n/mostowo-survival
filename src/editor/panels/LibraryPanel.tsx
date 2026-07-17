@@ -15,7 +15,7 @@ import { loadCatalog } from '../catalogSource';
 import { loadTerrainCatalog } from '../terrainCatalogSource';
 import { loadNodeDefs } from '../nodeDefsSource';
 import { colorToHex, resolveSkinPreviewUrl } from '../nodeTypesUi';
-import type { TerrainDef } from '../terrainCatalog';
+import type { TerrainCatalog, TerrainDef } from '../terrainCatalog';
 import {
   catalogTileCols,
   regionKey,
@@ -28,11 +28,14 @@ import {
   DECOR_ANIM_DEFAULT_FPS,
   type ArmedObjectAsset,
 } from '../store/editorStore';
+import { recentIdentity, type LibraryBrowseState, type RecentEntry } from '../libraryViewStore';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { cn } from '../lib/utils';
 import { useIsCompact } from '../hooks/useIsCompact';
+import { useLongPress } from '../hooks/useLongPress';
+import { toast } from 'sonner';
 
 /**
  * Library panel (plan 014 steps 6-7b) — loads the generated asset catalog, browses it by pack/category
@@ -81,6 +84,11 @@ const PREVIEW_PX = TILE_SIZE * 2;
  *  tile-variant picker needs to show many swatches at once to be usable at all, so these stay smaller
  *  and tap-precise rather than touch-ideal (see plan's "note it, don't grind" guidance).  */
 const COMPACT_PREVIEW_PX = 22;
+/** Recent-strip swatch size (plan 030 step 4). Compact is deliberately BIGGER than desktop: the strip
+ *  is a one-tap re-pick affordance, so on touch the swatch doubles as the tap target and wants to clear
+ *  the ~44px guideline (swatch + button padding ≈ 48px), whereas desktop can pack more into the row. */
+const RECENT_SWATCH_PX = 34;
+const RECENT_SWATCH_PX_COMPACT = 40;
 /** Sentinel `selectedCategory` value for the Favourites pseudo-category (never a real category
  *  string, which are always pack-relative path segments like "Environment/Tilesets"). */
 const FAVOURITES = '__favourites__';
@@ -177,20 +185,284 @@ function FavHeart({
   );
 }
 
-export function LibraryPanel() {
+/** Size-independent description of how to draw a library pick's preview (plan 030 step 4).
+ *  `resolveRecentSwatch` produces one of these; `AssetSwatch` turns it into a sized `<span>`. Keeping
+ *  it size-free means the same descriptor renders at any swatch size (strip vs favourites grid). */
+type RecentSwatch =
+  | { mode: 'crop'; url: string; col: number; row: number; cols: number; rows: number }
+  | {
+      mode: 'region';
+      url: string;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      sheetW: number;
+      sheetH: number;
+    }
+  | { mode: 'contain'; url: string }
+  | { mode: 'color'; color: string };
+
+/** Empty node-def map for `resolveRecentSwatch` call sites that can't produce a `node` entry (e.g.
+ *  `FavouriteItem`, whose favourites are always catalog asset ids) — a module const so it isn't
+ *  reallocated per render. */
+const EMPTY_NODE_DEFS: Record<string, ParsedNodeDef> = {};
+
+/**
+ * Resolve a `RecentEntry` (or any pick describable as one) to a size-free `RecentSwatch`, or `null`
+ * when its asset no longer exists in the catalog (pack removed/regenerated, a node/terrain deleted) —
+ * the one place the 6-kind preview crop math lives, reused by the Recent strip and `FavouriteItem`
+ * (critique #3). Mirrors the per-kind card math: tiles/terrains crop a frame out of their sheet, a
+ * decor region crops its sub-rect, a decor anim shows frame 0, plain decor/node show the whole image,
+ * and a node with no resolvable sprite falls back to its `color` swatch (see `nodePreviewUrl`).
+ */
+function resolveRecentSwatch(
+  entry: RecentEntry,
+  catalog: AssetCatalog,
+  nodeDefsParsed: Record<string, ParsedNodeDef>,
+  terrainCatalog: TerrainCatalog | null,
+): RecentSwatch | null {
+  switch (entry.kind) {
+    case 'tile': {
+      let parsed: ReturnType<typeof parseAssetId>;
+      try {
+        parsed = parseAssetId(entry.assetId);
+      } catch {
+        return null;
+      }
+      const asset = catalog.assets.find((a) => a.id === `${parsed.pack}/${parsed.path}`);
+      if (!asset || parsed.frame === undefined) return null;
+      const cols = catalogTileCols(asset, TILE_SIZE);
+      const rows = Math.max(1, Math.round(asset.h / TILE_SIZE));
+      const sheetPath = asset.source.kind === 'sheetFrame' ? asset.source.sheet : asset.source.path;
+      return {
+        mode: 'crop',
+        url: tilesetAssetUrl(asset.pack, sheetPath),
+        col: parsed.frame % cols,
+        row: Math.floor(parsed.frame / cols),
+        cols,
+        rows,
+      };
+    }
+    case 'decor': {
+      const asset = catalog.assets.find((a) => a.id === entry.assetId);
+      if (!asset) return null;
+      const sheetPath = asset.source.kind === 'sheetFrame' ? asset.source.sheet : asset.source.path;
+      const url = tilesetAssetUrl(asset.pack, sheetPath);
+      if (entry.region) {
+        return {
+          mode: 'region',
+          url,
+          x: entry.region.x,
+          y: entry.region.y,
+          w: entry.region.w,
+          h: entry.region.h,
+          sheetW: asset.w,
+          sheetH: asset.h,
+        };
+      }
+      if (entry.anim) {
+        // Show the first frame (cell 0) — the region-crop path fits it to the swatch, matching
+        // `AnimatedStripPicker`'s static fallback rather than trying to animate in the strip.
+        return {
+          mode: 'region',
+          url,
+          x: 0,
+          y: 0,
+          w: entry.anim.frameWidth,
+          h: entry.anim.frameHeight,
+          sheetW: asset.w,
+          sheetH: asset.h,
+        };
+      }
+      return { mode: 'contain', url };
+    }
+    case 'node': {
+      const def = nodeDefsParsed[entry.ref];
+      if (!def) return null;
+      const url = nodePreviewUrl(def);
+      return url ? { mode: 'contain', url } : { mode: 'color', color: colorToHex(def.color) };
+    }
+    case 'terrain': {
+      if (!terrainCatalog) return null;
+      const def = terrainCatalog.terrains.find((t) => t.id === entry.id);
+      if (!def) return null;
+      const sheetAsset = catalog.assets.find(
+        (a) =>
+          a.pack === def.pack && a.source.kind === 'sheetFrame' && a.source.sheet === def.sheet,
+      );
+      const cols = sheetAsset
+        ? catalogTileCols(sheetAsset, TILE_SIZE)
+        : TERRAIN_SHEET_COLS_FALLBACK;
+      const rows = sheetAsset ? Math.max(1, Math.round(sheetAsset.h / TILE_SIZE)) : cols;
+      return {
+        mode: 'crop',
+        url: tilesetAssetUrl(def.pack, def.sheet),
+        col: def.fillFrame % cols,
+        row: Math.floor(def.fillFrame / cols),
+        cols,
+        rows,
+      };
+    }
+  }
+}
+
+/** Renders a resolved `RecentSwatch` as a sized pixel-art `<span>` (plan 030 step 4) — no label, no
+ *  heart, no button (callers wrap it). `crop`/`contain`/`color` fill a `sizePx` square; `region` scales
+ *  its sub-rect to fit within `sizePx` (so a non-square region keeps its aspect, ≤ the box). */
+function AssetSwatch({ swatch, sizePx }: { swatch: RecentSwatch; sizePx: number }) {
+  if (swatch.mode === 'color') {
+    return (
+      <span
+        className="pixelated flex items-center justify-center rounded-[2px] text-[0.6rem] font-semibold text-fg-dim"
+        style={{ width: sizePx, height: sizePx, backgroundColor: swatch.color }}
+        title="No sprite assigned yet — set one in the Node Types panel"
+      >
+        ?
+      </span>
+    );
+  }
+  if (swatch.mode === 'contain') {
+    return (
+      <span
+        className="pixelated rounded-[2px] bg-inset bg-contain bg-center bg-no-repeat"
+        style={{ width: sizePx, height: sizePx, backgroundImage: `url(${swatch.url})` }}
+      />
+    );
+  }
+  if (swatch.mode === 'crop') {
+    // Per-frame sprite crop — computed background props stay inline (mirrors `TileFrameGrid`).
+    return (
+      <span
+        className="pixelated block rounded-[2px] bg-inset"
+        style={{
+          width: sizePx,
+          height: sizePx,
+          backgroundImage: `url(${swatch.url})`,
+          backgroundPosition: `-${swatch.col * sizePx}px -${swatch.row * sizePx}px`,
+          backgroundSize: `${swatch.cols * sizePx}px ${swatch.rows * sizePx}px`,
+        }}
+      />
+    );
+  }
+  // region — scale the sub-rect so its larger side fills the box, keeping aspect ratio.
+  const scale = sizePx / Math.max(swatch.w, swatch.h);
+  return (
+    <span
+      className="pixelated block rounded-[2px] bg-inset bg-no-repeat"
+      style={{
+        width: Math.round(swatch.w * scale),
+        height: Math.round(swatch.h * scale),
+        backgroundImage: `url(${swatch.url})`,
+        backgroundSize: `${Math.round(swatch.sheetW * scale)}px ${Math.round(swatch.sheetH * scale)}px`,
+        backgroundPosition: `-${Math.round(swatch.x * scale)}px -${Math.round(swatch.y * scale)}px`,
+      }}
+    />
+  );
+}
+
+/** Human-readable tooltip for a recent (its catalog id/ref, plus a hint for region/anim variants). */
+function recentTitle(entry: RecentEntry): string {
+  switch (entry.kind) {
+    case 'tile':
+      return entry.assetId;
+    case 'decor':
+      return entry.region
+        ? `${entry.assetId} (region)`
+        : entry.anim
+          ? `${entry.assetId} (anim)`
+          : entry.assetId;
+    case 'node':
+      return entry.ref;
+    case 'terrain':
+      return entry.id;
+  }
+}
+
+/**
+ * Recent strip (plan 030 step 4) — a top-of-Library MRU of recently-picked assets, so a re-pick is one
+ * tap instead of re-navigating the tree. Per the product decision, ALL tiles are grouped into ONE
+ * horizontally-scrollable swatch row (dense tiles scan best together); decor/node/terrain follow in a
+ * second scroll row. Every swatch re-arms through the parent's pick handlers (via `onRearm`), which also
+ * re-records it as most-recent and auto-closes the compact drawer. Entries whose asset no longer
+ * resolves are skipped (not rendered) — `resolveRecentSwatch` returns `null` for them.
+ */
+function RecentStrip({
+  recents,
+  catalog,
+  nodeDefsParsed,
+  terrainCatalog,
+  onRearm,
+}: {
+  recents: RecentEntry[];
+  catalog: AssetCatalog;
+  nodeDefsParsed: Record<string, ParsedNodeDef>;
+  terrainCatalog: TerrainCatalog | null;
+  onRearm: (entry: RecentEntry) => void;
+}) {
+  const isCompact = useIsCompact();
+  const sizePx = isCompact ? RECENT_SWATCH_PX_COMPACT : RECENT_SWATCH_PX;
+  const resolved = recents
+    .map((entry) => ({
+      entry,
+      swatch: resolveRecentSwatch(entry, catalog, nodeDefsParsed, terrainCatalog),
+    }))
+    .filter((r): r is { entry: RecentEntry; swatch: RecentSwatch } => r.swatch !== null);
+  if (resolved.length === 0) return null;
+  const tiles = resolved.filter((r) => r.entry.kind === 'tile');
+  const others = resolved.filter((r) => r.entry.kind !== 'tile');
+
+  const swatchButton = ({ entry, swatch }: { entry: RecentEntry; swatch: RecentSwatch }) => (
+    <button
+      key={recentIdentity(entry)}
+      type="button"
+      className={cn(
+        'flex flex-none items-center justify-center rounded-[3px] border border-transparent bg-inset p-0.5 hover:border-gold-light',
+        isCompact && 'p-1',
+      )}
+      title={recentTitle(entry)}
+      onClick={() => onRearm(entry)}
+    >
+      <span className="flex items-center justify-center" style={{ width: sizePx, height: sizePx }}>
+        <AssetSwatch swatch={swatch} sizePx={sizePx} />
+      </span>
+    </button>
+  );
+
+  return (
+    <div className="mb-2.5 flex flex-col gap-1 border-b border-surface pb-2">
+      <div className="text-[0.7rem] uppercase tracking-[0.03em] text-border-muted">Recent</div>
+      {tiles.length > 0 && (
+        <div className="flex gap-1 overflow-x-auto pb-1">{tiles.map(swatchButton)}</div>
+      )}
+      {others.length > 0 && (
+        <div className="flex gap-1 overflow-x-auto pb-1">{others.map(swatchButton)}</div>
+      )}
+    </div>
+  );
+}
+
+export function LibraryPanel({ onPick }: { onPick?: () => void } = {}) {
   const isCompact = useIsCompact();
   // The catalog lives in the store (plan 017 step 3): the object-editor tab's Apply refetches it via
   // the shared `loadCatalog` → `setCatalog`, so reading it here (rather than a local copy) is what
   // makes a reclassify show up in the Library live. `null` until the mount fetch below lands.
   const catalog = useEditorStore((s) => s.catalog);
   const [error, setError] = useState<string | null>(null);
-  const [selectedPack, setSelectedPack] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  // Which packs are expanded in the nav. Packs start collapsed (empty set) so the tree stays compact —
-  // the catalog has many packs, each with several categories, and rendering them all open overran the
-  // pane. A pack is toggled open/shut by clicking its header.
-  const [expandedPacks, setExpandedPacks] = useState<ReadonlySet<string>>(new Set());
+  // Browse state (search / selected pack+category / expanded packs) lives in the editor store now
+  // (plan 030) instead of local `useState`, so it survives the compact drawer unmounting on close
+  // (the Radix `Sheet` destroys `LibraryPanel`) and — for the persisted subset — a reload. `search`
+  // is store-only/transient (see `libraryViewStore`). `patchLibraryBrowse` is the single writer.
+  const { search, selectedPack, selectedCategory, expandedPacks } = useEditorStore(
+    (s) => s.libraryBrowse,
+  );
+  // Call through `getState()` rather than selecting the action — zustand actions are stable, so a
+  // subscription buys nothing, and selecting a method trips the `unbound-method` lint. Mirrors the
+  // pick handlers' `getState()` use below.
+  const patchLibraryBrowse = (partial: Partial<LibraryBrowseState>): void =>
+    useEditorStore.getState().patchLibraryBrowse(partial);
+  // Derived Set for O(1) expansion lookups — the store keeps `expandedPacks` as a serializable array.
+  const expandedPackSet = useMemo(() => new Set(expandedPacks), [expandedPacks]);
 
   const brushAsset = useEditorStore((s) => s.brushAsset);
   const armedObjectAsset = useEditorStore((s) => s.armedObjectAsset);
@@ -199,6 +471,7 @@ export function LibraryPanel() {
   const activeZoneId = useEditorStore((s) => s.activeZoneId);
   const terrainCatalog = useEditorStore((s) => s.terrainCatalog);
   const activeTerrainId = useEditorStore((s) => s.activeTerrainId);
+  const libraryRecents = useEditorStore((s) => s.libraryRecents);
   // Re-render triggers only — see module doc. The actual map/favourites are read fresh below.
   useEditorStore((s) => s.docRevision);
   useEditorStore((s) => s.mapEpoch);
@@ -256,6 +529,10 @@ export function LibraryPanel() {
     selectedCategory !== FAVOURITES &&
     selectedCategory !== NODES_CATEGORY &&
     selectedCategory !== TERRAINS_CATEGORY;
+  // Drill-down (plan 030 step 6, compact only): once a category/sentinel is picked, hide the tree and
+  // give the results grid the full drawer height, with a Back control to return to the tree. Desktop
+  // keeps its tree-above-list layout, so this is gated on `isCompact`.
+  const drilledIn = isCompact && searchLower.length === 0 && selectedCategory !== null;
 
   const visibleAssets: CatalogAsset[] = useMemo(() => {
     if (!catalog) return [];
@@ -273,6 +550,9 @@ export function LibraryPanel() {
     return [];
   }, [catalog, searchLower, showingCategory, selectedPack, selectedCategory]);
 
+  // Each pick handler, after its existing store call, records the pick as a "Recent" (plan 030) and
+  // fires `onPick` — the compact drawer passes `onPick` to auto-close so painting can start
+  // immediately; desktop omits it (no-op). `pushLibraryRecent` no-ops the disk write when no map.
   function pickTile(assetId: string): void {
     const s = useEditorStore.getState();
     s.setBrushAsset(assetId);
@@ -280,17 +560,23 @@ export function LibraryPanel() {
     // already on a brush-consuming tool (brush/rect), so a tile click never silently leaves Pan
     // active (which just drags the map).
     if (s.activeTool !== 'brush' && s.activeTool !== 'rect') s.setActiveTool('brush');
+    s.pushLibraryRecent({ kind: 'tile', assetId });
+    onPick?.();
   }
   function armObject(assetId: string): void {
     const s = useEditorStore.getState();
     s.setArmedObjectAsset({ assetId });
     s.setActiveTool('place'); // mirrors pickTile switching to Brush — arming always arms a TOOL too
+    s.pushLibraryRecent({ kind: 'decor', assetId });
+    onPick?.();
   }
   /** Arms a specific atlas-sheet crop (`AtlasSheetPicker`'s hotspot click). */
   function armRegion(assetId: string, region: DecorRegion): void {
     const s = useEditorStore.getState();
     s.setArmedObjectAsset({ assetId, region });
     s.setActiveTool('place');
+    s.pushLibraryRecent({ kind: 'decor', assetId, region });
+    onPick?.();
   }
   /** Arms an animated strip (`AnimatedStripPicker`'s click) — `fps` is stamped at placement time
    *  (`DECOR_ANIM_DEFAULT_FPS`), never carried here (critique #6: no per-instance editable fps). */
@@ -298,11 +584,15 @@ export function LibraryPanel() {
     const s = useEditorStore.getState();
     s.setArmedObjectAsset({ assetId, anim });
     s.setActiveTool('place');
+    s.pushLibraryRecent({ kind: 'decor', assetId, anim });
+    onPick?.();
   }
   function armNode(ref: string): void {
     const s = useEditorStore.getState();
     s.setArmedNodeRef(ref);
     s.setActiveTool('place');
+    s.pushLibraryRecent({ kind: 'node', ref });
+    onPick?.();
   }
   /** Arms a terrain for the terrain brush (step 10) — mirrors `pickTile`/`armObject`/`armNode` each
    *  switching to the tool their asset paints with. */
@@ -310,16 +600,17 @@ export function LibraryPanel() {
     const s = useEditorStore.getState();
     s.setActiveTerrainId(id);
     s.setActiveTool('terrain');
+    s.pushLibraryRecent({ kind: 'terrain', id });
+    onPick?.();
   }
   function toggleFavourite(assetId: string): void {
     useEditorStore.getState().toggleFavourite(assetId);
   }
   function togglePack(packId: string): void {
-    setExpandedPacks((prev) => {
-      const next = new Set(prev);
-      if (next.has(packId)) next.delete(packId);
-      else next.add(packId);
-      return next;
+    patchLibraryBrowse({
+      expandedPacks: expandedPacks.includes(packId)
+        ? expandedPacks.filter((p) => p !== packId)
+        : [...expandedPacks, packId],
     });
   }
 
@@ -328,6 +619,36 @@ export function LibraryPanel() {
     // single TooltipProvider mounted at the EditorApp root (plan 020 Step 5).
     <>
       <h2 className="mb-2 text-[0.85rem] uppercase tracking-[0.04em] text-fg-dim">Library</h2>
+      {/* Recent strip (plan 030 step 4) — top-of-panel MRU of everything pickable, on desktop and
+          compact. Re-arming goes through the same pick handlers as the main list, so a click also
+          moves the entry to front (`pushLibraryRecent`) and auto-closes the compact drawer (`onPick`).
+          Needs the resolved catalog to draw swatches; hidden entirely when there are no recents. */}
+      {catalog && libraryRecents.length > 0 && (
+        <RecentStrip
+          recents={libraryRecents}
+          catalog={catalog}
+          nodeDefsParsed={nodeDefsParsed}
+          terrainCatalog={terrainCatalog}
+          onRearm={(entry) => {
+            switch (entry.kind) {
+              case 'tile':
+                pickTile(entry.assetId);
+                break;
+              case 'decor':
+                if (entry.region) armRegion(entry.assetId, entry.region);
+                else if (entry.anim) armAnim(entry.assetId, entry.anim);
+                else armObject(entry.assetId);
+                break;
+              case 'node':
+                armNode(entry.ref);
+                break;
+              case 'terrain':
+                armTerrain(entry.id);
+                break;
+            }
+          }}
+        />
+      )}
       <input
         className={cn(
           'mb-2.5 w-full rounded-md border border-border bg-inset px-2 py-[5px] text-fg',
@@ -336,7 +657,7 @@ export function LibraryPanel() {
         type="search"
         placeholder="Search id or tag…"
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onChange={(e) => patchLibraryBrowse({ search: e.target.value })}
       />
       {error && (
         <p className="mb-2 -mt-1 text-[0.8rem] text-danger">Catalog failed to load: {error}</p>
@@ -344,42 +665,45 @@ export function LibraryPanel() {
       {!catalog && !error && <p className="text-[0.9rem] text-muted-2">Loading catalog…</p>}
       {catalog && (
         <>
-          {searchLower.length === 0 && (
+          {searchLower.length === 0 && !drilledIn && (
             // Plain overflow div, NOT shadcn ScrollArea: this list is bounded by `max-height` inside
             // an auto-height flow, and Radix ScrollArea's viewport only bounds against a DEFINITE-height
             // ancestor — with just a max-height it doesn't cap, so the list overran the pane. (Convention:
             // ScrollArea suits a fixed/flex-bounded container; a max-height region in normal flow stays a
-            // plain `overflow-auto` div.)
-            <nav className="mb-2.5 flex max-h-[40vh] flex-col gap-0.5 overflow-auto border-b border-surface pb-2">
+            // plain `overflow-auto` div.) On compact the cap is dropped: the tree is shown alone (drill-
+            // down hides the results), so it gets the full drawer height and the drawer itself scrolls.
+            <nav
+              className={cn(
+                'mb-2.5 flex flex-col gap-0.5 overflow-auto border-b border-surface pb-2',
+                !isCompact && 'max-h-[40vh]',
+              )}
+            >
               <TreeItem
                 active={selectedCategory === FAVOURITES}
-                onClick={() => {
-                  setSelectedPack(null);
-                  setSelectedCategory(FAVOURITES);
-                }}
+                onClick={() =>
+                  patchLibraryBrowse({ selectedPack: null, selectedCategory: FAVOURITES })
+                }
               >
                 ♥ Favourites ({favourites.length})
               </TreeItem>
               <TreeItem
                 active={selectedCategory === NODES_CATEGORY}
-                onClick={() => {
-                  setSelectedPack(null);
-                  setSelectedCategory(NODES_CATEGORY);
-                }}
+                onClick={() =>
+                  patchLibraryBrowse({ selectedPack: null, selectedCategory: NODES_CATEGORY })
+                }
               >
                 🌲 Nodes
               </TreeItem>
               <TreeItem
                 active={selectedCategory === TERRAINS_CATEGORY}
-                onClick={() => {
-                  setSelectedPack(null);
-                  setSelectedCategory(TERRAINS_CATEGORY);
-                }}
+                onClick={() =>
+                  patchLibraryBrowse({ selectedPack: null, selectedCategory: TERRAINS_CATEGORY })
+                }
               >
                 🟩 Terrains
               </TreeItem>
               {catalog.packs.map((pack) => {
-                const expanded = expandedPacks.has(pack.id);
+                const expanded = expandedPackSet.has(pack.id);
                 const categories = categoriesByPack.get(pack.id) ?? [];
                 return (
                   <div key={pack.id} className="mb-1">
@@ -403,10 +727,12 @@ export function LibraryPanel() {
                         <TreeItem
                           key={category}
                           active={selectedPack === pack.id && selectedCategory === category}
-                          onClick={() => {
-                            setSelectedPack(pack.id);
-                            setSelectedCategory(category);
-                          }}
+                          onClick={() =>
+                            patchLibraryBrowse({
+                              selectedPack: pack.id,
+                              selectedCategory: category,
+                            })
+                          }
                         >
                           {category}
                         </TreeItem>
@@ -415,6 +741,17 @@ export function LibraryPanel() {
                 );
               })}
             </nav>
+          )}
+
+          {drilledIn && (
+            // Compact drill-down Back: clears the selection to return to the full-height category tree.
+            <button
+              type="button"
+              className="mb-2 flex min-h-11 w-full items-center gap-1 rounded-md border border-border bg-inset px-3 text-left text-[0.9rem] text-fg-muted hover:bg-surface"
+              onClick={() => patchLibraryBrowse({ selectedPack: null, selectedCategory: null })}
+            >
+              ‹ Back
+            </button>
           )}
 
           <div className="flex flex-col gap-2.5">
@@ -608,38 +945,85 @@ function TileFrameGrid({
           const row = Math.floor(frame / cols);
           if (isOccluded(col, row)) return null;
           const frameId = `${asset.id}#${frame}`;
-          const isFav = favourites.has(frameId);
           return (
-            <button
+            <TileFrameButton
               key={frame}
-              className={cn(
-                'relative rounded-[2px] border border-transparent bg-transparent p-0 leading-[0]',
-                brushAsset === frameId && 'border-gold-light',
-              )}
-              title={`frame ${frame}`}
-              onClick={() => onPick(frameId)}
-            >
-              <span
-                className="pixelated block"
-                // Per-frame sprite crop — backgroundImage/Position/Size are computed, so inline.
-                style={{
-                  width: previewPx,
-                  height: previewPx,
-                  backgroundImage: `url(${url})`,
-                  backgroundPosition: `-${col * previewPx}px -${row * previewPx}px`,
-                  backgroundSize: bgSize,
-                }}
-              />
-              <FavHeart
-                fav={isFav}
-                onToggle={() => onToggleFavourite(frameId)}
-                className="absolute top-0 right-px"
-              />
-            </button>
+              frame={frame}
+              frameId={frameId}
+              isActive={brushAsset === frameId}
+              isFav={favourites.has(frameId)}
+              isCompact={isCompact}
+              swatchStyle={{
+                width: previewPx,
+                height: previewPx,
+                backgroundImage: `url(${url})`,
+                backgroundPosition: `-${col * previewPx}px -${row * previewPx}px`,
+                backgroundSize: bgSize,
+              }}
+              onPick={onPick}
+              onToggleFavourite={onToggleFavourite}
+            />
           );
         })}
       </div>
     </div>
+  );
+}
+
+/** One frame swatch in a `TileFrameGrid` (plan 030 step 6 extracted this from the grid's map so it can
+ *  own a `useLongPress` hook — hooks can't run inside a loop). Desktop: plain `onClick` pick + the
+ *  visible overlay `FavHeart` (unchanged). Compact/touch: the long-press hook governs BOTH gestures —
+ *  tap = pick, long-press = toggle favourite (with a toast) — and the overlay heart is dropped (it was
+ *  the tap-thief on touch), so long-press is the only favourite path here. */
+function TileFrameButton({
+  frame,
+  frameId,
+  isActive,
+  isFav,
+  isCompact,
+  swatchStyle,
+  onPick,
+  onToggleFavourite,
+}: {
+  frame: number;
+  frameId: string;
+  isActive: boolean;
+  isFav: boolean;
+  isCompact: boolean;
+  swatchStyle: CSSProperties;
+  onPick: (assetId: string) => void;
+  onToggleFavourite: (assetId: string) => void;
+}) {
+  const longPress = useLongPress({
+    onTap: () => onPick(frameId),
+    onLongPress: () => {
+      onToggleFavourite(frameId);
+      toast(isFav ? 'Removed favourite' : '♥ Favourited', { duration: 1200 });
+    },
+  });
+  return (
+    <button
+      className={cn(
+        'relative rounded-[2px] border border-transparent bg-transparent p-0 leading-[0]',
+        isActive && 'border-gold-light',
+      )}
+      title={`frame ${frame}`}
+      // Compact: the hook owns tap+long-press and swallows the trailing click; desktop keeps plain click.
+      {...(isCompact ? longPress : { onClick: () => onPick(frameId) })}
+    >
+      <span
+        className="pixelated block"
+        // Per-frame sprite crop — backgroundImage/Position/Size are computed, so inline.
+        style={swatchStyle}
+      />
+      {!isCompact && (
+        <FavHeart
+          fav={isFav}
+          onToggle={() => onToggleFavourite(frameId)}
+          className="absolute top-0 right-px"
+        />
+      )}
+    </button>
   );
 }
 
@@ -761,12 +1145,27 @@ function AssetCard({
   const path = asset.source.kind === 'sheetFrame' ? asset.source.sheet : asset.source.path;
   const url = tilesetAssetUrl(asset.pack, path);
   const label = asset.id.split('/').pop() ?? asset.id;
+  // Compact/touch: long-press governs tap (arm) + long-press (toggle favourite) and drops the inline
+  // heart, so the whole row is one clean tap target; desktop keeps plain click + the visible heart.
+  const longPress = useLongPress({
+    onTap: onArm,
+    onLongPress: () => {
+      onToggleFavourite();
+      toast(isFavourite ? 'Removed favourite' : '♥ Favourited', { duration: 1200 });
+    },
+  });
   return (
     <div className="relative">
-      <button className={libCardClass(isArmed, isCompact)} title={asset.id} onClick={onArm}>
+      <button
+        className={libCardClass(isArmed, isCompact)}
+        title={asset.id}
+        {...(isCompact ? longPress : { onClick: onArm })}
+      >
         <span className={libSwatchClass} style={{ backgroundImage: `url(${url})` }} />
         <span className={libLabelClass}>{label}</span>
-        <FavHeart fav={isFavourite} onToggle={onToggleFavourite} className="static px-0.5" />
+        {!isCompact && (
+          <FavHeart fav={isFavourite} onToggle={onToggleFavourite} className="static px-0.5" />
+        )}
       </button>
       <AssetReclassify asset={asset} />
     </div>
@@ -796,6 +1195,17 @@ function FavouriteItem({
 }) {
   const isCompact = useIsCompact();
   const previewPx = isCompact ? COMPACT_PREVIEW_PX : PREVIEW_PX;
+  // Compact/touch tile-favourite gesture (plan 030 step 6): tap = pick, long-press = un-favourite,
+  // matching TileFrameGrid so the heart never steals a pick tap here either. Called unconditionally
+  // (rules of hooks); only wired in the tile branch below, and only on compact. The object branch
+  // delegates to AssetCard, which has its own long-press.
+  const tileLongPress = useLongPress({
+    onTap: () => onPickTile(favId),
+    onLongPress: () => {
+      onToggleFavourite(favId);
+      toast('Removed favourite', { duration: 1200 });
+    },
+  });
   let resolved: { asset: CatalogAsset; frame?: number } | null = null;
   try {
     const { pack, path, frame } = parseAssetId(favId);
@@ -817,12 +1227,14 @@ function FavouriteItem({
 
   const { asset, frame } = resolved;
   if (asset.type === 'tile' && frame !== undefined) {
-    const cols = catalogTileCols(asset, TILE_SIZE);
-    const nativeRows = Math.max(1, Math.round(asset.h / TILE_SIZE));
-    const col = frame % cols;
-    const row = Math.floor(frame / cols);
-    const path = asset.source.kind === 'sheetFrame' ? asset.source.sheet : asset.source.path;
-    const url = tilesetAssetUrl(asset.pack, path);
+    // Reuse the shared crop renderer (plan 030 step 4) rather than re-deriving the frame math here —
+    // `asset` already resolved above, so `swatch` is non-null, but the guard keeps this crash-free.
+    const swatch = resolveRecentSwatch(
+      { kind: 'tile', assetId: favId },
+      catalog,
+      EMPTY_NODE_DEFS,
+      null,
+    );
     return (
       <button
         className={cn(
@@ -830,24 +1242,16 @@ function FavouriteItem({
           brushAsset === favId && 'border-gold-light',
         )}
         title={favId}
-        onClick={() => onPickTile(favId)}
+        {...(isCompact ? tileLongPress : { onClick: () => onPickTile(favId) })}
       >
-        <span
-          className="pixelated block"
-          // Per-frame sprite crop — computed background props stay inline.
-          style={{
-            width: previewPx,
-            height: previewPx,
-            backgroundImage: `url(${url})`,
-            backgroundPosition: `-${col * previewPx}px -${row * previewPx}px`,
-            backgroundSize: `${cols * previewPx}px ${nativeRows * previewPx}px`,
-          }}
-        />
-        <FavHeart
-          fav
-          onToggle={() => onToggleFavourite(favId)}
-          className="absolute top-0 right-px"
-        />
+        {swatch && <AssetSwatch swatch={swatch} sizePx={previewPx} />}
+        {!isCompact && (
+          <FavHeart
+            fav
+            onToggle={() => onToggleFavourite(favId)}
+            className="absolute top-0 right-px"
+          />
+        )}
       </button>
     );
   }

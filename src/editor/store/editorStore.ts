@@ -76,6 +76,17 @@ import {
   putSettings,
   type UnderlaySettings,
 } from '../underlayStore';
+import {
+  deleteBrowse,
+  deleteRecents,
+  getBrowse,
+  getRecents,
+  putBrowse,
+  putRecents,
+  pushRecent,
+  type LibraryBrowseState,
+  type RecentEntry,
+} from '../libraryViewStore';
 import type { AssetCatalog } from '../catalog';
 import type { TerrainCatalog, TerrainDef } from '../terrainCatalog';
 import { parseAssetId } from '../textureLoading';
@@ -199,6 +210,15 @@ export type UnderlayState = UnderlaySettings & { dataUrl: string };
  *  the trace-over image reads clearly while tile layers still paint legibly on top. */
 const DEFAULT_UNDERLAY_OPACITY = 0.5;
 
+/** Empty Library browse state — the reset value when no map is open and the fallback when a map has
+ *  no persisted browse. `search` is transient (store-only, never persisted; see `libraryViewStore`). */
+const EMPTY_LIBRARY_BROWSE: LibraryBrowseState = {
+  search: '',
+  selectedPack: null,
+  selectedCategory: null,
+  expandedPacks: [],
+};
+
 export interface EditorState {
   /** Central-pane tabs (plan 017 step 1). Always leads with the permanent `map` + `world` tabs;
    *  object tabs are appended by `openObjectTab`. */
@@ -306,6 +326,15 @@ export interface EditorState {
   /** Editor VIEW state, not map data — which layer ids are hidden in the viewport. Never touches
    *  `MapFile`/`TileLayer` (those have no visibility field; see module doc on `overhead` vs this). */
   hiddenLayerIds: string[];
+  /** Library panel's MRU "Recent" picks for the open map (plan 030) — editor VIEW state, persisted
+   *  per-map in `localStorage` (`libraryViewStore`), NEVER in `MapFile`. Empty when no map is open.
+   *  Deduped/capped via `pushLibraryRecent`. */
+  libraryRecents: RecentEntry[];
+  /** Library panel's search/filter/expansion state for the open map (plan 030) — editor VIEW state.
+   *  `selectedPack`/`selectedCategory`/`expandedPacks` persist per-map (`libraryViewStore`); `search`
+   *  is transient (in-memory only — survives a close/reopen within a session, not a reload). Never in
+   *  `MapFile`. Reset to `EMPTY_LIBRARY_BROWSE` when no map is open. */
+  libraryBrowse: LibraryBrowseState;
   /** Reference-underlay for the open map (plan 022) — a trace-over image behind the tile layers,
    *  editor VIEW state only (its `UnderlaySettings` persist per-map in `localStorage`, NEVER in
    *  `MapFile`). `null` when no reference is picked / the fetch failed / the map has no persisted
@@ -376,6 +405,17 @@ export interface EditorState {
   setActiveZoneId(id: number | null): void;
   toggleOverlay(key: keyof EditorOverlays): void;
   toggleLayerVisibility(layerId: string): void;
+
+  // ---- Library view-state (plan 030) — recents + browse, editor view-state persisted per-map in
+  //      localStorage (`libraryViewStore`), never in MapFile. Both write-throughs no-op the disk
+  //      write when `mapId` is null (in-memory state still updates). ----
+  /** Record a library pick as the most-recent entry (moves an existing one to front, caps the list)
+   *  and write the new list through to `localStorage` for the open map (skipped if no map). */
+  pushLibraryRecent(entry: RecentEntry): void;
+  /** Merge `partial` into `libraryBrowse`. Persists the browse subset for the open map only when
+   *  `partial` touches a persisted field (a `search`-only patch updates memory but skips the disk
+   *  write — `search` is transient). No-op disk write when no map is open. */
+  patchLibraryBrowse(partial: Partial<LibraryBrowseState>): void;
 
   // ---- reference underlay (plan 022 step 4) — editor view-state, persisted per-map in localStorage,
   //      never in MapFile. All are no-ops when `mapId` is null; async paths bail if the map swaps
@@ -1159,6 +1199,8 @@ export const useEditorStore = create<EditorState>()(
     activeZoneId: null,
     overlays: { grid: true, walkability: false, zones: false, ghosts: false },
     hiddenLayerIds: [],
+    libraryRecents: [],
+    libraryBrowse: EMPTY_LIBRARY_BROWSE,
     underlay: null,
     underlayRevision: 0,
     pendingDirty: null,
@@ -1171,6 +1213,7 @@ export const useEditorStore = create<EditorState>()(
     newMap: (id, name, width, height) => {
       const map = createEmptyMap(id, name, width, height);
       history.clear();
+      const persistedBrowse = getBrowse(id);
       set((s) => ({
         map,
         mapId: id,
@@ -1184,6 +1227,10 @@ export const useEditorStore = create<EditorState>()(
         pendingDirty: null,
         underlay: null, // fresh doc — drop any prior underlay; hydrate restores if this id has one
         underlayRevision: s.underlayRevision + 1,
+        // Library view-state (plan 030): hydrate this map's recents/browse (empty/default on a miss);
+        // `search` always rehydrates blank (transient — never persisted).
+        libraryRecents: getRecents(id),
+        libraryBrowse: persistedBrowse ? { ...persistedBrowse, search: '' } : EMPTY_LIBRARY_BROWSE,
         mapEpoch: s.mapEpoch + 1,
         docRevision: 0,
         canUndo: false,
@@ -1194,6 +1241,7 @@ export const useEditorStore = create<EditorState>()(
 
     loadMap: (map, id) => {
       history.clear();
+      const persistedBrowse = getBrowse(id);
       set((s) => ({
         map,
         mapId: id,
@@ -1207,6 +1255,10 @@ export const useEditorStore = create<EditorState>()(
         pendingDirty: null,
         underlay: null, // swap maps → drop the old underlay; hydrate re-resolves this map's own
         underlayRevision: s.underlayRevision + 1,
+        // Library view-state (plan 030): hydrate this map's recents/browse (empty/default on a miss);
+        // `search` always rehydrates blank (transient — never persisted).
+        libraryRecents: getRecents(id),
+        libraryBrowse: persistedBrowse ? { ...persistedBrowse, search: '' } : EMPTY_LIBRARY_BROWSE,
         mapEpoch: s.mapEpoch + 1,
         docRevision: 0,
         canUndo: false,
@@ -1230,6 +1282,9 @@ export const useEditorStore = create<EditorState>()(
         pendingDirty: null,
         underlay: null,
         underlayRevision: s.underlayRevision + 1,
+        // Library view-state (plan 030): no map open ⇒ reset to defaults.
+        libraryRecents: [],
+        libraryBrowse: EMPTY_LIBRARY_BROWSE,
         mapEpoch: s.mapEpoch + 1,
         docRevision: 0,
         canUndo: false,
@@ -1300,6 +1355,23 @@ export const useEditorStore = create<EditorState>()(
           ? s.hiddenLayerIds.filter((id) => id !== layerId)
           : [...s.hiddenLayerIds, layerId],
       })),
+
+    // ---- Library view-state (plan 030) ----
+    pushLibraryRecent: (entry) => {
+      const libraryRecents = pushRecent(get().libraryRecents, entry);
+      set({ libraryRecents });
+      const { mapId } = get();
+      if (mapId) putRecents(mapId, libraryRecents);
+    },
+    patchLibraryBrowse: (partial) => {
+      const libraryBrowse = { ...get().libraryBrowse, ...partial };
+      set({ libraryBrowse });
+      // `search` is transient — a search-only patch updates memory but never hits disk.
+      const touchesPersisted =
+        'selectedPack' in partial || 'selectedCategory' in partial || 'expandedPacks' in partial;
+      const { mapId } = get();
+      if (mapId && touchesPersisted) putBrowse(mapId, libraryBrowse);
+    },
 
     // ---- reference underlay (plan 022 step 4) ----
 
@@ -2023,6 +2095,23 @@ export const useEditorStore = create<EditorState>()(
           putSettings(newId, settings);
           deleteSettings(oldId);
           underlayMigrated = true;
+        }
+      }
+
+      // Library view-state migration (plan 030): move recents + browse from old→new id so a
+      // rename+reload keeps them and leaves no orphaned `oldId` keys (mirrors the underlay above).
+      // In-memory `libraryRecents`/`libraryBrowse` are unchanged by a rename — only the persistence
+      // key moves. Both `get*` degrade to empty/null, so an absent value just deletes nothing.
+      if (idChanged && oldId) {
+        const recents = getRecents(oldId);
+        if (recents.length) {
+          putRecents(newId, recents);
+          deleteRecents(oldId);
+        }
+        const browse = getBrowse(oldId);
+        if (browse) {
+          putBrowse(newId, { ...browse, search: '' });
+          deleteBrowse(oldId);
         }
       }
 

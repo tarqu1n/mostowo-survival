@@ -192,6 +192,13 @@ are authored as free **Columns × Rows** with per-cell **omission** (`omit`) —
 code via `DecorAnim`/`parseDecorAnim` (`mapFormat.ts`) and the decor renderer (`decorSprites.ts`,
 folding `frames`+`omit` into the anim cache key).
 
+**Editor mobile/touch UX pass (plan 030):** reworked the two worst touch surfaces. **Library** — a
+per-map **Recent strip** (grouped tiles) + persisted browse state (`src/editor/libraryViewStore.ts`),
+full-width compact drawers that **auto-close on pick**, compact **drill-down** category nav with Back,
+and **long-press to favourite** (tap = pick; `src/editor/hooks/useLongPress.ts`) replacing the
+tap-thief heart on touch. **Node Types tab** — restacked to a full-width **collapsible list-on-top**
+with a **collapsible Skins** section (thumbnail summary bar), on desktop + compact.
+
 ## Runtime map loader (plan 018)
 
 The game **boots straight into one authored map** (`START_MAP_ID`, currently `test`) — no procedural

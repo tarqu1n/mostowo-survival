@@ -28,6 +28,9 @@ export interface ChopFxInput {
   restY: number;
   /** Fitted base scale (skin/def `nodeScale`) — read live each hit, never captured. */
   baseScale: number;
+  /** The node's authored placement rotation (deg) — the TRUE rest angle. Recoil/tremble layer on top
+   *  and settle back to THIS, so a chop never snaps the node to 0 and drops its placement rotation. */
+  baseAngle: number;
   /** (maxHp - hp) / maxHp, 0..1 — tremble amplitude scales with this. */
   depletion: number;
   /** Chopper→node sign-delta (`Character.lastFacing`); away-from-chopper == +facing. */
@@ -48,6 +51,8 @@ export interface FellFxInput {
   x: number;
   y: number;
   scale: number;
+  /** The node's authored placement rotation (deg) — the clone starts here and topples/shudders FROM it. */
+  baseAngle: number;
   originX: number;
   originY: number;
   depth: number;
@@ -109,12 +114,14 @@ export class NodeFxManager {
    * the next hit or the fell to fight. The glow halo mirrors this motion each frame for free.
    */
   playChop(input: ChopFxInput): void {
-    const { sprite, restX, restY, depletion, facing } = input;
+    const { sprite, restX, restY, baseAngle, depletion, facing } = input;
     const baseScale = input.baseScale; // read live per hit — never a value captured across hits
     // Snap to the true resting transform + stop any in-flight tween FIRST, so a re-chop landing mid-
-    // jitter (hits can arrive every CHOP_INTERVAL_MS) can't accumulate drift off tile-centre.
+    // jitter (hits can arrive every CHOP_INTERVAL_MS) can't accumulate drift off tile-centre. Rest
+    // angle is the node's authored rotation (baseAngle), NOT 0 — snapping to 0 dropped the placement
+    // rotation permanently (it's never re-applied on regrow).
     this.recoilTweens.get(sprite)?.stop();
-    sprite.setPosition(restX, restY).setAngle(0).setScale(baseScale);
+    sprite.setPosition(restX, restY).setAngle(baseAngle).setScale(baseScale);
 
     // Unit vector along +facing (chopper→node), so the recoil pushes the node away from the chopper.
     // Normalised so a diagonal approach recoils the same distance as an orthogonal one.
@@ -142,7 +149,7 @@ export class NodeFxManager {
         const dx = ux * CHOP_RECOIL_PX * recoilEnv + Math.sin(p * Math.PI * 7) * ampPx * decay;
         const dy = uy * CHOP_RECOIL_PX * recoilEnv + Math.cos(p * Math.PI * 6) * ampPx * decay;
         sprite.setPosition(restX + dx, restY + dy);
-        sprite.setAngle(Math.sin(p * Math.PI * 5) * ampDeg * decay);
+        sprite.setAngle(baseAngle + Math.sin(p * Math.PI * 5) * ampDeg * decay);
         // Squash pop at the impact (widest+shortest at the peak), easing back to base scale.
         sprite.setScale(
           baseScale * (1 + CHOP_RECOIL_SQUASH * recoilEnv),
@@ -151,9 +158,9 @@ export class NodeFxManager {
       },
       onComplete: () => {
         this.recoilTweens.delete(sprite);
-        // Land exactly on rest (kill float error): tile-centre, upright, base scale. The fell owns any
-        // final angle, so we must leave none behind here.
-        if (sprite.active) sprite.setPosition(restX, restY).setAngle(0).setScale(baseScale);
+        // Land exactly on rest (kill float error): tile-centre, base scale, and the node's OWN rest
+        // angle (baseAngle) — never a hard 0, which would erase the placement rotation.
+        if (sprite.active) sprite.setPosition(restX, restY).setAngle(baseAngle).setScale(baseScale);
       },
     });
     this.recoilTweens.set(sprite, tween);
@@ -173,11 +180,13 @@ export class NodeFxManager {
     this.recoilTweens.get(input.nodeSprite)?.stop();
     this.recoilTweens.delete(input.nodeSprite);
 
-    const { kind, texKey, texFrame, x, y, scale, originX, originY, depth, facing } = input;
+    const { kind, texKey, texFrame, x, y, scale, baseAngle, originX, originY, depth, facing } =
+      input;
     const sprite = this.scene.add
       .image(x, y, texKey, texFrame)
       .setScale(scale)
       .setOrigin(originX, originY)
+      .setAngle(baseAngle) // start at the node's authored rotation; topple/shudder is relative to it
       .setDepth(depth); // match the node depth so the clone never renders over actors
     const entry = this.track(sprite);
     const end = () => this.endTransient(entry);
@@ -197,7 +206,7 @@ export class NodeFxManager {
             const p = state.p;
             const decay = 1 - p; // shudder rings down as the crumble takes over
             sprite.setPosition(x + Math.sin(p * Math.PI * 8) * 2 * decay, y);
-            sprite.setAngle(Math.sin(p * Math.PI * 6) * 1.5 * decay);
+            sprite.setAngle(baseAngle + Math.sin(p * Math.PI * 6) * 1.5 * decay);
             sprite.setScale(scale * (1 - 0.3 * p)); // → 0.7*scale
             sprite.setAlpha(1 - p);
           },
@@ -224,16 +233,17 @@ export class NodeFxManager {
       );
     } else {
       // Tree topple ('chop'/undefined): rotate about the base-anchored origin (the trunk hinges at its
-      // foot) through the fell arc, accelerating (ease-in) as it falls, then fade over the last beat.
-      // Lean sign never collapses to 0 — a worker directly above/below still gets a real topple, not a
-      // rotation-less fade (Finding 2).
+      // foot) FROM its rest angle through the fell arc, with a strong ease-in so it tips slowly then
+      // whips down like a pendulum falling from balance (Quart, not Quad — the old mild ease read as
+      // near-linear). Lean sign never collapses to 0 — a worker directly above/below still gets a real
+      // topple, not a rotation-less fade (Finding 2).
       const sign = Math.sign(facing.dCol) || Math.sign(facing.dRow) || 1;
       entry.tweens.push(
         this.scene.tweens.add({
           targets: sprite,
-          angle: sign * TREE_FELL_ARC_DEG,
+          angle: baseAngle + sign * TREE_FELL_ARC_DEG,
           duration: TREE_FELL_MS,
-          ease: 'Quad.easeIn',
+          ease: 'Quart.easeIn',
         }),
       );
       entry.tweens.push(

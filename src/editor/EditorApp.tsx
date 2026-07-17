@@ -401,23 +401,26 @@ export function EditorApp() {
                 </button>
 
                 <Sheet open={libraryOpen} onOpenChange={setLibraryOpen}>
+                  {/* Full-width: the drawer is a modal picker, not a persistent panel — trading canvas
+                      visibility for touch-friendly tap targets is the explicit ask (plan 030 Step 5). */}
                   <SheetContent
                     side="left"
-                    className="w-[min(85vw,320px)] gap-0 border-surface bg-raised p-0 sm:max-w-none"
+                    className="w-full max-w-none gap-0 border-surface bg-raised p-0"
                   >
                     <div className="flex-none border-b border-surface px-3 py-2">
                       <SheetTitle className="text-sm">Library</SheetTitle>
                     </div>
                     <div className="min-h-0 flex-1 overflow-auto p-3">
-                      <LibraryPanel />
+                      <LibraryPanel onPick={() => setLibraryOpen(false)} />
                     </div>
                   </SheetContent>
                 </Sheet>
 
                 <Sheet open={inspectorOpen} onOpenChange={setInspectorOpen}>
+                  {/* Full-width to match the Library drawer (plan 030 Step 5). */}
                   <SheetContent
                     side="right"
-                    className="w-[min(85vw,320px)] gap-0 border-surface bg-raised p-0 sm:max-w-none"
+                    className="w-full max-w-none gap-0 border-surface bg-raised p-0"
                   >
                     <div className="flex-none border-b border-surface px-3 py-2 pr-9">
                       <SheetTitle className="text-sm">Inspector</SheetTitle>

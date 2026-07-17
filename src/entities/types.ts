@@ -25,6 +25,10 @@ export interface TreeNode {
    *  `NodeObject.skin`; absent/unknown ⇒ `def.skins[0]`). Drives the live sprite and, if that skin
    *  carries a `depleted`, its stump sprite (plan 021 step 5). */
   skin: string;
+  /** Authored placement rotation (deg) — the node's TRUE resting angle. Stored so the chop fx can
+   *  recoil/tremble around it and settle back to it (rather than snapping the sprite to 0 and losing
+   *  the placement rotation permanently, incl. after regrow); the fell clone topples from it too. */
+  rotation: number;
 }
 
 /**
