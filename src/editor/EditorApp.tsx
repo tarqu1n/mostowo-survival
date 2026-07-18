@@ -16,6 +16,8 @@ import { ObjectEditorTab } from './tabs/ObjectEditorTab';
 import { WorldViewTab } from './tabs/WorldViewTab';
 import { NodeTypesTab } from './tabs/NodeTypesTab';
 import { LibraryPanel } from './panels/LibraryPanel';
+import { PaletteStrip } from './panels/PaletteStrip';
+import { QuickLayerSelect } from './ui/QuickLayerSelect';
 import { LayersPanel } from './panels/LayersPanel';
 import { ZonesPanel } from './panels/ZonesPanel';
 import { InspectorPanel } from './panels/InspectorPanel';
@@ -254,9 +256,16 @@ export function EditorApp() {
   // editor tab would otherwise stay hidden behind it — close the drawer when an object tab becomes
   // active so the edit surface is what you actually see. No-op on desktop (the drawer isn't rendered).
   const activeTabId = useEditorStore((s) => s.activeTabId);
+  const map = useEditorStore((s) => s.map);
   useEffect(() => {
     if (activeTabId.startsWith('object:')) setLibraryOpen(false);
   }, [activeTabId]);
+
+  // Tiling bars (palette strip + quick layer selector) are a Map-tab surface: the World and
+  // object-editor tabs have no tile layers, so gate to the Map tab with a map open. Deliberately NOT
+  // further gated to the brush/tile-paint tool — the palette doubles as a one-glance reference while
+  // selecting/placing, so it stays visible across every Map-tab tool (plan 033 Step 6 default).
+  const showTilingBar = activeTabId === 'map' && !!map;
 
   // Opening/closing a compact drawer is exactly where a finger's `touchend` can get swallowed by the
   // modal Sheet, stranding a phantom touch that later jams `EditorScene` in pinch-zoom (see the store's
@@ -484,6 +493,16 @@ export function EditorApp() {
                 </Sheet>
               </div>
 
+              {/* Palette strip: a thin always-visible tiling strip stacked above SelectionBar +
+                  ContextBar, so one-tap tile switching never requires opening the Library drawer. It
+                  sits OUTSIDE the canvas region (a flex-none row, not overlaying it) and stacks cleanly
+                  with SelectionBar (which self-hides when nothing is selected). Map-tab gated. */}
+              {showTilingBar && (
+                <div className="flex flex-none items-center overflow-x-auto border-t border-surface bg-raised px-2 py-1.5">
+                  <PaletteStrip />
+                </div>
+              )}
+
               {/* Selection-operations bar: a second bottom bar stacked above the ContextBar, shown only
                   while something is selected (it self-hides otherwise). */}
               <SelectionBar />
@@ -510,7 +529,23 @@ export function EditorApp() {
                 </ResizablePanel>
                 <ResizableHandle className="hover:bg-active" />
                 <ResizablePanel id="center" minSize="30">
-                  <CenterPane />
+                  {/* Wrap CenterPane so a slim tiling bar can dock directly beneath the viewport
+                      without depending on the Library aside being open. CenterPane keeps a positioned,
+                      full-size parent (relative flex-1 min-h-0) so its Scale.RESIZE canvas viewport is
+                      never collapsed; the bar is a flex-none sibling row below it. */}
+                  <div className="flex h-full min-h-0 flex-col">
+                    <div className="relative min-h-0 flex-1">
+                      <CenterPane />
+                    </div>
+                    {showTilingBar && (
+                      <div className="flex flex-none items-center gap-2 border-t border-surface bg-raised px-2 py-1.5">
+                        <QuickLayerSelect />
+                        <div className="min-w-0 flex-1 overflow-x-auto">
+                          <PaletteStrip />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </ResizablePanel>
               </ResizablePanelGroup>
               <aside className="box-border flex w-[280px] shrink-0 flex-col border-l border-surface bg-raised">

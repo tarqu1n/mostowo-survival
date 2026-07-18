@@ -29,6 +29,7 @@ import { useEditorStore, type EditorTool, type PaintMode } from './store/editorS
 import { regionMoveInBounds } from './regionOps';
 import { Button } from './ui/button';
 import { PanelBarButton } from './ui/PanelBarButton';
+import { QuickLayerSelect } from './ui/QuickLayerSelect';
 import { RotationWheel } from './ui/RotationWheel';
 
 /**
@@ -191,9 +192,12 @@ export function ContextBar({
 
           {/* Tool-contextual actions — scrolls horizontally if the row can't fit in portrait. */}
           <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
-            {/* Brush: rotate the painted tile (R / Shift+R). */}
+            {/* Brush: pick the active tile layer, then rotate the painted tile (R / Shift+R). The
+                quick layer selector sits with the tiling controls since it targets the TILE layer the
+                brush paints onto. */}
             {activeTool === 'brush' && (
               <div className={groupClass}>
+                <QuickLayerSelect />
                 <Button
                   variant="outline"
                   size="icon-lg"

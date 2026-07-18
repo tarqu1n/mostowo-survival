@@ -249,7 +249,8 @@ Research verified against the codebase (paths absolute under `/home/user/mostowo
     `setActiveLayer` and update the highlighted layer everywhere (LayersPanel stays in sync);
     typecheck + lint clean.
 
-- [ ] **Step 6: Wire palette strip + quick layer selector into both shells** `[inline]`
+- [x] **Step 6: Wire palette strip + quick layer selector into both shells** `[inline]`
+  - Outcome: `src/editor/EditorApp.tsx` + `src/editor/ContextBar.tsx`. Gate `showTilingBar = activeTabId === 'map' && !!map` (Map tab only — not further gated to brush, since the palette doubles as a reference while placing too). Desktop: wrapped `CenterPane` inside `ResizablePanel id="center"` in a `flex h-full min-h-0 flex-col`, CenterPane kept in a `relative min-h-0 flex-1` wrapper (canvas viewport never collapses), with a `flex-none` bar beneath holding `<QuickLayerSelect/>` + `<PaletteStrip/>` (palette in `min-w-0 flex-1 overflow-x-auto`). `ResizablePanelGroup` persisted-layout props untouched (wrap is inside the center panel). Compact: `<PaletteStrip/>` inserted as a `flex-none overflow-x-auto` strip between the viewport div and `<SelectionBar/>` (stacks above SelectionBar+ContextBar, outside canvas, no Library-drawer dependency; SelectionBar self-hides so no collision); `<QuickLayerSelect/>` added to `ContextBar.tsx`'s `activeTool === 'brush'` cluster (tiling controls, inherits component's ≥44px compact sizing). Non-map tabs hide both bars. Verified: typecheck clean; eslint clean; 377 editor tests pass. Runtime editor drive + boot canary deferred to final review.
   - Mount `PaletteStrip` and `QuickLayerSelect` so they're **always visible while tiling**, in both
     shells (`src/editor/EditorApp.tsx`, and `src/editor/ContextBar.tsx` for compact):
     - **Desktop:** place the palette strip + quick layer selector as a slim bar directly under the
