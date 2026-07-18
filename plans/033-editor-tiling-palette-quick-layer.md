@@ -28,6 +28,11 @@ Research verified against the codebase (paths absolute under `/home/user/mostowo
    autocommit. Multiple **named** palettes; one active at a time. Minimal management: an active
    palette + a switcher + a "＋ new palette" affordance. Rename/delete are out of scope for now
    (edit the file directly). Precedent: `MapMeta.favourites` already lives in the map file.
+   **Only the palette *structure* (`tilePalettes`) persists in `MapMeta`.** The *active-palette
+   pointer* is **editor view-state** (store-only, not persisted), reconciled to the first palette on
+   load and after any history move — exactly like `activeLayerId` (`store:299`, reconciled by
+   `reconcileActiveLayer` `:864`), which is deliberately **not** in the map file. This avoids
+   dirtying/autocommitting the map on every palette switch.
 3. **Palette slots store the tile only** — `{ assetId, rotation }` (i.e. `brushAsset` + `brushRotation`).
    **Not** palette indices (those are per-map, append-only, derived lazily via
    `findOrAppendPaletteIndex`). Layer is **not** bound per slot — the layer selector is independent.
@@ -39,6 +44,16 @@ Research verified against the codebase (paths absolute under `/home/user/mostowo
 6. **Quick layer selector = compact cycle/dropdown** — a single small control showing the current
    layer name; tap cycles to the next layer, with a dropdown to jump directly. Reuses
    `activeLayerId` + `setActiveLayer`.
+7. **Mutation mechanism (mirror favourites exactly).** Palette *structure* edits (add palette, add
+   tiles, remove slot) route through **`applyCommand`** — which is what `addFavourite`/etc. do
+   (`store:2805-2841`); `applyCommand` (`:1687-1699`) sets `dirty:true` + `docRevision+1` and
+   registers undo/redo. So structural palette edits are **undoable** (consistent with favourites) and
+   trigger a re-render + autocommit. The **active-palette switch** is a **direct `set`** (like
+   `setActiveLayer` `:1416`), **not** a history command and **not** dirty. **Never** bump `mapEpoch`
+   (documented `:9-11` as full-document-replaced → full texture reload/bake/camera-fit) or
+   `pendingDirty` (the paint-chunk-narrowing signal) for palette edits — both are wrong signals for a
+   meta edit. Transient Library multi-select state (Step 4) is plain store view-state — no command,
+   no dirty.
 
 **Key existing shapes to mirror (verified):**
 
@@ -91,57 +106,77 @@ Research verified against the codebase (paths absolute under `/home/user/mostowo
 ## Steps
 
 - [ ] **Step 1: Palette data model in the map file** `[inline]`
-  - In `src/systems/mapFormat.ts`, add palette types and wire them into `MapMeta` (mirror how
-    `favourites` is declared, defaulted, serialised, and parsed). Add:
+  - In `src/systems/mapFormat.ts`, add palette types and wire **only the palette structure** into
+    `MapMeta` (mirror how `favourites` is declared, serialised, and parsed). Add:
     `TilePaletteSlot = { assetId: string; rotation?: number }` and
     `NamedTilePalette = { id: string; name: string; slots: TilePaletteSlot[] }`. Add to `MapMeta`:
-    `tilePalettes?: NamedTilePalette[]` and `activeTilePaletteId?: string | null`.
-  - Update the serialiser/parser (and any zod/manual validation) so absent fields **migrate
-    cleanly**: a map with no `tilePalettes` parses to `[]` / `null` (do **not** synthesize a default
-    palette here — the store handles ensuring one active palette exists, Step 2). Preserve unknown
-    round-trip behaviour consistent with how `favourites` is handled.
+    `tilePalettes?: NamedTilePalette[]` **only**. Do **not** add `activeTilePaletteId` to `MapMeta` —
+    the active-palette pointer is editor view-state and lives in the store (Step 2), like
+    `activeLayerId`.
+  - **Preserve the byte-identical legacy round-trip.** `serializeMap`/`parseMeta` must follow the
+    `favourites` pattern **exactly** (see `mapFormat.ts` ~`:389`): when `tilePalettes` is absent,
+    **omit the key entirely** on serialise — do **not** materialise `tilePalettes: []` in `parseMeta`,
+    or `serializeMap` will re-emit it and break the guaranteed lossless round-trip for legacy maps.
+    Defaulting to `[]` happens at the **read sites in the store** (via `?? []`), not in the parser.
   - Generate slot/palette ids with the same id scheme the format already uses for layers/zones
     (find the existing id helper; do not introduce a new random scheme).
   - Side effects: anything that reads/writes `MapMeta` or snapshots the map (thumbnailing, `putMap`,
-    history serialisation if meta is included). Confirm palettes are **not** swept into undo/redo
-    unless favourites are (match favourites' history treatment exactly).
+    history serialisation if meta is included). Palette *structure* IS map data (persisted, and — per
+    Step 2 — undoable via `applyCommand`, matching favourites); the active pointer is not.
   - Docs: none yet (covered in Step 7). Add a one-line comment on the new types.
-  - Done when: `mapFormat` unit tests pass; a round-trip (parse→serialise) of a map with and without
-    `tilePalettes` is lossless; typecheck clean.
+  - Done when: `mapFormat` unit tests pass; parse→serialise of a **legacy** map (no `tilePalettes`
+    key) is **byte-identical** (key stays absent); a map **with** `tilePalettes` round-trips
+    losslessly; typecheck clean.
 
 - [ ] **Step 2: Store slice — palette state, actions, rehydration** `[inline]`
-  - In `src/editor/store/editorStore.ts` add state read from the loaded map on `loadMap`/`newMap`
-    (the `:1328-1358` rehydration region) and actions. Because `map` is mutated in place and meta
-    persists with it, treat `map.meta.tilePalettes` as the source of truth and bump the existing
-    dirty/revision counters (`pendingDirty`/`docRevision`/`mapEpoch` as appropriate) on every
-    mutation so panels re-render and the map autocommits. Mirror how favourite/layer actions mark
-    state dirty.
+  - In `src/editor/store/editorStore.ts`. `map.meta.tilePalettes` is the persisted source of truth
+    (read fresh from `getState().map` in render bodies, per repo convention). Add **one** piece of
+    store view-state: `activeTilePaletteId: string | null` (default `null`) — **not** persisted to the
+    map file, reconciled like `activeLayerId`.
+  - **Mutation mechanism — follow favourites, not a counter bump.** Structural palette edits MUST go
+    through **`applyCommand`** exactly as `addFavourite`/etc. do (`store:2805-2841`) — building a
+    `Command` that mutates `map.meta.tilePalettes` in place; `applyCommand` (`:1687-1699`) then sets
+    `dirty:true`, bumps `docRevision`, and registers undo/redo. **Do not** touch `mapEpoch` or
+    `pendingDirty` for any palette action (both are wrong signals for a meta edit — see decision #7).
   - Actions to add:
-    - `ensureActivePalette()` — internal: if no palettes exist, create one named `"Palette 1"` and
-      set it active; if `activeTilePaletteId` dangles, reconcile to the first palette (mirror
-      `reconcileActiveLayer`). Call on map load.
-    - `addTilePalette(name?)` → creates a new empty named palette (`"Palette N"` default) and makes
-      it active. Returns/sets active id.
-    - `setActiveTilePalette(id)`.
-    - `addTilesToActivePalette(entries: TilePaletteSlot[])` — bulk append (dedupe exact
-      assetId+rotation duplicates); used by the Library "Add to palette" button.
-    - `removeTilePaletteSlot(paletteId, index)`.
+    - `reconcileActiveTilePalette()` — internal, mirrors `reconcileActiveLayer` (`:864`): if
+      `activeTilePaletteId` is null or dangles, set it to the **first** palette's id (or `null` when
+      there are none). Call on map load and after every history move (wire into the same place
+      `reconcileActiveLayer` is called).
+    - `addTilePalette(name?)` — **applyCommand**: append a new empty named palette (`"Palette N"`
+      default, N = count+1) to `map.meta.tilePalettes` (creating the array if absent). Then, as a
+      separate direct `set` (not part of the command), make it the active palette.
+    - `setActiveTilePalette(id)` — **direct `set`** of `activeTilePaletteId` only (like
+      `setActiveLayer`): no command, no dirty, no counters.
+    - `addTilesToActivePalette(entries: TilePaletteSlot[])` — **applyCommand**. **Lazy creation:** if
+      no palettes exist, create `"Palette 1"` as part of this flow and make it active (so legacy maps
+      are *not* migrated/dirtied merely by being opened — a palette is only ever written when the user
+      actually adds tiles). Bulk-append `entries` to the active palette, deduping exact
+      `assetId`+`rotation` duplicates. Used by the Library "Add to palette" button.
+    - `removeTilePaletteSlot(paletteId, index)` — **applyCommand**: remove the slot.
     - `selectPaletteSlot(slot)` — arm the brush from a slot: `setBrushAsset(slot.assetId)`, set
       `brushRotation` to `slot.rotation ?? 0`, and switch to the brush tool unless already on
       brush/rect (reuse the exact logic `pickTile` uses — factor a shared helper if clean, else
-      replicate).
-  - Also add transient (store-held, non-persisted) UI state for Library multi-select used in Step 4:
-    `palettePickMode: boolean` and `palettePickSelection: string[]` (assetIds, or assetId#frame),
-    with actions `togglePalettePickMode()`, `togglePalettePickTile(assetId)`, `clearPalettePick()`.
-    Keep these in the store (not component state) so they survive compact `<Sheet>` unmount.
-  - Side effects: `loadMap`/`newMap` rehydration; ensure `selectPaletteSlot` reuses the brush-arm
-    path so tool-sync/library-filter side effects stay consistent. Confirm no interaction with
-    `armObject`/`armNode`/`armTerrain` (palette is tiles-only).
+      replicate). This is a brush-arm, **not** a palette mutation — no command/dirty.
+  - **Rehydration:** on `loadMap`/`newMap` (`:1328-1358`) do **not** create any palette; just call
+    `reconcileActiveTilePalette()` so the pointer targets the first existing palette (or stays `null`
+    for a map with none). `map.meta.tilePalettes` is already loaded with the map.
+  - Also add transient (store-held, non-persisted, **no command/dirty**) UI state for Library
+    multi-select used in Step 4: `palettePickMode: boolean` and `palettePickSelection: string[]`
+    (assetIds, or `assetId#frame`), with actions `togglePalettePickMode()`,
+    `togglePalettePickTile(assetId)`, `clearPalettePick()`. Keep these in the store (not component
+    state) so they survive compact `<Sheet>` unmount.
+  - Side effects: wire `reconcileActiveTilePalette` into the load path **and** the post-history-move
+    path alongside `reconcileActiveLayer` (undoing an `addTilePalette` must not leave a dangling
+    pointer). Ensure `selectPaletteSlot` reuses the brush-arm path so tool-sync/library-filter side
+    effects stay consistent. Confirm no interaction with `armObject`/`armNode`/`armTerrain` (palette
+    is tiles-only).
   - Docs: none yet.
-  - Done when: unit tests cover `addTilePalette`/`addTilesToActivePalette`/`selectPaletteSlot`/
-    `removeTilePaletteSlot`/`ensureActivePalette` reconciliation; loading a map with saved palettes
-    rehydrates them; adding a tile then reloading (via serialise round-trip) preserves it; typecheck
-    + lint clean.
+  - Done when: unit tests cover `addTilePalette`/`addTilesToActivePalette` (incl. **lazy first-palette
+    creation**)/`selectPaletteSlot`/`removeTilePaletteSlot`/`reconcileActiveTilePalette`; **undo**
+    reverses a structural palette edit (proves it went through `applyCommand`); switching the active
+    palette does **not** mark the map dirty; opening a legacy map (no `tilePalettes`) leaves it clean
+    (not dirtied/migrated); adding a tile then serialise→parse preserves it; typecheck + lint clean.
 
 - [ ] **Step 3: Palette strip component** `[inline]`
   - New file `src/editor/panels/PaletteStrip.tsx` (mirror `RecentStrip` shape and `libSwatchClass`/
@@ -149,9 +184,10 @@ Research verified against the codebase (paths absolute under `/home/user/mostowo
     - A **palette switcher** — a compact `select.tsx` (or `dropdown-menu.tsx`) listing named
       palettes by name, bound to `activeTilePaletteId` → `setActiveTilePalette`; plus a "＋" button →
       `addTilePalette()`.
-    - The **active palette's slots** as one-tap swatches. Each swatch renders the tile frame for its
-      `assetId`(+rotation) using the smallest reusable Library swatch renderer (extract from
-      `LibraryPanel.tsx` if it's currently inline — keep the extraction minimal and colocated).
+    - The **active palette's slots** as one-tap swatches. **Reuse the existing swatch renderer** the
+      Recent strip uses (`AssetSwatch` / `resolveRecentSwatch` + `libSwatchClass`) rather than
+      reimplementing frame rendering, so palette and Library swatches can't drift. If that renderer is
+      currently private to `LibraryPanel.tsx`, export/extract it minimally.
       Tapping a slot → `selectPaletteSlot(slot)`. The slot matching the current `brushAsset` +
       `brushRotation` is highlighted (`--color-active`/`--color-selection`), mirroring how
       `RecentStrip`/Library shows the active pick.
@@ -262,3 +298,17 @@ Research verified against the codebase (paths absolute under `/home/user/mostowo
 - Fixing the Library's underlying DOM scroll-reset-on-reopen in general (the palette makes it
   irrelevant for the tiling loop; a persisted `scrollTop` is a separate nicety).
 - Global (cross-map) palettes — palettes are per-map (travel with the map file via autocommit).
+
+## Critique
+
+Fresh-eyes review (independent sub-agent). **Verdict:** sound, well-researched plan that fits the
+project's dev-tooling direction; no High findings. Three Medium mechanism imprecisions in Steps 1–2
+were **resolved in-plan** (see decision #7 and the revised Steps 1–2); two Low items noted.
+
+| # | Finding | Severity | Resolution |
+| - | ------- | -------- | ---------- |
+| 1 | "Bump `pendingDirty`/`docRevision`/`mapEpoch`" contradicts the favourites precedent (favourites route through `applyCommand`); undo treatment of active-palette switch unresolved. | Medium | **Fixed** — decision #7 + Step 2: structural edits go through `applyCommand` (undoable + dirty + `docRevision`, like favourites); active-palette switch is a direct `set` like `setActiveLayer`; never touch `mapEpoch`/`pendingDirty`. |
+| 2 | "Absent field parses to `[]`/`null`" risks materialising empty arrays into `MapMeta`, breaking the byte-identical legacy round-trip. | Medium | **Fixed** — Step 1: omit the key when absent (match `favourites` ~`:389`); default with `?? []` at store read sites, never in `parseMeta`. |
+| 3 | `ensureActivePalette()` on load creates "Palette 1" + dirties every legacy map; persisting `activeTilePaletteId` dirties on every switch → autocommit churn. | Medium | **Fixed** — Step 2: lazy first-palette creation (only on first "Add to palette"); active pointer is store view-state (not in `MapMeta`), reconciled like `activeLayerId`. |
+| 4 | Multiple *named* palettes but no rename/delete UI is an awkward partial. | Low | **Accepted as-is** — user chose to keep multiple named palettes; rename/delete stay out of scope. |
+| 5 | `PaletteStrip` duplicates `RecentStrip` swatch rendering. | Low | **Fixed** — Step 3: reuse `AssetSwatch`/`resolveRecentSwatch`/`libSwatchClass` instead of reimplementing. |
