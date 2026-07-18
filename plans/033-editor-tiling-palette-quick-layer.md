@@ -1,6 +1,6 @@
 # Editor: tiling palette + quick layer selector
 
-> Status: in review
+> Status: deployed
 
 ## Summary
 
