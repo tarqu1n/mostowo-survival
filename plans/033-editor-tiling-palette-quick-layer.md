@@ -105,7 +105,8 @@ Research verified against the codebase (paths absolute under `/home/user/mostowo
 
 ## Steps
 
-- [ ] **Step 1: Palette data model in the map file** `[inline]`
+- [x] **Step 1: Palette data model in the map file** `[inline]`
+  - Outcome: Added `TilePaletteSlot`/`NamedTilePalette` types + `MapMeta.tilePalettes?` (new LAST field, after `favourites`) in `src/systems/mapFormat.ts`; omit-when-absent on both parse (`parseTilePalettes` helper, only read when present) and serialise (return-spread `...(tilePalettes === undefined ? {} : { tilePalettes })`), mirroring `favourites` — no `activeTilePaletteId` (store-only). Only one meta parse path (`parseMeta`); the plan's `:475-480` pointer was `parseZoneDef`'s per-zone favourites, unrelated. No id minting here (belongs to Step 2's store, reusing the `prefix_NNNN` scheme). Tests: added 6-test `meta.tilePalettes` block to `mapFormat.test.ts` (legacy byte-identical round-trip, with-palettes lossless, key-order, rejects). Verified: typecheck clean; 72 mapFormat tests pass.
   - In `src/systems/mapFormat.ts`, add palette types and wire **only the palette structure** into
     `MapMeta` (mirror how `favourites` is declared, serialised, and parsed). Add:
     `TilePaletteSlot = { assetId: string; rotation?: number }` and
@@ -214,7 +215,7 @@ Research verified against the codebase (paths absolute under `/home/user/mostowo
     - Show an **"Add to palette (N)"** button (disabled when N=0) that calls
       `addTilesToActivePalette(...)` mapping the selection to `{assetId, rotation}` slots (rotation 0
       unless the id carries one), then `clearPalettePick()` and exits pick mode (or stays in pick
-      mode — pick the less surprising: **exit** and toast "Added N tiles to <palette>"). Reuse
+      mode — pick the less surprising: **exit** and toast "Added N tiles to `<palette>`"). Reuse
       `sonner.tsx` toast if the Library already toasts elsewhere; otherwise skip the toast.
   - Keep `palettePickMode` visually distinct so the user knows taps won't paint. Ensure leaving the
     Library (compact drawer close) does **not** lose the selection (state is in the store).
@@ -305,10 +306,10 @@ Fresh-eyes review (independent sub-agent). **Verdict:** sound, well-researched p
 project's dev-tooling direction; no High findings. Three Medium mechanism imprecisions in Steps 1–2
 were **resolved in-plan** (see decision #7 and the revised Steps 1–2); two Low items noted.
 
-| # | Finding | Severity | Resolution |
-| - | ------- | -------- | ---------- |
-| 1 | "Bump `pendingDirty`/`docRevision`/`mapEpoch`" contradicts the favourites precedent (favourites route through `applyCommand`); undo treatment of active-palette switch unresolved. | Medium | **Fixed** — decision #7 + Step 2: structural edits go through `applyCommand` (undoable + dirty + `docRevision`, like favourites); active-palette switch is a direct `set` like `setActiveLayer`; never touch `mapEpoch`/`pendingDirty`. |
-| 2 | "Absent field parses to `[]`/`null`" risks materialising empty arrays into `MapMeta`, breaking the byte-identical legacy round-trip. | Medium | **Fixed** — Step 1: omit the key when absent (match `favourites` ~`:389`); default with `?? []` at store read sites, never in `parseMeta`. |
-| 3 | `ensureActivePalette()` on load creates "Palette 1" + dirties every legacy map; persisting `activeTilePaletteId` dirties on every switch → autocommit churn. | Medium | **Fixed** — Step 2: lazy first-palette creation (only on first "Add to palette"); active pointer is store view-state (not in `MapMeta`), reconciled like `activeLayerId`. |
-| 4 | Multiple *named* palettes but no rename/delete UI is an awkward partial. | Low | **Accepted as-is** — user chose to keep multiple named palettes; rename/delete stay out of scope. |
-| 5 | `PaletteStrip` duplicates `RecentStrip` swatch rendering. | Low | **Fixed** — Step 3: reuse `AssetSwatch`/`resolveRecentSwatch`/`libSwatchClass` instead of reimplementing. |
+|#|Finding|Severity|Resolution|
+|-|-------|--------|----------|
+|1|"Bump `pendingDirty`/`docRevision`/`mapEpoch`" contradicts the favourites precedent (favourites route through `applyCommand`); undo treatment of active-palette switch unresolved.|Medium|**Fixed** — decision #7 + Step 2: structural edits go through `applyCommand` (undoable + dirty + `docRevision`, like favourites); active-palette switch is a direct `set` like `setActiveLayer`; never touch `mapEpoch`/`pendingDirty`.|
+|2|"Absent field parses to `[]`/`null`" risks materialising empty arrays into `MapMeta`, breaking the byte-identical legacy round-trip.|Medium|**Fixed** — Step 1: omit the key when absent (match `favourites` ~`:389`); default with `?? []` at store read sites, never in `parseMeta`.|
+|3|`ensureActivePalette()` on load creates "Palette 1" + dirties every legacy map; persisting `activeTilePaletteId` dirties on every switch → autocommit churn.|Medium|**Fixed** — Step 2: lazy first-palette creation (only on first "Add to palette"); active pointer is store view-state (not in `MapMeta`), reconciled like `activeLayerId`.|
+|4|Multiple *named* palettes but no rename/delete UI is an awkward partial.|Low|**Accepted as-is** — user chose to keep multiple named palettes; rename/delete stay out of scope.|
+|5|`PaletteStrip` duplicates `RecentStrip` swatch rendering.|Low|**Fixed** — Step 3: reuse `AssetSwatch`/`resolveRecentSwatch`/`libSwatchClass` instead of reimplementing.|
