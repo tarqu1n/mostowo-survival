@@ -206,7 +206,8 @@ Research verified against the codebase (paths absolute under `/home/user/mostowo
     them, shows slots, highlights the active tile, tap-selects (arms brush), and removes slots;
     typecheck + lint clean.
 
-- [ ] **Step 4: Library multi-select → Add to palette** `[inline]`
+- [x] **Step 4: Library multi-select → Add to palette** `[inline]`
+  - Outcome: All in `src/editor/panels/LibraryPanel.tsx`. New `PalettePickControls` (under the role-filter chips): a "Select for palette" toggle (`palettePickMode`/`togglePalettePickMode`, flips `outline`→filled `default` + "● Selecting tiles" label + hint line when active) and an "Add to palette (N)" button (disabled at 0). Branched CENTRALLY inside `pickTile`: when `palettePickMode`, call `togglePalettePickTile(assetId)` and return before any brush-arm (also skips `onPick?.()` so the compact drawer stays open) — this one funnel covers every tile-frame surface (`TileFrameGrid`/`TileFrameButton`, Favourites tile cards, Recent tile re-arm). Selected overlay: `border-selection` ring + tint + ✓ badge on `TileFrameButton`/`FavouriteItem` tiles whose id is in `palettePickSelection` (read via selectors, re-renders on toggle). Add flow maps selection → `{assetId}` slots (rotation omitted = 0, byte-identical), calls `addTilesToActivePalette`, resolves active-palette name AFTER (lazy "Palette 1" may have been created), toasts via already-used `sonner`, exits via `togglePalettePickMode()` (clears selection). Object/node/terrain arm paths (`armObject`/`armRegion`/`armAnim`/`armNode`/`armTerrain`) untouched — only the tile path branches; non-pick `pickTile` unchanged. Verified: typecheck clean; eslint clean; 377 editor tests pass.
   - In `src/editor/panels/LibraryPanel.tsx`, add a **"select for palette"** toggle
     (a `button.tsx` `outline`/`ghost` near the existing role-filter chips ~`:480-485`) bound to
     `palettePickMode`/`togglePalettePickMode`. While active:

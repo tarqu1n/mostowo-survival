@@ -338,6 +338,72 @@ function LibraryRoleFilterChips({ active }: { active: LibraryRoleFilter }) {
   );
 }
 
+/**
+ * Palette multi-select controls (plan 033 step 4) — a "select for palette" toggle bound to
+ * `palettePickMode`, plus an "Add to palette (N)" action shown only while picking. Self-contained: it
+ * reads the transient pick state straight from the store (so a compact-drawer unmount never loses the
+ * in-progress selection) and drives `togglePalettePickMode`/`addTilesToActivePalette`. While pick mode
+ * is on the toggle is filled (primary variant) and a hint line spells out that taps select rather than
+ * paint — the actual click-path branch lives in `pickTile` (below), which every tile-frame surface
+ * funnels through, so object/node/terrain arm paths are untouched.
+ */
+function PalettePickControls() {
+  const isCompact = useIsCompact();
+  const pickMode = useEditorStore((s) => s.palettePickMode);
+  const count = useEditorStore((s) => s.palettePickSelection.length);
+
+  function addSelection(): void {
+    const s = useEditorStore.getState();
+    const selection = s.palettePickSelection;
+    const n = selection.length;
+    if (n === 0) return;
+    // A Library pick carries no rotation context, so map each ticked id to a rotation-0 slot with the
+    // rotation omitted (equivalent to 0, keeps slots byte-identical per the Step 1 contract). The add
+    // may LAZILY create "Palette 1" and make it active, so resolve the palette name AFTER the call.
+    s.addTilesToActivePalette(selection.map((assetId) => ({ assetId })));
+    const after = useEditorStore.getState();
+    const name =
+      after.map?.meta.tilePalettes?.find((p) => p.id === after.activeTilePaletteId)?.name ??
+      'palette';
+    // Exit pick mode — `togglePalettePickMode` also clears the selection on the way out (so no separate
+    // `clearPalettePick` is needed here). `n` was captured before the exit for the toast.
+    s.togglePalettePickMode();
+    toast(`Added ${n} ${n === 1 ? 'tile' : 'tiles'} to ${name}`);
+  }
+
+  return (
+    <div className="mb-2.5 flex flex-col gap-1.5">
+      <div className={cn('flex items-center gap-1.5', isCompact && 'gap-2.5')}>
+        <Button
+          type="button"
+          variant={pickMode ? 'default' : 'outline'}
+          size="sm"
+          className={cn('flex-1', isCompact && 'min-h-11 text-[0.85rem]')}
+          aria-pressed={pickMode}
+          onClick={() => useEditorStore.getState().togglePalettePickMode()}
+        >
+          {pickMode ? '● Selecting tiles' : '+ Select for palette'}
+        </Button>
+        {pickMode && (
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            className={cn(isCompact && 'min-h-11 text-[0.85rem]')}
+            disabled={count === 0}
+            onClick={addSelection}
+          >
+            Add to palette ({count})
+          </Button>
+        )}
+      </div>
+      {pickMode && (
+        <p className="text-[0.7rem] text-selection">Tap tiles to select — taps won’t paint.</p>
+      )}
+    </div>
+  );
+}
+
 export function LibraryPanel({ onPick }: { onPick?: () => void } = {}) {
   const isCompact = useIsCompact();
   // The catalog lives in the store (plan 017 step 3): the object-editor tab's Apply refetches it via
@@ -471,6 +537,17 @@ export function LibraryPanel({ onPick }: { onPick?: () => void } = {}) {
   // immediately; desktop omits it (no-op). `pushLibraryRecent` no-ops the disk write when no map.
   function pickTile(assetId: string): void {
     const s = useEditorStore.getState();
+    // Palette multi-select (plan 033 step 4): while pick mode is on, a tile-frame tap TOGGLES the
+    // frame in the palette selection instead of arming the brush. Branching here — the single funnel
+    // every tile-frame surface (TileFrameGrid, Favourites tile cards, the Recent strip's tile re-arm)
+    // routes through — means all of them honour pick mode without touching each grid; and because only
+    // the tile path calls `pickTile`, the object/node/terrain arm paths (`armObject`/`armNode`/… ) are
+    // inherently unaffected. `onPick` (compact-drawer auto-close) is deliberately NOT fired here — the
+    // user is mid multi-select and the drawer must stay open.
+    if (s.palettePickMode) {
+      s.togglePalettePickTile(assetId);
+      return;
+    }
     s.setBrushAsset(assetId);
     // Picking a tile means "I want to paint this" — switch to the Brush tool unless the user is
     // already on a brush-consuming tool (brush/rect), so a tile click never silently leaves Pan
@@ -545,6 +622,10 @@ export function LibraryPanel({ onPick }: { onPick?: () => void } = {}) {
       {/* Role-filter chips (plan 032 step 3) — above the Recent strip/search since the active filter
           governs both of those plus the category tree below. */}
       <LibraryRoleFilterChips active={libraryRoleFilter} />
+      {/* Palette multi-select (plan 033 step 4) — sits under the role chips: while pick mode is on, a
+          tap on any tile frame toggles its palette selection (branched centrally in `pickTile`) instead
+          of arming the brush, and "Add to palette (N)" flushes the selection into the active palette. */}
+      <PalettePickControls />
       {/* Recent strip (plan 030 step 4) — top-of-panel MRU of everything pickable, on desktop and
           compact. Re-arming goes through the same pick handlers as the main list, so a click also
           moves the entry to front (`pushLibraryRecent`) and auto-closes the compact drawer (`onPick`).
@@ -932,6 +1013,12 @@ function TileFrameButton({
   onPick: (assetId: string) => void;
   onToggleFavourite: (assetId: string) => void;
 }) {
+  // Palette pick-mode selection state (plan 033 step 4) — read straight from the store so the check
+  // overlay re-renders the instant this frame is (de)selected. In pick mode a tap still routes through
+  // `onPick` (=`pickTile`), which branches to `togglePalettePickTile`; only the affordance changes here.
+  const palettePickMode = useEditorStore((s) => s.palettePickMode);
+  const palettePicked = useEditorStore((s) => s.palettePickSelection.includes(frameId));
+  const showPickOverlay = palettePickMode && palettePicked;
   const longPress = useLongPress({
     onTap: () => onPick(frameId),
     onLongPress: () => {
@@ -944,6 +1031,8 @@ function TileFrameButton({
       className={cn(
         'relative rounded-[2px] border border-transparent bg-transparent p-0 leading-[0]',
         isActive && 'border-gold-light',
+        // Selected-for-palette wins the ring so the multi-select is unmistakable while picking.
+        showPickOverlay && 'border-selection',
       )}
       title={`frame ${frame}`}
       // Compact: the hook owns tap+long-press and swallows the trailing click; desktop keeps plain click.
@@ -954,6 +1043,13 @@ function TileFrameButton({
         // Per-frame sprite crop — backgroundImage/Position/Size are computed, so inline.
         style={swatchStyle}
       />
+      {showPickOverlay && (
+        // Selection tint + check — reuses the AtlasSheetPicker armed-region colour for one consistent
+        // "this is selected" language across the Library.
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[rgba(95,208,255,0.28)] text-[0.7rem] font-bold text-fg-bright">
+          ✓
+        </span>
+      )}
       {!isCompact && (
         <FavHeart
           fav={isFav}
@@ -1117,6 +1213,11 @@ function FavouriteItem({
 }) {
   const isCompact = useIsCompact();
   const previewPx = isCompact ? COMPACT_PREVIEW_PX : PREVIEW_PX;
+  // Palette pick-mode selection state (plan 033 step 4) — a favourited tile frame is a tile-frame
+  // surface too, so it funnels through `onPickTile` (=`pickTile`) and honours pick mode; mirror the
+  // TileFrameButton check overlay here. `favId` is the frame id used for the selection key.
+  const palettePickMode = useEditorStore((s) => s.palettePickMode);
+  const palettePicked = useEditorStore((s) => s.palettePickSelection.includes(favId));
   // Compact/touch tile-favourite gesture (plan 030 step 6): tap = pick, long-press = un-favourite,
   // matching TileFrameGrid so the heart never steals a pick tap here either. Called unconditionally
   // (rules of hooks); only wired in the tile branch below, and only on compact. The object branch
@@ -1162,11 +1263,17 @@ function FavouriteItem({
         className={cn(
           'relative rounded-[2px] border border-transparent bg-transparent p-0 leading-[0]',
           brushAsset === favId && 'border-gold-light',
+          palettePickMode && palettePicked && 'border-selection',
         )}
         title={favId}
         {...(isCompact ? tileLongPress : { onClick: () => onPickTile(favId) })}
       >
         {swatch && <AssetSwatch swatch={swatch} sizePx={previewPx} />}
+        {palettePickMode && palettePicked && (
+          <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[rgba(95,208,255,0.28)] text-[0.7rem] font-bold text-fg-bright">
+            ✓
+          </span>
+        )}
         {!isCompact && (
           <FavHeart
             fav
