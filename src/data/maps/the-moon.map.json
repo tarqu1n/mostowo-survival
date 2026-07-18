@@ -2713,6 +2713,15 @@
       "flipX": false,
       "flipY": false,
       "depth": 0
+    },
+    {
+      "id": "node_0011",
+      "kind": "node",
+      "ref": "tree",
+      "col": 109,
+      "row": 149,
+      "skin": "skin_3",
+      "rotation": 347.06937615982133
     }
   ]
 }
