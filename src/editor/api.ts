@@ -93,6 +93,27 @@ export async function putNodes(json: string): Promise<void> {
   );
 }
 
+/** Raw JSON of `src/data/maps/palettes.json` (plan 033 step 9) — the editor's GLOBAL, cross-map tile
+ *  palettes (curation trays), NOT part of any map file. Like `getNodes`, a write here never regenerates
+ *  `manifest.json` (it isn't a map placement — see `scripts/vite-editor-api.mjs`'s module doc). Narrow
+ *  the `{ palettes: NamedTilePalette[] }` shape defensively before use (see `palettesSource.ts`). */
+export async function getPalettes(): Promise<unknown> {
+  const res = await expectOk(await fetch(`${BASE}/palettes`), 'getPalettes');
+  return res.json();
+}
+
+/** Writes `json` to `src/data/maps/palettes.json`. No manifest regen (mirrors `getPalettes`'s doc). */
+export async function putPalettes(json: string): Promise<void> {
+  await expectOk(
+    await fetch(`${BASE}/palettes`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: json,
+    }),
+    'putPalettes',
+  );
+}
+
 /** Writes a 1px-per-tile thumbnail PNG to `public/assets/maps/thumbs/<id>.png`. */
 export async function putThumb(id: string, png: Blob): Promise<void> {
   await expectOk(

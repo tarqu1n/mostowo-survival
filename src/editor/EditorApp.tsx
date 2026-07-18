@@ -9,6 +9,7 @@ import { useEditorStore } from './store/editorStore';
 import { loadCatalog } from './catalogSource';
 import { loadTerrainCatalog } from './terrainCatalogSource';
 import { loadNodeDefs } from './nodeDefsSource';
+import { loadPalettes, installPaletteAutosave } from './palettesSource';
 import { Toolbar } from './Toolbar';
 import { ContextBar, SelectionBar } from './ContextBar';
 import { PhaserViewport } from './PhaserViewport';
@@ -293,6 +294,20 @@ export function EditorApp() {
     loadNodeDefs().catch((e: unknown) => {
       console.warn('[editor] node defs failed to load:', (e as Error).message);
     });
+    // Global tile palettes (plan 033 step 9): load from disk, THEN install the autosave subscriber —
+    // installing after the load resolves means the load's own `setTilePalettes` doesn't trigger a
+    // redundant re-save. `installPaletteAutosave` returns an unsubscribe, torn down on effect cleanup.
+    let unsubPalettes: (() => void) | undefined;
+    loadPalettes()
+      .catch((e: unknown) => {
+        console.warn('[editor] palettes failed to load:', (e as Error).message);
+      })
+      .finally(() => {
+        unsubPalettes = installPaletteAutosave();
+      });
+    return () => {
+      unsubPalettes?.();
+    };
   }, []);
 
   // react-resizable-panels v4 persistence: restores the Library/centre split on load and saves it

@@ -58,11 +58,6 @@ interface RawFixture {
     height: number;
     tileSize: number;
     favourites?: string[];
-    tilePalettes?: Array<{
-      id: string;
-      name: string;
-      slots: Array<{ assetId: string; rotation?: number }>;
-    }>;
   };
   shape?: { cells: number[] };
   palette: Array<{
@@ -316,96 +311,6 @@ describe('parseMap', () => {
         r.meta.favourites = 'not-an-array';
       });
       expect(() => parseMap(raw)).toThrow(/favourites/);
-    });
-  });
-
-  describe('meta.tilePalettes (plan 033 step 1)', () => {
-    it('round-trips a legacy map WITHOUT tilePalettes byte-identical (key stays absent)', () => {
-      const map = parseMap(validRaw()); // the base fixture never sets tilePalettes
-      expect(map.meta.tilePalettes).toBeUndefined();
-      const json = serializeMap(map);
-      const parsedJson = JSON.parse(json) as { meta: object };
-      expect(Object.prototype.hasOwnProperty.call(parsedJson.meta, 'tilePalettes')).toBe(false);
-      // Byte-identical: reparse yields the same object AND re-serializing gives the same JSON.
-      const reparsed = parseMap(JSON.parse(json));
-      expect(reparsed.meta.tilePalettes).toBeUndefined();
-      expect(reparsed).toEqual(map);
-      expect(serializeMap(reparsed)).toBe(json);
-    });
-
-    it('round-trips a map WITH tilePalettes losslessly (slots with and without rotation)', () => {
-      const raw = withRaw((r) => {
-        r.meta.tilePalettes = [
-          {
-            id: 'palette_0001',
-            name: 'Camp',
-            slots: [
-              { assetId: 'pixel-crawler/Environment/Tilesets/Floors_Tiles.png#252' },
-              { assetId: 'pixel-crawler/Environment/Tilesets/Floors_Tiles.png#253', rotation: 90 },
-            ],
-          },
-        ];
-      });
-      const map = parseMap(raw);
-      expect(map.meta.tilePalettes).toEqual([
-        {
-          id: 'palette_0001',
-          name: 'Camp',
-          slots: [
-            { assetId: 'pixel-crawler/Environment/Tilesets/Floors_Tiles.png#252' },
-            { assetId: 'pixel-crawler/Environment/Tilesets/Floors_Tiles.png#253', rotation: 90 },
-          ],
-        },
-      ]);
-      const json = serializeMap(map);
-      const parsedJson = JSON.parse(json) as {
-        meta: { tilePalettes?: Array<{ slots: Array<Record<string, unknown>> }> };
-      };
-      // The unrotated slot omits the rotation key entirely.
-      expect(
-        Object.prototype.hasOwnProperty.call(parsedJson.meta.tilePalettes![0].slots[0], 'rotation'),
-      ).toBe(false);
-      expect(parsedJson.meta.tilePalettes![0].slots[1].rotation).toBe(90);
-      const reparsed = parseMap(JSON.parse(json));
-      expect(reparsed).toEqual(map);
-      expect(serializeMap(reparsed)).toBe(json);
-    });
-
-    it('serializes tilePalettes LAST in meta (after favourites), keeping key order stable', () => {
-      const raw = withRaw((r) => {
-        r.meta.favourites = ['pixel-crawler/foo.png#1'];
-        r.meta.tilePalettes = [{ id: 'palette_0001', name: 'Camp', slots: [] }];
-      });
-      const map = parseMap(raw);
-      const metaKeys = Object.keys(map.meta);
-      expect(metaKeys).toEqual([
-        'schemaVersion',
-        'id',
-        'name',
-        'width',
-        'height',
-        'tileSize',
-        'favourites',
-        'tilePalettes',
-      ]);
-    });
-
-    it('rejects a non-array meta.tilePalettes', () => {
-      const raw = withRaw((r) => {
-        // @ts-expect-error deliberately invalid for the test
-        r.meta.tilePalettes = 'not-an-array';
-      });
-      expect(() => parseMap(raw)).toThrow(/tilePalettes/);
-    });
-
-    it('rejects a palette slot with a missing assetId', () => {
-      const raw = withRaw((r) => {
-        r.meta.tilePalettes = [
-          // @ts-expect-error deliberately invalid for the test
-          { id: 'palette_0001', name: 'Camp', slots: [{ rotation: 90 }] },
-        ];
-      });
-      expect(() => parseMap(raw)).toThrow(/tilePalettes\[0\]\.slots\[0\]\.assetId/);
     });
   });
 

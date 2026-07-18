@@ -321,6 +321,57 @@ Research verified against the codebase (paths absolute under `/home/user/mostowo
     shorter, both still work (cycle layers, switch/fill/arm palette), desktop unaffected; typecheck +
     lint clean; re-verified via the editor drive with zero console errors.
 
+- [x] **Step 9: Palettes → global auto-saved file (reverse the per-map decision)** `[inline]`
+  - Outcome: Palettes are now a GLOBAL, cross-map, auto-saved store slice backed by new
+    `src/data/maps/palettes.json` (`{ "palettes": [] }`, auto-committed via the existing `src/data/maps`
+    autocommit path). New `GET/PUT /__editor/palettes` in `scripts/vite-editor-api.mjs` (mirrors
+    `/__editor/nodes`) + `getPalettes`/`putPalettes` in `api.ts`. New `src/editor/palettesSource.ts`:
+    `loadPalettes()` (boot) + `installPaletteAutosave()` (400ms-debounced `putPalettes` on any
+    `tilePalettes` change; installed AFTER the initial load so the load can't re-save). Store: top-level
+    `tilePalettes` slice; structural edits are plain immutable `set`s (no `applyCommand`, no dirty, no
+    undo); removed all palette wiring from `applyCommand`/undo/redo/resize/`loadMap`/`newMap`/`closeMap`
+    so the slice + pointer survive map switches; `reconcileActiveTilePalette` reconciles against the
+    slice. `MapMeta.tilePalettes` + its parse/serialize removed from `mapFormat.ts` (types kept, marked
+    editor-global); Step-1 meta tests deleted. `PaletteStrip` reads the slice (plain selector) + strip
+    redesign: content-width switcher, slots wrap to ≤3 rows with NO gap + `overflow-y-auto`, per-slot ✕
+    row replaced by **long-press to remove** (`useLongPress`; tap = arm brush). `editorStoreTilePalettes.test.ts`
+    rewritten (16 tests, incl. map-switch-doesn't-clear-slice). Verified live (dev server): typecheck +
+    lint clean; 754 tests pass; **added 2 tiles → `palettes.json` auto-wrote them (no Save) → full page
+    reload → palette still present**; long-press removed a slot (2→1, persisted); map file stays clean
+    (no `tilePalettes`); 14-slot seed wraps to multiple rows with no gap on the phone viewport; zero
+    console errors.
+  - Added during review from phone feedback: the user wants palettes to (a) **persist without the
+    manual Save button** and (b) be **cross-map (global)**, not tied to the open map. This **reverses**
+    decision #2 / the "per-map, in `MapMeta.tilePalettes`" model. No map on disk has `tilePalettes`
+    yet, so the migration is clean (nothing to convert).
+  - **Storage:** palettes move OUT of the map file into their own global editor file
+    `src/data/maps/palettes.json` (`{ "palettes": NamedTilePalette[] }`), mirroring `nodes.json`
+    exactly — a `GET/PUT /__editor/palettes` pair in `scripts/vite-editor-api.mjs` (no manifest
+    regen), already covered by `AUTOCOMMIT_PATHS` (`src/data/maps`). Add `getPalettes`/`putPalettes`
+    to `src/editor/api.ts`.
+  - **Auto-save (no manual Save, no undo):** palette structural edits (`addTilePalette`,
+    `addTilesToActivePalette`, `removeTilePaletteSlot`) become plain immutable `set`s of a top-level
+    store slice `tilePalettes: NamedTilePalette[]` — NOT `applyCommand`, NOT map-`dirty`, NOT undoable
+    (global curation isn't map history). A debounced autosave subscriber (`palettesSource.ts`,
+    mirroring `nodeDefsSource.ts`) persists `tilePalettes` via `putPalettes` on every change; guppi's
+    autocommit then pushes it. `loadPalettes()` runs once at boot (EditorApp effect, alongside
+    `loadNodeDefs`). `activeTilePaletteId` stays view-state; `reconcileActiveTilePalette` reconciles
+    against the store slice (after load) instead of map load / history moves.
+  - **Remove from the map schema:** drop `MapMeta.tilePalettes` + its parse/serialize + the Step-1
+    `meta.tilePalettes` tests from `mapFormat.ts`/`mapFormat.test.ts`; keep the `TilePaletteSlot`/
+    `NamedTilePalette` types (mark them editor-global, not map schema). Remove the palette wiring from
+    `loadMap`/`newMap` and from `applyCommand`/undo/redo/resize. Rewrite `editorStoreTilePalettes.test.ts`
+    for the new model (global slice, immutable set, no undo, reconcile).
+  - **UI:** `PaletteStrip` reads `tilePalettes` from the store slice (plain selector). Plus the phone
+    feedback on the strip itself: switcher `Select` sized to content (not full-width); slots wrap to
+    **up to 3 rows**, **no gap** between tiles (smaller if needed); drop the per-slot ✕ row — **long-
+    press a slot to remove** it (reuse `useLongPress`, mirroring Library favouriting: tap = arm brush,
+    long-press = remove + toast).
+  - Done when: adding/removing palette tiles persists across a full **reload without pressing Save**;
+    palettes are the same after opening a **different map** (global); `palettes.json` round-trips;
+    typecheck + lint + tests clean; verified via editor drive (desktop + phone) with zero console
+    errors.
+
 ## Out of scope
 
 - Multi-tile / NxM stamp brushes or pattern-fill (palette holds single tiles only; `brushAsset` is a
@@ -332,7 +383,8 @@ Research verified against the codebase (paths absolute under `/home/user/mostowo
 - Drag-and-drop reordering of palette slots.
 - Fixing the Library's underlying DOM scroll-reset-on-reopen in general (the palette makes it
   irrelevant for the tiling loop; a persisted `scrollTop` is a separate nicety).
-- Global (cross-map) palettes — palettes are per-map (travel with the map file via autocommit).
+- ~~Global (cross-map) palettes — palettes are per-map~~ **Reversed in Step 9:** palettes are now
+  global (their own `palettes.json`, auto-saved, shared across maps).
 
 ## Critique
 

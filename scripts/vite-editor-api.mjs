@@ -13,6 +13,8 @@
  *   PUT  /__editor/world           -> writes body to world.json, regens manifest
  *   GET  /__editor/nodes           -> src/data/maps/nodes.json contents
  *   PUT  /__editor/nodes           -> writes body to nodes.json (NO manifest regen — not a placement)
+ *   GET  /__editor/palettes        -> src/data/maps/palettes.json (global editor tile palettes; no manifest regen)
+ *   PUT  /__editor/palettes        -> writes body to palettes.json (NO manifest regen — editor curation, not a placement)
  *   PUT  /__editor/maps/:id/thumb  -> writes PNG body to public/assets/maps/thumbs/<id>.png
  *   PUT  /__editor/asset-override  -> patches a pack.json asset override, reruns the asset pipeline
  *   PUT  /__editor/asset-regions   -> replaces a pack.json regions list, reruns the asset pipeline
@@ -521,6 +523,7 @@ export function editorApiPlugin() {
       const mapsDir = join(root, 'src/data/maps');
       const worldPath = join(mapsDir, 'world.json');
       const nodesPath = join(mapsDir, 'nodes.json');
+      const palettesPath = join(mapsDir, 'palettes.json');
       const thumbsDir = join(root, 'public/assets/maps/thumbs');
       const tilesetsDir = join(root, 'public/assets/tilesets');
       const referencesDir = join(root, 'scripts/map-reference/out');
@@ -581,6 +584,25 @@ export function editorApiPlugin() {
             }
             if (req.method === 'PUT') {
               writeFileSync(nodesPath, await readBody(req));
+              sendJson(res, 200, { ok: true });
+              return;
+            }
+          }
+
+          if (path === '/__editor/palettes') {
+            // Global editor tile palettes (plan 033 step 9) — the editor's curated quick-access trays,
+            // moved OUT of per-map files into one cross-map file. Mirrors `/nodes`: NOT a map placement,
+            // so a write here does NOT regenerate `manifest.json` (see module doc's endpoint list).
+            if (req.method === 'GET') {
+              if (!existsSync(palettesPath)) {
+                sendJson(res, 404, { error: 'palettes.json not found' });
+                return;
+              }
+              sendRawJsonFile(res, palettesPath);
+              return;
+            }
+            if (req.method === 'PUT') {
+              writeFileSync(palettesPath, await readBody(req));
               sendJson(res, 200, { ok: true });
               return;
             }

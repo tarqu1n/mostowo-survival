@@ -299,10 +299,17 @@ export interface EditorState {
    *  `zone` tool. `null` ⇒ the terrain tool is disarmed (painting/erasing both no-op with a warning). */
   activeTerrainId: string | null;
   activeLayerId: string | null;
-  /** Active tile-palette pointer (plan 033) — editor VIEW state, NOT persisted to the map file (the
-   *  palette STRUCTURE lives in `map.meta.tilePalettes`; this pointer is store-only, reconciled like
-   *  `activeLayerId`). `null` when the open map has no palettes. Switching it is a plain `set` — never
-   *  a command, never dirties the map. */
+  /** Editor tile palettes (plan 033 step 9) — the SOURCE OF TRUTH for the curated quick-access trays,
+   *  a GLOBAL cross-map slice loaded from / auto-saved to `src/data/maps/palettes.json` (NOT map data,
+   *  NOT `map.meta`). Structural edits are plain immutable `set`s — never `applyCommand`, never
+   *  undoable, never dirty the map. Persistence is a debounced store SUBSCRIBER (`palettesSource.ts`'s
+   *  `installPaletteAutosave`), not inline here. Map open/close/switch leaves this untouched. */
+  tilePalettes: NamedTilePalette[];
+  /** Active tile-palette pointer (plan 033) — editor VIEW state, store-only (the palette STRUCTURE is
+   *  the global `tilePalettes` slice above; this pointer is not persisted). `null` when there are no
+   *  palettes. Switching it is a plain `set` — never a command, never dirties the map. Reconciled
+   *  against `tilePalettes` (via `reconcileActiveTilePalette`) after every palette-slice mutation so it
+   *  never dangles, exactly like `activeLayerId`. */
   activeTilePaletteId: string | null;
   /** Library multi-select "add to palette" mode (plan 033, Step 4) — transient store view-state (never
    *  persisted, never a command/dirty). Kept in the store, not component state, so it survives the
@@ -711,18 +718,25 @@ export interface EditorState {
    *  zone is active, else in the map-level `meta.favourites` (created lazily on first use). */
   toggleFavourite(assetId: string): void;
 
-  // ---- tile palettes (plan 033) ----
+  // ---- tile palettes (plan 033 step 9 — GLOBAL, auto-saved, NOT undoable) ----
+  /** Installs a freshly-loaded palette set (the boot `GET /__editor/palettes` result) into the global
+   *  `tilePalettes` slice, then reconciles the active pointer. Mirrors `setNodeDefs`/`setWorld`'s
+   *  "install from disk" posture — no command, no dirty. Used by `palettesSource.ts`'s `loadPalettes`. */
+  setTilePalettes(palettes: NamedTilePalette[]): void;
+  /** Re-points `activeTilePaletteId` at the first palette (or `null`) if it's null/dangling — see
+   *  `resolveActiveTilePalette`. Called after every palette-slice mutation so the pointer never dangles. */
+  reconcileActiveTilePalette(): void;
   /** Sets the active-palette pointer directly (a plain `set`, like `setActiveLayer`) — no command, no
    *  dirty, no counter bump. */
   setActiveTilePalette(id: string): void;
-  /** Appends a new empty named palette (`"Palette N"` default) via `applyCommand` (undoable, dirties
-   *  the map), then makes it active as a separate direct `set`. */
+  /** Appends a new empty named palette (`"Palette N"` default) to the global `tilePalettes` slice via a
+   *  plain immutable `set` (NOT undoable), then makes it active. Autosaved by the store subscriber. */
   addTilePalette(name?: string): void;
-  /** Bulk-appends slots to the active palette via `applyCommand`, deduping exact `assetId`+`rotation`
-   *  duplicates. Lazily creates `"Palette 1"` (and makes it active) if the map has no palettes yet, so
-   *  a legacy map is only ever migrated the moment the user actually adds tiles — never on open. */
+  /** Bulk-appends slots to the active palette via a plain immutable `set` (NOT undoable), deduping exact
+   *  `assetId`+`rotation` duplicates. Lazily creates `"Palette 1"` (and makes it active) if there are no
+   *  palettes yet. Autosaved by the store subscriber. */
   addTilesToActivePalette(entries: TilePaletteSlot[]): void;
-  /** Removes the slot at `index` from palette `paletteId` via `applyCommand` (undoable). */
+  /** Removes the slot at `index` from palette `paletteId` via a plain immutable `set` (NOT undoable). */
   removeTilePaletteSlot(paletteId: string, index: number): void;
   /** Arms the brush from a palette slot — sets `brushAsset`/`brushRotation` and switches to the brush
    *  tool (mirrors `pickTile`). A brush-arm, NOT a palette mutation: no command, no dirty. */
@@ -1118,17 +1132,15 @@ function nextTilePaletteId(palettes: readonly NamedTilePalette[]): string {
   return `palette_${String(max + 1).padStart(4, '0')}`;
 }
 
-/** If `activeTilePaletteId` no longer names a palette in `map` (deleted, or an undo removed it), fall
- *  back to the first palette, or `null` for an empty/absent palette set (plan 033). Called on map load
- *  and after every history-stack move so the active-palette pointer never dangles — mirrors
- *  `reconcileActiveLayer`. Read-only: it NEVER materialises `meta.tilePalettes` on a map that lacks it,
- *  so opening a legacy map stays clean. */
-function reconcileActiveTilePalette(
-  map: MapFile | null,
+/** If `activeTilePaletteId` no longer names a palette in the GLOBAL `tilePalettes` slice (removed, or a
+ *  fresh load replaced the set), fall back to the first palette, or `null` for an empty set (plan 033
+ *  step 9). Pure resolver behind the `reconcileActiveTilePalette` store action — the pointer is
+ *  reconciled after every palette-slice mutation so it never dangles (mirrors `reconcileActiveLayer`).
+ *  Map-independent now: tile palettes are global editor curation, not map data. */
+function resolveActiveTilePalette(
+  palettes: readonly NamedTilePalette[],
   activeTilePaletteId: string | null,
 ): string | null {
-  if (!map) return null;
-  const palettes = map.meta.tilePalettes ?? [];
   if (activeTilePaletteId && palettes.some((p) => p.id === activeTilePaletteId)) {
     return activeTilePaletteId;
   }
@@ -1335,6 +1347,7 @@ export const useEditorStore = create<EditorState>()(
     nodeDefsRevision: 0,
     activeTerrainId: null,
     activeLayerId: null,
+    tilePalettes: [],
     activeTilePaletteId: null,
     palettePickMode: false,
     palettePickSelection: [],
@@ -1380,8 +1393,8 @@ export const useEditorStore = create<EditorState>()(
         map,
         mapId: id,
         activeLayerId: map.layers[0]?.id ?? null,
-        // Plan 033: point at the first existing palette (or null) — never CREATE one on new/load.
-        activeTilePaletteId: reconcileActiveTilePalette(map, null),
+        // Plan 033 step 9: tile palettes are GLOBAL editor curation — a new map neither creates nor
+        // resets them, so `tilePalettes`/`activeTilePaletteId` are deliberately left untouched here.
         palettePickMode: false,
         palettePickSelection: [],
         selectedObjectIds: [],
@@ -1413,8 +1426,9 @@ export const useEditorStore = create<EditorState>()(
         map,
         mapId: id,
         activeLayerId: map.layers[0]?.id ?? null,
-        // Plan 033: point at the first existing palette (or null); loading never migrates a legacy map.
-        activeTilePaletteId: reconcileActiveTilePalette(map, null),
+        // Plan 033 step 9: tile palettes are GLOBAL editor curation — opening a map neither migrates
+        // nor resets them, so `tilePalettes`/`activeTilePaletteId` are deliberately left untouched here
+        // (they persist across map switches).
         palettePickMode: false,
         palettePickSelection: [],
         selectedObjectIds: [],
@@ -1445,7 +1459,8 @@ export const useEditorStore = create<EditorState>()(
         map: null,
         mapId: null,
         activeLayerId: null,
-        activeTilePaletteId: null,
+        // Plan 033 step 9: tile palettes are GLOBAL — closing a map leaves `tilePalettes`/
+        // `activeTilePaletteId` untouched (they aren't map data).
         palettePickMode: false,
         palettePickSelection: [],
         selectedObjectIds: [],
@@ -1768,7 +1783,6 @@ export const useEditorStore = create<EditorState>()(
         dirty: true,
         docRevision: s.docRevision + 1,
         activeLayerId: reconcileActiveLayer(s.map, s.activeLayerId),
-        activeTilePaletteId: reconcileActiveTilePalette(s.map, s.activeTilePaletteId),
         selectedObjectIds: reconcileSelection(s.map, s.selectedObjectIds),
         activeZoneId: reconcileActiveZone(s.map, s.activeZoneId),
         canUndo: history.canUndo(),
@@ -1803,7 +1817,6 @@ export const useEditorStore = create<EditorState>()(
           pendingDirty: null,
           regionSelection: null, // region select isn't history-tracked — drop the box so it can't drift from the reverted content
           activeLayerId: reconcileActiveLayer(s.map, s.activeLayerId),
-          activeTilePaletteId: reconcileActiveTilePalette(s.map, s.activeTilePaletteId),
           selectedObjectIds: reconcileSelection(s.map, s.selectedObjectIds),
           activeZoneId: reconcileActiveZone(s.map, s.activeZoneId),
           worldDirty: true,
@@ -1828,7 +1841,6 @@ export const useEditorStore = create<EditorState>()(
         pendingDirty: null, // a whole coalesced stroke reverted at once — fall back to a full rebake
         regionSelection: null, // region select isn't history-tracked — drop the box so it can't drift from the reverted content
         activeLayerId: reconcileActiveLayer(s.map, s.activeLayerId),
-        activeTilePaletteId: reconcileActiveTilePalette(s.map, s.activeTilePaletteId),
         selectedObjectIds: reconcileSelection(s.map, s.selectedObjectIds),
         activeZoneId: reconcileActiveZone(s.map, s.activeZoneId),
         canUndo: history.canUndo(),
@@ -1847,7 +1859,6 @@ export const useEditorStore = create<EditorState>()(
           pendingDirty: null,
           regionSelection: null, // region select isn't history-tracked — drop the box so it can't drift from the reverted content
           activeLayerId: reconcileActiveLayer(s.map, s.activeLayerId),
-          activeTilePaletteId: reconcileActiveTilePalette(s.map, s.activeTilePaletteId),
           selectedObjectIds: reconcileSelection(s.map, s.selectedObjectIds),
           activeZoneId: reconcileActiveZone(s.map, s.activeZoneId),
           worldDirty: true,
@@ -1871,7 +1882,6 @@ export const useEditorStore = create<EditorState>()(
         docRevision: s.docRevision + 1,
         pendingDirty: null,
         activeLayerId: reconcileActiveLayer(s.map, s.activeLayerId),
-        activeTilePaletteId: reconcileActiveTilePalette(s.map, s.activeTilePaletteId),
         selectedObjectIds: reconcileSelection(s.map, s.selectedObjectIds),
         activeZoneId: reconcileActiveZone(s.map, s.activeZoneId),
         canUndo: history.canUndo(),
@@ -2274,7 +2284,6 @@ export const useEditorStore = create<EditorState>()(
         docRevision: s.docRevision + 1,
         regionSelection: null, // a crop/grow can leave the box off the new bounds — drop it
         activeLayerId: reconcileActiveLayer(s.map, s.activeLayerId),
-        activeTilePaletteId: reconcileActiveTilePalette(s.map, s.activeTilePaletteId),
         selectedObjectIds: reconcileSelection(s.map, s.selectedObjectIds),
         activeZoneId: reconcileActiveZone(s.map, s.activeZoneId),
         canUndo: history.canUndo(),
@@ -2925,57 +2934,47 @@ export const useEditorStore = create<EditorState>()(
       get().applyCommand(cmd);
     },
 
-    // ---- tile palettes (plan 033) ----
+    // ---- tile palettes (plan 033 step 9 — GLOBAL, auto-saved, NOT undoable) ----
+
+    setTilePalettes: (palettes) => {
+      set({ tilePalettes: palettes });
+      get().reconcileActiveTilePalette();
+    },
+
+    reconcileActiveTilePalette: () =>
+      set((s) => ({
+        activeTilePaletteId: resolveActiveTilePalette(s.tilePalettes, s.activeTilePaletteId),
+      })),
 
     setActiveTilePalette: (id) => set({ activeTilePaletteId: id }),
 
     addTilePalette: (name) => {
-      const map = get().map;
-      if (!map) return;
-      const palettes = map.meta.tilePalettes ?? [];
+      const palettes = get().tilePalettes;
       const id = nextTilePaletteId(palettes);
       const created: NamedTilePalette = {
         id,
         name: name?.trim() || `Palette ${palettes.length + 1}`,
         slots: [],
       };
-      const cmd: Command = {
-        do: () => {
-          if (!map.meta.tilePalettes) map.meta.tilePalettes = [];
-          map.meta.tilePalettes.push(created);
-        },
-        undo: () => {
-          const arr = map.meta.tilePalettes;
-          if (!arr) return;
-          const i = arr.indexOf(created);
-          if (i >= 0) arr.splice(i, 1);
-        },
-      };
-      get().applyCommand(cmd);
-      // Making it active is view-state, NOT part of the undoable structural edit (mirrors `addLayer`).
-      set({ activeTilePaletteId: id });
+      // Plain immutable append — the global slice is the source of truth (no map history, no dirty).
+      set({ tilePalettes: [...palettes, created], activeTilePaletteId: id });
     },
 
     addTilesToActivePalette: (entries) => {
-      const map = get().map;
-      if (!map || entries.length === 0) return;
-      const palettes = map.meta.tilePalettes ?? [];
-      // Lazy first-palette creation: a legacy map is only ever written the moment the user actually
-      // adds tiles — never migrated on open. If palettes already exist, target the active one (falling
-      // back to the first if the pointer is null/dangling).
+      if (entries.length === 0) return;
+      const palettes = get().tilePalettes;
+      // Lazy first-palette creation: with no palettes yet, materialise "Palette 1" and make it active.
+      // Otherwise target the active palette (falling back to the first if the pointer is null/dangling).
       const lazyCreate = palettes.length === 0;
       const created: NamedTilePalette | null = lazyCreate
         ? { id: nextTilePaletteId(palettes), name: 'Palette 1', slots: [] }
         : null;
       const active = get().activeTilePaletteId;
-      const targetId = created
-        ? created.id
-        : (palettes.find((p) => p.id === active) ?? palettes[0]).id;
+      const target = created ?? palettes.find((p) => p.id === active) ?? palettes[0];
       // Dedupe exact `assetId`+`rotation` duplicates — against the target's existing slots AND within
       // this batch. Slot key normalises a missing rotation to 0.
       const slotKey = (s: TilePaletteSlot): string => `${s.assetId}#${s.rotation ?? 0}`;
-      const existingTarget = created ?? palettes.find((p) => p.id === targetId);
-      const seen = new Set((existingTarget?.slots ?? []).map(slotKey));
+      const seen = new Set(target.slots.map(slotKey));
       const toAppend: TilePaletteSlot[] = [];
       for (const e of entries) {
         const key = slotKey(e);
@@ -2987,46 +2986,28 @@ export const useEditorStore = create<EditorState>()(
         );
       }
       if (toAppend.length === 0 && !created) return; // nothing new and no structural change to make
-      const cmd: Command = {
-        do: () => {
-          if (!map.meta.tilePalettes) map.meta.tilePalettes = [];
-          if (created) map.meta.tilePalettes.push(created);
-          const target = map.meta.tilePalettes.find((p) => p.id === targetId);
-          if (target) target.slots.push(...toAppend);
-        },
-        undo: () => {
-          const arr = map.meta.tilePalettes;
-          if (!arr) return;
-          const target = arr.find((p) => p.id === targetId);
-          if (target && toAppend.length > 0) {
-            target.slots.splice(target.slots.length - toAppend.length, toAppend.length);
-          }
-          if (created) {
-            const i = arr.indexOf(created);
-            if (i >= 0) arr.splice(i, 1);
-          }
-        },
-      };
-      get().applyCommand(cmd);
-      // A lazily-created palette becomes active as view-state, outside the command (like `addTilePalette`).
-      if (created) set({ activeTilePaletteId: created.id });
+      // Build the next palette set immutably: a NEW target object with a NEW slots array, and (when
+      // lazily created) the new palette appended.
+      const updatedTarget: NamedTilePalette = { ...target, slots: [...target.slots, ...toAppend] };
+      const nextPalettes = created
+        ? [...palettes, updatedTarget]
+        : palettes.map((p) => (p.id === target.id ? updatedTarget : p));
+      set({
+        tilePalettes: nextPalettes,
+        // A lazily-created palette becomes active as view-state.
+        ...(created ? { activeTilePaletteId: created.id } : {}),
+      });
     },
 
     removeTilePaletteSlot: (paletteId, index) => {
-      const map = get().map;
-      if (!map) return;
-      const palette = (map.meta.tilePalettes ?? []).find((p) => p.id === paletteId);
+      const palettes = get().tilePalettes;
+      const palette = palettes.find((p) => p.id === paletteId);
       if (!palette || index < 0 || index >= palette.slots.length) return;
-      const [removed] = palette.slots.slice(index, index + 1);
-      const cmd: Command = {
-        do: () => {
-          palette.slots.splice(index, 1);
-        },
-        undo: () => {
-          palette.slots.splice(index, 0, removed);
-        },
+      const updated: NamedTilePalette = {
+        ...palette,
+        slots: palette.slots.filter((_, i) => i !== index),
       };
-      get().applyCommand(cmd);
+      set({ tilePalettes: palettes.map((p) => (p.id === paletteId ? updated : p)) });
     },
 
     selectPaletteSlot: (slot) => {

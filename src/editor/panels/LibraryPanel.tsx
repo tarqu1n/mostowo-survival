@@ -367,8 +367,7 @@ export function PalettePickControls() {
     s.addTilesToActivePalette(selection.map((assetId) => ({ assetId })));
     const after = useEditorStore.getState();
     const name =
-      after.map?.meta.tilePalettes?.find((p) => p.id === after.activeTilePaletteId)?.name ??
-      'palette';
+      after.tilePalettes.find((p) => p.id === after.activeTilePaletteId)?.name ?? 'palette';
     // Exit pick mode — `togglePalettePickMode` also clears the selection on the way out (so no separate
     // `clearPalettePick` is needed here). `n` was captured before the exit for the toast.
     s.togglePalettePickMode();

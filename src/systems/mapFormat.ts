@@ -23,15 +23,21 @@ import { TILE_SIZE } from '../config';
 /** One slot in a named tile palette (editor quick-access tray, plan 033). Stores the tile itself — a
  *  catalog asset id plus optional rotation — never a `MapFile.palette` index, and layer is not bound
  *  per slot. `rotation` is optional-omitted-when-absent so slots stay minimal and round-trip
- *  byte-identical. */
+ *  byte-identical.
+ *
+ *  This is the shape of the editor's GLOBAL `src/data/maps/palettes.json` (plan 033 step 9), NOT part
+ *  of the map schema — tile palettes are editor curation shared across every map, auto-saved on every
+ *  edit, and validated/loaded by `src/editor/palettesSource.ts` (not `parseMap`). The type lives here
+ *  only because it's the natural home for the tile-slot vocabulary. */
 export interface TilePaletteSlot {
   assetId: string;
   rotation?: number;
 }
 
-/** A named, persisted tile palette (plan 033) — editor curation stored in the map file so it syncs
- *  across devices, exactly like `MapMeta.favourites`. The active-palette pointer is editor view-state
- *  (store-only), NOT stored here. */
+/** A named tile palette (plan 033) — one editor quick-access tray. See `TilePaletteSlot`'s doc: these
+ *  are the entries of the editor's GLOBAL `palettes.json` (`{ palettes: NamedTilePalette[] }`), a
+ *  cross-map editor-curation file, NOT stored in any map. The active-palette pointer is editor
+ *  view-state (store-only), not stored here either. */
 export interface NamedTilePalette {
   id: string;
   name: string;
@@ -46,16 +52,10 @@ export interface MapMeta {
   height: number;
   tileSize: number;
   /** Map-level favourited catalog asset ids (editor Library "Favourites" pseudo-category) used when
-   *  no zone is active. Optional and second-to-last in this interface / every `MapMeta` constructor
-   *  (before `tilePalettes`) so serialized key order stays stable; omitted entirely (not `[]`) on maps
-   *  that never favourited anything, so old maps round-trip byte-identical. */
+   *  no zone is active. Optional and always LAST in this interface / every `MapMeta` constructor so
+   *  serialized key order stays stable; omitted entirely (not `[]`) on maps that never favourited
+   *  anything, so old maps round-trip byte-identical. */
   favourites?: string[];
-  /** Named tile palettes — editor quick-access trays (plan 033) persisted in the map file so they
-   *  sync across devices, mirroring `favourites`. Optional and always LAST so serialized key order
-   *  stays stable; omitted entirely (not `[]`) on maps that never created one, so old maps round-trip
-   *  byte-identical. Only the palette STRUCTURE lives here; the active-palette pointer is editor
-   *  view-state (store-only). */
-  tilePalettes?: NamedTilePalette[];
 }
 
 /** Per-tile inside/void mask, `width*height` row-major. Absent on `MapFile` ⇒ all-inside. */
@@ -385,35 +385,6 @@ function parseRotation(value: unknown, path: string): 0 | 90 | 180 | 270 | undef
   return n;
 }
 
-/** Parse `meta.tilePalettes` (plan 033 quick-access trays). Each palette is `{ id, name, slots }`;
- *  each slot is `{ assetId, rotation? }` with `rotation` omitted-when-absent so slots stay minimal and
- *  round-trip byte-identical. Called only when the key is present (mirrors `meta.favourites`), so the
- *  key is never materialised on maps that never had it. */
-function parseTilePalettes(value: unknown, path: string): NamedTilePalette[] {
-  return expectArray(value, path).map((entry, i) => {
-    const palettePath = `${path}[${i}]`;
-    const obj = expectRecord(entry, palettePath);
-    const slots = expectArray(obj.slots, `${palettePath}.slots`).map((s, j) => {
-      const slotPath = `${palettePath}.slots[${j}]`;
-      const slot = expectRecord(s, slotPath);
-      const rotation =
-        slot.rotation === undefined
-          ? undefined
-          : expectNumber(slot.rotation, `${slotPath}.rotation`);
-      // rotation LAST and omitted when absent so a slot without one re-serializes byte-identical.
-      return {
-        assetId: expectString(slot.assetId, `${slotPath}.assetId`),
-        ...(rotation === undefined ? {} : { rotation }),
-      };
-    });
-    return {
-      id: expectString(obj.id, `${palettePath}.id`),
-      name: expectString(obj.name, `${palettePath}.name`),
-      slots,
-    };
-  });
-}
-
 function parseMeta(value: unknown, path: string): MapMeta {
   const obj = expectRecord(value, path);
   const schemaVersion = expectInt(obj.schemaVersion, `${path}.schemaVersion`);
@@ -432,12 +403,6 @@ function parseMeta(value: unknown, path: string): MapMeta {
       : expectArray(obj.favourites, `${path}.favourites`).map((f, i) =>
           expectString(f, `${path}.favourites[${i}]`),
         );
-  // tilePalettes is optional — read only if present, and omit the key entirely when absent (same
-  // pattern as favourites) so maps without it serialize unchanged. Built LAST to keep key order stable.
-  const tilePalettes =
-    obj.tilePalettes === undefined
-      ? undefined
-      : parseTilePalettes(obj.tilePalettes, `${path}.tilePalettes`);
   return {
     schemaVersion: 1,
     id: expectString(obj.id, `${path}.id`),
@@ -446,7 +411,6 @@ function parseMeta(value: unknown, path: string): MapMeta {
     height,
     tileSize: expectInt(obj.tileSize, `${path}.tileSize`),
     ...(favourites === undefined ? {} : { favourites }),
-    ...(tilePalettes === undefined ? {} : { tilePalettes }),
   };
 }
 
