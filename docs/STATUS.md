@@ -199,6 +199,16 @@ and **long-press to favourite** (tap = pick; `src/editor/hooks/useLongPress.ts`)
 tap-thief heart on touch. **Node Types tab** — restacked to a full-width **collapsible list-on-top**
 with a **collapsible Skins** section (thumbnail summary bar), on desktop + compact.
 
+**Region select & move:** the **Select** tool doubles as a marquee — drag a box over empty map to
+select a whole **area**, then move its entire contents one tile at a time (on-screen ← ↑ ↓ → in the
+Toolbar / compact SelectionBar, or the arrow keys). The move relocates **every tile layer's cells, the
+walkability/zone grids, each terrain mask, and every intersecting object/node/portal** as ONE undoable
+command — for inserting space between existing content without re-authoring it. The void/shape mask is
+deliberately not moved (structural). Pure block-move helpers live in `src/editor/regionOps.ts`
+(`computeGridRegionMove`/`captureRegionObjects`/`normalizeRegion`), driven by the store's
+`regionSelection` + `translateRegion(dCol,dRow)`; a move is refused whole if the box would leave the
+map or land any content on void (mirrors `translateObjects`).
+
 **Library role filter (plan 032):** every catalog asset carries a semantic `role` (`tile`/`object`/`actor`,
 orthogonal to the structural `type`; tagged via `rules.actor` globs in `pack.json`). The Library's
 `[Tiles] [Objects] [Actors]` chips filter the whole browse surface by role and **auto-sync to the active

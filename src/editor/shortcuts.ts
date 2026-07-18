@@ -43,6 +43,16 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ['Shift + ↑ ↓ ← →'], action: 'Move the selection one whole tile' },
       { keys: ['Delete', 'Backspace'], action: 'Delete the selected object(s)' },
       {
+        keys: ['Drag over empty map'],
+        action:
+          'Select tool: draw a box around a whole AREA — every tile on every layer, plus any objects/nodes it encloses (walkability/zones/terrain move with it too)',
+      },
+      {
+        keys: ['↑ ↓ ← →'],
+        action:
+          'With an area (box) selected: move the whole group one tile (also the on-screen ← ↑ ↓ → controls) — insert space between things without redoing them. Click empty map to clear the box.',
+      },
+      {
         keys: ['S'],
         action: "Cycle the selected node's skin to the next variant (node with ≥2 skins)",
       },
@@ -146,7 +156,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       {
         keys: ['Context bar (bottom)'],
         action:
-          'Per-tool on-screen bar mirroring the keyboard vocabulary: Undo/Redo always; brush rotate ∓90°; erase/invert toggle for Collision/Zone/Shape/Terrain (mirrors Alt + Drag); free-pixel toggle for Place/Select (mirrors Alt hold); multi-select toggle (mirrors Shift + Click) + Delete + 4-way nudge for Select; underlay toggle (mirrors U); skin-cycle (mirrors S) when one node is selected',
+          'Per-tool on-screen bar mirroring the keyboard vocabulary: Undo/Redo always; brush rotate ∓90°; erase/invert toggle for Collision/Zone/Shape/Terrain (mirrors Alt + Drag); free-pixel toggle for Place/Select (mirrors Alt hold); multi-select toggle (mirrors Shift + Click) + Delete + 4-way nudge for Select; a drawn area (box) gets its own 4-way whole-tile nudge (moves tiles + objects together); underlay toggle (mirrors U); skin-cycle (mirrors S) when one node is selected',
       },
       {
         keys: ['Drag from tray'],

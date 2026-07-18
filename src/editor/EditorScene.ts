@@ -19,6 +19,7 @@ import { getMap } from './api';
 import { computeGhostStripCells, ghostBoundingBox, type GhostCell } from './worldViewOps';
 import { queueDecorTexture, resolveDecorDraw } from '../render/decorSprites';
 import { objectFootprintCells } from './objectOps';
+import { normalizeRegion } from './regionOps';
 
 /** Which target a `collision`/`zone`/`shape`/`terrain` tool gesture writes to (plan 014 step 8,
  *  extended step 10) — see `dispatchTargetPaint`. `terrain` writes an editor-only mask (rebaked into
@@ -88,6 +89,9 @@ const DEPTH_GRID = 9000;
 const DEPTH_SHAPE_BOUNDARY = 9100;
 const DEPTH_HOVER = 9500;
 const DEPTH_SELECTION = 9550;
+/** The Select tool's marquee region highlight — above the object-selection outline, below the live
+ *  rect-drag preview (so an in-progress marquee draws over a committed region box). */
+const DEPTH_REGION = 9560;
 const DEPTH_RECT_PREVIEW = 9600;
 
 // Void checker — two near-black shades per cell plus a faint diagonal, reads as "out of bounds".
@@ -97,6 +101,9 @@ const VOID_HATCH = 0x2a2320;
 const GRID_COLOUR = 0x4a3f38;
 const HOVER_COLOUR = 0xf0d890;
 const SELECTION_COLOUR = 0x5fd0ff;
+/** Marquee region highlight/preview — a warm amber, distinct from the cyan single-object outline so a
+ *  drawn box reads as "a whole area", not "an object". */
+const REGION_COLOUR = 0xffb454;
 const PORTAL_PREVIEW_COLOUR = 0x7aa6ff;
 const COLLISION_PREVIEW_COLOUR = 0xd06a5a;
 const ZONE_PREVIEW_COLOUR = 0x8fd67a;
@@ -167,6 +174,9 @@ export class EditorScene extends Phaser.Scene {
   private ghostTexturesRequested = new Set<string>();
   private rectPreviewGfx?: Phaser.GameObjects.Graphics;
   private selectionGfx?: Phaser.GameObjects.Graphics;
+  /** The persistent highlight of the Select tool's marquee region (`store.regionSelection`). Redrawn
+   *  on every region change; cleared when the region clears or the tool leaves `select`. */
+  private regionGfx?: Phaser.GameObjects.Graphics;
   // ---- Step 8 overlays ----
   private walkabilityGfx?: Phaser.GameObjects.Graphics;
   private zonesGfx?: Phaser.GameObjects.Graphics;
@@ -241,6 +251,10 @@ export class EditorScene extends Phaser.Scene {
     startWorld: { x: number; y: number };
     displayOrigins: Map<string, { x: number; y: number }>;
   } | null = null;
+  /** An in-progress Select-tool marquee drag over EMPTY map space: the pressed tile corner. Committed
+   *  to `store.regionSelection` (the moveable group box) on pointer-up — a same-tile release (a click,
+   *  not a drag) clears the region instead. Mirrors `rectDrag`, but sets a region rather than painting. */
+  private regionMarquee: { startCol: number; startRow: number } | null = null;
 
   constructor() {
     super('Editor');
@@ -262,6 +276,7 @@ export class EditorScene extends Phaser.Scene {
       .setDepth(DEPTH_HOVER)
       .setVisible(false);
     this.selectionGfx = this.add.graphics().setDepth(DEPTH_SELECTION);
+    this.regionGfx = this.add.graphics().setDepth(DEPTH_REGION);
     this.rectPreviewGfx = this.add.graphics().setDepth(DEPTH_RECT_PREVIEW);
 
     // Input wiring: wheel = zoom, middle/space/pan-tool drag = pan, and the pointer-tool modifiers
@@ -319,7 +334,13 @@ export class EditorScene extends Phaser.Scene {
           this.redrawOverlays();
           this.refreshBrushGhost(); // hide/show the tile preview when entering/leaving the brush tool
           this.updateToolCursor(); // eyedropper pipette when the eyedropper tool is active
+          this.redrawRegion(); // show/hide the marquee region box when entering/leaving Select
         },
+      ),
+      // Marquee region highlight (region select & move): redraw whenever the box is set/moved/cleared.
+      useEditorStore.subscribe(
+        (s) => s.regionSelection,
+        () => this.redrawRegion(),
       ),
       // Eyedropper cursor: reflect the physical Alt modifier over a tile-paint tool the moment it's
       // pressed/released (a pointer-move also refreshes it from the click's native event — see
@@ -419,6 +440,7 @@ export class EditorScene extends Phaser.Scene {
     this.hoverTile = null;
     this.brushGhost?.setVisible(false);
     this.selectionGfx?.clear();
+    this.regionGfx?.clear();
     this.rectPreviewGfx?.clear();
     // A full document reload invalidates any in-flight paint/object interaction (the layer/cells/
     // objects it was targeting may no longer exist).
@@ -426,6 +448,7 @@ export class EditorScene extends Phaser.Scene {
     this.rectDrag = null;
     this.portalDrag = null;
     this.objectDrag = null;
+    this.regionMarquee = null;
     this.activeTargetStroke = null;
     this.targetRectDrag = null;
   }
@@ -908,6 +931,25 @@ export class EditorScene extends Phaser.Scene {
       const bounds = withBounds.getBounds();
       g.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
     }
+  }
+
+  /** Draws the Select tool's marquee region box (`store.regionSelection`) — a translucent amber fill +
+   *  outline over the whole selected tile area. Only shown while the Select tool is active; cleared
+   *  otherwise (a different tool, no box, or no map). */
+  private redrawRegion(): void {
+    const g = this.regionGfx;
+    if (!g) return;
+    g.clear();
+    const { map, regionSelection, activeTool } = useEditorStore.getState();
+    if (!map || !regionSelection || activeTool !== 'select') return;
+    const x = regionSelection.col * TILE_SIZE;
+    const y = regionSelection.row * TILE_SIZE;
+    const w = regionSelection.w * TILE_SIZE;
+    const h = regionSelection.h * TILE_SIZE;
+    g.fillStyle(REGION_COLOUR, 0.12);
+    g.fillRect(x, y, w, h);
+    g.lineStyle(2, REGION_COLOUR, 0.95);
+    g.strokeRect(x, y, w, h);
   }
 
   // ---- Overlays ----
@@ -1611,10 +1653,11 @@ export class EditorScene extends Phaser.Scene {
   private cancelActiveInteraction(): void {
     this.activeStroke = null;
     this.activeTargetStroke = null;
-    if (this.rectDrag || this.targetRectDrag || this.portalDrag) {
+    if (this.rectDrag || this.targetRectDrag || this.portalDrag || this.regionMarquee) {
       this.rectDrag = null;
       this.targetRectDrag = null;
       this.portalDrag = null;
+      this.regionMarquee = null; // abort an in-progress marquee (no region committed)
       this.rectPreviewGfx?.clear();
     }
     if (this.objectDrag) {
@@ -1894,9 +1937,19 @@ export class EditorScene extends Phaser.Scene {
     const shift = store.multiSelectActive || store.shiftHeld;
 
     if (!pickedId) {
+      // Empty space → start a marquee (region select & move). Object selection clears (unless shift),
+      // matching the old empty-click behaviour; the region box is committed/cleared on pointer-up
+      // depending on whether this becomes a real drag.
       if (!shift) store.setSelectedObjectIds([]);
-      return; // empty space — no drag begins
+      const { col, row } = this.pointerTile(pointer);
+      this.regionMarquee = { startCol: col, startRow: row };
+      this.drawRectPreview(col, row, col, row, REGION_COLOUR);
+      return;
     }
+
+    // Clicking an object is an object interaction — drop any drawn region so the two selection modes
+    // never both show at once.
+    if (store.regionSelection) store.setRegionSelection(null);
 
     let selection = store.selectedObjectIds;
     if (shift) {
@@ -1994,6 +2047,19 @@ export class EditorScene extends Phaser.Scene {
         col,
         row,
         PORTAL_PREVIEW_COLOUR,
+      );
+      this.updateHover(pointer);
+      return;
+    }
+
+    if (this.regionMarquee) {
+      const { col, row } = this.pointerTile(pointer);
+      this.drawRectPreview(
+        this.regionMarquee.startCol,
+        this.regionMarquee.startRow,
+        col,
+        row,
+        REGION_COLOUR,
       );
       this.updateHover(pointer);
       return;
@@ -2099,6 +2165,25 @@ export class EditorScene extends Phaser.Scene {
         useEditorStore.getState().setPendingPortalRect(rect);
       } else {
         console.warn('[editor] portal rect refused — overlaps void/out-of-bounds');
+      }
+      return;
+    }
+    if (this.regionMarquee) {
+      const { startCol, startRow } = this.regionMarquee;
+      this.regionMarquee = null;
+      this.rectPreviewGfx?.clear();
+      const { col, row } = this.pointerTile(pointer);
+      const store = useEditorStore.getState();
+      const map = store.map;
+      if (!map) return;
+      if (col === startCol && row === startRow) {
+        // A click, not a drag → clear the region (the touch/desktop "deselect" gesture).
+        store.setRegionSelection(null);
+      } else {
+        // A real box drag → select that tile area (normalizeRegion clamps to bounds, null if off-map).
+        store.setRegionSelection(
+          normalizeRegion(startCol, startRow, col, row, map.meta.width, map.meta.height),
+        );
       }
       return;
     }

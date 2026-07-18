@@ -99,6 +99,14 @@ import {
   type CellChange,
 } from '../paintOps';
 import { footprintIsValid, nextObjectId } from '../objectOps';
+import {
+  captureRegionObjects,
+  computeGridRegionMove,
+  regionDestinationInside,
+  regionMoveInBounds,
+  type RegionCellEdit,
+  type RegionRect,
+} from '../regionOps';
 import { computeVoidCascade } from '../shapeOps';
 import { defaultZoneColour, nextFreeZoneId } from '../zoneOps';
 import { computeTerrainBake } from '../terrainOps';
@@ -328,6 +336,13 @@ export interface EditorState {
    *  Set on pointer-up of a valid (non-void) portal drag; cleared on dialog confirm/cancel. */
   pendingPortalRect: PortalRect | null;
   selectedObjectIds: string[];
+  /** The Select tool's marquee region — a tile rectangle drawn around an area of the map to move its
+   *  whole contents (tiles on every layer + walkability/zone/terrain grids + intersecting objects) as
+   *  one block via `translateRegion`. Editor VIEW state, NOT map data and NOT in the undo history
+   *  (like `selectedObjectIds`): drawing/clearing a box isn't an undoable edit, only the moves it
+   *  drives are. `null` when no box is drawn. Cleared on a plain (no-drag) click, tool switch away
+   *  from `select`, map load/close/new, resize, and undo/redo (see those sites). */
+  regionSelection: RegionRect | null;
   /** Gesture for the `collision`/`zone`/`shape` tools (step 8) — see `PaintMode`'s doc. */
   paintMode: PaintMode;
 
@@ -443,6 +458,24 @@ export interface EditorState {
   setPlaceRotation(deg: number): void;
   setPendingPortalRect(rect: PortalRect | null): void;
   setSelectedObjectIds(ids: string[]): void;
+  /** Set (or clear, with `null`) the Select tool's marquee region. */
+  setRegionSelection(region: RegionRect | null): void;
+  /** Moves the current `regionSelection`'s whole contents by `(dCol,dRow)` WHOLE tiles as ONE
+   *  undoable command: every tile layer's cells, the walkability/zone grids, each terrain mask, and
+   *  every object whose footprint intersects the region are relocated together (the void/shape mask is
+   *  NOT — see below). The vacated source cells are cleared to empty. On success the region box itself
+   *  follows to the new location (so repeated nudges keep moving the same group) and returns `true`.
+   *
+   *  Refuses (returns `false`, NO mutation) when: there's no region/map; the move would push the box
+   *  off the map edge (`regionMoveInBounds` — never silently drops tiles); any destination tile is
+   *  void (`regionDestinationInside` — never breaks the void-consistency invariant); or any captured
+   *  object's destination footprint is void/out-of-bounds (mirrors `translateObjects`' all-or-nothing
+   *  contract). A zero delta is a no-op (`true`, no history entry).
+   *
+   *  Why the void/shape mask is excluded: it's structural (moving it would create/destroy void regions
+   *  and cascade tile/object removal). The terrain MASKS are moved so a later `rebakeTerrainsForSave`
+   *  re-derives the moved tiles correctly rather than reverting them to the mask's old position. */
+  translateRegion(dCol: number, dRow: number): boolean;
   setPaintMode(mode: PaintMode): void;
   /** Set the sticky erase/inverse toggle (context bar). */
   setEraseActive(active: boolean): void;
@@ -1249,6 +1282,7 @@ export const useEditorStore = create<EditorState>()(
     placeRotation: 0,
     pendingPortalRect: null,
     selectedObjectIds: [],
+    regionSelection: null,
     paintMode: 'brush',
     eraseActive: false,
     freePixelActive: false,
@@ -1280,6 +1314,7 @@ export const useEditorStore = create<EditorState>()(
         mapId: id,
         activeLayerId: map.layers[0]?.id ?? null,
         selectedObjectIds: [],
+        regionSelection: null,
         activeZoneId: null,
         armedObjectAsset: null,
         armedNodeRef: null,
@@ -1308,6 +1343,7 @@ export const useEditorStore = create<EditorState>()(
         mapId: id,
         activeLayerId: map.layers[0]?.id ?? null,
         selectedObjectIds: [],
+        regionSelection: null,
         activeZoneId: null,
         armedObjectAsset: null,
         armedNodeRef: null,
@@ -1335,6 +1371,7 @@ export const useEditorStore = create<EditorState>()(
         mapId: null,
         activeLayerId: null,
         selectedObjectIds: [],
+        regionSelection: null,
         activeZoneId: null,
         armedObjectAsset: null,
         armedNodeRef: null,
@@ -1382,7 +1419,15 @@ export const useEditorStore = create<EditorState>()(
         const mapped = TOOL_LIBRARY_FILTER[activeTool];
         const libraryRoleFilter =
           !s.libraryRoleFilterOverridden && mapped ? mapped : s.libraryRoleFilter;
-        return { activeTool, libraryRoleFilter, libraryRoleFilterOverridden: false };
+        // The marquee region belongs to the Select tool — drop it when switching to any other tool so
+        // a stale box never lingers (or accepts a nudge) under an unrelated tool.
+        const regionSelection = activeTool === 'select' ? s.regionSelection : null;
+        return {
+          activeTool,
+          libraryRoleFilter,
+          libraryRoleFilterOverridden: false,
+          regionSelection,
+        };
       }),
     setLibraryRoleFilter: (filter) =>
       set({ libraryRoleFilter: filter, libraryRoleFilterOverridden: true }),
@@ -1409,6 +1454,7 @@ export const useEditorStore = create<EditorState>()(
       set({ placeRotation: Number.isFinite(deg) ? ((deg % 360) + 360) % 360 : 0 }),
     setPendingPortalRect: (pendingPortalRect) => set({ pendingPortalRect }),
     setSelectedObjectIds: (selectedObjectIds) => set({ selectedObjectIds }),
+    setRegionSelection: (regionSelection) => set({ regionSelection }),
     setPaintMode: (paintMode) => set({ paintMode }),
     setEraseActive: (eraseActive) => set({ eraseActive }),
     setFreePixelActive: (freePixelActive) => set({ freePixelActive }),
@@ -1676,6 +1722,7 @@ export const useEditorStore = create<EditorState>()(
           dirty: true,
           docRevision: s.docRevision + 1,
           pendingDirty: null,
+          regionSelection: null, // region select isn't history-tracked — drop the box so it can't drift from the reverted content
           activeLayerId: reconcileActiveLayer(s.map, s.activeLayerId),
           selectedObjectIds: reconcileSelection(s.map, s.selectedObjectIds),
           activeZoneId: reconcileActiveZone(s.map, s.activeZoneId),
@@ -1699,6 +1746,7 @@ export const useEditorStore = create<EditorState>()(
         dirty: true,
         docRevision: s.docRevision + 1,
         pendingDirty: null, // a whole coalesced stroke reverted at once — fall back to a full rebake
+        regionSelection: null, // region select isn't history-tracked — drop the box so it can't drift from the reverted content
         activeLayerId: reconcileActiveLayer(s.map, s.activeLayerId),
         selectedObjectIds: reconcileSelection(s.map, s.selectedObjectIds),
         activeZoneId: reconcileActiveZone(s.map, s.activeZoneId),
@@ -1716,6 +1764,7 @@ export const useEditorStore = create<EditorState>()(
           dirty: true,
           docRevision: s.docRevision + 1,
           pendingDirty: null,
+          regionSelection: null, // region select isn't history-tracked — drop the box so it can't drift from the reverted content
           activeLayerId: reconcileActiveLayer(s.map, s.activeLayerId),
           selectedObjectIds: reconcileSelection(s.map, s.selectedObjectIds),
           activeZoneId: reconcileActiveZone(s.map, s.activeZoneId),
@@ -2140,6 +2189,7 @@ export const useEditorStore = create<EditorState>()(
       set((s) => ({
         dirty: true,
         docRevision: s.docRevision + 1,
+        regionSelection: null, // a crop/grow can leave the box off the new bounds — drop it
         activeLayerId: reconcileActiveLayer(s.map, s.activeLayerId),
         selectedObjectIds: reconcileSelection(s.map, s.selectedObjectIds),
         activeZoneId: reconcileActiveZone(s.map, s.activeZoneId),
@@ -2966,6 +3016,113 @@ export const useEditorStore = create<EditorState>()(
         },
       };
       get().applyCommand(cmd);
+      return true;
+    },
+
+    translateRegion: (dCol, dRow) => {
+      const { map, regionSelection: region } = get();
+      if (!map || !region) return false;
+      if (dCol === 0 && dRow === 0) return true; // no movement — nothing to commit (no undo noise)
+
+      const { width, height, tileSize } = map.meta;
+      // Refuse before mutating anything (mirrors `translateObjects`' all-or-nothing contract):
+      //  1. the box must stay fully on-map (never silently drop tiles off the edge), and
+      //  2. no destination tile may be void (never break parseMap's void-consistency invariant).
+      if (!regionMoveInBounds(region, dCol, dRow, width, height)) return false;
+      if (!regionDestinationInside(map, region, dCol, dRow)) return false;
+
+      // Capture every object whose footprint intersects the box, and validate each one's DESTINATION
+      // footprint up-front — one invalid target (e.g. a decor collision box that would poke off-map)
+      // refuses the WHOLE move, exactly like `translateObjects`.
+      const capturedIds = new Set(captureRegionObjects(map, region));
+      const targets = map.objects.filter((o) => capturedIds.has(o.id));
+      const objPrev = new Map<string, { x: number; y: number } | { col: number; row: number }>();
+      const objNext = new Map<string, { x: number; y: number } | { col: number; row: number }>();
+      for (const obj of targets) {
+        if (obj.kind === 'decor') {
+          objPrev.set(obj.id, { x: obj.x, y: obj.y });
+          objNext.set(obj.id, { x: obj.x + dCol * tileSize, y: obj.y + dRow * tileSize });
+        } else if (obj.kind === 'node') {
+          objPrev.set(obj.id, { col: obj.col, row: obj.row });
+          objNext.set(obj.id, { col: obj.col + dCol, row: obj.row + dRow });
+        } else {
+          objPrev.set(obj.id, { col: obj.rect.col, row: obj.rect.row });
+          objNext.set(obj.id, { col: obj.rect.col + dCol, row: obj.rect.row + dRow });
+        }
+      }
+      for (const obj of targets) {
+        const n = objNext.get(obj.id);
+        if (!n) continue;
+        const candidate: MapObject =
+          obj.kind === 'decor'
+            ? { ...obj, x: (n as { x: number; y: number }).x, y: (n as { x: number; y: number }).y }
+            : obj.kind === 'node'
+              ? {
+                  ...obj,
+                  col: (n as { col: number; row: number }).col,
+                  row: (n as { col: number; row: number }).row,
+                }
+              : {
+                  ...obj,
+                  rect: {
+                    ...obj.rect,
+                    col: (n as { col: number; row: number }).col,
+                    row: (n as { col: number; row: number }).row,
+                  },
+                };
+        if (!footprintIsValid(map, candidate)) return false;
+      }
+
+      // Block-move edits for every flat width*height grid EXCEPT the void/shape mask (structural, see
+      // the action doc): all tile layers, walkability, zones, and each terrain mask. A grid that
+      // doesn't change (e.g. an untouched walkability grid) contributes nothing.
+      const isIn = (c: number, r: number): boolean => isInside(map, c, r);
+      const gridMoves: Array<{ cells: number[]; edits: RegionCellEdit[] }> = [];
+      const collect = (cells: number[]): void => {
+        const edits = computeGridRegionMove(cells, width, region, dCol, dRow, isIn);
+        if (edits.length > 0) gridMoves.push({ cells, edits });
+      };
+      for (const layer of map.layers) collect(layer.cells);
+      collect(map.walkability.cells);
+      collect(map.zones.cells);
+      for (const section of map.terrain) collect(section.cells);
+
+      const applyObj = (
+        which: Map<string, { x: number; y: number } | { col: number; row: number }>,
+      ): void => {
+        for (const obj of targets) {
+          const v = which.get(obj.id);
+          if (!v) continue;
+          if (obj.kind === 'decor') {
+            obj.x = (v as { x: number; y: number }).x;
+            obj.y = (v as { x: number; y: number }).y;
+          } else if (obj.kind === 'node') {
+            obj.col = (v as { col: number; row: number }).col;
+            obj.row = (v as { col: number; row: number }).row;
+          } else {
+            obj.rect.col = (v as { col: number; row: number }).col;
+            obj.rect.row = (v as { col: number; row: number }).row;
+          }
+        }
+      };
+
+      const cmd: Command = {
+        do: () => {
+          for (const g of gridMoves) for (const e of g.edits) g.cells[e.index] = e.next;
+          applyObj(objNext);
+        },
+        undo: () => {
+          for (const g of gridMoves) for (const e of g.edits) g.cells[e.index] = e.prev;
+          applyObj(objPrev);
+        },
+      };
+      // Multiple layers move at once — no narrowed rebake is worth it, so force the scene's full
+      // chunked rebake by leaving `pendingDirty` cleared (see the module doc + shape/void cascade).
+      set({ pendingDirty: null });
+      get().applyCommand(cmd);
+      // The box follows its contents so repeated nudges keep moving the same group. Set AFTER
+      // applyCommand (whose own `set` doesn't touch `regionSelection`).
+      set({ regionSelection: { ...region, col: region.col + dCol, row: region.row + dRow } });
       return true;
     },
 

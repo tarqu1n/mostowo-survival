@@ -13,6 +13,10 @@ import { EditMapDialog } from './EditMapDialog';
 import { ShortcutsDialog } from './ShortcutsDialog';
 import { toast } from 'sonner';
 import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   Ban,
   ChevronDown,
   DoorOpen,
@@ -28,8 +32,10 @@ import {
   Square,
   SquareDashed,
   Stamp,
+  X,
   type LucideIcon,
 } from 'lucide-react';
+import { regionMoveInBounds } from './regionOps';
 import { Button } from './ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import {
@@ -57,7 +63,8 @@ const TOOLS: Array<{ id: EditorTool; label: string; title: string; icon: LucideI
   {
     id: 'select',
     label: 'Select',
-    title: 'Pick objects (click, shift-click for multi-select), drag to move, Delete to remove',
+    title:
+      'Pick objects (click, shift-click for multi-select), drag to move, Delete to remove. Drag a box over empty map to select a whole area (tiles + objects) and move it a tile at a time.',
     icon: MousePointer2,
   },
   {
@@ -264,6 +271,7 @@ export function Toolbar() {
   const snapToTileCenter = useEditorStore((s) => s.snapToTileCenter);
   const placeRotation = useEditorStore((s) => s.placeRotation);
   const paintMode = useEditorStore((s) => s.paintMode);
+  const regionSelection = useEditorStore((s) => s.regionSelection);
   const overlays = useEditorStore((s) => s.overlays);
   const isCompact = useIsCompact();
 
@@ -426,6 +434,63 @@ export function Toolbar() {
           onChange={(deg) => useEditorStore.getState().setPlaceRotation(deg)}
           ariaLabel="Placement rotation"
         />
+      </div>
+    ) : null;
+
+  // Select tool: when a marquee region is drawn, a 4-way whole-tile nudge that moves the whole area
+  // (tiles on every layer + walkability/zones/terrain + intersecting objects). Mirrors the compact
+  // SelectionBar's region controls; each arrow disables at the map edge. Arrow keys do the same.
+  const regionNudgeGroup =
+    activeTool === 'select' && regionSelection && map ? (
+      <div className={groupClass} title="Move the selected area a tile at a time (arrow keys)">
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label="Move region left"
+          disabled={!regionMoveInBounds(regionSelection, -1, 0, map.meta.width, map.meta.height)}
+          onClick={() => useEditorStore.getState().translateRegion(-1, 0)}
+        >
+          <ArrowLeft />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label="Move region up"
+          disabled={!regionMoveInBounds(regionSelection, 0, -1, map.meta.width, map.meta.height)}
+          onClick={() => useEditorStore.getState().translateRegion(0, -1)}
+        >
+          <ArrowUp />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label="Move region down"
+          disabled={!regionMoveInBounds(regionSelection, 0, 1, map.meta.width, map.meta.height)}
+          onClick={() => useEditorStore.getState().translateRegion(0, 1)}
+        >
+          <ArrowDown />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label="Move region right"
+          disabled={!regionMoveInBounds(regionSelection, 1, 0, map.meta.width, map.meta.height)}
+          onClick={() => useEditorStore.getState().translateRegion(1, 0)}
+        >
+          <ArrowRight />
+        </Button>
+        <span className="px-1 text-[0.8rem] text-fg-muted tabular-nums">
+          {regionSelection.w}×{regionSelection.h}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label="Clear region selection"
+          title="Clear the selected area"
+          onClick={() => useEditorStore.getState().setRegionSelection(null)}
+        >
+          <X />
+        </Button>
       </div>
     ) : null;
 
@@ -624,6 +689,7 @@ export function Toolbar() {
       {paintModeGroup}
       {rotateGroup}
       {placeRotateGroup}
+      {regionNudgeGroup}
 
       <div className={cn(groupClass, 'flex-1 justify-center text-[0.9rem]')}>
         {map ? (
