@@ -293,6 +293,33 @@ Research verified against the codebase (paths absolute under `/home/user/mostowo
   - Done when: markdownlint passes (repo has a pre-commit md lint hook); the new workflow is
     discoverable from `docs/README.md`; `STATUS.md` mentions the feature.
 
+- [x] **Step 8: Mobile compact-layout polish** `[inline]`
+  - Outcome: `QuickLayerSelect.tsx` — primary button now shows the layer **number** (0-based, top-first) instead of the name (name in tooltip/aria-label + dropdown); compact renders **number-only** (chevron dropdown desktop-only, since the ContextBar is space-tight and direct selection stays in Inspector→Layers); wrapper `shrink-0` so it never compresses. `PanelBarButton.tsx` — Library/Inspector bottom-bar buttons are now **icon-only** (`size-12`, label kept in aria-label/title) to free ContextBar width. `PaletteStrip.tsx` — dropped its own "PALETTE"/"Palette" title row (the Select trigger already shows the name + built-in down-arrow), reclaiming a row on compact + desktop. Verified via editor drive at 390px phone viewport: ContextBar tool-cluster went from 15px→74px so the number button is fully visible (was clipped to a sliver); layer number cycles 2→0 (0-based wrap); palette fill/switch/remove all work; desktop shows "N ▾" + dropdown; zero console errors; typecheck + lint clean; 377 editor tests pass. Updated `docs/EDITOR.md` layer-selector description.
+  - Added during review after driving the compact/touch shell (390px phone): the tiling bars were
+    functional (zero console errors, ≥44px targets) but cramped — the ContextBar's quick layer
+    selector clipped when the row overflowed, and the palette strip was tall (own "PALETTE" title +
+    the `Palette N ▾` switcher + slots). User design direction:
+  - **QuickLayerSelect → tiny number-cycle button** (`src/editor/ui/QuickLayerSelect.tsx`): the
+    primary button shows the active layer's **number** (its 1-based position in the top-first
+    presentation order) instead of the full name — super small, so it stops overflowing/clipping the
+    compact ContextBar. Tap still cycles (wrap, disabled `<2` layers). Keep the chevron dropdown
+    (names, active checked) for direct jump, and put the full layer name in the button's `title`/
+    `aria-label` so the number stays legible.
+  - **PaletteStrip → drop its own title** (`src/editor/panels/PaletteStrip.tsx`): remove the
+    uppercase "PALETTE"/"Palette" label row in both the empty and populated states. The `Select`
+    trigger already shows the palette name + a built-in down-arrow (`ChevronDownIcon`), which IS the
+    switcher the user wants — so the name+arrow stands alone with no redundant heading, reclaiming a
+    row of height on compact (and desktop).
+  - Side effects: both are shared by desktop + compact; re-verify desktop still reads well (the
+    number is fine there too; name is in the tooltip). No store/data changes. No new keyboard
+    bindings.
+  - Docs: update the `docs/EDITOR.md` subsection if the number-based layer control changes the
+    described interaction ("shows the current layer name" → "shows the layer number; name in the
+    dropdown/tooltip").
+  - Done when: on a 390px phone the quick layer selector no longer clips and the palette strip is
+    shorter, both still work (cycle layers, switch/fill/arm palette), desktop unaffected; typecheck +
+    lint clean; re-verified via the editor drive with zero console errors.
+
 ## Out of scope
 
 - Multi-tile / NxM stamp brushes or pattern-fill (palette holds single tiles only; `brushAsset` is a

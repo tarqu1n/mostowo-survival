@@ -9,6 +9,10 @@ import { Button } from './button';
  * screen position, CLOSES it) so the control reads as one persistent toggle you can tap in place to
  * open and close. `active` marks the open state (the in-drawer copy), styled like the toolbar's
  * pressed controls.
+ *
+ * Icon-only: the bottom bar is space-tight on a phone (the quick layer selector + tool controls have
+ * to fit too), so the text label is dropped from the visual and kept in `aria-label`/`title` — the
+ * book/sliders glyphs read clearly enough as the Library/Inspector entry points.
  */
 export function PanelBarButton({
   side,
@@ -32,14 +36,13 @@ export function PanelBarButton({
       title={`${active ? 'Close' : 'Open'} ${label}`}
       onClick={onClick}
       className={cn(
-        'h-12 shrink-0 flex-col gap-0.5 px-3 text-[0.7rem] font-normal',
+        'size-12 shrink-0 px-2',
         side === 'left' ? 'mr-auto' : 'ml-auto',
         "[&_svg:not([class*='size-'])]:size-6",
         active && 'bg-active text-fg-bright hover:bg-active',
       )}
     >
       {icon}
-      {label}
     </Button>
   );
 }

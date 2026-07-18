@@ -62,7 +62,6 @@ export function PaletteStrip() {
   if (palettes.length === 0) {
     return (
       <div className="mb-2.5 flex flex-col gap-1 border-b border-surface pb-2">
-        <div className="text-[0.7rem] uppercase tracking-[0.03em] text-border-muted">Palette</div>
         <Button
           size="sm"
           variant="outline"
@@ -77,7 +76,8 @@ export function PaletteStrip() {
 
   return (
     <div className="mb-2.5 flex flex-col gap-1.5 border-b border-surface pb-2">
-      <div className="text-[0.7rem] uppercase tracking-[0.03em] text-border-muted">Palette</div>
+      {/* No heading of its own — the switcher below already names the active palette (with the
+          Select's built-in down-arrow), so a "PALETTE" title would just be redundant height. */}
       <div className="flex items-center gap-1.5">
         <Select
           value={activePalette?.id ?? undefined}
