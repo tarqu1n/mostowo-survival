@@ -57,6 +57,15 @@ Two always-visible surfaces that kill the open-Library → paint → open-Inspec
 > git-conflict playbook when a phone Claude Code session also touches `master`, and the
 > cloud-container fallback.
 
+**Changing editor UI? Check BOTH resolutions before you're done.** The editor is a dual shell — a
+docked desktop layout and a full-bleed compact/touch layout (drawers + `ContextBar`) that diverge
+below the `useIsCompact` breakpoint. A change that looks right on desktop routinely breaks on a phone
+(a control clips in the space-tight bottom bar, a strip grows too tall, a tap target shrinks below
+44px) and vice-versa. So verify a UI change at a **desktop** width **and** a **narrow phone** width
+(~390px) — drive the live dev server with Playwright (Chromium at `/opt/pw-browsers`) and screenshot
+both, don't eyeball one and assume. Keep compact tap targets ≥44px and let wide rows scroll rather
+than pushing the layout out.
+
 Below a compact breakpoint (`src/editor/hooks/useIsCompact.ts`,
 `(max-width: 960px), (pointer: coarse) and (max-width: 1200px)`) the shell goes full-bleed: Library
 and the tabbed Inspector/Layers/Zones/Reference column collapse into slide-in **Sheet drawers**
