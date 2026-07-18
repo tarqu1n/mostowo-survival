@@ -1,3 +1,9 @@
 {
-  "palettes": []
+  "palettes": [
+    {
+      "id": "palette_0001",
+      "name": "Palette 1",
+      "slots": []
+    }
+  ]
 }
