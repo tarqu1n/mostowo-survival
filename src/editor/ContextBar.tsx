@@ -19,12 +19,14 @@ import {
   SlidersHorizontal,
   Trash2,
   Undo2,
+  X,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
 import { TILE_SIZE } from '../config';
 import { cn } from './lib/utils';
 import { useEditorStore, type EditorTool, type PaintMode } from './store/editorStore';
+import { regionMoveInBounds } from './regionOps';
 import { Button } from './ui/button';
 import { PanelBarButton } from './ui/PanelBarButton';
 import { RotationWheel } from './ui/RotationWheel';
@@ -353,6 +355,8 @@ export function SelectionBar() {
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const map = useEditorStore((s) => s.map);
   const selectedObjectIds = useEditorStore((s) => s.selectedObjectIds);
+  const activeTool = useEditorStore((s) => s.activeTool);
+  const regionSelection = useEditorStore((s) => s.regionSelection);
   // `map` is mutated in place by store commands (see InspectorPanel's re-render note) — subscribe to the
   // revision counters so kind-derived enablement (rotate/restack) refreshes after an edit, not just a
   // selection change.
@@ -361,8 +365,81 @@ export function SelectionBar() {
 
   const st = useEditorStore.getState;
 
-  // Nothing selected (or not on the Map tab) → the whole bar collapses, yielding its row back to the map.
-  if (activeTabId !== 'map' || !map || selectedObjectIds.length === 0) return null;
+  // Off the Map tab (or no map) → the whole bar collapses, yielding its row back to the map.
+  if (activeTabId !== 'map' || !map) return null;
+
+  // Region select & move: a marquee box is drawn → surface a 4-way WHOLE-TILE nudge that moves the
+  // whole group (tiles on every layer + walkability/zones/terrain + intersecting objects). Mutually
+  // exclusive with an object selection (drawing a box clears the object selection). Each arrow is
+  // disabled at the map edge (the store also refuses that move); a nudge onto void just no-ops.
+  const region = activeTool === 'select' ? regionSelection : null;
+  if (region) {
+    const { width, height } = map.meta;
+    const canMove = (dx: number, dy: number): boolean =>
+      regionMoveInBounds(region, dx, dy, width, height);
+    return (
+      <div className="flex items-center gap-1.5 overflow-x-auto border-t border-surface bg-raised/95 px-2 py-1.5 backdrop-blur">
+        <div className={groupClass}>
+          <Button
+            variant="outline"
+            size="icon-lg"
+            aria-label="Move region left"
+            title="Move the selected area one tile left (←)"
+            disabled={!canMove(-1, 0)}
+            onClick={() => st().translateRegion(-1, 0)}
+          >
+            <ArrowLeft />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon-lg"
+            aria-label="Move region up"
+            title="Move the selected area one tile up (↑)"
+            disabled={!canMove(0, -1)}
+            onClick={() => st().translateRegion(0, -1)}
+          >
+            <ArrowUp />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon-lg"
+            aria-label="Move region down"
+            title="Move the selected area one tile down (↓)"
+            disabled={!canMove(0, 1)}
+            onClick={() => st().translateRegion(0, 1)}
+          >
+            <ArrowDown />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon-lg"
+            aria-label="Move region right"
+            title="Move the selected area one tile right (→)"
+            disabled={!canMove(1, 0)}
+            onClick={() => st().translateRegion(1, 0)}
+          >
+            <ArrowRight />
+          </Button>
+        </div>
+        <span className="text-[0.8rem] text-fg-muted tabular-nums">
+          {region.w}×{region.h} tiles
+        </span>
+        <Button
+          variant="outline"
+          size="icon-lg"
+          aria-label="Clear region selection"
+          title="Clear the selected area"
+          className="ml-auto"
+          onClick={() => st().setRegionSelection(null)}
+        >
+          <X />
+        </Button>
+      </div>
+    );
+  }
+
+  // Otherwise fall back to the per-object selection bar — hidden when nothing's selected.
+  if (selectedObjectIds.length === 0) return null;
 
   const selected = map.objects.filter((o) => selectedObjectIds.includes(o.id));
   const hasDecor = selected.some((o) => o.kind === 'decor');

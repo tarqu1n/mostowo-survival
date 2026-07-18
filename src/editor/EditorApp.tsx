@@ -360,17 +360,23 @@ export function EditorApp() {
       // same void-validated, undoable `translateObjects` a drag uses — one undo entry per press.
       const dir = NUDGE_DIRS[e.key];
       if (dir) {
-        const ids = useEditorStore.getState().selectedObjectIds;
+        const state = useEditorStore.getState();
+        const ids = state.selectedObjectIds;
         if (ids.length > 0) {
           e.preventDefault();
           const coarse = e.shiftKey;
           const step = coarse ? TILE_SIZE : 1;
-          useEditorStore.getState().translateObjects(ids, {
+          state.translateObjects(ids, {
             dxPx: dir.x * step,
             dyPx: dir.y * step,
             dCol: coarse ? dir.x : 0,
             dRow: coarse ? dir.y : 0,
           });
+        } else if (state.activeTool === 'select' && state.regionSelection) {
+          // No object selected but a marquee region is drawn → arrow keys move the whole area one
+          // WHOLE tile (region moves are always tile-stepped; Shift has no finer step to offer).
+          e.preventDefault();
+          state.translateRegion(dir.x, dir.y);
         }
       }
     };
