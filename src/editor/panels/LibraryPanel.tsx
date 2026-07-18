@@ -39,6 +39,7 @@ import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { cn } from '../lib/utils';
+import { Palette, Plus } from 'lucide-react';
 import { useIsCompact } from '../hooks/useIsCompact';
 import { useLongPress } from '../hooks/useLongPress';
 import { toast } from 'sonner';
@@ -339,15 +340,18 @@ function LibraryRoleFilterChips({ active }: { active: LibraryRoleFilter }) {
 }
 
 /**
- * Palette multi-select controls (plan 033 step 4) — a "select for palette" toggle bound to
- * `palettePickMode`, plus an "Add to palette (N)" action shown only while picking. Self-contained: it
- * reads the transient pick state straight from the store (so a compact-drawer unmount never loses the
- * in-progress selection) and drives `togglePalettePickMode`/`addTilesToActivePalette`. While pick mode
- * is on the toggle is filled (primary variant) and a hint line spells out that taps select rather than
- * paint — the actual click-path branch lives in `pickTile` (below), which every tile-frame surface
- * funnels through, so object/node/terrain arm paths are untouched.
+ * Palette multi-select controls (plan 033 step 4; compacted to an icon button in step 8 follow-up) — a
+ * small palette-with-plus toggle bound to `palettePickMode`, plus an "Add (N)" action shown only while
+ * picking. Self-contained: it reads the transient pick state straight from the store (so a compact-
+ * drawer unmount never loses the in-progress selection) and drives `togglePalettePickMode`/
+ * `addTilesToActivePalette`. Exported so it can live in the Library **panel** on desktop and in the
+ * Library **drawer's bottom bar** on compact (near the Library-close toggle, per phone feedback — a
+ * full-width button wasted prime Library space). While pick mode is on the toggle is filled and
+ * entering it toasts a hint (taps select rather than paint); the actual click-path branch lives in
+ * `pickTile` (below), which every tile-frame surface funnels through, so object/node/terrain arm paths
+ * are untouched.
  */
-function PalettePickControls() {
+export function PalettePickControls() {
   const isCompact = useIsCompact();
   const pickMode = useEditorStore((s) => s.palettePickMode);
   const count = useEditorStore((s) => s.palettePickSelection.length);
@@ -371,34 +375,51 @@ function PalettePickControls() {
     toast(`Added ${n} ${n === 1 ? 'tile' : 'tiles'} to ${name}`);
   }
 
+  function toggle(): void {
+    const wasOff = !useEditorStore.getState().palettePickMode;
+    useEditorStore.getState().togglePalettePickMode();
+    // No inline hint line any more (the control is a bare icon in a bottom bar) — a one-off toast on
+    // entry tells the user their taps now select rather than paint.
+    if (wasOff) toast('Tap tiles to add them to a palette');
+  }
+
+  // A palette icon with a small + badge — the entry point / active toggle for palette selection.
+  const glyph = (
+    <span className="relative inline-flex items-center justify-center">
+      <Palette />
+      <Plus className="absolute -right-1 -top-1 size-3 stroke-[3]" />
+    </span>
+  );
+
   return (
-    <div className="mb-2.5 flex flex-col gap-1.5">
-      <div className={cn('flex items-center gap-1.5', isCompact && 'gap-2.5')}>
+    <div className="flex flex-none items-center gap-1.5">
+      <Button
+        type="button"
+        variant={pickMode ? 'default' : 'outline'}
+        size={isCompact ? 'icon-lg' : 'icon-sm'}
+        className={cn(isCompact && 'size-11')}
+        aria-pressed={pickMode}
+        title={
+          pickMode ? 'Selecting tiles for a palette — tap to cancel' : 'Select tiles for a palette'
+        }
+        aria-label={
+          pickMode ? 'Selecting tiles for a palette — tap to cancel' : 'Select tiles for a palette'
+        }
+        onClick={toggle}
+      >
+        {glyph}
+      </Button>
+      {pickMode && (
         <Button
           type="button"
-          variant={pickMode ? 'default' : 'outline'}
+          variant="default"
           size="sm"
-          className={cn('flex-1', isCompact && 'min-h-11 text-[0.85rem]')}
-          aria-pressed={pickMode}
-          onClick={() => useEditorStore.getState().togglePalettePickMode()}
+          className={cn(isCompact && 'min-h-11 text-[0.85rem]')}
+          disabled={count === 0}
+          onClick={addSelection}
         >
-          {pickMode ? '● Selecting tiles' : '+ Select for palette'}
+          Add ({count})
         </Button>
-        {pickMode && (
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            className={cn(isCompact && 'min-h-11 text-[0.85rem]')}
-            disabled={count === 0}
-            onClick={addSelection}
-          >
-            Add to palette ({count})
-          </Button>
-        )}
-      </div>
-      {pickMode && (
-        <p className="text-[0.7rem] text-selection">Tap tiles to select — taps won’t paint.</p>
       )}
     </div>
   );
@@ -622,10 +643,16 @@ export function LibraryPanel({ onPick }: { onPick?: () => void } = {}) {
       {/* Role-filter chips (plan 032 step 3) — above the Recent strip/search since the active filter
           governs both of those plus the category tree below. */}
       <LibraryRoleFilterChips active={libraryRoleFilter} />
-      {/* Palette multi-select (plan 033 step 4) — sits under the role chips: while pick mode is on, a
-          tap on any tile frame toggles its palette selection (branched centrally in `pickTile`) instead
-          of arming the brush, and "Add to palette (N)" flushes the selection into the active palette. */}
-      <PalettePickControls />
+      {/* Palette multi-select (plan 033 step 4) — DESKTOP only here (under the role chips): while pick
+          mode is on, a tap on any tile frame toggles its palette selection (branched centrally in
+          `pickTile`) instead of arming the brush, and "Add (N)" flushes the selection into the active
+          palette. On compact this control lives in the Library drawer's bottom bar (EditorApp) instead,
+          so it doesn't eat the top of the touch Library. */}
+      {!isCompact && (
+        <div className="mb-2.5">
+          <PalettePickControls />
+        </div>
+      )}
       {/* Recent strip (plan 030 step 4) — top-of-panel MRU of everything pickable, on desktop and
           compact. Re-arming goes through the same pick handlers as the main list, so a click also
           moves the entry to front (`pushLibraryRecent`) and auto-closes the compact drawer (`onPick`).

@@ -15,7 +15,7 @@ import { PhaserViewport } from './PhaserViewport';
 import { ObjectEditorTab } from './tabs/ObjectEditorTab';
 import { WorldViewTab } from './tabs/WorldViewTab';
 import { NodeTypesTab } from './tabs/NodeTypesTab';
-import { LibraryPanel } from './panels/LibraryPanel';
+import { LibraryPanel, PalettePickControls } from './panels/LibraryPanel';
 import { PaletteStrip } from './panels/PaletteStrip';
 import { QuickLayerSelect } from './ui/QuickLayerSelect';
 import { LayersPanel } from './panels/LayersPanel';
@@ -465,6 +465,10 @@ export function EditorApp() {
                         active
                         onClick={() => setLibraryOpen(false)}
                       />
+                      {/* Palette multi-select entry — a small palette+plus toggle on the RIGHT of the
+                          drawer's bottom bar (mirroring the Library close-toggle on the left), per phone
+                          feedback that a full-width "Select for palette" button wasted Library space. */}
+                      <PalettePickControls />
                     </div>
                   </SheetContent>
                 </Sheet>
