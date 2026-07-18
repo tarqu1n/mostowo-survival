@@ -1,6 +1,6 @@
 # Editor: tiling palette + quick layer selector
 
-> Status: planned — run /execute-plan to begin.
+> Status: in review
 
 ## Summary
 
