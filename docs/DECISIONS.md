@@ -16,6 +16,12 @@ Shards: [rendering](decisions/rendering.md) · [architecture](decisions/architec
 
 ---
 
+## 2026-07-19 — [DECIDED] Combat controls (mobile): movepad + auto-surfacing Melee/Bow cluster; facing-biased auto-target w/ highlight; telegraphed enemies; minimal HP bars; no dodge
+
+Movepad + auto-surfacing action cluster (Melee/Bow, room for spells); melee slows movement a lot / bow a little; facing-biased auto-target with highlighted target; telegraphed enemy wind-ups; minimal attention-scoped monster HP bars; kite instead of a dodge.
+
+→ [gameplay.md](decisions/gameplay.md#2026-07-19--decided-combat-controls-mobile-movepad--auto-surfacing-meleebow-cluster-facing-biased-auto-target-w-highlight-telegraphed-enemies-minimal-hp-bars-no-dodge)
+
 ## 2026-07-19 — [DECIDED] Player combat is the "danger verb" — avoid it; push danger to traps/NPCs/ranged; melee most dangerous
 
 Personal combat is a fallback, not the main verb; risk gradient traps→NPCs→ranged/spells→melee; "good combat" = tense/exposed not power-fantasy; melee fragile+loud+telegraphed but free/emergency/early-only; ranged+spells post-MVP. Reframes ROADMAP step 1.

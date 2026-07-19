@@ -59,8 +59,11 @@ to avoid, **not a power fantasy**. Traps + NPCs are the intended answer; you mel
 (clear tells, hit feedback, readable range, no mode-fighting) — you feel *exposed*, not dominant.
 *Test:* scenario spawns one skeleton, fight it.
 *Scope:* MVP combat = **melee + a basic bow** (adds an arrows/ammo resource + auto-target-nearest aiming).
-*Open (design next):* the **fighting controls** (move / melee / bow / dodge?) — the dodge-vs-fragility
-question falls out of them.
+*Controls (settled — see GAME-DESIGN "Fighting controls"):* movepad + an auto-surfacing action cluster
+(Melee + Bow, room for a later Spell slot); melee slows you a lot / bow only a little while firing;
+facing-biased auto-target with a **highlighted target**; **telegraphed** enemy wind-ups; minimal
+attention-scoped monster HP bars; **no dodge in MVP** (kite instead). This step also adds: the bow +
+arrows, the target highlight, HP-bar rendering, and a real telegraphed skeleton attack.
 
 ### 2. The night wave + loop-close (**first playable loop**)
 

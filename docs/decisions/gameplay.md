@@ -6,6 +6,27 @@ Part of the [decision log index](../DECISIONS.md). Newest first.
 
 ---
 
+## 2026-07-19 — [DECIDED] Combat controls (mobile): movepad + auto-surfacing Melee/Bow cluster; facing-biased auto-target w/ highlight; telegraphed enemies; minimal HP bars; no dodge
+
+Settles the fighting controls (ROADMAP step 1); full write-up in
+[GAME-DESIGN.md](../GAME-DESIGN.md#fighting-controls-mobile).
+
+- **Layout:** left-thumb movepad (move + facing) + a right-thumb **action cluster** (Melee + Bow in MVP,
+  **designed to grow** — a Spell slot post-MVP; dodge if ever added).
+- **Controls auto-surface** when a threat is near / at night — no manual mode toggle to fumble mid-wave
+  (a likely source of the current clunk). Command-mode resumes when safe.
+- **Movement-while-attacking is the risk lever:** melee slows you **significantly but never stops**
+  (`ATTACK_MOVE_SLOW`); bow slows you **only a little** (kite-able). This is where "ranged is safer" lives.
+- **Bow = facing-biased auto-target-nearest**, no manual aim; the current target is **highlighted**
+  (marker/outline, can reuse baked-glow tech); face to switch, tap to loose.
+- **Enemy attacks telegraphed** — a readable wind-up (coded tween + pose/flash for the strip-less
+  skeleton) before the strike; makes melee a fair reaction game, retires the contact-damage clunk.
+- **Monster HP: minimal, attention-scoped** — targeted enemy shows its bar persistently; others show a
+  brief on-hit bar that fades; thin/colour-only; cap the count rendered; backed by sprite feedback
+  (hit-flash + stagger/near-death tell). Chosen to avoid mobile clutter.
+- **No dedicated dodge in MVP** — kiting (bow) + spacing is the survivability skill; melee stays raw.
+  Revisit only if melee emergencies feel unfair; the cluster leaves room.
+
 ## 2026-07-19 — [DECIDED] Player combat is the "danger verb" — avoid it; push danger to traps/NPCs/ranged; melee most dangerous
 
 Design thesis steering the combat rework (ROADMAP step 1). Player combat is a **fallback, not the main

@@ -190,9 +190,31 @@ scavenge loot and/or a station-less wood→arrows craft — to firm at plan time
 rarity. Naturally **Litrandil's** domain (a reason the drunk wizard is worth the vodka).
 
 **[DECIDED 2026-07-19] MVP combat = melee + a basic bow.**
-**[OPEN — design next] Fighting controls** (mobile/touch): move, melee, bow, and whether there's a dodge.
-The survivability choice (dodge/backstep vs positioning+fragility vs block) **falls out of the control
-scheme**, so controls come first.
+
+### Fighting controls (mobile)
+
+- **Layout:** left thumb **movepad** (move + facing); right thumb an **action cluster** — **Melee** +
+  **Bow** in MVP, with the cluster **designed to grow** (a **Spell** slot lands post-MVP; a dodge if ever added).
+- **Controls auto-surface** when a threat is near / at night — no manual mode toggle to fumble mid-wave
+  (a likely source of the current "clunk"); Command-mode tap-to-manage resumes when it's safe.
+- **Movement-while-attacking is the risk lever:** **melee** slows you **significantly but never stops**
+  you (committal; existing `ATTACK_MOVE_SLOW`, tune); **bow** slows you **only a little** while firing
+  (you can still kite). That split is where "ranged is safer" lives mechanically.
+- **Bow targeting = facing-biased auto-target-nearest** (no manual aim). The current target is
+  **highlighted** (a marker/outline on the enemy — can reuse the baked-glow/outline tech) so you know
+  what the next arrow hits; face with the movepad to switch target, tap Bow to loose.
+- **Enemy attacks are telegraphed** — a readable **wind-up** before the strike (the skeleton has no
+  attack strip today, so a coded wind-up tween + pose/flash, then the hit), giving reaction time. This
+  is the core of making melee a fair reaction game and retiring the contact-damage clunk.
+- **Monster HP readout (minimal, attention-scoped — avoid mobile clutter):** the **targeted** enemy
+  shows its bar **persistently** (rides the target highlight); any enemy shows a **brief bar on hit**
+  that fades; bars are **thin/colour-only** above the hurtbox; **cap** how many render at once
+  (nearest/engaged) so a wave never draws dozens; backed by **sprite feedback** (hit-flash + a
+  stagger/near-death tell) so "nearly dead" reads without a bar.
+
+**Survivability = kiting (bow) + spacing; no dedicated dodge in MVP** (revisit if melee emergencies feel
+unfair — the cluster leaves room to add one).
+
 **[OPEN]** Player-casts-spells vs wizard-NPC-only (post-MVP).
 
 ## The night wave — shape, not just spawns
