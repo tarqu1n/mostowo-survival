@@ -16,6 +16,12 @@ Shards: [rendering](decisions/rendering.md) · [architecture](decisions/architec
 
 ---
 
+## 2026-07-19 — [DECIDED] Daily narrative events + wave contract; time-driven escalation (progress = accelerant); endgame challenge valve
+
+Dawn = authored vignette + 2–4 mostly-deterministic choices carrying the wave contract (hints only for now); nightly wave is time-driven "keep up or die" with progress as accelerant; optional endgame challenges once you out-pace the curve.
+
+→ [gameplay.md](decisions/gameplay.md#2026-07-19--decided-daily-narrative-events--wave-contract-time-driven-escalation-progress--accelerant-endgame-challenge-valve)
+
 ## 2026-07-19 — [DECIDED] Companion recruitment-as-quest + day/night hot-swap roles; torches as cheap perimeter lighting
 
 Recruitment via fetch-quest (first NPC: Litrandil the drunk wizard); companions hold a hot-swappable day-role + night-role; torches as a small refuelable light source complementing hearths.

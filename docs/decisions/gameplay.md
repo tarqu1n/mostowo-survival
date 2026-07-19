@@ -6,6 +6,30 @@ Part of the [decision log index](../DECISIONS.md). Newest first.
 
 ---
 
+## 2026-07-19 — [DECIDED] Daily narrative events + wave contract; time-driven escalation (progress = accelerant); endgame challenge valve
+
+Designs the dawn beat and refines the escalation model.
+
+- **Escalation is time-driven — "keep up or die" — with progress as the accelerant** (refines the
+  progress-keyed framing in the core-loop entry below). The nightly *base* wave hardens on a schedule;
+  pushing into new maps throws nastier types into the pool, speeding the ramp. Fair because the base
+  wave is predictable, telegraphed (the contract), and faced from home — you die from not keeping pace,
+  not a dice roll. The "no unfair death" concern applies to *roaming* danger while scavenging out, a
+  distinct threat from the predictable base wave.
+- **Endgame valve:** once you've out-paced the curve, optional authored challenges open up (hunt a
+  named beast, clear a haunted location, arena/boss/timed fights) for rare mats/blueprints/lore/recruits
+  — stops a stabilised settlement fizzling; feeds the escape arc.
+- **Daily narrative events:** each dawn = a short authored vignette + 2–4 choices, weighted draw from a
+  state-gated pool (day count / maps / NPCs / prior choices), one-shot + repeatable; types = threat-
+  foreshadow / opportunity / encounter / pressure / story; consequences carry into day + night.
+- **Event outcomes are mostly deterministic with occasional explicit gambles** (chosen over fully
+  deterministic or chance-based) — a choice is a decision not a dice roll, fair under no-fallback, with
+  spice.
+- **The wave contract is delivered via the dawn event; hints only for now** (custom call, not the full
+  invest-for-clarity system): atmospheric foreshadowing ("lights in the north woods" ≈ big/north), not
+  a stat readout. The structured version (scale/composition/direction/modifier on a HUD card, fidelity
+  sharpened by scout/watchtower/wizard-divination) is deferred.
+
 ## 2026-07-19 — [DECIDED] Companion recruitment-as-quest + day/night hot-swap roles; torches as cheap perimeter lighting
 
 Concrete companion + lighting mechanics (design direction; first named NPC → LORE.md).
@@ -88,6 +112,10 @@ design intent in [GAME-DESIGN.md](../GAME-DESIGN.md), to firm into systems at pl
 - **The escalation curve keys off player progress (what's unlocked / how far pushed), not just the day
   counter.** Forced by "no fallback": a purely time-based spike night + a far-scavenge run = an
   unavoidable death (unfair). Progress-keyed escalation keeps difficulty something the player chose into.
+  *(Refined 2026-07-19 — see the narrative-events/wave-contract entry above: the nightly **base** wave
+  IS time-driven ("keep up or die") with progress as an accelerant; it's fair because it's predictable +
+  telegraphed + faced from home. This "no unfair death" point stands for **roaming** danger while
+  scavenging out, which is the threat that mustn't spike arbitrarily.)*
 - **The base phase is NOT a separate timed phase** — fortify/craft shares the same daylight budget as
   scavenging, so prep vs. explore is a live opportunity-cost decision (the day's core trade).
 - **Pacing targets (config-tunable, no new architecture over plan 004's clock):** day long & breathing

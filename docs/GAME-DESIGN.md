@@ -103,12 +103,21 @@ because growth outstrips the home map; each new map is fresh scavenging **and** 
 what the nights throw at you. Unlocking the car doesn't just open fast travel — it advances the
 escalation curve. So the escape arc and the siege arc are the same tension pulling opposite ways.
 
-**The escalation curve keys off what you've unlocked / how far you've pushed — not just the day
-counter.** This matters doubly under "no fallback": a purely time-based spike night + a far-scavenge
-run would be an unavoidable death (unfair); tying escalation to player progress keeps the difficulty
-something the player *chose into*. The escape story is the finish line the other two spines don't
-provide alone — a growth sandbox fizzles, a pure siege is just a high-score. Mostowo's premise hands
-us the arc: **understand what woke the woods, and get out — or put it back down.**
+**The nightly wave escalates on a time ramp — keep up or die — with progress as the accelerant.**
+Waves harden on a schedule (a treadmill that speeds up); pushing into new maps throws nastier types
+into the pool, speeding the ramp further. This is *fair* because the base wave is **predictable** (you
+know night N+1 is worse), **telegraphed** (the wave contract — see "Daily narrative events"), and
+faced from **home** — you die because you didn't keep pace, not on a dice roll. (The earlier concern
+about unfair deaths was really about *roaming* danger while you're out scavenging — a different threat
+from the predictable base wave; that's what mustn't spike arbitrarily.) The escape story is the finish
+line the other two spines don't provide alone — a growth sandbox fizzles, a pure siege is just a
+high-score. Mostowo's premise hands us the arc: **understand what woke the woods, and get out — or put
+it back down.**
+
+**Endgame valve:** once you've out-paced the wave curve, the world opens into **optional authored
+challenges** — hunt a named beast on a far map, clear a haunted location, arena/boss fights, timed
+hunts — rewarding rare mats, blueprints, lore, or new recruits. This is what keeps a stabilised
+settlement from fizzling, and feeds the escape arc.
 
 ## Pacing & the clock
 
@@ -162,7 +171,8 @@ spawn and beeline the player." The roaming/attacking distinction above should be
 3. **The lull / dawn creep.** Numbers thin, a straggler or two still roams. The danger: the player
    relaxes, chases loot past the fireline, and gets caught by a leftover pack. **The lull is a trap.**
 
-Layered on top, keyed to the **escalation curve** (progress-based, not just day count):
+Layered on top, keyed to the **escalation curve** (a time-driven ramp accelerated by how far you've
+pushed — see Progression):
 
 - **Composition escalates, not just count.** Early: skeletons. Later: beasts, cursed local characters,
   a **named mini-boss** that a dawn narrative event foreshadowed. This is where dark-fantasy-comic
@@ -170,10 +180,9 @@ Layered on top, keyed to the **escalation curve** (progress-based, not just day 
 - **Directionality.** The wave comes from the **treeline** (a map edge / the woods), so base
   *orientation* matters — you fortify the wood-facing side heavier. Later maps may attack from two
   edges, forcing you to split defense (or split companions).
-- **A visible "wave contract."** Because dusk is a hard countdown and death is final, the player needs
-  a **morning read on tonight** — the dawn narrative event can *be* the scouting report ("something big
-  moved in the north woods"). Fair max-tension means you die from a threat you *chose* to under-prepare
-  for, never a surprise.
+- **A "wave contract" telegraphs tonight** so a hard-death night stays fair — delivered as hints woven
+  into the dawn event (full treatment in "Daily narrative events + the wave contract" below). You die
+  from a threat you *chose* to under-prepare for, never a surprise.
 
 Technically friendly: the same FSM + spawn system, spawning attackers-from-treeline on a paced schedule
 tied to the night phase, with the existing radius aggro doing the roaming-pull for free.
@@ -329,15 +338,46 @@ Ideas captured as they land; to be firmed into real systems later.
 - To design out later: food types & spoilage, cooking/crafting food at stations, hunger→health
   cascade, and how night danger trades off against the need to forage.
 
-## Daily narrative events (draft)
+## Daily narrative events + the wave contract
 
-- **Each day opens with a narrative event** — a short bit of story presented with **multiple-choice
-  options**. Choices carry consequences: **some good, some bad** (resources, risks, NPC encounters,
-  map/story developments, buffs/debuffs for the day).
-- Sets the tone and stakes for the day before the player heads out, and injects variety + story so
-  no two days feel identical. Themed with Mostowo lore (see [LORE.md](LORE.md)).
-- To design later: are outcomes deterministic or partly chance? Do prior choices/state gate which
-  events appear? How authored vs. randomised is the pool?
+**Each dawn opens with a short authored vignette + 2–4 multiple-choice options** — the day's setup
+(tone, stakes, variety, so no two days feel identical) and, crucially, **how tonight's threat is
+telegraphed** (see "the wave contract" below). Themed with Mostowo lore ([LORE.md](LORE.md)).
+
+**Outcomes are mostly deterministic, with occasional gambles** (decided 2026-07-19). Most choices carry
+known-ish consequences so a choice is a *decision*, not a dice roll — fair under hard-death "no
+fallback" — with the odd explicit "press your luck" option for spice.
+
+**Event pool** — a weighted draw from an authored pool, gated by state (day count, unlocked maps,
+recruited NPCs, prior choices); some **one-shot** (story beats, recruit hooks like Litrandil), some
+**repeatable** (flavour). Types:
+
+- **Threat foreshadow** — carries the wave contract (below).
+- **Opportunity** — a cache, a scavenge lead, a passing trader.
+- **Encounter** — an NPC: a recruit hook, a threat, or a moral choice.
+- **Pressure** — a companion crisis, a curse, weather turning.
+- **Story** — advances the escape arc / a map unlock.
+
+**Consequences carry into the day and night** — a day buff/debuff, resources gained/lost, a modifier on
+tonight's wave, a revealed map node, a companion's mood.
+
+### The wave contract
+
+Because dusk is a hard countdown with no fallback and the wave hardens over time (see Progression), the
+player must *see tonight coming* to prep fairly — you die from a threat you chose to under-prepare for,
+never a surprise. The contract is that morning read.
+
+**For now: hints only** (decided 2026-07-19). Delivered as **atmospheric foreshadowing woven into the
+dawn event** — "a survivor staggers in raving about lights in the north woods" (≈ big, from the north) —
+not a precise stat readout. Enough to steer prep (roughly which wall, roughly how hard), short of
+spelling it out.
+
+**Eventually** (deferred design) it aims to convey four things via a glanceable "tonight" HUD card:
+**scale** (rising with the time ramp), **composition** (escalating types; a named boss on spike nights),
+**direction** (which treeline ⇒ which wall to fortify — "hold the north wall"), and an occasional
+**modifier** (a fog night that kills vision, a wave targeting a structure, a fast rush) — with fidelity
+you can **sharpen by investing** (a scout companion / watchtower / Litrandil's divination). Not built
+now; hints first.
 
 ## NPC companions (draft)
 
