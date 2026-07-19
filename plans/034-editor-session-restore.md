@@ -236,7 +236,8 @@ tooling, not game content — no conflict with the MVP roadmap.
   - Done when: renaming an open map moves its `camera:<id>` key and repoints `last.mapId`; deleting a map
     clears its camera key and clears `last` if it named that map.
 
-- [ ] **Step 6: store-level + source tests** `[delegate]`
+- [x] **Step 6: store-level + source tests** `[delegate]`
+  - Outcome: created `src/editor/store/__tests__/editorStoreSession.test.ts` (4 cases: id-change rename migrates `camera:<id>` + repoints `last.mapId` preserving tool/layer/tab; id-change clears old camera key even with none to migrate; id-change leaves `last` untouched when it names a different map; name-only rename touches neither key) and `src/editor/__tests__/sessionSource.test.ts` (7 cases: `restoreSession` opens seeded map + applies tool/validated-layer/tab; unknown `activeLayerId` skipped per critique #3; no session → `getMap` uncalled; stale pointer clears `last`; `installSessionAutosave` debounces one write + `closeMap` clears; `flushSession` writes synchronously + cancels pending timer). Mocks `../api` (`getMap` only, via `importOriginal` spread) + `migrateMap`→identity; drives the real store. Acceptance: 11/11 new pass (stable ×3, no flake), full suite 788/788, `tsc` + eslint clean. Camera-restore-in-`buildScene` left to live check (Phaser, per step).
   - `src/editor/store/__tests__/editorStoreSession.test.ts` (mirror `editorStoreLibraryView.test.ts`:
     `FakeStorage`, `vi.stubGlobal`, `reset()` opening a scratch map): `renameMapState` id-change migrates
     the `camera:<id>` key and repoints `last.mapId`; a name-only rename leaves keys untouched. (Camera
