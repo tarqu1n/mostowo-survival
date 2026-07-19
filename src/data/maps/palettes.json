@@ -53,6 +53,11 @@
           "assetId": "pixel-crawler/Environment/Tilesets/Floors_Tiles.png#78"
         }
       ]
+    },
+    {
+      "id": "palette_0002",
+      "name": "Palette 2",
+      "slots": []
     }
   ]
 }
