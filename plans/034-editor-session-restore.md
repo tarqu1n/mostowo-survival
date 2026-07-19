@@ -1,6 +1,6 @@
 # Editor Session Restore
 
-> Status: planned — run /execute-plan to begin.
+> Status: planned (revised after critique) — run /execute-plan to begin.
 
 ## Summary
 
@@ -20,266 +20,275 @@ goal is to make it a non-event.
 - **Restore trigger: on ANY reload.** Whenever a saved session exists, boot reopens the last map.
   A deliberate "Close map" clears the pointer, so it still gives a clean start. `document.wasDiscarded`
   is NOT used to gate restore (it would skip manual refreshes, which we specifically want to survive).
-- **Camera memory: per-map.** Each map remembers its own camera view, keyed by map id — consistent
-  with how underlay + library view-state already persist per-map. Restored on every open of that map.
+- **Camera memory: per-map.** Each map remembers its own camera view, keyed by map id — restored on
+  every open of that map.
 - **Tabs scope: active-tab-only.** Restore which *permanent* tab (map/world/nodeTypes) was active.
   Do NOT persist/reopen on-demand `object:<assetId>` tabs. A dangling active tab falls back to `map`.
 
-**What splits per-map vs session-scoped:**
-- **Per-map (restored on every `loadMap`, any open path):** camera. Also the existing behaviour —
-  `loadMap` already rehydrates library recents/browse per map id.
-- **Session-scoped (restored only on boot resume):** activeTool, activeLayerId, activeTabId. A
-  deliberate mid-session open of a *different* map should not yank your tool/tab — only resuming the
-  session restores those. (activeLayerId keeps its normal `layers[0]` default on a manual open.)
+**Revisions applied after critique (see `## Critique` at end):**
+- **Camera persistence is fully scene-owned** (critique #6). `EditorScene` owns the camera and every
+  gesture-settle point, so it BOTH reads the saved camera at build time and writes it on settle,
+  talking to `sessionStore` directly. This removes the `readCamera` bridge, the `cameraSettleNonce`
+  signal, and `pendingRestoreCamera` from the earlier draft — **the store gains no camera fields at
+  all** — and eliminates the debounced-autosave-vs-async-buildScene race that could persist a
+  default camera over a good one (critique #1/#2).
+- **Storage split by restore-timing** (critique #5): two keys, each with exactly ONE writer, so no
+  shared-key read-modify-write races and no cross-map contamination:
+  - `mostowo-editor-session:last` → `{ mapId, activeTool?, activeLayerId?, activeTabId? }` — the whole
+    boot-resume session (which map + the tool/layer/tab to restore *on resume only*). Written solely by
+    the store-driven autosave. Always reflects the currently-open map's state; opening a different map
+    overwrites it wholesale, so map B can never inherit map A's tool.
+  - `mostowo-editor-session:camera:<mapId>` → `CameraState` — per-map camera. Written solely by
+    `EditorScene` on gesture-settle; read solely by `EditorScene` in `buildScene`.
+- Restored `activeLayerId` is **validated against the loaded map's layers** before applying (critique
+  #3 — `setActiveLayer` is a bare `set`, it does NOT reconcile).
+- Camera settle fires at **pinch / two-finger gesture end** too (critique #4 — the primary mobile
+  zoom), not only pan-end / wheel / `zoomByStep`.
+- The autosave debounce timer is **module-scoped** in `sessionSource.ts` so `flushSession` can clear
+  it (critique #8).
 
 **Architecture (mirrors existing seams — do not invent new patterns):**
 
 - **Storage module** `src/editor/sessionStore.ts` (NEW) — Phaser-free, `MapFile`-free, exactly like
   `src/editor/libraryViewStore.ts`. Same `storage()` try/catch guard (`libraryViewStore.ts:51-57`),
-  same `PREFIX` + per-id key builders, same read=degrade-to-default / write=swallow-errors pattern
-  (`libraryViewStore.ts:93-157`).
-  - `PREFIX = 'mostowo-editor-session:'`
-  - Global pointer `${PREFIX}last` → `{ mapId: string }` — which map to reopen on boot.
-  - Per-map record `${PREFIX}view:<mapId>` → `SessionView = { camera?: CameraState; activeTool?: EditorTool;
-    activeLayerId?: string | null; activeTabId?: string }` (all optional, tolerant on read).
-  - `CameraState = { scrollX: number; scrollY: number; zoom: number }` (zoom is the integer 1..4 step).
-  - Define `CameraState` + `SessionView` HERE and import into `editorStore.ts` — same dependency
-    direction as `libraryViewStore` types (`RecentEntry`/`LibraryBrowseState`) imported by the store.
+  same `PREFIX` + key builders, same read=degrade-to-default / write=swallow-errors pattern
+  (`libraryViewStore.ts:93-157`). Defines `CameraState` + `SessionLast` and exports them (same
+  dependency direction as `libraryViewStore` types imported by the store / scene).
 
 - **Orchestration module** `src/editor/sessionSource.ts` (NEW) — mirrors `src/editor/palettesSource.ts`
-  (which pairs `loadPalettes` + `installPaletteAutosave` + `putPalettes`). Holds `openMapById`,
-  `restoreSession`, `installSessionAutosave`, `flushSession`.
+  (pairs `loadPalettes` + `installPaletteAutosave` + `putPalettes`). Holds `openMapById`,
+  `restoreSession`, `installSessionAutosave`, `flushSession`. Writes ONLY the `last` record; never camera.
 
-- **Phaser↔store bridge** — add a camera get bridge + a one-shot restore-camera signal + a settle
-  nonce to `editorStore.ts`, mirroring `zoomViewport`/`bakeThumbnail` (`editorStore.ts:432-446,
-  566-570, 1762-1763`; installed `EditorScene.ts:391,394`; nulled `EditorScene.ts:404-405`) and
-  `pendingDirty` (the one-shot consumed signal, `editorStore.ts:415-417`).
+- **`EditorScene`** owns camera persistence end-to-end — no store bridge. Reads
+  `getCamera(mapId)` in `buildScene` (restore-or-fit) and calls `putCamera(mapId, …)` on every
+  settle. Importing a pure `sessionStore` helper from the scene is fine (one-way, no cycle).
 
-**Key file:line references (from research):**
+**Key file:line references (from research — reverify on execution):**
 - Boot mount effect (restore hook point): `EditorApp.tsx:294-320` (loads catalog/terrain/nodeDefs/
   palettes; `loadPalettes().finally(() => installPaletteAutosave())` is the load-then-subscribe shape).
 - Manual open path: `OpenMapDialog.tsx:58` → `Toolbar.tsx:324-334` (`handleOpen`) → `getMap` (`api.ts:25`)
   → `migrateMap` → `store.loadMap(loaded, id)` (`editorStore.ts:1428-1460`).
-- `loadMap` (`editorStore.ts:1428-1460`) already rehydrates per-map view-state (`getRecents(id)`/
-  `getBrowse(id)`) and bumps `mapEpoch`; sets `activeLayerId = map.layers[0]?.id ?? null`.
-- Epoch→fit chain: `EditorScene.ts:305-308` (mapEpoch sub) → `syncDocument()` `:413-421` →
-  `loadTexturesThenBuild` → `buildScene` `:536-547` → `fitCamera(map)` `:541`/`:1553-1562`.
-- `fitCamera` sets `cam.setBounds(...)` then `setZoom`/`centerOn`. **Keep `setBounds` on the restore
-  path** (it makes scroll clamping correct); only override the zoom/scroll.
-- Zoom clamp: `MIN_ZOOM = 1`, `MAX_ZOOM = 4` (`EditorScene.ts:56-57`); camera = `this.cameras.main`,
-  props `scrollX`/`scrollY`/`zoom`; zoom stepping integer-only (`zoomByStep` `:1583-1586`).
-- Bridge template: store `editorStore.ts:432-446, 566-570, 1762-1763`; scene install `:391,394`;
+- `loadMap` already rehydrates per-map view-state (`getRecents(id)`/`getBrowse(id)`) and bumps `mapEpoch`;
+  sets `activeLayerId = map.layers[0]?.id ?? null` (the default a manual open keeps).
+- Epoch→build chain: `EditorScene.ts:305-308` (mapEpoch sub) → `syncDocument()` `:413-421` →
+  `loadTexturesThenBuild` (async texture load) → `buildScene` `:536-547` → `fitCamera(map)` `:541`/`:1553-1562`.
+  `buildScene` reads the live `map`; `mapId` is already set on the store by the time it runs.
+- `fitCamera` (`:1553-1562`) sets `cam.setBounds(...)` then `setZoom`/`centerOn`. **The restore branch
+  must keep the `setBounds` line** (it makes scroll clamping correct); only override zoom/scroll.
+- Zoom clamp: `MIN_ZOOM = 1`, `MAX_ZOOM = 4` (`:56-57`); camera = `this.cameras.main`, props
+  `scrollX`/`scrollY`/`zoom`; zoom stepping integer-only (`zoomByStep` `:1583-1586`, `handleWheel`
+  `:1570-1575`); pan-drag updates scroll ~`:1988-1990`; **two-finger/pinch gesture end in the
+  pointer-up handler ~`:2103`** (reverify the exact line — this is the mobile-zoom settle site).
+- `setActiveLayer` is a bare `set` at `editorStore.ts:1515` — **no reconcile** (critique #3); validate
+  before calling. `reconcileTabs` (`:1178-1196`) early-returns while `catalog` is null, so applying
+  `activeTabId` before catalog load is safe; `activateTab` no-ops on an unknown id.
+- Bridge precedent (NOT used for camera anymore, but the install/teardown shape for reference):
+  `zoomViewport`/`bakeThumbnail` store `editorStore.ts:432-446, 566-570, 1762-1763`; scene `:391,394`,
   teardown `:404-405`.
-- Reconcilers that make restored dangling values safe: `reconcileActiveLayer` (`editorStore.ts:917-924`),
-  `reconcileTabs` (`:1178-1196`, early-returns while `catalog` is null so restoring before catalog
-  load is safe), `activeTabId` "never dangles" (`:258-260`).
-- Persistence templates: `libraryViewStore.ts` (full), `palettesSource.ts:50-67` (debounced subscriber).
-- Rename id-migration (must migrate the new key too): `renameMapState` (`editorStore.ts:678-689`),
-  documented `docs/EDITOR.md:214-219`.
+- Rename id-migration (must migrate the camera key + repoint the pointer): `renameMapState`
+  (`editorStore.ts:678-689`), documented `docs/EDITOR.md:214-219`.
 - Page Lifecycle usage is **greenfield** — no existing `visibilitychange`/`pagehide`/`freeze`/
   `wasDiscarded` usage anywhere in the repo.
 - Tests to mirror: `src/editor/__tests__/libraryViewStore.test.ts` (pure module: `FakeStorage`,
   `vi.stubGlobal('localStorage', …)`, malformed→default, storage-unavailable→no-throw) and
-  `src/editor/store/__tests__/editorStoreLibraryView.test.ts` (store write-through/reset).
+  `src/editor/store/__tests__/editorStoreLibraryView.test.ts` (store reset via `newMap('scratch',…)`).
 - Docs: `docs/EDITOR.md:200-224` "Persistence contract" (add a sibling paragraph + the rename list).
 
-**Direction check (`CLAUDE.md`):** the game is worked on "from whatever device is to hand (often on
-a phone, mid-journey, across many short sessions)"; the editor is "hosted always-on on guppi for phone
-authoring." A lossless phone reload is squarely on that stated direction — short mobile sessions that
-survive tab eviction. No conflict with the MVP roadmap (this is editor tooling, not game content).
+**Direction check (`CLAUDE.md` / `README.md`):** the game is worked on "from whatever device is to
+hand (often on a phone, mid-journey, across many short sessions)"; the editor is "hosted always-on on
+guppi for phone authoring." A lossless phone reload is squarely on that stated direction. It's editor
+tooling, not game content — no conflict with the MVP roadmap.
 
 ## Steps
 
-- [ ] **Step 1: `sessionStore.ts` pure storage module + unit test** `[delegate]` (parallel: A)
-  - Create `src/editor/sessionStore.ts`, a direct structural copy of `src/editor/libraryViewStore.ts`'s
-    posture (Phaser-free, `MapFile`-free): the `storage()` guard, a `PREFIX = 'mostowo-editor-session:'`,
-    key builders `lastKey = () => \`${PREFIX}last\``, `viewKey = (mapId) => \`${PREFIX}view:${mapId}\``.
-  - Export types `CameraState = { scrollX: number; scrollY: number; zoom: number }` and
-    `SessionView = { camera?: CameraState; activeTool?: EditorTool; activeLayerId?: string | null;
-    activeTabId?: string }`. Import `EditorTool` as a `type` from `./store/editorStore` (type-only import,
-    no runtime cycle). If a type-only import risks a cycle, instead define `SessionView.activeTool` as
-    `string` and let callers narrow — but prefer the typed import.
-  - Functions (all with the read=degrade-to-default, write=swallow-errors pattern from
-    `libraryViewStore.ts:93-157`): `getLastMapId(): string | null`, `putLastMapId(mapId: string): void`,
-    `clearLastMapId(): void`, `getSessionView(mapId: string): SessionView` (default `{}`),
-    `putSessionView(mapId: string, view: SessionView): void`, `clearSessionView(mapId: string): void`.
-    `putSessionView` should read-modify-write is NOT needed — callers pass the full record; but tolerate
-    partial records on read (missing fields = undefined).
-  - Create `src/editor/__tests__/sessionStore.test.ts` mirroring `libraryViewStore.test.ts`:
-    `FakeStorage` + `vi.stubGlobal`; round-trip `putLastMapId`/`getLastMapId` and
-    `putSessionView`/`getSessionView`; a malformed raw value → default; storage-unavailable
-    (`vi.stubGlobal('localStorage', undefined)`) → getters return default and setters don't throw;
-    `clear*` removes the key.
-  - Side effects: none — new files only, nothing imports them yet.
-  - Docs: none (covered in Step 8).
-  - Done when: `sessionStore.ts` exports the six functions + two types; `npm test` passes the new
-    `sessionStore.test.ts`; `npm run lint`/typecheck clean.
+- [ ] **Step 1: `sessionStore.ts` pure storage module + unit test** `[delegate]`
+  - Create `src/editor/sessionStore.ts`, structurally copying `src/editor/libraryViewStore.ts`'s posture
+    (Phaser-free, `MapFile`-free): the `storage()` guard, `PREFIX = 'mostowo-editor-session:'`, key
+    builders `LAST_KEY = \`${PREFIX}last\`` and `cameraKey = (mapId) => \`${PREFIX}camera:${mapId}\``.
+  - Export types: `CameraState = { scrollX: number; scrollY: number; zoom: number }` and
+    `SessionLast = { mapId: string; activeTool?: EditorTool; activeLayerId?: string | null; activeTabId?:
+    string }`. Import `EditorTool` as a type-only import from `./store/editorStore` (no runtime cycle;
+    if a cycle is flagged by the linter, fall back to `activeTool?: string` and let callers narrow).
+  - Functions (all with read=degrade-to-default, write=swallow-errors, per `libraryViewStore.ts:93-157`):
+    `getLast(): SessionLast | null`, `putLast(last: SessionLast): void`, `clearLast(): void`,
+    `getCamera(mapId: string): CameraState | null`, `putCamera(mapId: string, cam: CameraState): void`,
+    `clearCamera(mapId: string): void`. Tolerate partial/missing fields on read; validate that a parsed
+    `SessionLast` has a string `mapId` (else return null) and a parsed camera has three finite numbers
+    (else return null).
+  - Create `src/editor/__tests__/sessionStore.test.ts` mirroring `libraryViewStore.test.ts`: `FakeStorage`
+    + `vi.stubGlobal`; round-trip both records; malformed raw → null/default; storage-unavailable
+    (`vi.stubGlobal('localStorage', undefined)`) → getters return null, setters don't throw; `clear*`
+    removes the key.
+  - Side effects: none — new files, nothing imports them yet.
+  - Docs: none (Step 7).
+  - Done when: the six functions + two types export; `npm test` passes `sessionStore.test.ts`;
+    lint/typecheck clean.
 
-- [ ] **Step 2: store fields — restore-camera signal, camera bridge, settle nonce, camera restore in `loadMap`** `[inline]`
-  - In `src/editor/store/editorStore.ts`:
-    - Import `type CameraState`, `getSessionView` from `../sessionStore`.
-    - Add state fields (near `pendingDirty`/`zoomViewport`): `pendingRestoreCamera: CameraState | null`
-      (one-shot, consumed by `EditorScene.buildScene`, mirrors `pendingDirty`), `readCamera:
-      (() => CameraState) | null` (Phaser bridge, mirrors `zoomViewport`), `cameraSettleNonce: number`.
-    - Add actions: `setPendingRestoreCamera(cam: CameraState | null): void`,
-      `setReadCamera(fn: (() => CameraState) | null): void` (mirrors `setZoomViewport` `:1763`),
-      `notifyCameraSettled(): void` (`set((s) => ({ cameraSettleNonce: s.cameraSettleNonce + 1 }))`).
-    - Initial values: `pendingRestoreCamera: null`, `readCamera: null`, `cameraSettleNonce: 0` (add
-      beside the other initial-state values around `:1391-1392`).
-    - In `loadMap` (`:1428-1460`), after `mapId` is known, set `pendingRestoreCamera` from the saved
-      per-map record: `pendingRestoreCamera: getSessionView(id).camera ?? null` (inside the same `set`).
-      This restores the per-map camera on EVERY open path (manual dialog + boot). Do NOT restore
-      tool/layer/tab here — those are session-scoped (Step 4/5). Leave the existing `activeLayerId =
-      map.layers[0]?.id` default untouched.
-  - Side effects: `newMap` (`:1394-1426`) must set `pendingRestoreCamera: null` in its `set` (a brand-new
-    map has no saved camera → normal `fitCamera`). Verify no other `set` needs the field defaulted.
-    `EditorScene` will read the new fields in Step 3 — until then they're inert.
-  - Docs: none (Step 8).
-  - Done when: fields + actions compile and are covered by the store's existing typecheck; a manual
-    `getState().setPendingRestoreCamera({scrollX:1,scrollY:2,zoom:3})` round-trips; `loadMap` with a
-    seeded `getSessionView(id).camera` leaves `getState().pendingRestoreCamera` equal to it.
+- [ ] **Step 2: `EditorScene` — camera restore-on-build + scene-owned persist-on-settle** `[inline]`
+  - In `src/editor/EditorScene.ts`, import `getCamera`, `putCamera` (and `type CameraState`) from
+    `./sessionStore`, and `useEditorStore`.
+  - **Restore-or-fit** in `buildScene` (`:536-547`): replace the unconditional `fitCamera(map)` (`:541`)
+    with: read the current map id (`const mapId = useEditorStore.getState().mapId`); `const saved = mapId
+    ? getCamera(mapId) : null;` if `saved`, apply it — run the same `cam.setBounds(...)` block from
+    `fitCamera` (KEEP bounds), then `cam.setZoom(Phaser.Math.Clamp(saved.zoom, MIN_ZOOM, MAX_ZOOM))` and
+    `cam.setScroll(saved.scrollX, saved.scrollY)` (Phaser clamps scroll to the bounds just set); else
+    `fitCamera(map)`. Extract a private `applyRestoreCamera(map, saved)` if cleaner. This is the ONLY
+    read site and it must NOT write (no persist feedback loop from a programmatic camera set).
+  - **Persist-on-settle**: add a private `persistCamera()` — `const mapId = useEditorStore.getState().mapId;
+    if (!mapId) return; const c = this.cameras.main; putCamera(mapId, { scrollX: c.scrollX, scrollY:
+    c.scrollY, zoom: Math.round(c.zoom) });`. Call it at every USER camera-gesture settle (end of gesture,
+    not per frame): the pan-drag pointer-up site (~`:1988-1990` release), `zoomByStep` (`:1583-1586`),
+    `handleWheel` (`:1570-1575`), and the **two-finger/pinch gesture-end branch in the pointer-up handler
+    (~`:2103` — reverify)**. Do not call it from `buildScene`/`fitCamera`/`applyRestoreCamera`
+    (programmatic moves) or per-move-frame. Writing synchronously on settle means there's no camera
+    debounce to flush and the saved camera is always current (closes critique #2 — no null-bridge write).
+  - Side effects: no store changes at all in this step. StrictMode double-mount is irrelevant (no
+    install/teardown bridge). Confirm `Math.round(zoom)` matches the integer-zoom invariant; confirm a
+    brand-new map (no `camera:<id>` key) falls through to `fitCamera` (its fit is intentionally NOT
+    persisted — absence of a key deterministically re-fits next load).
+  - Docs: none (Step 7).
+  - Done when: opening a map with no saved camera fits as before; with a seeded `camera:<id>` it lands at
+    that scroll/zoom instead; panning / wheel-zoom / step-zoom / pinch-zoom each write the current camera
+    to `camera:<id>` on release (verified by reading localStorage after the gesture).
 
-- [ ] **Step 3: EditorScene camera bridge + restore-on-build + settle notifications** `[inline]`
-  - In `src/editor/EditorScene.ts`:
-    - `create()` (near `:391,394`): install the read bridge —
-      `useEditorStore.getState().setReadCamera(() => { const c = this.cameras.main; return { scrollX:
-      c.scrollX, scrollY: c.scrollY, zoom: Math.round(c.zoom) }; })`.
-    - `teardown()` (near `:404-405`): `if (useEditorStore.getState().readCamera)
-      useEditorStore.getState().setReadCamera(null);`.
-    - `buildScene(map)` (`:536-547`): replace the unconditional `fitCamera(map)` (`:541`) with a
-      pending-camera check — read + clear `pendingRestoreCamera` (one-shot, like `consumePendingDirty`):
-      if present, run the same `cam.setBounds(...)` from `fitCamera` (keep bounds!) then set
-      `cam.setZoom(Phaser.Math.Clamp(pending.zoom, MIN_ZOOM, MAX_ZOOM))` and `cam.setScroll(pending.scrollX,
-      pending.scrollY)`; else `fitCamera(map)`. Add a small private helper `applyRestoreCamera(map, cam)`
-      or inline. Because it's consumed one-shot, the resize-driven re-`buildScene`/`fitCamera` path
-      (`onDocEdited`, `:559-571`) is unaffected.
-    - Camera settle notification: call `useEditorStore.getState().notifyCameraSettled()` when a camera
-      gesture SETTLES (not per frame) — at the end of a pan drag (the pan pointer-up handler) and after a
-      zoom step (`zoomByStep` `:1583-1586` and `handleWheel` `:1570-1575`). Find the pan pointer-up /
-      drag-end site (the code that updates `cam.scrollX/scrollY` on drag — around `:1988-1990`) and fire
-      the notify on release, not on every move.
-  - Side effects: StrictMode double-mount (`main.tsx:12-19`) re-runs create/teardown — the null-guarded
-    setter tolerates it (same as `zoomViewport`). Confirm `Math.round(c.zoom)` matches the integer-zoom
-    invariant. Confirm `setScroll` respects the bounds set just above (Phaser clamps to bounds).
-  - Docs: none (Step 8).
-  - Done when: opening a map with no saved camera still fits as before; seeding `pendingRestoreCamera`
-    before a `mapEpoch` bump lands the camera at that scroll/zoom instead of the fit; panning/zooming
-    bumps `cameraSettleNonce` exactly once per gesture (not per frame).
-
-- [ ] **Step 4: `sessionSource.ts` — shared open, restore, autosave, flush** `[inline]`
-  - Create `src/editor/sessionSource.ts` (mirror `palettesSource.ts`'s structure). Imports: `useEditorStore`,
-    `getMap` (`./api`), `migrateMap` (wherever `Toolbar` imports it from), the six `sessionStore`
-    functions, `toast` only if needed.
-  - `export async function openMapById(id: string): Promise<boolean>` — the single open sequence used by
-    both the manual dialog and boot restore: `getMap(id)` → `migrateMap(raw)` →
-    `useEditorStore.getState().loadMap(loaded, id)` → return `true`. On a fetch/parse failure return
-    `false` (caller decides whether to toast). (`loadMap` sets `pendingRestoreCamera` from Step 2, so the
-    per-map camera restore is automatic here.)
-  - `export async function restoreSession(): Promise<void>` — boot resume: `const id = getLastMapId();
-    if (!id) return;` then `const ok = await openMapById(id);` if `!ok` → `clearLastMapId()` (stale/deleted
-    map — self-heal) and return. On success, apply the SESSION-SCOPED fields from `getSessionView(id)`:
-    `activeTool` via `setActiveTool` (if set), `activeLayerId` via `setActiveLayer` (reconcile guards a
-    dangling id), `activeTabId` via `activateTab` (no-op if the id isn't a live tab; active-tab-only, so
-    only `map`/`world`/`nodeTypes` are ever persisted). Do NOT toast on restore (silent resume).
+- [ ] **Step 3: `sessionSource.ts` — shared open, restore, autosave, flush** `[inline]`
+  - Create `src/editor/sessionSource.ts` (mirror `palettesSource.ts`). Imports: `useEditorStore`, `getMap`
+    (`./api`), `migrateMap` (same source `Toolbar` uses), and `getLast`/`putLast`/`clearLast` from
+    `./sessionStore`.
+  - `export async function openMapById(id: string): Promise<boolean>` — the single open sequence for both
+    the manual dialog and boot restore: `getMap(id)` → `migrateMap(raw)` →
+    `useEditorStore.getState().loadMap(loaded, id)` → `true`; on fetch/parse failure → `false` (caller
+    decides toast). Camera restore is automatic (Step 2's `buildScene`).
+  - `export async function restoreSession(): Promise<void>` — `const last = getLast(); if (!last?.mapId)
+    return; const ok = await openMapById(last.mapId); if (!ok) { clearLast(); return; }` then apply the
+    session-scoped fields: `setActiveTool(last.activeTool)` if set; `activateTab(last.activeTabId)` if set
+    (no-ops on unknown id); and for the layer, **validate first** (critique #3) —
+    `const m = useEditorStore.getState().map; if (last.activeLayerId && m?.layers.some(l => l.id ===
+    last.activeLayerId)) setActiveLayer(last.activeLayerId);` (else keep `loadMap`'s `layers[0]` default).
+    No toast (silent resume).
   - `export function installSessionAutosave(): () => void` — mirror `installPaletteAutosave`
-    (`palettesSource.ts:50-67`): `useEditorStore.subscribe` with a tuple selector `(s) => [s.mapId,
-    s.activeTool, s.activeLayerId, s.activeTabId, s.cameraSettleNonce]` (use `subscribeWithSelector`'s
-    array-selector with an equality fn, or subscribe to a derived string). On change, debounce (~400 ms,
-    reuse a `SESSION_AUTOSAVE_DEBOUNCE_MS` const) then write: read `const st = useEditorStore.getState()`;
-    if `st.mapId` is null → `clearLastMapId()` (deliberate close = fresh start next boot) and return; else
-    `putLastMapId(st.mapId)` and `putSessionView(st.mapId, { camera: st.readCamera?.(), activeTool:
-    st.activeTool, activeLayerId: st.activeLayerId, activeTabId: st.activeTabId })`. Returns the unsubscribe.
-  - `export function flushSession(): void` — immediate (no-debounce) synchronous version of the write
-    above, for the lifecycle listeners; clears any pending debounce timer first so it can't double-fire.
-    (Share the write body between `installSessionAutosave` and `flushSession` via a private `writeNow()`.)
-  - Refactor `Toolbar.tsx` `handleOpen` (`:324-334`) to call `openMapById(id)` then keep its
-    `toast.success`/`setShowOpen(false)` (and a failure toast when `openMapById` returns false), so the
-    open sequence is single-sourced and camera-restore-on-manual-open comes for free.
-  - Side effects: `Toolbar.tsx` now imports from `sessionSource`; confirm no import cycle
-    (`sessionSource` → `editorStore`/`api`; `Toolbar` → `sessionSource` — acyclic). The autosave's
-    tuple must include `cameraSettleNonce` so a pan/zoom (no other field change) still triggers a save.
-  - Docs: none (Step 8).
-  - Done when: `openMapById` opens a map identically to the old `handleOpen`; `restoreSession()` with a
-    seeded pointer+record opens the map and applies tool/layer/tab; with a stale pointer (getMap 404) it
-    clears the pointer and no-ops; `installSessionAutosave` writes pointer+record on a tool change and on
-    a `notifyCameraSettled()`; closing the map clears the pointer.
+    (`palettesSource.ts:50-67`) with a **module-scoped** debounce timer (critique #8): subscribe (via the
+    store's `subscribeWithSelector`) to the tuple `(s) => [s.mapId, s.activeTool, s.activeLayerId,
+    s.activeTabId]` (array selector + shallow equality, or a joined-string selector). On change, debounce
+    (~400 ms, `SESSION_AUTOSAVE_DEBOUNCE_MS`) then `writeNow()`. Returns the unsubscribe. **Camera is NOT
+    in this tuple** and never written here.
+  - Private `writeNow()`: `const s = useEditorStore.getState(); if (!s.mapId) { clearLast(); return; }
+    putLast({ mapId: s.mapId, activeTool: s.activeTool, activeLayerId: s.activeLayerId, activeTabId:
+    s.activeTabId });`
+  - `export function flushSession(): void` — clear the module-scoped debounce timer, then `writeNow()`
+    immediately (for the lifecycle listeners).
+  - Refactor `Toolbar.tsx` `handleOpen` (`:324-334`) to call `openMapById(id)`, keeping its
+    `toast.success`/`setShowOpen(false)`, plus a failure toast when it returns `false`. Single-sources the
+    open sequence.
+  - Side effects: `Toolbar.tsx` imports from `sessionSource`; confirm acyclic (`sessionSource` →
+    `editorStore`/`api`/`sessionStore`; `Toolbar` → `sessionSource`). Verify the store exposes
+    `subscribe(selector, listener)` (it uses `subscribeWithSelector` — `editorStore.ts:33`).
+  - Docs: none (Step 7).
+  - Done when: `openMapById` opens identically to the old `handleOpen`; `restoreSession()` with a seeded
+    `last` opens the map and applies tool/validated-layer/tab; a stale pointer (getMap 404) clears `last`
+    and no-ops; `installSessionAutosave` writes `last` on a tool/layer/tab/map change (debounced) and
+    clears it when the map closes; `flushSession` writes immediately.
 
-- [ ] **Step 5: EditorApp boot wiring + Page Lifecycle flush** `[inline]`
+- [ ] **Step 4: EditorApp boot wiring + Page Lifecycle flush** `[inline]`
   - In `src/editor/EditorApp.tsx` boot effect (`:294-320`), alongside the existing loaders:
-    - Kick off restore and install autosave load-then-subscribe style (mirror the palettes line):
-      `let unsubSession: (() => void) | undefined; void restoreSession().finally(() => { unsubSession =
-      installSessionAutosave(); });`
-    - Add lifecycle flush listeners that call `flushSession()` so a discard/refresh mid-debounce still
-      persists: `const onHide = () => { if (document.visibilityState === 'hidden') flushSession(); };`
-      `window.addEventListener('visibilitychange', onHide);` and
-      `window.addEventListener('pagehide', flushSession);` (`pagehide` is the most reliable pre-unload
-      signal; `visibilitychange:hidden` is the most reliable on iOS — register both).
-    - Cleanup (effect return): `unsubSession?.(); window.removeEventListener('visibilitychange', onHide);
-      window.removeEventListener('pagehide', flushSession);` alongside the existing `unsubPalettes` cleanup.
+    - `let unsubSession: (() => void) | undefined; void restoreSession().finally(() => { unsubSession =
+      installSessionAutosave(); });` (load-then-subscribe, like palettes).
+    - Lifecycle flush so a discard/refresh mid-debounce still persists the `last` pointer/fields:
+      `const onHide = () => { if (document.visibilityState === 'hidden') flushSession(); };`
+      `window.addEventListener('visibilitychange', onHide);`
+      `window.addEventListener('pagehide', flushSession);` (register both — `pagehide` is the most
+      reliable pre-unload signal; `visibilitychange:hidden` the most reliable on iOS).
+    - Cleanup (effect return): `unsubSession?.();
+      window.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', flushSession);` beside the existing `unsubPalettes` cleanup.
   - Side effects: StrictMode double-mount runs the effect twice; restore is idempotent (re-opening the
-    same map is harmless) and cleanup unsubs/removes between mounts. `document.wasDiscarded` is
-    intentionally NOT used (decision: restore on any reload). Ensure `restoreSession` runs even though
-    catalog/nodeDefs may still be loading — active-tab-only means no object-tab reconcile depends on the
-    catalog, so ordering is safe (`reconcileTabs` early-returns while `catalog` is null).
-  - Docs: none (Step 8).
+    same map is harmless). Note (critique #7): because `unsubSession` is assigned inside `.finally()`, the
+    first StrictMode cleanup may run before the assignment and leak one autosave subscription in DEV —
+    this mirrors the existing `installPaletteAutosave` pattern and is dev-only + idempotent; accept it
+    (do not add complexity to guard a dev-only double-subscribe). `document.wasDiscarded` is intentionally
+    NOT used. Active-tab-only means no object-tab reconcile depends on catalog load, so restore ordering
+    vs the async catalog/nodeDefs loads is safe.
+  - Docs: none (Step 7).
   - Done when: a full reload with a saved session reopens the map at the saved camera with the saved
-    tool/layer/active-tab; backgrounding then killing the tab (simulate via `visibilitychange`→hidden)
-    flushes the latest state; a deliberate Close map → reload lands on the empty state.
+    tool/validated-layer/active-tab; simulating `visibilitychange`→hidden flushes the `last` record; a
+    deliberate Close map → reload lands on the empty state.
 
-- [ ] **Step 6: rename + delete key migration** `[inline]`
+- [ ] **Step 5: rename + delete key migration** `[inline]`
   - `renameMapState` (`editorStore.ts:678-689`) already migrates the underlay + library keys on an id
-    change; add the session view key to that migration: `getSessionView(oldId)` → `putSessionView(newId,
-    …)` → `clearSessionView(oldId)`, and if `getLastMapId() === oldId` then `putLastMapId(newId)`. Guard
-    to the id-changed branch (a name-only rename skips it, like the existing underlay/world migration).
-  - Delete path: find the caller of `deleteMap` (`api.ts`) — the map-delete affordance (likely in
-    `Toolbar.tsx`/a dialog) — and after a successful delete, `clearSessionView(id)` and, if
-    `getLastMapId() === id`, `clearLastMapId()`. (Boot restore already self-heals a dangling pointer via
-    the getMap-404 path, so this is tidiness/consistency, not correctness-critical — still do it.)
-  - Side effects: keep this step's edits to CODE only — the EDITOR.md rename-migration list entry is in
-    Step 8 (avoids two steps editing EDITOR.md).
-  - Docs: none here (Step 8).
-  - Done when: renaming an open map moves its `mostowo-editor-session:view:<id>` record and repoints the
-    pointer; deleting a map clears its session record and the pointer if it named that map.
+    change; in the id-changed branch add the camera key: `const cam = getCamera(oldId); if (cam)
+    putCamera(newId, cam); clearCamera(oldId);` and repoint the session pointer if it named the old id:
+    `const last = getLast(); if (last?.mapId === oldId) putLast({ ...last, mapId: newId });` (layer ids are
+    unchanged by a rename, so `last.activeLayerId` stays valid). Import `getCamera`/`putCamera`/`clearCamera`
+    /`getLast`/`putLast` from `../sessionStore`. Skip in a name-only (id-unchanged) rename, like the
+    existing underlay/world migration.
+  - Delete path: find the caller of `deleteMap` (`api.ts`) — the map-delete affordance — and after a
+    successful delete, `clearCamera(id)` and, if `getLast()?.mapId === id`, `clearLast()`. (Boot restore
+    also self-heals a dangling pointer via the getMap-404 path, so this is tidiness, not correctness-
+    critical — still do it.)
+  - Side effects: keep this step's edits to CODE only — the `docs/EDITOR.md` rename-migration list entry
+    is in Step 7 (avoids two steps editing EDITOR.md).
+  - Docs: none here (Step 7).
+  - Done when: renaming an open map moves its `camera:<id>` key and repoints `last.mapId`; deleting a map
+    clears its camera key and clears `last` if it named that map.
 
-- [ ] **Step 7: store-level + source tests** `[delegate]`
-  - Add `src/editor/store/__tests__/editorStoreSession.test.ts` (mirror `editorStoreLibraryView.test.ts`:
-    `FakeStorage`, `vi.stubGlobal('localStorage', …)`, `reset()` opening a scratch map): (a) `loadMap`
-    with a seeded `putSessionView(id, { camera })` sets `getState().pendingRestoreCamera` to that camera;
-    without a record it's `null`; (b) `newMap` leaves `pendingRestoreCamera` null; (c) `renameMapState`
-    id-change migrates the session view key + pointer.
-  - Add `src/editor/__tests__/sessionSource.test.ts`: with `getMap` mocked (`vi.mock('../api', …)`) and a
-    fake `readCamera` installed via `setReadCamera`, assert `restoreSession()` opens the seeded pointer's
-    map and applies tool/layer/activeTab; a stale pointer (getMap rejects/404) clears the pointer;
-    `installSessionAutosave()` writes pointer+record after a `notifyCameraSettled()` (advance fake timers
-    past the debounce) and clears the pointer when the map is closed (`closeMap`); `flushSession()` writes
-    immediately without waiting for the debounce.
-  - Side effects: use `vi.useFakeTimers()` for the debounce assertions (see how other debounced code is
-    tested, if any; otherwise standard vitest fake timers).
+- [ ] **Step 6: store-level + source tests** `[delegate]`
+  - `src/editor/store/__tests__/editorStoreSession.test.ts` (mirror `editorStoreLibraryView.test.ts`:
+    `FakeStorage`, `vi.stubGlobal`, `reset()` opening a scratch map): `renameMapState` id-change migrates
+    the `camera:<id>` key and repoints `last.mapId`; a name-only rename leaves keys untouched. (Camera
+    restore-in-`buildScene` is Phaser and not unit-testable here — cover it by the Step 2 manual check /
+    the boot canary if it exercises a map open.)
+  - `src/editor/__tests__/sessionSource.test.ts`: with `getMap` mocked (`vi.mock('../api', …)`), assert
+    `restoreSession()` opens the seeded `last.mapId` and applies tool + validated layer + active tab; a
+    saved `activeLayerId` NOT in the map's layers is skipped (critique #3); a stale pointer (getMap
+    rejects) clears `last`; `installSessionAutosave()` writes `last` after a tool change (advance fake
+    timers past the debounce) and clears it on `closeMap`; `flushSession()` writes immediately without the
+    debounce. Use `vi.useFakeTimers()` for the debounce assertions.
+  - Side effects: none beyond test files.
   - Docs: none.
-  - Done when: `npm test` passes the new suites; no flake under the existing test runner.
+  - Done when: `npm test` passes the new suites with no flake.
 
-- [ ] **Step 8: docs** `[delegate haiku]`
-  - `docs/EDITOR.md` "Persistence contract" (`:200-224`): add a sibling paragraph "Session restore
-    (plan 034)" — keys `mostowo-editor-session:last` (last open map id) and `…:view:<mapId>` (per-map
-    camera + session-scoped activeTool/activeLayerId/activeTabId); restore-on-boot for ANY reload
-    (reopens the last map, applies camera+tool+layer+active-tab), per-map camera also restored on every
-    manual open; a deliberate Close map clears the pointer; a Page Lifecycle `visibilitychange:hidden`/
-    `pagehide` flush guarantees the latest state persists before a discard. Add the session view key to
-    the rename id-migration list (`:218-219`) and note delete clears it. Keep it terse/high-signal.
-  - `docs/MOBILE-EDITOR-ACCESS.md`: one line under the guppi/HMR context tying session-restore to the
-    phone workflow — a discarded/refreshed tab now resumes where you left off (pairs with the `EDITOR_NO_HMR`
-    manual-refresh workflow).
-  - Side effects: none (docs only; write-disjoint from all code steps).
+- [ ] **Step 7: docs** `[delegate haiku]`
+  - `docs/EDITOR.md` "Persistence contract" (`:200-224`): add a terse "Session restore (plan 034)"
+    paragraph — keys `mostowo-editor-session:last` (`{mapId, activeTool?, activeLayerId?, activeTabId?}`,
+    written by the store autosave) and `…:camera:<mapId>` (`CameraState`, written by `EditorScene` on
+    gesture-settle, read in `buildScene`); restore-on-boot for ANY reload (reopens last map, applies
+    camera + tool + validated layer + active-tab); per-map camera also restored on every manual open;
+    a deliberate Close map clears the pointer; a `visibilitychange:hidden`/`pagehide` flush persists the
+    `last` record before a discard. Add the `camera:<mapId>` key to the rename id-migration list
+    (`:218-219`) and note delete clears it.
+  - `docs/MOBILE-EDITOR-ACCESS.md`: one line tying session-restore to the phone workflow — a discarded/
+    refreshed tab now resumes where you left off (pairs with the `EDITOR_NO_HMR` manual-refresh workflow).
+  - Side effects: docs only; write-disjoint from all code steps.
   - Done when: both docs describe the slice; `markdownlint` (if wired) passes.
 
 ## Out of scope
 
-- Reopening on-demand `object:<assetId>` tabs (active-tab-only decision) — only the permanent
-  map/world/nodeTypes selection is restored.
+- Reopening on-demand `object:<assetId>` tabs (active-tab-only decision).
 - Restoring undo/redo history (not persisted; a reload starts a fresh history — unchanged).
-- `document.wasDiscarded`-gated restore (decision: restore on any reload, so it's unused).
+- `document.wasDiscarded`-gated restore (decision: restore on any reload).
 - Restoring session-scoped tool/layer/tab on a *manual* mid-session open of a different map (only the
-  boot resume restores those; manual open restores per-map camera only).
-- Preventing the browser reload itself (no web API allows it) — this feature makes the reload lossless,
-  not avoidable.
-- Any change to map data persistence / autocommit (already handled) or to the game runtime.
+  boot resume restores those; a manual open restores per-map camera only).
+- Preventing the browser reload itself (no web API allows it).
+- Any change to map data persistence / autocommit, or to the game runtime.
+
+## Critique
+
+> Recorded from the fresh-eyes review of the pre-revision draft. The revision above adopts #6
+> (scene-owned camera — dissolves #1/#2) and #5 (storage split), and folds in #2/#3/#4/#8. Kept here
+> for the execution context.
+
+Verdict: Proceed, but resolve the camera-write timing race (High) and the three Medium
+correctness/scope gaps before execution — the plan is well-researched and its seam-mirroring is
+sound, but the debounced store-tuple autosave races the async scene build in ways that can corrupt
+the very state it persists.
+
+| # | Finding | Lens | Severity | Resolution |
+| - | ------- | ---- | -------- | ---------- |
+| 1 | Debounced autosave reads live camera via a bridge during the async `buildScene` window → can persist a default camera over the good saved value; corruption only shows on the *next* reload | gaps/race | High | RESOLVED — camera is now scene-owned (read in `buildScene`, written on settle); no store autosave path touches camera, so the race can't occur |
+| 2 | On teardown `readCamera` is null → `{camera: readCamera?.()}` writes `camera: undefined`, wiping the save (possible on `pagehide`) | gaps | Medium | RESOLVED — no `readCamera` bridge; the scene writes real values synchronously on settle |
+| 3 | Plan claimed `setActiveLayer` reconciles a dangling id — it doesn't (bare `set`); stale layer applied unguarded | correctness | Medium | FIXED — `restoreSession` validates the saved layer id against `map.layers` before `setActiveLayer` |
+| 4 | Settle sites omitted pinch / two-finger gesture-end — the primary MOBILE zoom | gaps | Medium | FIXED — `persistCamera` also fires at the pinch gesture-end branch (~`EditorScene.ts:2103`) |
+| 5 | Session-scoped tool/tab stored in the per-map record → opening B writes A's tool into B's record | consistency | Medium | RESOLVED — tool/layer/tab live on the single global `last` record (overwritten wholesale per open); only camera is per-map |
+| 6 | Camera persistence could live entirely in `EditorScene`, dropping the bridge + nonce + the #1/#2 races | alternative | Medium | ADOPTED — see revision |
+| 7 | `restoreSession().finally(() => unsub = …)` can leak one autosave subscription under StrictMode first-cleanup | consistency | Low | ACCEPTED — dev-only + idempotent, mirrors the existing palettes pattern; noted in Step 4 |
+| 8 | `flushSession` can only clear the debounce timer if it's module-scoped; template keeps it in-closure | executability | Low | FIXED — Step 3 specifies a module-scoped timer |
