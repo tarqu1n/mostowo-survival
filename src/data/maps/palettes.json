@@ -387,7 +387,14 @@
     {
       "id": "palette_0007",
       "name": "Road",
-      "slots": []
+      "slots": [
+        {
+          "assetId": "pixel-crawler/Environment/Tilesets/Floors_Tiles.png#307"
+        },
+        {
+          "assetId": "pixel-crawler/Environment/Tilesets/Floors_Tiles.png#432"
+        }
+      ]
     }
   ]
 }
