@@ -3131,6 +3131,272 @@
       "ref": "tree",
       "col": 108,
       "row": 139
+    },
+    {
+      "id": "decor_0027",
+      "kind": "decor",
+      "asset": "fairy-forest/Assets/Props.png",
+      "x": 1752,
+      "y": 2440,
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 0,
+      "flipX": false,
+      "flipY": false,
+      "depth": 0,
+      "region": {
+        "x": 226,
+        "y": 97,
+        "w": 12,
+        "h": 30
+      }
+    },
+    {
+      "id": "decor_0028",
+      "kind": "decor",
+      "asset": "fairy-forest/Assets/Props.png",
+      "x": 1784,
+      "y": 2456,
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 0,
+      "flipX": false,
+      "flipY": false,
+      "depth": 0,
+      "region": {
+        "x": 226,
+        "y": 97,
+        "w": 12,
+        "h": 30
+      }
+    },
+    {
+      "id": "decor_0029",
+      "kind": "decor",
+      "asset": "fairy-forest/Assets/Props.png",
+      "x": 1768,
+      "y": 2424,
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 0,
+      "flipX": false,
+      "flipY": false,
+      "depth": -2,
+      "region": {
+        "x": 226,
+        "y": 97,
+        "w": 12,
+        "h": 30
+      }
+    },
+    {
+      "id": "decor_0030",
+      "kind": "decor",
+      "asset": "fairy-forest/Assets/Props.png",
+      "x": 1752,
+      "y": 2488,
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 0,
+      "flipX": false,
+      "flipY": false,
+      "depth": 0,
+      "region": {
+        "x": 211,
+        "y": 101,
+        "w": 10,
+        "h": 26
+      }
+    },
+    {
+      "id": "decor_0031",
+      "kind": "decor",
+      "asset": "fairy-forest/Assets/Props.png",
+      "x": 1768,
+      "y": 2488,
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 0,
+      "flipX": false,
+      "flipY": false,
+      "depth": 0,
+      "region": {
+        "x": 196,
+        "y": 108,
+        "w": 8,
+        "h": 19
+      }
+    },
+    {
+      "id": "decor_0032",
+      "kind": "decor",
+      "asset": "fairy-forest/Assets/Props.png",
+      "x": 1736,
+      "y": 2440,
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 0,
+      "flipX": false,
+      "flipY": false,
+      "depth": 0,
+      "region": {
+        "x": 272,
+        "y": 96,
+        "w": 16,
+        "h": 16
+      }
+    },
+    {
+      "id": "decor_0033",
+      "kind": "decor",
+      "asset": "fairy-forest/Assets/Props.png",
+      "x": 1736,
+      "y": 2456,
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 0,
+      "flipX": false,
+      "flipY": false,
+      "depth": 0,
+      "region": {
+        "x": 272,
+        "y": 116,
+        "w": 15,
+        "h": 11
+      }
+    },
+    {
+      "id": "decor_0034",
+      "kind": "decor",
+      "asset": "fairy-forest/Assets/Props.png",
+      "x": 1720,
+      "y": 2472,
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 0,
+      "flipX": false,
+      "flipY": false,
+      "depth": 0,
+      "region": {
+        "x": 242,
+        "y": 50,
+        "w": 12,
+        "h": 11
+      }
+    },
+    {
+      "id": "decor_0035",
+      "kind": "decor",
+      "asset": "fairy-forest/Assets/Props.png",
+      "x": 1720,
+      "y": 2488,
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 0,
+      "flipX": false,
+      "flipY": false,
+      "depth": 0,
+      "region": {
+        "x": 226,
+        "y": 51,
+        "w": 9,
+        "h": 10
+      }
+    },
+    {
+      "id": "decor_0036",
+      "kind": "decor",
+      "asset": "fairy-forest/Assets/Props.png",
+      "x": 1720,
+      "y": 2488,
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 0,
+      "flipX": false,
+      "flipY": false,
+      "depth": 0,
+      "region": {
+        "x": 211,
+        "y": 53,
+        "w": 7,
+        "h": 8
+      }
+    },
+    {
+      "id": "decor_0037",
+      "kind": "decor",
+      "asset": "fairy-forest/Assets/Props.png",
+      "x": 1704,
+      "y": 2488,
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 0,
+      "flipX": false,
+      "flipY": false,
+      "depth": 0,
+      "region": {
+        "x": 211,
+        "y": 53,
+        "w": 7,
+        "h": 8
+      }
+    },
+    {
+      "id": "decor_0038",
+      "kind": "decor",
+      "asset": "fairy-forest/Assets/Props.png",
+      "x": 1704,
+      "y": 2472,
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 0,
+      "flipX": false,
+      "flipY": false,
+      "depth": 0,
+      "region": {
+        "x": 226,
+        "y": 4,
+        "w": 13,
+        "h": 11
+      }
+    },
+    {
+      "id": "decor_0039",
+      "kind": "decor",
+      "asset": "fairy-forest/Assets/Props.png",
+      "x": 1704,
+      "y": 2456,
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 0,
+      "flipX": false,
+      "flipY": false,
+      "depth": 0,
+      "region": {
+        "x": 211,
+        "y": 6,
+        "w": 11,
+        "h": 8
+      }
+    },
+    {
+      "id": "decor_0040",
+      "kind": "decor",
+      "asset": "fairy-forest/Assets/Props.png",
+      "x": 1720,
+      "y": 2456,
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 0,
+      "flipX": false,
+      "flipY": false,
+      "depth": 0,
+      "region": {
+        "x": 195,
+        "y": 5,
+        "w": 7,
+        "h": 9
+      }
     }
   ]
 }
