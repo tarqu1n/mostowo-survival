@@ -65,6 +65,14 @@ facing-biased auto-target with a **highlighted target**; **telegraphed** enemy w
 attention-scoped monster HP bars; **no dodge in MVP** (kite instead). This step also adds: the bow +
 arrows, the target highlight, HP-bar rendering, and a real telegraphed skeleton attack.
 
+**Progress — largely delivered by [plan 035a](../plans/035a-combat-feel-skeleton-controls-bow.md):**
+telegraphed skeleton wind-up, the left-movepad + Melee/Bow/Spell cluster, auto-surface, the
+facing-biased auto-target bow with highlight + hitscan arrow, and the attention-scoped monster HP bars
+all landed (see [STATUS.md](STATUS.md)). **Flagged stand-ins:** the bow release anim is a coded
+placeholder (reuses the Pierce strip — no bow rig/art yet), and **arrows are unlimited** (the ammo
+resource in the scope line above is deferred). The **boar + the 4-way directional-actor pipeline** are
+split out to **[plan 035b](../plans/035b-boar-directional-enemy.md)** (still to do).
+
 ### 2. The night wave + loop-close (**first playable loop**)
 
 - Spawn skeletons from the treeline at night, path them toward the **fire / player**, attack; wave

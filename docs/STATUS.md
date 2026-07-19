@@ -60,6 +60,43 @@ torso, not only their feet tile. Player and kid-zombie both use `{width:1,height
 Tuning: `HIT_FLASH_*` / `ZOMBIE_LUNGE_*` / `*_SHAKE_*` / `DAMAGE_VIGNETTE_*` / `DEATH_*` /
 `ATTACK_MOVE_SLOW` in `config.ts`. Still open: non-linear movement (accel/decel).
 
+## Combat feel rework (plan 035a)
+
+De-clunks ROADMAP step 1's core on the existing skeleton — combat should feel tense/exposed/committal,
+not a power fantasy. Six pieces (numbers → [GAME-MECHANICS.md](GAME-MECHANICS.md); rationale →
+[decisions/gameplay.md](decisions/gameplay.md) 2026-07-19):
+
+- **Telegraphed skeleton attack:** the old instant contact-bite is now a readable **wind-up → strike**,
+  driven caller-side in `MonsterCharacter` contact logic (the FSM stays movement-only). The tell is a
+  ramping warning tint (`ENEMY_WINDUP_TINT`) + a freeze for `ENEMY_ATTACK_WINDUP_MS`, **carved out of
+  the tail of the existing bite cadence** so DPS is unchanged — leaving contact mid-wind-up whiffs the
+  strike (the cue to disengage). `enemyWindups` in `debugState`.
+- **Mobile control cluster:** the movepad moved to the **left thumb**; a **right-thumb action cluster**
+  (`combatMeleeButton` MELEE / `combatBowButton` BOW / a reserved dimmed **Spell** slot) sits
+  bottom-right (`UIScene`). Melee roots you (`ATTACK_MOVE_SLOW` 0.2); the bow only lightly slows you
+  (`BOW_MOVE_SLOW` 0.75) — the "ranged is safer" gap — both via `PlayerCharacter.effectiveMoveSpeed`
+  (`attackLockUntil`/`bowLockUntil`).
+- **Auto-surfacing controls:** a `combatActive` predicate (recomputed each frame — a live enemy within
+  `COMBAT_ACTIVE_RADIUS_TILES` OR night) reveals the fighting HUD **and makes the movepad
+  authoritative**, without ever calling `setMode('combat')` (that would `cancelAll()` the task queue).
+  Chosen precedence: movepad drives, command-mode taps still queue orders; a pending order survives the
+  reveal. `combatActive` in `debugState`.
+- **Bow:** `combat:bow` auto-targets the **facing-biased nearest** live enemy within `BOW_RANGE_TILES`,
+  applies **ranged** damage (`resolveRangedAttack`, dex-based, `BOW_BASE_DAMAGE`) as a **hitscan**, and
+  flies a coded **arrow tracer** (pure FX). **Unlimited ammo.** The current target wears a stroked
+  **highlight** re-synced each frame (`CombatFxManager`, mirrors `outlineCampfire` — not a baked halo);
+  `bowTargetId` in `debugState`. Release body-pose is a **coded stand-in** (reuses the Pierce/`attack`
+  strip — the pack has no bow rig/art yet).
+- **Monster HP bars:** thin floating green→red bars above enemy hurtboxes (`CombatFxManager`),
+  **attention-scoped** — the bow target's bar persists, any hit enemy flashes a brief bar that fades
+  (`HP_BAR_SHOW_MS`), capped to `HP_BAR_MAX_VISIBLE` nearest, plus a near-death **alpha-throb** sprite
+  tell so a capped-out enemy still reads as almost-dead. `enemyHpBarsVisible` in `debugState`.
+- **Dev SPAWN ENEMY button** (replaced RANDOMISE) drops a skeleton by the player for fight-testing.
+
+Sibling plan **035b** (deferred) adds the boar + the 4-way directional-actor pipeline. Still a coded
+stand-in / flagged for playtest: the bow release anim + unlimited arrows (no ammo economy), plus all
+`035a` tuning knobs.
+
 ## Day/night + hunger survival slice (plan 004)
 
 Real-time **day/night cycle** (`src/systems/daynight.ts`, pure): a continuous clock drives a map-sized

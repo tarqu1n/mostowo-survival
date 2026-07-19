@@ -45,6 +45,36 @@ All numbers are `CAMPFIRE_FUEL_MAX`/`_BURN_PER_SEC`/`_PER_WOOD`/`_FEED_INTERVAL_
 pure fuel math (`drainFuel`/`feedFuel`/`isLit`/`fuelFrac`) in
 [src/systems/campfire.ts](../src/systems/campfire.ts).
 
+## Combat feel & the bow (plan 035a)
+
+All knobs in [src/config.ts](../src/config.ts); behaviour in [STATUS.md](STATUS.md), rationale in
+[decisions/gameplay.md](decisions/gameplay.md).
+
+- **Telegraphed enemy attack:** on entering melee contact the enemy freezes in a wind-up for
+  `ENEMY_ATTACK_WINDUP_MS` (**350ms**), tinting toward `ENEMY_WINDUP_TINT`, then strikes. The wind-up
+  is carved out of the *tail* of the bite cadence (weapon `attackMs` / `CONTACT_DAMAGE_COOLDOWN_MS`), so
+  DPS is unchanged — leaving contact during it whiffs the strike.
+- **Move-slow while committing:** melee roots you to `ATTACK_MOVE_SLOW` (**0.2**) during the swing lock;
+  the bow only drops you to `BOW_MOVE_SLOW` (**0.75**) for `BOW_DRAW_MS` (**450ms**) — the "ranged is
+  safer / kite-able" gap. Both applied via `PlayerCharacter.effectiveMoveSpeed` (melee wins if they
+  overlap).
+- **Auto-surface:** the fighting HUD reveals + the movepad becomes authoritative whenever a live enemy
+  is within `COMBAT_ACTIVE_RADIUS_TILES` (**7**, Chebyshev) OR it's night. Never flips input `mode`
+  (that would cancel the task queue); command-mode taps keep queuing orders.
+- **Bow:** auto-targets the facing-biased nearest live enemy within `BOW_RANGE_TILES` (**6**,
+  Euclidean), deals `BOW_BASE_DAMAGE` (**2**) + the attacker's `dex` (**0** today → 2/shot, kills a
+  3-HP kidZombie in 2) via `resolveRangedAttack` — **hitscan**; the arrow is a coded tracer
+  (`BOW_ARROW_LEN_PX` dash over `BOW_ARROW_MS`). **Unlimited ammo** (no arrows resource yet). The
+  current target wears a stroked highlight (`COLORS.bowTarget`) until it dies or leaves range.
+- **Monster HP bars:** `HP_BAR_WIDTH_PX`×`HP_BAR_HEIGHT_PX` (**16×2**) green→red bar
+  (`COLORS.hpBarHigh`/`hpBarLow`), lifted `HP_BAR_GAP_PX` above the hurtbox. The **bow target** shows
+  its bar persistently; any hit enemy shows one for `HP_BAR_SHOW_MS` (**2500ms**) then it fades; at most
+  `HP_BAR_MAX_VISIBLE` (**5**) render (target first, then nearest). Below `HP_BAR_NEAR_DEATH_FRAC`
+  (**0.34**) HP an enemy gets an alpha throb (`HP_BAR_NEAR_DEATH_ALPHA_MIN`..1 over
+  `HP_BAR_NEAR_DEATH_PERIOD_MS`) so "almost dead" reads even with no bar.
+
+All numbers are **proposed starting values — playtest-tune.**
+
 ## Base zone
 
 A constant-size rect anchored at (centred on) the spawn tile: `BASE_ZONE_SIZE` (tile extent) in

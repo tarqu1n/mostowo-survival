@@ -27,6 +27,23 @@ Settles the fighting controls (ROADMAP step 1); full write-up in
 - **No dedicated dodge in MVP** — kiting (bow) + spacing is the survivability skill; melee stays raw.
   Revisit only if melee emergencies feel unfair; the cluster leaves room.
 
+**Execution notes (plan 035a — where the build diverged from / pinned the above):**
+
+- **Bow release anim = coded stand-in, not a pinned bow sprite.** The plan wanted "a held bow sprite
+  pinned via `attachment.ts`", but the player rig carries **no per-frame hand anchors** (only the
+  skeleton does) and the pack ships **no bow art**, so the release body-pose reuses the existing
+  Pierce (`attack`) strip for the draw window; the **arrow tracer + target highlight** carry the ranged
+  read. A real bow rig/art + arrow-nock anchors is a later polish pass.
+- **Arrow = hitscan + coded tracer** (the "projectile vs hitscan" open question → hitscan; damage
+  resolves instantly, the flying dash is pure FX). **Arrows unlimited** — no ammo resource yet
+  (deferred from ROADMAP step 1's scope line).
+- **Auto-surface never flips input `mode`.** It drives a separate `combatActive` predicate; calling
+  `setMode('combat')` would `cancelAll()` the worker queue. **Precedence:** while surfaced the movepad
+  drives, but command-mode taps still queue orders and a pending order survives the reveal.
+- **Near-death tell = alpha throb** (not tint/scale): alpha is the one sprite channel free of the
+  hit-flash (pipeline/tint-fill), wind-up tint, and flinch-squash, and VisionController hides only the
+  player — so it can't fight any existing FX.
+
 ## 2026-07-19 — [DECIDED] Player combat is the "danger verb" — avoid it; push danger to traps/NPCs/ranged; melee most dangerous
 
 Design thesis steering the combat rework (ROADMAP step 1). Player combat is a **fallback, not the main
@@ -71,7 +88,7 @@ The first-playable target and the order to build it, captured in [ROADMAP.md](..
 - **NPC recruitment skipped for MVP** — spawn a companion directly; Litrandil's quest is post-MVP.
 - **Explicitly OUT of MVP:** crafting stations, recruit quests, campfire-heart *extensions* (multiple
   hearths, walls extending the claim, torches — MVP has only the single central hearth), narrative events
-  + structured wave contract, multi-map/fast-travel, richer enemy roster.
+  - structured wave contract, multi-map/fast-travel, richer enemy roster.
 
 ## 2026-07-19 — [DECIDED] Daily narrative events + wave contract; time-driven escalation (progress = accelerant); endgame challenge valve
 

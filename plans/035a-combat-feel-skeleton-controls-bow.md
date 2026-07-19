@@ -1,6 +1,6 @@
 # Combat Feel Rework — Telegraphed Skeleton, Mobile Controls, Bow, HP Bars
 
-> Status: planned — run /execute-plan to begin.
+> Status: in review
 > Split from plan 035 after critique (the roadmap-step-1 core; the boar + directional-actor pipeline is
 > the sibling plan 035b, which depends on this one).
 
@@ -275,7 +275,26 @@ night; **no dodge** (kiting is survivability), leave a Spell slot in the cluster
   - Done when: hitting the skeleton flashes a brief bar that fades; the bow's target keeps its bar; a swarm
     never exceeds the cap; near-death visible without a bar; Tier-2 asserts on-hit reveal + targeted-persistent.
 
-- [ ] **Step 7: Docs + full test sweep** `[inline]`
+- [x] **Step 7: Docs + full test sweep** `[inline]`
+  - Outcome: docs updated — **STATUS.md** gained a "Combat feel rework (plan 035a)" section (all six
+    pieces + config-knob pointers + the 035b split); **GAME-MECHANICS.md** gained a "Combat feel & the
+    bow" section with the tuned numbers (`ENEMY_ATTACK_WINDUP_MS`, `ATTACK_MOVE_SLOW`/`BOW_MOVE_SLOW`,
+    `COMBAT_ACTIVE_RADIUS_TILES`, `BOW_RANGE_TILES`/`BOW_BASE_DAMAGE`/`BOW_ARROW_*`, `HP_BAR_*`);
+    **ROADMAP.md** step 1 got a progress note (035a delivered the core; **flagged stand-ins**: bow anim
+    = Pierce-strip placeholder, arrows unlimited/no ammo resource; boar + directional pipeline → 035b);
+    **decisions/gameplay.md** got an "Execution notes (plan 035a)" block under the combat-controls entry
+    (bow-anim stand-in, hitscan+unlimited arrows, auto-surface never flips `mode`, near-death = alpha
+    throb). Full three-tier sweep: **unit 793✓**, **e2e 49 pass / 5 fail** — the 5 (campfire tryPlace,
+    campfire-feed, death, menu-start, survival-hunger) are **pre-existing environmental flakes**,
+    **confirmed** by re-running them on the pre-035a base commit `53bba5c` (identical 5 fail / 7 pass)
+    and by the fact that none touch this plan's code paths; combat.spec (18, incl. all 035a specs) +
+    refactor-tripwire green. **smoke** boots clean (zero console/page errors; the single-click
+    start-timing flake is pre-existing/intermittent). typecheck clean, `pnpm lint` 0 errors (96
+    pre-existing `any` warnings in test files), prettier clean. **markdownlint:** the 035a docs are
+    clean; pre-existing `MD060`/`MD049`/`MD004` drift in two UNTOUCHED files (`docs/LORE.md`, the `035`
+    sibling plan) — present on the base commit, violating the config's explicit `tight`-table/`dash`
+    rules — was cleared in a **separate housekeeping commit** (mechanical `--fix` only), so `pnpm
+    lint:md` is now green. Plan status → `in review`.
   - Update [STATUS.md](../docs/STATUS.md) (telegraphed skeleton attack, mobile control cluster + auto-surface,
     bow + auto-target + highlight, monster HP bars). Note new `config.ts` knobs (`ENEMY_ATTACK_WINDUP_MS`,
     `BOW_MOVE_SLOW`, `HP_BAR_*`) in [GAME-MECHANICS.md](../docs/GAME-MECHANICS.md). Tick ROADMAP step 1
