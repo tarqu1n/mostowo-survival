@@ -39,6 +39,14 @@ export default defineConfig(({ command }) => ({
           .map((h) => h.trim())
           .filter(Boolean)
       : undefined,
+    // Disable HMR when `EDITOR_NO_HMR=1` (guppi's phone-hosted editor sets it). HMR's websocket is
+    // the single channel every auto-refresh travels over: file-watcher full-reloads AND the
+    // reconnect-after-restart reload. Turning it off makes the editor never refresh on its own —
+    // a manual refresh still re-fetches the latest, since the editor reads all its data (maps,
+    // packs, catalog) live from the `/__editor/*` save API and the dev server re-serves modules on
+    // a full load. The save API is unaffected (it's dev-server middleware, not HMR). Desktop dev
+    // leaves this unset to keep fast HMR. See docs/MOBILE-EDITOR-ACCESS.md.
+    hmr: process.env.EDITOR_NO_HMR === '1' ? false : undefined,
     watch: {
       // The Map Builder editor (dev-only) writes these on Save: map/world/nodes JSON + the
       // regenerated manifest.json (`scripts/vite-editor-api.mjs`), the thumbnail PNGs, and captured

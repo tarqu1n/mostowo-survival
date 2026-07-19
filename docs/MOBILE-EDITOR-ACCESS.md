@@ -45,6 +45,33 @@ serialized so bursts never race git. Knobs: `EDITOR_AUTOCOMMIT_PUSH=0` (commit l
 So each Save lands on `master` on GitHub within a second or two — the host can be rebuilt without
 losing more than the edit in flight.
 
+## No auto-refresh on guppi (`EDITOR_NO_HMR=1`)
+
+The editor is a live Vite dev server, and Vite's HMR websocket is the single channel every
+*automatic* page refresh rides: file-watcher full-reloads **and** the reload-on-reconnect after the
+dev server restarts. On the phone-hosted instance that showed up as the editor spontaneously
+refreshing — snapping back to its onload state mid-edit when another device/session pushed a code
+change to `master` (the autosave's self-heal `git pull --rebase` rewrites `src/` files on disk), or
+when the container had restarted while the tab was backgrounded.
+
+guppi's compose sets **`EDITOR_NO_HMR=1`** (read by `vite.config.ts`, which sets `server.hmr:
+false`) to switch that off. Trade-off by design:
+
+- **Nothing refreshes on its own** any more — no mid-edit yank.
+- **A manual refresh still loads the latest of everything.** The editor reads *all* its data (maps,
+  world, nodes, palettes, asset catalog, references) live from the `/__editor/*` API on each load —
+  none of it is bundled — so a refresh re-fetches the current files. Editor *code* changes are
+  picked up too, since the dev server re-serves modules on a full load. There is **no build step**;
+  "refresh to see the latest" is the whole model.
+- The save/load API is **unaffected** — it's dev-server middleware (`scripts/vite-editor-api.mjs`'s
+  `configureServer`), independent of HMR. (This is also why the editor can't just be a static
+  `vite build`: that API only exists under `vite dev`, and `editor.html` is excluded from the prod
+  bundle.)
+- **You choose when to see others' pushes** — a map/code change pushed elsewhere won't appear until
+  you refresh. That's the point.
+
+Desktop dev leaves `EDITOR_NO_HMR` unset, keeping fast HMR for iterating on editor code.
+
 ## Claude getting a shell on guppi + working on the build there
 
 When Matt asks a Claude Code cloud session to *"get on guppi and work on the editor"*, this is the
