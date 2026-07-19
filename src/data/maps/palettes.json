@@ -272,6 +272,11 @@
           "assetId": "pixel-crawler/Environment/Tilesets/Wall_Tiles.png#25"
         }
       ]
+    },
+    {
+      "id": "palette_0005",
+      "name": "Palette 5",
+      "slots": []
     }
   ]
 }
