@@ -10,6 +10,7 @@ import { loadCatalog } from './catalogSource';
 import { loadTerrainCatalog } from './terrainCatalogSource';
 import { loadNodeDefs } from './nodeDefsSource';
 import { loadPalettes, installPaletteAutosave } from './palettesSource';
+import { restoreSession, installSessionAutosave, flushSession } from './sessionSource';
 import { Toolbar } from './Toolbar';
 import { ContextBar, SelectionBar } from './ContextBar';
 import { PhaserViewport } from './PhaserViewport';
@@ -314,8 +315,25 @@ export function EditorApp() {
       .finally(() => {
         unsubPalettes = installPaletteAutosave();
       });
+    // Session restore (plan 034): reopen the last map + its camera/tool/layer/tab, THEN install the
+    // autosave subscriber (same load-then-subscribe shape as palettes, so the restore's own store
+    // writes don't immediately re-save). A discard/manual-refresh mid-debounce still persists the
+    // pointer via the lifecycle flush below — `pagehide` is the most reliable pre-unload signal,
+    // `visibilitychange:hidden` the most reliable on iOS, so register both.
+    let unsubSession: (() => void) | undefined;
+    void restoreSession().finally(() => {
+      unsubSession = installSessionAutosave();
+    });
+    const onHide = (): void => {
+      if (document.visibilityState === 'hidden') flushSession();
+    };
+    window.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', flushSession);
     return () => {
       unsubPalettes?.();
+      unsubSession?.();
+      window.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', flushSession);
     };
   }, []);
 

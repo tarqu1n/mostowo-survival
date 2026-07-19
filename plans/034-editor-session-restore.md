@@ -192,7 +192,8 @@ tooling, not game content — no conflict with the MVP roadmap.
     and no-ops; `installSessionAutosave` writes `last` on a tool/layer/tab/map change (debounced) and
     clears it when the map closes; `flushSession` writes immediately.
 
-- [ ] **Step 4: EditorApp boot wiring + Page Lifecycle flush** `[inline]`
+- [x] **Step 4: EditorApp boot wiring + Page Lifecycle flush** `[inline]`
+  - Outcome: edited `src/editor/EditorApp.tsx` boot effect (the catalog/palettes loader effect). Added `import { restoreSession, installSessionAutosave, flushSession } from './sessionSource'`; `void restoreSession().finally(() => { unsubSession = installSessionAutosave(); })` (load-then-subscribe, mirroring palettes); registered `visibilitychange` (fires `flushSession` only when `document.visibilityState === 'hidden'`) + `pagehide` (`flushSession`) listeners; effect cleanup now also calls `unsubSession?.()` and removes both listeners, beside the existing `unsubPalettes?.()`. StrictMode double-mount is idempotent (re-open same map harmless); the `.finally`-assigned `unsubSession` dev-only double-subscribe is accepted per critique #7. Acceptance: `tsc` clean, eslint clean, 777/777 tests pass. Behavioural reload/flush/close checks deferred to live verification.
   - In `src/editor/EditorApp.tsx` boot effect (`:294-320`), alongside the existing loaders:
     - `let unsubSession: (() => void) | undefined; void restoreSession().finally(() => { unsubSession =
       installSessionAutosave(); });` (load-then-subscribe, like palettes).
