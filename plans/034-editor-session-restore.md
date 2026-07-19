@@ -1,6 +1,6 @@
 # Editor Session Restore
 
-> Status: in review
+> Status: deployed
 
 ## Summary
 
