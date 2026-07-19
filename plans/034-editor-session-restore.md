@@ -1,6 +1,6 @@
 # Editor Session Restore
 
-> Status: planned (revised after critique) — run /execute-plan to begin.
+> Status: in review
 
 ## Summary
 
