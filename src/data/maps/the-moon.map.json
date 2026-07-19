@@ -2683,8 +2683,8 @@
       "id": "decor_0024",
       "kind": "decor",
       "asset": "craftpix-nature/Bushes/Fern2_1.png",
-      "x": 1768,
-      "y": 2360,
+      "x": 1784,
+      "y": 2424,
       "scaleX": 1,
       "scaleY": 1,
       "rotation": 0,
@@ -2696,8 +2696,8 @@
       "id": "node_0010",
       "kind": "node",
       "ref": "tree",
-      "col": 109,
-      "row": 147,
+      "col": 108,
+      "row": 146,
       "skin": "default",
       "rotation": 326.3866414888742
     },
@@ -2718,8 +2718,8 @@
       "id": "node_0011",
       "kind": "node",
       "ref": "tree",
-      "col": 109,
-      "row": 149,
+      "col": 108,
+      "row": 147,
       "skin": "skin_3",
       "rotation": 347.06937615982133
     },
@@ -2730,6 +2730,37 @@
       "col": 109,
       "row": 142,
       "skin": "skin_7"
+    },
+    {
+      "id": "node_0013",
+      "kind": "node",
+      "ref": "tree",
+      "col": 109,
+      "row": 146,
+      "skin": "skin_4",
+      "rotation": 5.494575646860994
+    },
+    {
+      "id": "node_0014",
+      "kind": "node",
+      "ref": "tree",
+      "col": 110,
+      "row": 143,
+      "skin": "skin_5",
+      "rotation": 352.57783130698624
+    },
+    {
+      "id": "decor_0026",
+      "kind": "decor",
+      "asset": "craftpix-nature/Bushes/Broken_tree1.png",
+      "x": 1752,
+      "y": 2360,
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 352.57783130698624,
+      "flipX": false,
+      "flipY": false,
+      "depth": 0
     }
   ]
 }
