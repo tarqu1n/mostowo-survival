@@ -12,13 +12,11 @@ import {
   LibraryBig,
   Palette,
   Pipette,
-  Redo2,
   RotateCcw,
   RotateCw,
   SendToBack,
   SlidersHorizontal,
   Trash2,
-  Undo2,
   X,
   ZoomIn,
   ZoomOut,
@@ -36,7 +34,8 @@ import { RotationWheel } from './ui/RotationWheel';
  * Per-tool context bar (plan 027 Step 9) — a compact action bar anchored to the bottom edge of the
  * full-bleed viewport for thumb reach in phone portrait. It gives touch users an on-screen equivalent
  * of the editor's whole keyboard vocabulary (rotate, erase/free-pixel/multi-select modifiers, delete,
- * nudge, underlay toggle, skin-cycle, undo/redo), so the map is fully editable without a keyboard.
+ * nudge, underlay toggle, skin-cycle), so the map is fully editable without a keyboard. Undo/redo are
+ * NOT here — they live as icon buttons in the top toolbar, freeing this bar's width for tool actions.
  *
  * It is rendered ONLY in the compact shell (EditorApp mounts it only in the `isCompact` branch), so
  * desktop keeps its keyboard modifiers and toolbar-hosted rotate/paint-mode controls unchanged — the
@@ -143,8 +142,6 @@ export function ContextBar({
   const multiSelectActive = useEditorStore((s) => s.multiSelectActive);
   const selectedObjectIds = useEditorStore((s) => s.selectedObjectIds);
   const underlay = useEditorStore((s) => s.underlay);
-  const canUndo = useEditorStore((s) => s.canUndo);
-  const canRedo = useEditorStore((s) => s.canRedo);
 
   const st = useEditorStore.getState;
   // The tool actions are a Map-tab surface (World has its own controls; object-editor tabs have
@@ -169,30 +166,8 @@ export function ContextBar({
 
       {showTools && (
         <>
-          {/* Persistent undo/redo — always reachable at thumb height. */}
-          <div className={cn(groupClass, 'shrink-0')}>
-            <Button
-              variant="secondary"
-              size="icon-lg"
-              aria-label="Undo"
-              title="Undo (Ctrl/Cmd+Z)"
-              disabled={!canUndo}
-              onClick={() => st().undo()}
-            >
-              <Undo2 />
-            </Button>
-            <Button
-              variant="secondary"
-              size="icon-lg"
-              aria-label="Redo"
-              title="Redo (Shift+Ctrl/Cmd+Z)"
-              disabled={!canRedo}
-              onClick={() => st().redo()}
-            >
-              <Redo2 />
-            </Button>
-          </div>
-
+          {/* Undo/redo live in the top toolbar (icon buttons) — kept off this bar to free thumb-height
+              width for the tool-contextual controls. */}
           {/* Tool-contextual actions — scrolls horizontally if the row can't fit in portrait. */}
           <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
             {/* Brush: pick the active tile layer, then rotate the painted tile (R / Shift+R). The

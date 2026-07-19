@@ -27,11 +27,13 @@ import {
   PaintBucket,
   Paintbrush,
   Pipette,
+  Redo2,
   Scissors,
   SlidersHorizontal,
   Square,
   SquareDashed,
   Stamp,
+  Undo2,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -549,11 +551,12 @@ export function Toolbar() {
         <TooltipTrigger asChild>
           <Button
             variant="secondary"
-            size="sm"
+            size="icon-sm"
+            aria-label="Undo"
             onClick={() => useEditorStore.getState().undo()}
             disabled={!canUndo}
           >
-            Undo
+            <Undo2 />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Undo (Ctrl/Cmd+Z)</TooltipContent>
@@ -562,11 +565,12 @@ export function Toolbar() {
         <TooltipTrigger asChild>
           <Button
             variant="secondary"
-            size="sm"
+            size="icon-sm"
+            aria-label="Redo"
             onClick={() => useEditorStore.getState().redo()}
             disabled={!canRedo}
           >
-            Redo
+            <Redo2 />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Redo (Shift+Ctrl/Cmd+Z)</TooltipContent>
