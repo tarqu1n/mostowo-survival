@@ -666,7 +666,10 @@ function RegionsEditor({
 
   function capture(e: React.PointerEvent): void {
     canvasRef.current?.setPointerCapture(e.pointerId);
-    canvasRef.current?.focus();
+    // `preventScroll` so focusing the (tall) canvas doesn't scroll it into view inside the tab's
+    // overflow-auto container — that jump pushed the toolbar (zoom + Pan toggle) up off-screen the
+    // moment you started drawing or selecting a box. Focus itself is still needed for Space-pan/Delete.
+    canvasRef.current?.focus({ preventScroll: true });
   }
 
   /** Middle mouse (any target), left+Space, or the sticky Pan toggle (`panMode`, the touch path) starts
