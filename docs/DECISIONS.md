@@ -16,6 +16,48 @@ Shards: [rendering](decisions/rendering.md) · [architecture](decisions/architec
 
 ---
 
+## 2026-07-19 — [DECIDED] Combat controls (mobile): movepad + auto-surfacing Melee/Bow cluster; facing-biased auto-target w/ highlight; telegraphed enemies; minimal HP bars; no dodge
+
+Movepad + auto-surfacing action cluster (Melee/Bow, room for spells); melee slows movement a lot / bow a little; facing-biased auto-target with highlighted target; telegraphed enemy wind-ups; minimal attention-scoped monster HP bars; kite instead of a dodge.
+
+→ [gameplay.md](decisions/gameplay.md#2026-07-19--decided-combat-controls-mobile-movepad--auto-surfacing-meleebow-cluster-facing-biased-auto-target-w-highlight-telegraphed-enemies-minimal-hp-bars-no-dodge)
+
+## 2026-07-19 — [DECIDED] Player combat is the "danger verb" — avoid it; push danger to traps/NPCs/ranged; melee most dangerous
+
+Personal combat is a fallback, not the main verb; risk gradient traps→NPCs→ranged/spells→melee; "good combat" = tense/exposed not power-fantasy; melee fragile+loud+telegraphed but free/emergency/early-only; ranged+spells post-MVP. Reframes ROADMAP step 1.
+
+→ [gameplay.md](decisions/gameplay.md#2026-07-19--decided-player-combat-is-the-danger-verb--avoid-it-push-danger-to-trapsnpcsranged-melee-most-dangerous)
+
+## 2026-07-19 — [DECIDED] MVP scope + build order (see ROADMAP.md)
+
+First-playable = smallest complete day→night→defend loop; order = map → combat rework → night wave + fire-heart defense → trap → hunger → NPC; campfire-heart stage 1 IN (mobs knock the light out; fuel + hunger retunes in); recruit-quests/crafting/torches/multi-fire/events/multi-map out.
+
+→ [gameplay.md](decisions/gameplay.md#2026-07-19--decided-mvp-scope--build-order-see-roadmapmd)
+
+## 2026-07-19 — [DECIDED] Daily narrative events + wave contract; time-driven escalation (progress = accelerant); endgame challenge valve
+
+Dawn = authored vignette + 2–4 mostly-deterministic choices carrying the wave contract (hints only for now); nightly wave is time-driven "keep up or die" with progress as accelerant; optional endgame challenges once you out-pace the curve.
+
+→ [gameplay.md](decisions/gameplay.md#2026-07-19--decided-daily-narrative-events--wave-contract-time-driven-escalation-progress--accelerant-endgame-challenge-valve)
+
+## 2026-07-19 — [DECIDED] Companion recruitment-as-quest + day/night hot-swap roles; torches as cheap perimeter lighting
+
+Recruitment via fetch-quest (first NPC: Litrandil the drunk wizard); companions hold a hot-swappable day-role + night-role; torches as a small refuelable light source complementing hearths.
+
+→ [gameplay.md](decisions/gameplay.md#2026-07-19--decided-companion-recruitment-as-quest--daynight-hot-swap-roles-torches-as-cheap-perimeter-lighting)
+
+## 2026-07-19 — [DECIDED] Crafting via hybrid stations gate; base claim = the campfire heart (lit area)
+
+Hybrid station tiering (distinct kinds + in-place upgrades) as the recipe gate that climbs with map-unlocks; base claim redefined as the fire's lit area, superseding the fixed base rect.
+
+→ [gameplay.md](decisions/gameplay.md#2026-07-19--decided-crafting-via-hybrid-stations-gate-base-claim--the-campfire-heart-lit-area)
+
+## 2026-07-19 — [DECIDED] Core-loop framing: three-horizon progression, hard-countdown-no-fallback dusk, progress-keyed escalation, pacing targets
+
+Nested progression (siege/growth/escape), no-fallback dusk + legibility/range costs, progress-keyed escalation, pacing targets; trap/wave/companion shapes captured as intent.
+
+→ [gameplay.md](decisions/gameplay.md#2026-07-19--decided-core-loop-framing-three-horizon-progression-hard-countdown-no-fallback-dusk-progress-keyed-escalation-pacing-targets)
+
 ## 2026-07-16 — [DECIDED] Node + buildable y-sort by base row via shared `rowDepthOffset`; optional `depthBias` for manual same-row node ordering (plan 029)
 
 Base-row y-sort for nodes/buildables via a shared `rowDepthOffset`; optional per-node `depthBias`.

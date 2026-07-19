@@ -6,6 +6,7 @@ surface stays lean — load the one leaf a task needs, not the whole set.
 ## Game & design
 
 - [GAME-DESIGN.md](GAME-DESIGN.md) — what the game *is*: premise, day/night loop, enemies, pillars, MVP slice
+- [ROADMAP.md](ROADMAP.md) — the ordered build path to a first playable MVP (scope locked; post-MVP deferred list)
 - [LORE.md](LORE.md) — intro story + real-Mostowo people/places/stories that theme the game
 - [GAME-MECHANICS.md](GAME-MECHANICS.md) — tuned mechanics & numbers (costs, fuel, radii, base zone)
 - [STATUS.md](STATUS.md) — current state of what's built, by subsystem (+ `plan NNN` refs into `plans/`)

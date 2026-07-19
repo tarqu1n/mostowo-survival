@@ -232,15 +232,17 @@ export const DEATH_HOLD_MS = 300;
  * looping continuously. TWILIGHT_MS is the length of the dusk/dawn cross-fade at each boundary —
  * kept short relative to DAY_MS/NIGHT_MS so full day and full night both read as distinct plateaus.
  */
-export const DAY_MS = 120_000;
-export const NIGHT_MS = 90_000;
+export const DAY_MS = 660_000; // 11 min — long, breathing day (leave → scavenge → return → prep)
+export const NIGHT_MS = 240_000; // 4 min — shorter, denser night
 export const TWILIGHT_MS = 8_000;
 /** Darkest the night tint gets (alpha of COLORS.night overlay) — never fully opaque so play stays visible. */
 export const NIGHT_MAX_ALPHA = 0.55;
 
 /**
- * Hunger (see systems/needs.ts). HUNGER_DRAIN_PER_SEC empties a full HUNGER_MAX in ~250s (~1.5
- * day/night cycles at current DAY_MS/NIGHT_MS) — tune by feel. While starving (hunger <= 0), the
+ * Hunger (see systems/needs.ts). HUNGER_DRAIN_PER_SEC empties a full HUNGER_MAX in ~250s — ~0.28 of a
+ * full day/night cycle (900s at DAY_MS 660s + NIGHT_MS 240s), i.e. you'd starve well within one day.
+ * NOTE: this drain was tuned against the old ~210s cycle; retune by feel now the cycle is ~4x longer.
+ * While starving (hunger <= 0), the
  * player takes STARVE_DAMAGE every STARVE_DAMAGE_INTERVAL_MS (1 HP / 2s).
  *
  * `HUNGER_LOW_FRACTION` is the "near-empty" cutoff (fraction of HUNGER_MAX): below it the HUD hunger
@@ -280,8 +282,10 @@ export const BASE_ZONE_SIZE = { w: 21, h: 27 };
 
 /**
  * Campfire fuel (see plan 014 Context & decisions). The fire is always burning once built, draining
- * fuel continuously at `CAMPFIRE_FUEL_BURN_PER_SEC` — a full tank (`CAMPFIRE_FUEL_MAX`) lasts ~120s,
- * deliberately short of a full day/night cycle (DAY_MS + NIGHT_MS = 210s) so upkeep stays a pressure.
+ * fuel continuously at `CAMPFIRE_FUEL_BURN_PER_SEC` — a full tank (`CAMPFIRE_FUEL_MAX`) lasts ~120s.
+ * NOTE: originally sized "deliberately short of a full cycle" when that cycle was 210s; the cycle is
+ * now 900s (DAY_MS 660s + NIGHT_MS 240s), so a full tank now covers only ~13% of a cycle and needs
+ * ~7 refuels per cycle — likely too punishing. Retune CAMPFIRE_FUEL_MAX / burn rate by feel.
  * Refuelled by feeding wood: each unit adds `CAMPFIRE_FUEL_PER_WOOD` fuel (4 wood refuels an empty
  * fire). Starts full on completion.
  */

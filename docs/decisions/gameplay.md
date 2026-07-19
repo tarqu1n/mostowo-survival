@@ -6,6 +6,196 @@ Part of the [decision log index](../DECISIONS.md). Newest first.
 
 ---
 
+## 2026-07-19 — [DECIDED] Combat controls (mobile): movepad + auto-surfacing Melee/Bow cluster; facing-biased auto-target w/ highlight; telegraphed enemies; minimal HP bars; no dodge
+
+Settles the fighting controls (ROADMAP step 1); full write-up in
+[GAME-DESIGN.md](../GAME-DESIGN.md#fighting-controls-mobile).
+
+- **Layout:** left-thumb movepad (move + facing) + a right-thumb **action cluster** (Melee + Bow in MVP,
+  **designed to grow** — a Spell slot post-MVP; dodge if ever added).
+- **Controls auto-surface** when a threat is near / at night — no manual mode toggle to fumble mid-wave
+  (a likely source of the current clunk). Command-mode resumes when safe.
+- **Movement-while-attacking is the risk lever:** melee slows you **significantly but never stops**
+  (`ATTACK_MOVE_SLOW`); bow slows you **only a little** (kite-able). This is where "ranged is safer" lives.
+- **Bow = facing-biased auto-target-nearest**, no manual aim; the current target is **highlighted**
+  (marker/outline, can reuse baked-glow tech); face to switch, tap to loose.
+- **Enemy attacks telegraphed** — a readable wind-up (coded tween + pose/flash for the strip-less
+  skeleton) before the strike; makes melee a fair reaction game, retires the contact-damage clunk.
+- **Monster HP: minimal, attention-scoped** — targeted enemy shows its bar persistently; others show a
+  brief on-hit bar that fades; thin/colour-only; cap the count rendered; backed by sprite feedback
+  (hit-flash + stagger/near-death tell). Chosen to avoid mobile clutter.
+- **No dedicated dodge in MVP** — kiting (bow) + spacing is the survivability skill; melee stays raw.
+  Revisit only if melee emergencies feel unfair; the cluster leaves room.
+
+## 2026-07-19 — [DECIDED] Player combat is the "danger verb" — avoid it; push danger to traps/NPCs/ranged; melee most dangerous
+
+Design thesis steering the combat rework (ROADMAP step 1). Player combat is a **fallback, not the main
+verb** — you should want to avoid fighting in person.
+
+- **Risk gradient (safest → riskiest for the player):** traps → NPCs → ranged/spells → melee. The combat
+  economy is pushing danger off your own body.
+- **"Good combat feel" = tense / exposed / relieved-to-escape, NOT a power fantasy** — reframes step 1's
+  success criteria away from the satisfying-brawler default.
+- **Melee is deliberately dangerous:** player fragile (a few hits kill), being surrounded = death, enemy
+  attacks telegraphed (the skeleton's *missing* attack is the core clunk), and fighting is **loud**
+  (pulls roamers; traps are silent → doubly better).
+- **Melee keeps a niche:** free (no ammo/mana), the emergency button, and the only early option — so the
+  first ranged weapon/spell is the first real relief/power step, and early-night risk pushes you to get it.
+- **Ranged = ammo-gated (scavenge/craft), auto-target-nearest on mobile (skill = positioning); spells =
+  mana + rarity-gated AoE/utility, Litrandil's domain.** Both post-MVP.
+- **MVP combat = melee + a basic bow** (decided 2026-07-19; the bow adds an arrows/ammo resource +
+  auto-target-nearest aiming, and can move-while-shooting where melee roots you). Fighting **controls**
+  (mobile) are the next thing to design; the player-survivability choice (dodge/backstep vs
+  positioning+fragility vs block) falls out of the control scheme, so it's deferred to that.
+  **[OPEN]** player-casts-spells vs wizard-NPC-only (post-MVP).
+
+## 2026-07-19 — [DECIDED] MVP scope + build order (see ROADMAP.md)
+
+The first-playable target and the order to build it, captured in [ROADMAP.md](../ROADMAP.md). Key calls:
+
+- **MVP = the smallest complete, fun day→night→defend loop**, mostly completing/de-clunking built
+  machinery rather than new systems.
+- **Build order (dependency + risk sequenced):** 0 MVP arena map → 1 combat feel rework (player +
+  skeleton attack/AI) → 2 night wave + campfire-defense + loop-close (first playable) → 3 one trap →
+  4 hunger live → 5 one NPC. Rationale: combat is the reused verb (de-risk first); the night wave is the
+  riskiest missing piece and earliest loop-feel (promoted above "buildings"); the trap comes *after* the
+  wave so it's tuned against real wave pathing; the NPC is most composite (reuses everything).
+- **Campfire-heart is IN the MVP (stage 1):** the single central fire's **lit radius is the base/claim**
+  (replaces the fixed base rect). Mobs **target the fire to knock the light out** — attacks reduce its
+  light/integrity, fuel sustains it. **Defend target = the fire's light AND the player**; lose = fire
+  knocked out OR player dead. *(Open: instant-loss vs relight-to-recover — lean instant-loss for MVP.)*
+  **Consequence: the campfire-fuel retune is now ON the MVP path** (fire is load-bearing) — reverses an
+  earlier draft of this entry that kept the fixed rect + deferred the retune.
+- **Hunger is IN the MVP loop** (chosen over deferring): reuses the built needs/eat systems — author food
+  on the map + flip `HUNGER_LETHAL` + retune drain to the 15-min cycle.
+- **NPC recruitment skipped for MVP** — spawn a companion directly; Litrandil's quest is post-MVP.
+- **Explicitly OUT of MVP:** crafting stations, recruit quests, campfire-heart *extensions* (multiple
+  hearths, walls extending the claim, torches — MVP has only the single central hearth), narrative events
+  + structured wave contract, multi-map/fast-travel, richer enemy roster.
+
+## 2026-07-19 — [DECIDED] Daily narrative events + wave contract; time-driven escalation (progress = accelerant); endgame challenge valve
+
+Designs the dawn beat and refines the escalation model.
+
+- **Escalation is time-driven — "keep up or die" — with progress as the accelerant** (refines the
+  progress-keyed framing in the core-loop entry below). The nightly *base* wave hardens on a schedule;
+  pushing into new maps throws nastier types into the pool, speeding the ramp. Fair because the base
+  wave is predictable, telegraphed (the contract), and faced from home — you die from not keeping pace,
+  not a dice roll. The "no unfair death" concern applies to *roaming* danger while scavenging out, a
+  distinct threat from the predictable base wave.
+- **Endgame valve:** once you've out-paced the curve, optional authored challenges open up (hunt a
+  named beast, clear a haunted location, arena/boss/timed fights) for rare mats/blueprints/lore/recruits
+  — stops a stabilised settlement fizzling; feeds the escape arc.
+- **Daily narrative events:** each dawn = a short authored vignette + 2–4 choices, weighted draw from a
+  state-gated pool (day count / maps / NPCs / prior choices), one-shot + repeatable; types = threat-
+  foreshadow / opportunity / encounter / pressure / story; consequences carry into day + night.
+- **Event outcomes are mostly deterministic with occasional explicit gambles** (chosen over fully
+  deterministic or chance-based) — a choice is a decision not a dice roll, fair under no-fallback, with
+  spice.
+- **The wave contract is delivered via the dawn event; hints only for now** (custom call, not the full
+  invest-for-clarity system): atmospheric foreshadowing ("lights in the north woods" ≈ big/north), not
+  a stat readout. The structured version (scale/composition/direction/modifier on a HUD card, fidelity
+  sharpened by scout/watchtower/wizard-divination) is deferred.
+
+## 2026-07-19 — [DECIDED] Companion recruitment-as-quest + day/night hot-swap roles; torches as cheap perimeter lighting
+
+Concrete companion + lighting mechanics (design direction; first named NPC → LORE.md).
+
+- **Recruitment is per-character, first pattern is a fetch-and-deliver quest:** talk → accept → gather/
+  craft the ask → deliver → join. First NPC: **Litrandil the drunk wizard** (wants cigarettes + vodka).
+  His ask doubles as a crafting-chain example — cigs crafted from tobacco (forageable plant node) +
+  paper (scavenged loot); vodka scavenged/found. Character + quest live in
+  [LORE.md](../LORE.md#litrandil-the-drunk-wizard).
+- **Companion assignment = a day-role AND a night-role, hot-swappable any time.** Day roles are
+  worker-queue tasks (arm/re-arm traps, cook, gather, operate a station); night roles are defense
+  postures (feed fires/torches, hold a named wall segment, or follow as a mobile squad). Reuses the
+  worker task queue (day) + the hold-segment posture (night) — supersedes the vaguer "night posture"
+  sketch in the core-loop framing entry below.
+- **Torches: a small-radius, refuelable light source (own buildable)** complementing campfire hearths
+  under the base-claim model — hearths anchor the claim, torches cheaply light walls/perimeter/gaps.
+  Both are what companions keep lit at night (fire-tending role).
+- **[OPEN]** whether an NPC's recruitment desire (Litrandil's vodka/cigs) is a one-time entry price or
+  an ongoing upkeep/morale need. Ongoing → morale economy; one-time → clean gate. Deferred.
+
+## 2026-07-19 — [DECIDED] Crafting via hybrid stations gate; base claim = the campfire heart (lit area)
+
+Two greenfield systems given shape (design direction; firm into systems at plan time). Both fold the
+four pillars into single objects and reuse built machinery.
+
+**Crafting-station progression — hybrid tiering** (chosen over distinct-only or upgrade-only):
+
+- **Stations are buildables** (reuse `BUILDABLES`/`BuildManager`/palette). A recipe declares the station
+  (+ tier) it needs; the crafting UI shows only recipes whose station is present — unmet recipes are
+  **invisible**, so the gate *is* the progression.
+- **Hybrid tiering:** distinct station *kinds* (workbench → forge → alchemy/arcane), each unlocking a
+  recipe band, **and** each upgradeable a level or two in place. Distinct kinds = visible in-base
+  progression; in-place upgrades = depth without a station per tier.
+- **The tree reaches across maps** — higher stations/upgrades need lower-station outputs + materials only
+  found on not-yet-unlocked maps, so the crafting tree and the map-unlock spine are the same climb
+  (pushing outward raises the night ceiling).
+- **Crafting is a queued station task**, not instant (matches the harvest/refuel "work reads as work"
+  pattern) — a worker/companion crafts over `craftMs`, giving companions a day job beyond gathering
+  (a mature base = a production line).
+- **Blueprint discovery** is an optional second gate: some recipes must be *found* (exploration / dawn
+  event), pacing reveals independently of resources.
+- Cost: stations take base space inside the fireline — crafting depth is paid in defensibility.
+- Data shape to firm at plan time: `Recipe { inputs, output, station, stationTier?, craftMs, blueprintId? }`.
+
+**Base claim = the campfire heart** (chosen over walls-enclosure or a fire-seeds-walls-extend hybrid):
+
+- **Your base is everywhere your fire's light reaches** — replaces the placeholder fixed base rect
+  (`BASE_ZONE_SIZE`, plan 018 A8). Reuses the built campfire light/vision/fuel (`CampfireManager`,
+  `lightSources()`, fuel-scaled radius).
+- **Claim = lit area** grants base-storage auto-access ("being in the light" ⇒ "being home"),
+  buildable/station placement, and vision.
+- **Expansion is costed** — bigger/second fire = bigger claim = more room BUT more fuel drain + more
+  perimeter to defend (a running cost + a defense cost, not just a build price).
+- **The dark reclaims ground** — a fire out at night = that area goes dark = enemies pour through the
+  unlit gap; night refuelling is a live defensive task (companion job). **Resolves plan 012's deferred
+  enemy fog-gating**: enemies hidden in darkness, revealed in light — partner to the treeline night wave.
+- **Knock-on:** fuel now governs the whole claim, so the campfire fuel numbers (already flagged mis-tuned
+  for the 15-min cycle) become critical to retune — no longer optional.
+- **Staging:** (1) base zone = central hearth radius replacing the rect; (2) multiple fires union claims;
+  (3) walls shape/extend the boundary while fire-connected.
+
+## 2026-07-19 — [DECIDED] Core-loop framing: three-horizon progression, hard-countdown-no-fallback dusk, progress-keyed escalation, pacing targets
+
+A brainstorm pass that pinned the connective tissue the design doc was missing (the *why do I play
+tomorrow?* layer). Framing calls decided; the detailed trap/wave/companion *shapes* are captured as
+design intent in [GAME-DESIGN.md](../GAME-DESIGN.md), to firm into systems at plan time.
+
+- **Progression is three nested time horizons that reinforce, not compete** (Matt chose all three):
+  **tonight** = escalating siege ("can I hold this wave?"); **this stretch of days** = settlement
+  growth ("is my camp outgrowing the nights?"); **the campaign** = map-unlock/escape ("can I get
+  out?"). Growth is driven by the siege; map-pushes are driven by growth; each new map is fresh
+  scavenging *and* raises the night ceiling. The escape story is the finish line the growth-sandbox
+  and pure-siege spines don't provide alone.
+- **Dusk is a hard countdown with NO fallback** (chosen over a rough-camp fallback or path-locking):
+  caught away from a defensible position at nightfall is a desperate scramble with a real chance of
+  death — the game's emotional spine. Accepted cost: this makes two things non-negotiable, or it reads
+  as unfair — (1) **the day must be legible** (always know daylight-left *and* can-I-get-home), and
+  (2) **range must scale both ways** (fast travel that takes you far must return you fast; car/boat are
+  the dusk lifeline, and a cut-off travel node is a "stranded at night" beat).
+- **The escalation curve keys off player progress (what's unlocked / how far pushed), not just the day
+  counter.** Forced by "no fallback": a purely time-based spike night + a far-scavenge run = an
+  unavoidable death (unfair). Progress-keyed escalation keeps difficulty something the player chose into.
+  *(Refined 2026-07-19 — see the narrative-events/wave-contract entry above: the nightly **base** wave
+  IS time-driven ("keep up or die") with progress as an accelerant; it's fair because it's predictable +
+  telegraphed + faced from home. This "no unfair death" point stands for **roaming** danger while
+  scavenging out, which is the threat that mustn't spike arbitrarily.)*
+- **The base phase is NOT a separate timed phase** — fortify/craft shares the same daylight budget as
+  scavenging, so prep vs. explore is a live opportunity-cost decision (the day's core trade).
+- **Pacing targets (config-tunable, no new architecture over plan 004's clock):** day long & breathing
+  ~6–10 min, night short & dense ~3–5 min, full cycle ~10–15 min; **dawn** is the pause/save seam;
+  travel time is the pressure that makes fast travel's real job "buying daylight back."
+
+Design intent captured in GAME-DESIGN.md (not yet decided-in-detail): the **night wave** as a
+three-beat shape (pressure ramp → push, with fight-noise pulling roaming aggro → lull-is-a-trap) with
+composition (not just count) escalating from a treeline direction and a dawn "wave contract";
+**traps** as multipliers on walls (funnel-and-line a kill-channel), re-armed by a daily worker order,
+paid from scarce day inputs; **companions** as a labour/mouths/muscle triangle with night-defense
+postures, one trait axis to start, permadeath, and a weaken-before-death starvation warning.
+
 ## 2026-07-14 — [DECIDED] Campfire fixes (plan 016): refuel is a worker order, flame scales (not sheet-swaps), outline is a rect
 
 Post-playtest fixes to the plan-012 campfire. Four boundary calls (advisor-consulted before build):
