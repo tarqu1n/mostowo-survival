@@ -57,7 +57,47 @@
     {
       "id": "palette_0002",
       "name": "Palette 2",
-      "slots": []
+      "slots": [
+        {
+          "assetId": "pixel-crawler/Environment/Tilesets/Water_tiles.png#2"
+        },
+        {
+          "assetId": "pixel-crawler/Environment/Tilesets/Water_tiles.png#54"
+        },
+        {
+          "assetId": "pixel-crawler/Environment/Tilesets/Water_tiles.png#102"
+        },
+        {
+          "assetId": "pixel-crawler/Environment/Tilesets/Water_tiles.png#50"
+        },
+        {
+          "assetId": "pixel-crawler/Environment/Tilesets/Water_tiles.png#80"
+        },
+        {
+          "assetId": "pixel-crawler/Environment/Tilesets/Water_tiles.png#103"
+        },
+        {
+          "assetId": "pixel-crawler/Environment/Tilesets/Water_tiles.png#29"
+        },
+        {
+          "assetId": "pixel-crawler/Environment/Tilesets/Water_tiles.png#1"
+        },
+        {
+          "assetId": "pixel-crawler/Environment/Tilesets/Water_tiles.png#101"
+        },
+        {
+          "assetId": "pixel-crawler/Environment/Tilesets/Water_tiles.png#26"
+        },
+        {
+          "assetId": "pixel-crawler/Environment/Tilesets/Water_tiles.png#78"
+        },
+        {
+          "assetId": "pixel-crawler/Environment/Tilesets/Water_tiles.png#28"
+        },
+        {
+          "assetId": "pixel-crawler/Environment/Tilesets/Water_tiles.png#76"
+        }
+      ]
     }
   ]
 }
