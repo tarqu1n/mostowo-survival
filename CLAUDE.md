@@ -51,8 +51,9 @@ swap, a three-tier test harness, a first day/night + hunger survival slice, and 
 swappable weapons system have all landed. **Full feature/plan history:**
 [docs/STATUS.md](docs/STATUS.md).
 
-**Next:** enemy night-waves + the equipment queue — see [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md)
-MVP slice; [docs/DECISIONS.md](docs/DECISIONS.md) for settled vs open.
+**Next:** the ordered path to a first playable MVP is in [docs/ROADMAP.md](docs/ROADMAP.md) (combat
+rework → night wave + campfire defense → trap → hunger → NPC). Full vision in
+[docs/GAME-DESIGN.md](docs/GAME-DESIGN.md); [docs/DECISIONS.md](docs/DECISIONS.md) for settled vs open.
 
 ## The game in one line
 

@@ -6,6 +6,26 @@ Part of the [decision log index](../DECISIONS.md). Newest first.
 
 ---
 
+## 2026-07-19 — [DECIDED] MVP scope + build order (see ROADMAP.md)
+
+The first-playable target and the order to build it, captured in [ROADMAP.md](../ROADMAP.md). Key calls:
+
+- **MVP = the smallest complete, fun day→night→defend loop**, mostly completing/de-clunking built
+  machinery rather than new systems.
+- **Build order (dependency + risk sequenced):** 0 MVP arena map → 1 combat feel rework (player +
+  skeleton attack/AI) → 2 night wave + campfire-defense + loop-close (first playable) → 3 one trap →
+  4 hunger live → 5 one NPC. Rationale: combat is the reused verb (de-risk first); the night wave is the
+  riskiest missing piece and earliest loop-feel (promoted above "buildings"); the trap comes *after* the
+  wave so it's tuned against real wave pathing; the NPC is most composite (reuses everything).
+- **Defend target = the campfire AND the player** (chosen over just-survive): campfire gains HP + becomes
+  an enemy target; lose = player dead OR campfire destroyed. Still keep the **fixed base rect** (the
+  campfire-heart claim is post-MVP), so **no fuel retune needed** for MVP.
+- **Hunger is IN the MVP loop** (chosen over deferring): reuses the built needs/eat systems — author food
+  on the map + flip `HUNGER_LETHAL` + retune drain to the 15-min cycle.
+- **NPC recruitment skipped for MVP** — spawn a companion directly; Litrandil's quest is post-MVP.
+- **Explicitly OUT of MVP:** crafting stations, recruit quests, campfire-heart claim + torches + fuel
+  retune, narrative events + structured wave contract, multi-map/fast-travel, richer enemy roster.
+
 ## 2026-07-19 — [DECIDED] Daily narrative events + wave contract; time-driven escalation (progress = accelerant); endgame challenge valve
 
 Designs the dawn beat and refines the escalation model.
