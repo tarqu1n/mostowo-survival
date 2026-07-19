@@ -178,9 +178,18 @@ function CenterPane() {
               </div>
             );
           }
+          // Object-editor tab panels are UNMOUNTED while inactive (unlike Map/World/NodeTypes, which
+          // stay mounted). Each `RegionsEditor` decodes the whole sheet into a retained alpha
+          // `Uint8Array` (for double-click auto-detect) and registers window key + resize + wheel
+          // listeners; object tabs are per-asset, so keeping every one a user reclassifies mounted for
+          // the app's lifetime piled those buffers up until the tab ran out of memory and crashed.
+          // Re-mounting on re-activation re-decodes the alpha and re-seeds boxes from the (saved)
+          // catalog cheaply — only UNSAVED box edits are dropped on switch-away, an acceptable trade
+          // vs. the crash. The display:none-collapses-the-Phaser-canvas reason to stay mounted is
+          // Map-tab-only, so it doesn't apply here.
           return (
             <div key={tab.id} className={panelClass}>
-              <ObjectEditorTab assetId={tab.assetId} />
+              {!hidden && <ObjectEditorTab assetId={tab.assetId} />}
             </div>
           );
         })}
