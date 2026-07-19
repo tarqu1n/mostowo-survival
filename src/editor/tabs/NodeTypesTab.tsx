@@ -259,7 +259,9 @@ interface StatsDraft {
   maxHpText: string;
   yieldItemId: string;
   yieldPerHitText: string;
-  regrowMsText: string;
+  /** Regrow delay authored in MINUTES (the stored def field is `regrowMs`); converted at the
+   *  draft⇄def seam so the input reads in a human unit while the data model stays milliseconds. */
+  regrowMinText: string;
   blocksPath: boolean;
   harvestAnim: HarvestAnimOption;
   colorHex: string;
@@ -275,7 +277,7 @@ function draftOf(def: AuthoredNodeDef): StatsDraft {
     maxHpText: String(def.maxHp),
     yieldItemId: def.yieldItemId,
     yieldPerHitText: String(def.yieldPerHit),
-    regrowMsText: String(def.regrowMs),
+    regrowMinText: String(def.regrowMs / 60000),
     blocksPath: def.blocksPath,
     harvestAnim: def.harvestAnim ?? '',
     colorHex: colorToHex(def.color),
@@ -296,7 +298,9 @@ function draftToPatch(d: StatsDraft): Partial<Omit<AuthoredNodeDef, 'id' | 'skin
     maxHp: Number(d.maxHpText),
     yieldItemId: d.yieldItemId,
     yieldPerHit: Number(d.yieldPerHitText),
-    regrowMs: Number(d.regrowMsText),
+    // Minutes → ms for the stored def. A mid-edit non-number (e.g. a lone "-") yields NaN and flows
+    // straight to `validateNodeDefPatch` as a normal inline error, same as the other numeric fields.
+    regrowMs: Math.round(Number(d.regrowMinText) * 60000),
     blocksPath: d.blocksPath,
     harvestAnim: d.harvestAnim === '' ? undefined : d.harvestAnim,
     color: hexToColor(d.colorHex),
@@ -313,7 +317,7 @@ function statsEqual(a: StatsDraft, b: StatsDraft): boolean {
     a.maxHpText === b.maxHpText &&
     a.yieldItemId === b.yieldItemId &&
     a.yieldPerHitText === b.yieldPerHitText &&
-    a.regrowMsText === b.regrowMsText &&
+    a.regrowMinText === b.regrowMinText &&
     a.blocksPath === b.blocksPath &&
     a.harvestAnim === b.harvestAnim &&
     a.colorHex === b.colorHex &&
@@ -389,12 +393,13 @@ function NodeStatsForm({ def, allDefs }: { def: AuthoredNodeDef; allDefs: Author
           />
         </div>
         <div className={cn(fieldClass, 'flex-1')}>
-          <Label className={fieldLabelClass}>Regrow (ms)</Label>
+          <Label className={fieldLabelClass}>Regrow (min)</Label>
           <Input
             type="number"
+            step="any"
             className={fieldInputClass}
-            value={draft.regrowMsText}
-            onChange={(e) => set('regrowMsText', e.target.value)}
+            value={draft.regrowMinText}
+            onChange={(e) => set('regrowMinText', e.target.value)}
           />
         </div>
       </div>
