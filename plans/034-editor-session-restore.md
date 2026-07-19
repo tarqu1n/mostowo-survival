@@ -125,7 +125,8 @@ tooling, not game content — no conflict with the MVP roadmap.
   - Done when: the six functions + two types export; `npm test` passes `sessionStore.test.ts`;
     lint/typecheck clean.
 
-- [ ] **Step 2: `EditorScene` — camera restore-on-build + scene-owned persist-on-settle** `[inline]`
+- [x] **Step 2: `EditorScene` — camera restore-on-build + scene-owned persist-on-settle** `[inline]`
+  - Outcome: edited `src/editor/EditorScene.ts`. Imported `getCamera`/`putCamera` from `./sessionStore`. `buildScene` now calls new `restoreOrFitCamera(map)` instead of `fitCamera(map)`: reads `getCamera(mapId)`, applies saved zoom/scroll (clamped) over shared bounds, else fits. Extracted `setCameraBounds(map)` helper shared by `fitCamera` + restore (keeps the `setBounds` that scroll-clamping needs). Added `persistCamera()` (`putCamera` with `Math.round(zoom)`), wired into all four USER settle sites — reverified against live code: `handleWheel` end, `zoomByStep` end, pinch/two-finger end (`this.gesture = null` in `handlePointerUp`, ~:2103), and pan release (`dispatchToolPointerUp` `panning` branch, ~:2123 — NOT the per-frame `handlePointerMove` scroll at ~:1988 as the plan's ref implied). No store changes. Acceptance: `tsc --noEmit` clean; eslint 0 errors (5 pre-existing unbound-method warnings unchanged); full suite 777/777 pass. Behavioural camera check deferred to live (restore only reachable after steps 3–4).
   - In `src/editor/EditorScene.ts`, import `getCamera`, `putCamera` (and `type CameraState`) from
     `./sessionStore`, and `useEditorStore`.
   - **Restore-or-fit** in `buildScene` (`:536-547`): replace the unconditional `fitCamera(map)` (`:541`)

@@ -16,6 +16,7 @@ import { worldToTile, snapToTileCenter } from '../systems/grid';
 import { useEditorStore, type PaintMode, type UnderlayState } from './store/editorStore';
 import { parseAssetId, tilesetAssetUrl } from './textureLoading';
 import { getMap } from './api';
+import { getCamera, putCamera } from './sessionStore';
 import { computeGhostStripCells, ghostBoundingBox, type GhostCell } from './worldViewOps';
 import { queueDecorTexture, resolveDecorDraw } from '../render/decorSprites';
 import { objectFootprintCells } from './objectOps';
@@ -538,7 +539,7 @@ export class EditorScene extends Phaser.Scene {
     this.placeObjects(map);
     this.redrawOverlays();
     this.applyLayerVisibility();
-    this.fitCamera(map);
+    this.restoreOrFitCamera(map);
     // A reopen/reload re-derives the neighbour ghost strips from the current world layout (step 9).
     void this.refreshGhosts();
     // …and the reference underlay from persisted per-map settings (plan 022). Handles the case where
@@ -1550,15 +1551,52 @@ export class EditorScene extends Phaser.Scene {
 
   // ---- Camera ----
 
+  /** Set the pannable camera bounds for `map` (the fit margin included). Shared by `fitCamera` and the
+   *  restore branch — scroll clamping depends on these bounds, so a restored camera must set them too. */
+  private setCameraBounds(map: MapFile): void {
+    const widthPx = map.meta.width * TILE_SIZE;
+    const heightPx = map.meta.height * TILE_SIZE;
+    const margin = PAN_MARGIN_TILES * TILE_SIZE;
+    this.cameras.main.setBounds(-margin, -margin, widthPx + margin * 2, heightPx + margin * 2);
+  }
+
   private fitCamera(map: MapFile): void {
     const cam = this.cameras.main;
     const widthPx = map.meta.width * TILE_SIZE;
     const heightPx = map.meta.height * TILE_SIZE;
-    const margin = PAN_MARGIN_TILES * TILE_SIZE;
-    cam.setBounds(-margin, -margin, widthPx + margin * 2, heightPx + margin * 2);
+    this.setCameraBounds(map);
     const fit = Math.min(this.scale.width / widthPx, this.scale.height / heightPx);
     cam.setZoom(Phaser.Math.Clamp(Math.floor(fit) || MIN_ZOOM, MIN_ZOOM, MAX_ZOOM));
     cam.centerOn(widthPx / 2, heightPx / 2);
+  }
+
+  /** Restore the open map's saved camera (plan 034) if one exists, else fit-to-map. The restore branch
+   *  keeps the same bounds `fitCamera` sets (Phaser clamps the restored scroll to them) and only
+   *  overrides zoom/scroll. This is the ONLY camera *read* site, and it must NOT persist — a
+   *  programmatic camera set is not a user settle, so there is no feedback loop into `putCamera`. A map
+   *  with no saved camera (brand-new, or never panned) deterministically re-fits on every load. */
+  private restoreOrFitCamera(map: MapFile): void {
+    const mapId = useEditorStore.getState().mapId;
+    const saved = mapId ? getCamera(mapId) : null;
+    if (!saved) {
+      this.fitCamera(map);
+      return;
+    }
+    const cam = this.cameras.main;
+    this.setCameraBounds(map);
+    cam.setZoom(Phaser.Math.Clamp(saved.zoom, MIN_ZOOM, MAX_ZOOM));
+    cam.setScroll(saved.scrollX, saved.scrollY);
+  }
+
+  /** Persist the open map's current camera (plan 034), keyed by map id. Called only at a USER
+   *  camera-gesture *settle* (pan / wheel / step-zoom / pinch end) — never per move-frame and never
+   *  from a programmatic move (`fitCamera`/`restoreOrFitCamera`), so the saved value is always a
+   *  place the user actually left the view. Zoom is rounded to honour the integer-zoom invariant. */
+  private persistCamera(): void {
+    const mapId = useEditorStore.getState().mapId;
+    if (!mapId) return;
+    const c = this.cameras.main;
+    putCamera(mapId, { scrollX: c.scrollX, scrollY: c.scrollY, zoom: Math.round(c.zoom) });
   }
 
   private handleWheel(
@@ -1573,6 +1611,7 @@ export class EditorScene extends Phaser.Scene {
       MAX_ZOOM,
     );
     this.zoomAnchored(next, pointer.x, pointer.y);
+    this.persistCamera();
     this.updateHover(pointer);
   }
 
@@ -1583,6 +1622,7 @@ export class EditorScene extends Phaser.Scene {
   private zoomByStep(delta: number): void {
     const next = Phaser.Math.Clamp(Math.round(this.cameras.main.zoom) + delta, MIN_ZOOM, MAX_ZOOM);
     this.zoomAnchored(next, this.scale.width / 2, this.scale.height / 2);
+    this.persistCamera();
   }
 
   /**
@@ -2101,6 +2141,8 @@ export class EditorScene extends Phaser.Scene {
         return;
       }
       this.gesture = null;
+      // Pinch/two-finger zoom just ended (the primary mobile zoom) — persist the settled camera.
+      this.persistCamera();
     } else {
       this.dispatchToolPointerUp(pointer);
     }
@@ -2122,6 +2164,7 @@ export class EditorScene extends Phaser.Scene {
   private dispatchToolPointerUp(pointer: Phaser.Input.Pointer): void {
     if (this.panning) {
       this.panning = false;
+      this.persistCamera();
       this.setCursor(this.spaceDown ? 'grab' : this.desiredIdleCursor());
       return;
     }
