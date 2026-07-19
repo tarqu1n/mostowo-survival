@@ -217,7 +217,8 @@ tooling, not game content — no conflict with the MVP roadmap.
     tool/validated-layer/active-tab; simulating `visibilitychange`→hidden flushes the `last` record; a
     deliberate Close map → reload lands on the empty state.
 
-- [ ] **Step 5: rename + delete key migration** `[inline]`
+- [x] **Step 5: rename + delete key migration** `[inline]`
+  - Outcome: edited `src/editor/store/editorStore.ts`. Imported `getCamera`/`putCamera`/`clearCamera`/`getLast`/`putLast` from `../sessionStore`. In `renameMapState` (impl at :2352), added a migration block inside the existing `if (idChanged && oldId)` guard, mirroring the library view-state block: `getCamera(oldId)` → `putCamera(newId, …)` → `clearCamera(oldId)`, and `if (getLast()?.mapId === oldId) putLast({ ...last, mapId: newId })`. **Deviation (delete path):** the plan assumed a standalone map-delete affordance, but none exists — the only `deleteMap` caller is the rename flow's old-file cleanup (`EditMapDialog.tsx:131`), where `renameMapState` has *already* cleared `camera:<oldId>` and repointed `last`, so adding `clearCamera`/`clearLast` there would be redundant (camera) or actively wrong (`clearLast` would drop the now-correct newId pointer). Out-of-band deletion self-heals via the boot `getMap`-404 → `clearLast` path (Step 3). Nothing wired for delete. Acceptance: `tsc` clean, eslint clean, 777/777 tests pass (store-level migration test added in Step 6).
   - `renameMapState` (`editorStore.ts:678-689`) already migrates the underlay + library keys on an id
     change; in the id-changed branch add the camera key: `const cam = getCamera(oldId); if (cam)
     putCamera(newId, cam); clearCamera(oldId);` and repoint the session pointer if it named the old id:

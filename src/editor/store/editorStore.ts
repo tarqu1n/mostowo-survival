@@ -89,6 +89,7 @@ import {
   type LibraryBrowseState,
   type RecentEntry,
 } from '../libraryViewStore';
+import { getCamera, putCamera, clearCamera, getLast, putLast } from '../sessionStore';
 import type { AssetCatalog, CatalogAssetRole } from '../catalog';
 import type { TerrainCatalog, TerrainDef } from '../terrainCatalog';
 import { parseAssetId } from '../textureLoading';
@@ -2381,6 +2382,17 @@ export const useEditorStore = create<EditorState>()(
           putBrowse(newId, { ...browse, search: '' });
           deleteBrowse(oldId);
         }
+      }
+
+      // Session-restore key migration (plan 034), same shape as above: move the per-map camera to the
+      // new id, and repoint the boot-resume pointer if it named the old id (layer ids are unchanged by
+      // a rename, so `last.activeLayerId` stays valid). Only on an id change.
+      if (idChanged && oldId) {
+        const cam = getCamera(oldId);
+        if (cam) putCamera(newId, cam);
+        clearCamera(oldId);
+        const last = getLast();
+        if (last?.mapId === oldId) putLast({ ...last, mapId: newId });
       }
 
       // World placement migration: rewrite the matching placement's mapId in place (mirrors
