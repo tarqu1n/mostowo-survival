@@ -489,6 +489,7 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on('build:select', this.onBuildSelect, this);
     this.game.events.on('tasks:cancel', this.cancelAll, this);
     this.game.events.on('debug:randomise', this.randomiseWorld, this); // dev menu: scatter nodes + enemies
+    this.game.events.on('debug:spawnEnemy', this.spawnEnemyNearPlayer, this); // dev menu: drop one enemy by the player to fight
     this.game.events.on('debug:toggleTime', this.survivalClock.toggleDayNight, this.survivalClock); // dev menu: flip day/night
     this.game.events.on('zoom:delta', this.pointerInput.adjustZoom, this.pointerInput);
     this.game.events.on('camera:center', this.pointerInput.centerOnPlayer, this.pointerInput);
@@ -505,6 +506,7 @@ export class GameScene extends Phaser.Scene {
       this.game.events.off('build:select', this.onBuildSelect, this);
       this.game.events.off('tasks:cancel', this.cancelAll, this);
       this.game.events.off('debug:randomise', this.randomiseWorld, this);
+      this.game.events.off('debug:spawnEnemy', this.spawnEnemyNearPlayer, this);
       this.game.events.off(
         'debug:toggleTime',
         this.survivalClock.toggleDayNight,
@@ -1173,6 +1175,38 @@ export class GameScene extends Phaser.Scene {
       const tile = pickTile(6); // keep enemies clear of the player's tile
       if (!tile) break;
       this.enemyManager.addEnemy('kidZombie', tile.col, tile.row);
+    }
+  }
+
+  /**
+   * Dev menu: drop a single enemy right beside the player so there's always something to fight-test
+   * on demand — the quick counterpart to Randomise's scatter. Scans outward in Chebyshev rings from
+   * the player's tile (starting at distance 2, so it never lands on or directly touching the player)
+   * up to a small cap, taking the first empty, walkable, unoccupied tile it finds. No-ops if the
+   * player is boxed in with no clear tile in range. Wired to the dev-menu Spawn Enemy button.
+   */
+  private spawnEnemyNearPlayer(): void {
+    const pt = this.playerChar.tile();
+    const canSpawn = (col: number, row: number): boolean =>
+      col >= 0 &&
+      row >= 0 &&
+      col < this.gridDims.cols &&
+      row < this.gridDims.rows &&
+      !this.buildManager.isOccupied(col, row) &&
+      !this.buildManager.hasSiteTile(col, row) &&
+      !this.isBlocked(col, row);
+
+    // Walk out ring by ring; the first empty tile on the nearest ring wins.
+    for (let dist = 2; dist <= 8; dist++) {
+      for (let col = pt.col - dist; col <= pt.col + dist; col++) {
+        for (let row = pt.row - dist; row <= pt.row + dist; row++) {
+          if (Math.max(Math.abs(col - pt.col), Math.abs(row - pt.row)) !== dist) continue; // ring edge only
+          if (canSpawn(col, row)) {
+            this.enemyManager.addEnemy('kidZombie', col, row);
+            return;
+          }
+        }
+      }
     }
   }
 }

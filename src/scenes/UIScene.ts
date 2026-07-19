@@ -482,13 +482,13 @@ export class UIScene extends Phaser.Scene {
     });
     this.devPanel.addText(14, { fontSize: '10px', color: UI_THEME.olive.text }).setText('DEV MENU');
 
-    const randomiseButton = new Button(this, 0, -4, {
+    const spawnEnemyButton = new Button(this, 0, -4, {
       width: 108,
       height: 24,
-      label: '⟳ RANDOMISE',
+      label: 'SPAWN ENEMY',
       variant: 'olive',
       fontSize: 11,
-      onDown: () => this.game.events.emit('debug:randomise'),
+      onDown: () => this.game.events.emit('debug:spawnEnemy'),
     });
     const initialTimeLabel = initialPhase === 'day' ? 'GO NIGHT' : 'GO DAY';
     this.devTimeButton = new Button(this, 0, 26, {
@@ -499,7 +499,7 @@ export class UIScene extends Phaser.Scene {
       fontSize: 11,
       onDown: () => this.game.events.emit('debug:toggleTime'),
     });
-    this.devPanel.add([randomiseButton, this.devTimeButton]);
+    this.devPanel.add([spawnEnemyButton, this.devTimeButton]);
     this.hudElements.push(this.devPanel);
 
     // Hotbar — always-visible row of the first HOTBAR_SLOTS slots, bottom-centre. Hidden in combat

@@ -168,7 +168,21 @@ night; **no dodge** (kiting is survivability), leave a Spell slot in the cluster
     Tier-2 asserts BOTH triggers, that a pending move order survives, AND that the movepad drives while
     auto-surfaced.
 
-- [ ] **Step 4: Dev "SPAWN ENEMY" button** `[delegate]`
+- [x] **Step 4: Dev "SPAWN ENEMY" button** `[delegate]`
+  - Outcome: UIScene dev-menu button `⟳ RANDOMISE` → `SPAWN ENEMY` (same slot/size/olive variant,
+    `fontSize 11`), now emits `debug:spawnEnemy` (was `debug:randomise`); `GO NIGHT`/`GO DAY` +
+    panel size (`dph`) untouched (1-for-1 swap). GameScene: `debug:spawnEnemy` → new
+    `spawnEnemyNearPlayer()` wired on/off symmetrically in `wireBus`. `spawnEnemyNearPlayer` scans
+    outward in Chebyshev rings from the player tile (dist 2→8, never 0/1) for the first empty tile
+    passing bounds + `!isOccupied` + `!hasSiteTile` + `!isBlocked` (walkable), then
+    `enemyManager.addEnemy('kidZombie', …)`; no-ops if boxed in. `randomiseWorld` + its
+    `debug:randomise` bus wiring KEPT as-is (still bus-referenced; 035b reuses the scatter) — only the
+    button stopped emitting it. No DebugState/test-API change; no new prod surface. Files:
+    `scenes/UIScene.ts`, `scenes/GameScene.ts`. Verified (sub-agent + independent recheck): typecheck
+    clean, lint 0 errors, prettier clean, `pnpm build` succeeds, `pnpm smoke` boot canary passed (Game
+    - UI active, zero console/page errors). Delegated to a sub-agent; reverted incidental stray
+    markdown-emphasis reformatting the agent's formatter run left in three unrelated docs so the commit
+    stays scoped to the code.
   - Replace `⟳ RANDOMISE` (`UIScene.ts:449-456`) with a `SPAWN ENEMY` button emitting `debug:spawnEnemy`
     (keep `GO NIGHT`). In `GameScene`: register/teardown (`:474`/`:489`) → `spawnEnemyNearPlayer()` spawning
     `'kidZombie'` on a nearby empty tile (reuse `randomiseWorld`'s `pickTile`/min-dist, `:1073`/`:1103`).
