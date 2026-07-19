@@ -228,3 +228,47 @@ except Step 2. Execute sequentially.
 - Bow: arrow **projectile vs hitscan** visual (lean: light projectile); bow range value.
 - Melee `0.2` vs new `BOW_MOVE_SLOW ~0.75` exact numbers — playtest.
 - Whether to keep the manual Combat-mode toggle once controls auto-surface (default: keep as override).
+
+## Critique
+
+**Verdict:** A well-researched, largely well-aligned plan, but two things should be resolved before
+execution — it leaves the *skeleton* (the MVP night-wave enemy) un-telegraphed, which is the exact clunk
+ROADMAP step 1 and GAME-DESIGN name as core, and its auto-surface mechanism as written would reveal a
+non-functional movepad.
+
+| # | Finding | Lens | Severity | Suggested action |
+| - | ------- | ---- | -------- | ---------------- |
+| 1 | Telegraph built only on a new boar; skeleton keeps its un-telegraphed coded lunge, yet ROADMAP step 1 + GAME-DESIGN name the *skeleton* telegraph as the core clunk and step 2's wave is skeletons | Roadmap fit | High | Add the coded skeleton wind-up in-scope (machinery exists in `CombatFxManager.lungeAt`), or confirm deferring it; align acceptance to ROADMAP's "fight one skeleton" test |
+| 2 | Auto-surface "visibility only, don't call setMode" surfaces a dead movepad: `onCombatMove` (`:1022`), the per-frame drive (`:624`), and PointerInputController gates (`:149`,`:212`) are all keyed on `mode==='combat'`, not visibility | Gaps/risks | High | Rebase those execution gates onto a `combatActive` predicate (or split `setMode` to enter combat input without `cancelAll`); assert the movepad actually drives while auto-surfaced |
+| 3 | Front-loads a full 4-way directional-actor pipeline refactor for a brand-new boar — costliest, least-aligned piece — ahead of de-clunking the existing skeleton | Alternatives | Medium | Do the skeleton coded-telegraph + controls + bow first; defer the boar/directional pipeline |
+| 4 | Doesn't specify how `EnemyDef` selects its actor, nor the `TilesetManifest.actors` shape change (fixed `{player,enemy}` → id-keyed directional actors) | Consistency/exec | Medium | Nail the type model up front: an actor discriminator on `EnemyDef` + an id-keyed directional-actor map; keep skeleton on its global `enemy-*` keys |
+| 5 | 8 steps / ~6 substantial features in one plan | Scope discipline | Medium | Split the separable bow + HP bars from the enemy/controls foundation |
+| 6 | DebugState field-order + tripwire snapshot spread across steps | Consistency | Low | Adequately handled (append-at-end + same-step snapshot update); verify golden-scenario values |
+
+**Detail — High #1 (skeleton stays clunky):** ROADMAP step 1 and GAME-DESIGN's danger-verb section
+explicitly require the *skeleton* telegraph (coded wind-up tween + pose/flash) as the core de-clunk, and
+step 2's night wave spawns skeletons — so shipping this rework with the boar telegraphed but the wave enemy
+still un-telegraphed misses the point. Bring the skeleton coded wind-up in-scope (cheap; `lungeAt`
+machinery exists) or get the deferral blessed.
+
+**Detail — High #2 (auto-surface broken as written):** movement execution is mode-gated at four sites the
+plan didn't cite — `:624` (per-frame drive), `:1022` (`onCombatMove`), `:149`/`:212` (PointerInputController).
+"Toggle UIScene visibility, keep mode `command`" surfaces a movepad whose `combat:move` events the scene
+discards — visible but dead. Introduce a `combatActive` predicate those sites read (or a `cancelAll`-free
+`setMode` path), and add a "movepad drives the player while auto-surfaced" acceptance assertion.
+
+**Resolution:** superseded — this plan is split into **035a** (skeleton telegraph + controls + bow + HP
+bars, resolving #1/#2/#3/#5) and **035b** (boar + directional-actor pipeline, resolving #4). See the
+[Superseded](#superseded) note below.
+
+## Superseded
+
+This monolithic plan was split following the critique above into two sequential plans; execute those, not
+this file (retained only as the home of the critique + history):
+
+- **[035a-combat-feel-skeleton-controls-bow.md](035a-combat-feel-skeleton-controls-bow.md)** — the
+  roadmap step-1 core on the *existing* skeleton: telegraphed skeleton attack, mobile control cluster +
+  auto-surface, dev spawn button, bow, monster HP bars. No new actor pipeline.
+- **[035b-boar-directional-enemy.md](035b-boar-directional-enemy.md)** — the boar as a 4-way directional
+  enemy: the actor-pipeline generalization + boar def/anims + its real telegraphed attack; makes the boar
+  the default dev spawn. Depends on 035a.
