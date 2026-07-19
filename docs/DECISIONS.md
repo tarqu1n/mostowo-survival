@@ -16,6 +16,12 @@ Shards: [rendering](decisions/rendering.md) · [architecture](decisions/architec
 
 ---
 
+## 2026-07-19 — [DECIDED] Companion recruitment-as-quest + day/night hot-swap roles; torches as cheap perimeter lighting
+
+Recruitment via fetch-quest (first NPC: Litrandil the drunk wizard); companions hold a hot-swappable day-role + night-role; torches as a small refuelable light source complementing hearths.
+
+→ [gameplay.md](decisions/gameplay.md#2026-07-19--decided-companion-recruitment-as-quest--daynight-hot-swap-roles-torches-as-cheap-perimeter-lighting)
+
 ## 2026-07-19 — [DECIDED] Crafting via hybrid stations gate; base claim = the campfire heart (lit area)
 
 Hybrid station tiering (distinct kinds + in-place upgrades) as the recipe gate that climbs with map-unlocks; base claim redefined as the fire's lit area, superseding the fixed base rect.

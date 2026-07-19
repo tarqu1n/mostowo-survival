@@ -283,6 +283,10 @@ campfire light/vision/fuel systems (`CampfireManager`, `lightSources()`, fuel-sc
   **and** more perimeter to defend. Growth has a *running* cost (fuel) + a defense cost (perimeter), not
   just a build price. Light a **second hearth** to push the claim toward the treeline you must hold — a
   network of fires, each its own fuel sink.
+- **Torches — cheap perimeter/wall lighting.** A small-radius light source (its own buildable) that also
+  needs refuelling. Hearths are the expensive *anchors* of the claim; torches cheaply light the walls,
+  perimeter, and gaps the fires don't reach — so you light a wall line without paying for a whole hearth.
+  Both fires and torches are what NPCs keep lit at night (the fire-tending night role).
 - **The dark reclaims ground.** A fire that burns out at night → that area goes dark → vision lost →
   enemies pour through the unlit gap. "Hold the fireline" is literal; night refuelling is a live
   defensive task (a companion job), and the fuel economy becomes the base's load-bearing strategic resource.
@@ -357,10 +361,18 @@ against each other, exactly as wanted.
 
 Design calls to stake out:
 
-- **Companions need orders for the night defense — getting them right is a skill, not auto-fight.** A
-  simple posture: **hold this tile/segment** (defend a spot — pairs with your trap kill-channel) vs.
-  **follow me** (a mobile squad). Positioning them along the wall you funnelled is the payoff of the
-  whole prep phase. Can reuse the existing Command/Combat mode split.
+- **Recruitment is per-character, often a quest.** You acquire companions different ways; the first
+  concrete pattern is a **fetch-and-deliver quest** — talk to an NPC, accept their ask, gather/craft
+  what they want, deliver it, and they join. First example: **Litrandil the drunk wizard**, who wants
+  **cigarettes + vodka** before he'll join (see [LORE.md](LORE.md)). This makes recruitment a hook for
+  crafting chains and exploration (cigs = tobacco + paper; vodka = scavenged), and a natural home for
+  named Mostowo characters.
+- **Assignment is a day-role AND a night-role, hot-swappable at any time.** Each companion holds a
+  standing job per phase that you can reassign on the fly. **Day roles** are worker-queue tasks (arm/
+  re-arm traps, cook food, gather, operate a crafting station). **Night roles** are defense postures
+  (feed the fires/torches, **hold the north wall** or a named segment, or follow you as a mobile squad).
+  Getting the night assignment right — bodies on the segments your walls funnelled toward — is the payoff
+  of the whole prep phase. Reuses the worker task queue (day) + the hold-segment posture (night).
 - **Start with one trait axis, not a matrix.** Each companion is *better at one thing* (a strong fighter
   who's a mediocre gatherer vs. a forager who folds in a fight). That alone creates "who do I send out
   vs. who holds the wall tonight." Themed as named Mostowo locals.
@@ -370,8 +382,11 @@ Design calls to stake out:
 - **Starvation gives a warning turn, not instant death.** They get **weak first** (worse at everything,
   may refuse orders) — a moral/resource choice (feed them the last berries, or feed yourself) with a
   window to act, which matters more under permadeath.
+- **[OPEN] Are recruitment desires one-time or ongoing?** Is Litrandil's vodka/cigs a one-off entry
+  price, or an ongoing upkeep/morale need (a drunk wizard who works worse sober)? Ongoing ties into the
+  hunger/morale economy; one-time keeps recruitment a clean gate. To decide.
 - Themed as Mostowo people/survivors (see [LORE.md](LORE.md)); a natural home for named characters.
-- Still to design: recruitment mechanics, task-assignment UI, morale/loyalty, deeper trait/skill systems.
+- Still to design: task-assignment UI, morale/loyalty, deeper trait/skill systems.
 
 ## MVP vertical slice (first playable) — proposed
 

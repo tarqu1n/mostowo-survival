@@ -6,6 +6,26 @@ Part of the [decision log index](../DECISIONS.md). Newest first.
 
 ---
 
+## 2026-07-19 — [DECIDED] Companion recruitment-as-quest + day/night hot-swap roles; torches as cheap perimeter lighting
+
+Concrete companion + lighting mechanics (design direction; first named NPC → LORE.md).
+
+- **Recruitment is per-character, first pattern is a fetch-and-deliver quest:** talk → accept → gather/
+  craft the ask → deliver → join. First NPC: **Litrandil the drunk wizard** (wants cigarettes + vodka).
+  His ask doubles as a crafting-chain example — cigs crafted from tobacco (forageable plant node) +
+  paper (scavenged loot); vodka scavenged/found. Character + quest live in
+  [LORE.md](../LORE.md#litrandil-the-drunk-wizard).
+- **Companion assignment = a day-role AND a night-role, hot-swappable any time.** Day roles are
+  worker-queue tasks (arm/re-arm traps, cook, gather, operate a station); night roles are defense
+  postures (feed fires/torches, hold a named wall segment, or follow as a mobile squad). Reuses the
+  worker task queue (day) + the hold-segment posture (night) — supersedes the vaguer "night posture"
+  sketch in the core-loop framing entry below.
+- **Torches: a small-radius, refuelable light source (own buildable)** complementing campfire hearths
+  under the base-claim model — hearths anchor the claim, torches cheaply light walls/perimeter/gaps.
+  Both are what companions keep lit at night (fire-tending role).
+- **[OPEN]** whether an NPC's recruitment desire (Litrandil's vodka/cigs) is a one-time entry price or
+  an ongoing upkeep/morale need. Ongoing → morale economy; one-time → clean gate. Deferred.
+
 ## 2026-07-19 — [DECIDED] Crafting via hybrid stations gate; base claim = the campfire heart (lit area)
 
 Two greenfield systems given shape (design direction; firm into systems at plan time). Both fold the
