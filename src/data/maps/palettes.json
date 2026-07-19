@@ -56,7 +56,7 @@
     },
     {
       "id": "palette_0002",
-      "name": "Palette 2",
+      "name": "Forest water edge",
       "slots": [
         {
           "assetId": "pixel-crawler/Environment/Tilesets/Water_tiles.png#2"
