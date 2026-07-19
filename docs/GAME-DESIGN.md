@@ -238,6 +238,64 @@ Don't hard-wire a single world; build the map-loading + travel system to add map
 - **Crafting** — data-driven items/recipes/stations; scavenged inputs → tools, weapons, defenses.
 - **Base defense** — traps + walls + player combat vs the nightly wave; the payoff for the day's prep.
 
+## Crafting & stations
+
+No crafting system exists yet — greenfield. The gate *is* the progression, not difficulty bolted on later.
+
+**Stations are buildables** (reuse `BUILDABLES` + `BuildManager` + the build palette). A recipe declares
+the station (and tier) it needs; the crafting UI shows only recipes whose station exists in the base —
+an unmet recipe is **invisible** until you can see the thing that makes it.
+
+**Tiering is hybrid (decided 2026-07-19):** distinct station *kinds* (e.g. workbench → forge →
+alchemy/arcane bench), each unlocking a band of recipes, **and** each **upgradeable a level or two** in
+place for deeper outputs. Distinct kinds give visible in-base progression; in-place upgrades add depth
+without a whole new station per tier.
+
+**The tree reaches across maps.** Higher stations / upgrades need lower-station outputs *plus* materials
+that only appear on maps you haven't unlocked — so the crafting tree and the map-unlock spine are the
+**same climb**. You can't out-tech the nights without pushing outward, and pushing outward raises the
+night ceiling.
+
+**Crafting is a queued station task, not an instant menu** (matches the "work reads as work" ethos —
+harvest/refuel are worker orders). Assign a recipe → a worker or **companion** walks over and crafts it
+over `craftMs`. This gives companions a real day job beyond gathering (station operators): a mature base
+is a production line.
+
+**Blueprint discovery is a second, optional gate:** some recipes must be *found* (exploration / a dawn
+narrative event), pacing reveals independently of resources and giving narrative events mechanical teeth.
+
+**Cost that keeps it honest:** stations take base space and sit *inside the fireline* — more stations =
+bigger base = more to defend (see "Base claim" below). Crafting depth is paid in defensibility.
+
+Data shape to firm at plan time: `Recipe { inputs, output, station, stationTier?, craftMs, blueprintId? }`;
+stations carry a kind + level; the UI filters recipes by which stations/levels are present.
+
+## Base claim — the campfire heart
+
+Replaces the placeholder fixed base rect (`BASE_ZONE_SIZE` centred on spawn — plan 018 A8, always a
+stopgap). **Decided 2026-07-19: your base is everywhere your fire's light reaches** — the hearth *is*
+the claim. This collapses base-building + survival + defense into one object and reuses the already-built
+campfire light/vision/fuel systems (`CampfireManager`, `lightSources()`, fuel-scaled radius).
+
+- **Claim = lit area.** Standing in it grants auto-access to base storage (the "being home opens the bag"
+  rule → "being in the light"), buildable/station placement, and vision.
+- **Expansion is costed.** Bigger fire = bigger claim = room for more stations/walls — but more fuel drain
+  **and** more perimeter to defend. Growth has a *running* cost (fuel) + a defense cost (perimeter), not
+  just a build price. Light a **second hearth** to push the claim toward the treeline you must hold — a
+  network of fires, each its own fuel sink.
+- **The dark reclaims ground.** A fire that burns out at night → that area goes dark → vision lost →
+  enemies pour through the unlit gap. "Hold the fireline" is literal; night refuelling is a live
+  defensive task (a companion job), and the fuel economy becomes the base's load-bearing strategic resource.
+- **Resolves the deferred enemy fog-gating** (plan 012): enemies are hidden in darkness, revealed in the
+  light — the natural partner to the treeline-directional night wave.
+
+**Knock-on:** fire = base means the campfire fuel numbers (flagged mis-tuned for the 15-min cycle) are now
+**critical** — fuel governs the whole claim, so it must be tuned as a strategic resource, not a chore. The
+retune is no longer optional under this model.
+
+**Staging (not a cliff):** (1) base zone becomes the central hearth's radius, replacing the rect;
+(2) multiple fires union their claims; (3) walls shape/extend the boundary as long as it stays fire-connected.
+
 ## Survival & inventory systems (draft)
 
 Ideas captured as they land; to be firmed into real systems later.

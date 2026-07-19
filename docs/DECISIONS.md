@@ -16,6 +16,12 @@ Shards: [rendering](decisions/rendering.md) · [architecture](decisions/architec
 
 ---
 
+## 2026-07-19 — [DECIDED] Crafting via hybrid stations gate; base claim = the campfire heart (lit area)
+
+Hybrid station tiering (distinct kinds + in-place upgrades) as the recipe gate that climbs with map-unlocks; base claim redefined as the fire's lit area, superseding the fixed base rect.
+
+→ [gameplay.md](decisions/gameplay.md#2026-07-19--decided-crafting-via-hybrid-stations-gate-base-claim--the-campfire-heart-lit-area)
+
 ## 2026-07-19 — [DECIDED] Core-loop framing: three-horizon progression, hard-countdown-no-fallback dusk, progress-keyed escalation, pacing targets
 
 Nested progression (siege/growth/escape), no-fallback dusk + legibility/range costs, progress-keyed escalation, pacing targets; trap/wave/companion shapes captured as intent.

@@ -6,6 +6,47 @@ Part of the [decision log index](../DECISIONS.md). Newest first.
 
 ---
 
+## 2026-07-19 — [DECIDED] Crafting via hybrid stations gate; base claim = the campfire heart (lit area)
+
+Two greenfield systems given shape (design direction; firm into systems at plan time). Both fold the
+four pillars into single objects and reuse built machinery.
+
+**Crafting-station progression — hybrid tiering** (chosen over distinct-only or upgrade-only):
+
+- **Stations are buildables** (reuse `BUILDABLES`/`BuildManager`/palette). A recipe declares the station
+  (+ tier) it needs; the crafting UI shows only recipes whose station is present — unmet recipes are
+  **invisible**, so the gate *is* the progression.
+- **Hybrid tiering:** distinct station *kinds* (workbench → forge → alchemy/arcane), each unlocking a
+  recipe band, **and** each upgradeable a level or two in place. Distinct kinds = visible in-base
+  progression; in-place upgrades = depth without a station per tier.
+- **The tree reaches across maps** — higher stations/upgrades need lower-station outputs + materials only
+  found on not-yet-unlocked maps, so the crafting tree and the map-unlock spine are the same climb
+  (pushing outward raises the night ceiling).
+- **Crafting is a queued station task**, not instant (matches the harvest/refuel "work reads as work"
+  pattern) — a worker/companion crafts over `craftMs`, giving companions a day job beyond gathering
+  (a mature base = a production line).
+- **Blueprint discovery** is an optional second gate: some recipes must be *found* (exploration / dawn
+  event), pacing reveals independently of resources.
+- Cost: stations take base space inside the fireline — crafting depth is paid in defensibility.
+- Data shape to firm at plan time: `Recipe { inputs, output, station, stationTier?, craftMs, blueprintId? }`.
+
+**Base claim = the campfire heart** (chosen over walls-enclosure or a fire-seeds-walls-extend hybrid):
+
+- **Your base is everywhere your fire's light reaches** — replaces the placeholder fixed base rect
+  (`BASE_ZONE_SIZE`, plan 018 A8). Reuses the built campfire light/vision/fuel (`CampfireManager`,
+  `lightSources()`, fuel-scaled radius).
+- **Claim = lit area** grants base-storage auto-access ("being in the light" ⇒ "being home"),
+  buildable/station placement, and vision.
+- **Expansion is costed** — bigger/second fire = bigger claim = more room BUT more fuel drain + more
+  perimeter to defend (a running cost + a defense cost, not just a build price).
+- **The dark reclaims ground** — a fire out at night = that area goes dark = enemies pour through the
+  unlit gap; night refuelling is a live defensive task (companion job). **Resolves plan 012's deferred
+  enemy fog-gating**: enemies hidden in darkness, revealed in light — partner to the treeline night wave.
+- **Knock-on:** fuel now governs the whole claim, so the campfire fuel numbers (already flagged mis-tuned
+  for the 15-min cycle) become critical to retune — no longer optional.
+- **Staging:** (1) base zone = central hearth radius replacing the rect; (2) multiple fires union claims;
+  (3) walls shape/extend the boundary while fire-connected.
+
 ## 2026-07-19 — [DECIDED] Core-loop framing: three-horizon progression, hard-countdown-no-fallback dusk, progress-keyed escalation, pacing targets
 
 A brainstorm pass that pinned the connective tissue the design doc was missing (the *why do I play
