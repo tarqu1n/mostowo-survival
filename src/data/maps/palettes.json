@@ -383,6 +383,11 @@
           "assetId": "fantasy-tileset/Tiles/Tileset_RockSlope.png#194"
         }
       ]
+    },
+    {
+      "id": "palette_0007",
+      "name": "Palette 7",
+      "slots": []
     }
   ]
 }
