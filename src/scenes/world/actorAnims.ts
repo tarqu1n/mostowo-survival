@@ -6,11 +6,14 @@ import {
   enemyWalkKey,
   enemyIdleKey,
   enemyDeathKey,
+  dirEnemyAnimKey,
   campfireBaseKey,
   campfireFlameLargeKey,
   campfireFlameSmallKey,
   campfireSmokeKey,
   type Facing,
+  type Facing4,
+  type DirEnemyState,
   type PlayerState,
 } from '../../data/tileset';
 
@@ -83,6 +86,36 @@ export function registerActorAnims(scene: Phaser.Scene): void {
       repeat: 0,
     });
   }
+  // Directional enemies (dir4, e.g. the boar): one anim per state per facing, id-scoped keys (distinct
+  // from the skeleton's global enemy-* keys). idle/walk/run loop (locomotion); attack/hurt/death play
+  // once. Frame counts come from each strip in the manifest. Empty until a dir4 creature is registered.
+  const dirStates: Array<[DirEnemyState, number, number]> = [
+    // [state, frameRate, repeat] — run bumped over walk for the charge; attack at the action rate.
+    ['idle', 6, -1],
+    ['walk', 10, -1],
+    ['run', 12, -1],
+    ['attack', ACTION_ANIM_FRAMERATE, 0],
+    ['hurt', ACTION_ANIM_FRAMERATE, 0],
+    ['death', DEATH_ANIM_FRAMERATE, 0],
+  ];
+  for (const [id, actor] of Object.entries(ACTIVE_TILESET.actors.directional)) {
+    for (const [state, frameRate, repeat] of dirStates) {
+      for (const facing of ['down', 'up', 'left', 'right'] as Facing4[]) {
+        const key = dirEnemyAnimKey(id, state, facing);
+        if (scene.anims.exists(key)) continue;
+        scene.anims.create({
+          key,
+          frames: scene.anims.generateFrameNumbers(key, {
+            start: 0,
+            end: actor[state][facing].frames - 1,
+          }),
+          frameRate,
+          repeat,
+        });
+      }
+    }
+  }
+
   // Campfire (station): four looping flickers — the stone-ring base, the large + small flame sheets,
   // and the smoke plume (plan 016 follow-up). Registered here alongside the actors so every anims.create
   // lives in one guarded place; keys + frame counts come from the manifest. CampfireManager picks which

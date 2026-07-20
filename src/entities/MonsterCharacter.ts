@@ -20,7 +20,12 @@ import {
   enemyWalkKey,
   enemyIdleKey,
   enemyDeathKey,
+  dirEnemyAnimKey,
+  facing4FromVelocity,
   type AttachPoint,
+  type DirectionalEnemyActor,
+  type DirEnemyState,
+  type Facing4,
 } from '../data/tileset';
 import { tileToWorldCenter } from '../systems/grid';
 import { findPath, type Cell, type Dims } from '../systems/pathfind';
@@ -95,6 +100,14 @@ export class MonsterCharacter extends Character {
   /** Which render footprint the sprite is currently showing (`walk` 64px vs the `idle` 32px bob) —
    *  so `updateAnim` only swaps scale/origin/body on an actual state change (see setFootprint). */
   private activeStrip: 'idle' | 'walk' = 'walk'; // the constructor sets up the 64px Walk footprint
+  /** The directional (`dir4`) actor art for this enemy (e.g. the boar), or undefined for a flip3
+   *  skeleton. Its presence is the render-path discriminator: set ⇒ strip-per-facing, no flip, no
+   *  weapon/hand rig; undefined ⇒ the skeleton's single Run strip mirrored by `setFlipX`. */
+  private readonly dir4Actor?: DirectionalEnemyActor;
+  /** Last 4-way facing a `dir4` enemy moved in — held while stationary so it idles/dies facing the way
+   *  it last went (unused for flip3). Updated from velocity each moving tick. Distinct from the base
+   *  `Character.lastFacing` (a dCol/dRow vector); this is the discrete `Facing4` for strip selection. */
+  private dir4Facing: Facing4 = 'down';
   /** The rolled-per-spawn held weapon (Phase B), or undefined = unarmed. `sprite` is a plain image
    *  (no physics body) pinned to the hand each tick; `def` owns its damage/cadence; `swingRot` is the
    *  live coded-swing angle (deg) tweened on each bite. */
@@ -114,9 +127,16 @@ export class MonsterCharacter extends Character {
     opts?: MonsterSpawnOpts,
   ) {
     const enemyActor = ACTIVE_TILESET.actors.enemy;
-    const { render } = enemyActor;
+    // dir4 (e.g. boar) renders from its id-keyed directional entry; flip3 (skeleton) from the shared
+    // `enemy` struct. Presence of the entry is the whole discriminator (a dir4 def with no manifest
+    // entry falls back to the skeleton path — data.test asserts the two stay in lockstep).
+    const dir4Actor =
+      def.actorKind === 'dir4' ? ACTIVE_TILESET.actors.directional[def.id] : undefined;
+    const render = dir4Actor?.render ?? enemyActor.render;
+    // dir4 starts on its idle-down strip; flip3 on the shared Run strip (its frame 0 doubles as idle).
+    const initialKey = dir4Actor ? dirEnemyAnimKey(def.id, 'idle', 'down') : enemyWalkKey;
     const sprite = scene.add
-      .sprite(tileToWorldCenter(col), tileToWorldCenter(row), enemyWalkKey)
+      .sprite(tileToWorldCenter(col), tileToWorldCenter(row), initialKey)
       .setDepth(9);
     sprite.setScale(render.scale).setOrigin(render.originX, render.originY);
     sprite.setData('baseScale', render.scale); // rest scale the flinch squash returns to
@@ -124,6 +144,7 @@ export class MonsterCharacter extends Character {
     super(scene, sprite as CharacterSprite, def);
     this.id = id;
     this.def = def;
+    this.dir4Actor = dir4Actor;
     this.col = col;
     this.row = row;
     this.sprite.body.setCollideWorldBounds(true);
@@ -131,36 +152,40 @@ export class MonsterCharacter extends Character {
     this.ai = initialMonsterState(opts?.patrolRoute);
     if (opts?.mode) this.ai.mode = opts.mode; // scenario override (e.g. spawn already chasing)
 
-    // Roll a held weapon from the enemy's pool (Phase B) — or take a scenario-forced id. The weapon is
-    // a plain image (no physics body); it's pinned to the hand each tick in syncAttachments.
-    const pool = def.weaponPool ?? [];
-    const weaponId =
-      opts?.weaponId ?? (pool.length ? pool[Math.floor(rng() * pool.length)] : undefined);
-    const art = weaponId ? enemyActor.weapons[weaponId] : undefined;
-    const stats = weaponId ? MONSTER_WEAPONS[weaponId] : undefined;
-    if (weaponId && art && stats) {
-      const wsprite = scene.add.image(sprite.x, sprite.y, resolveTile(art.source).key);
-      wsprite
-        .setOrigin(art.pivot[0], art.pivot[1])
-        .setScale(art.scale ?? 1)
-        .setDepth(sprite.depth + art.z);
-      this.weapon = { id: weaponId, sprite: wsprite, def: stats, swingRot: 0 };
+    // Weapon + hand rig — flip3 (skeleton) ONLY. A dir4 mob (boar) bites unarmed with a natural body,
+    // so it carries no weapon and no layered fists (its sheets draw the whole animal).
+    if (!dir4Actor) {
+      // Roll a held weapon from the enemy's pool (Phase B) — or take a scenario-forced id. The weapon is
+      // a plain image (no physics body); it's pinned to the hand each tick in syncAttachments.
+      const pool = def.weaponPool ?? [];
+      const weaponId =
+        opts?.weaponId ?? (pool.length ? pool[Math.floor(rng() * pool.length)] : undefined);
+      const art = weaponId ? enemyActor.weapons[weaponId] : undefined;
+      const stats = weaponId ? MONSTER_WEAPONS[weaponId] : undefined;
+      if (weaponId && art && stats) {
+        const wsprite = scene.add.image(sprite.x, sprite.y, resolveTile(art.source).key);
+        wsprite
+          .setOrigin(art.pivot[0], art.pivot[1])
+          .setScale(art.scale ?? 1)
+          .setDepth(sprite.depth + art.z);
+        this.weapon = { id: weaponId, sprite: wsprite, def: stats, swingRot: 0 };
+      }
+
+      // Both hands — always (the skeleton has hands whether or not it's armed). The gripping (main) hand
+      // draws over the weapon, the free (off) hand beside the body; both pinned each tick in
+      // syncAttachments. They use DISTINCT images (open grip vs fist) so they don't read as two of the same.
+      const handArt = enemyActor.hand;
+      const offKey = resolveTile(handArt.source).key;
+      const mainKey = resolveTile(handArt.mainSource ?? handArt.source).key;
+      const mkHand = (key: string, z: number) =>
+        scene.add
+          .image(sprite.x, sprite.y, key)
+          .setOrigin(handArt.pivot[0], handArt.pivot[1])
+          .setDepth(sprite.depth + z);
+      this.hands = { main: mkHand(mainKey, handArt.mainZ), off: mkHand(offKey, handArt.offZ) };
+
+      this.syncAttachments(); // place weapon + fists on frame 0
     }
-
-    // Both hands — always (the skeleton has hands whether or not it's armed). The gripping (main) hand
-    // draws over the weapon, the free (off) hand beside the body; both pinned each tick in
-    // syncAttachments. They use DISTINCT images (open grip vs fist) so they don't read as two of the same.
-    const handArt = enemyActor.hand;
-    const offKey = resolveTile(handArt.source).key;
-    const mainKey = resolveTile(handArt.mainSource ?? handArt.source).key;
-    const mkHand = (key: string, z: number) =>
-      scene.add
-        .image(sprite.x, sprite.y, key)
-        .setOrigin(handArt.pivot[0], handArt.pivot[1])
-        .setDepth(sprite.depth + z);
-    this.hands = { main: mkHand(mainKey, handArt.mainZ), off: mkHand(offKey, handArt.offZ) };
-
-    this.syncAttachments(); // place weapon + fists on frame 0
   }
 
   protected override moveSpeed(): number {
@@ -279,6 +304,10 @@ export class MonsterCharacter extends Character {
    * mid-bite). The footprint (scale/origin/body) is swapped only on a state change (setFootprint).
    */
   private updateAnim(): void {
+    if (this.dir4Actor) {
+      this.updateAnimDir4();
+      return;
+    }
     const moving = this.sprite.body.velocity.lengthSq() > 1;
     const calmIdle = !moving && this.ai.mode !== 'chase';
     this.setFootprint(calmIdle ? 'idle' : 'walk');
@@ -298,6 +327,32 @@ export class MonsterCharacter extends Character {
   }
 
   /**
+   * Animation each tick for a `dir4` enemy (the boar): choose the strip by movement + FSM mode and face
+   * it with the dominant-axis facing — no flipX (each direction is its own sheet), no attachments (the
+   * sheets draw the whole animal). Charges on the Run sheet while chasing, ambles on Walk when
+   * wandering/patrolling, and holds an Idle bob when stopped calm. Chasing-but-stalled (melee contact)
+   * holds a static facing frame — the bite telegraph is Step 3, not a bob mid-lunge. One footprint for
+   * every strip (all 32px), so no `setFootprint` swap.
+   */
+  private updateAnimDir4(): void {
+    const v = this.sprite.body.velocity;
+    const moving = v.lengthSq() > 1;
+    if (!moving) {
+      if (this.ai.mode === 'chase') {
+        // Stalled in melee while chasing: hold a still facing pose (Step 3 plays the real Attack anim).
+        this.sprite.anims.stop();
+        this.sprite.setTexture(dirEnemyAnimKey(this.def.id, 'idle', this.dir4Facing), 0);
+      } else {
+        this.sprite.anims.play(dirEnemyAnimKey(this.def.id, 'idle', this.dir4Facing), true);
+      }
+      return;
+    }
+    this.dir4Facing = facing4FromVelocity(v.x, v.y);
+    const state: DirEnemyState = this.ai.mode === 'chase' ? 'run' : 'walk';
+    this.sprite.anims.play(dirEnemyAnimKey(this.def.id, state, this.dir4Facing), true);
+  }
+
+  /**
    * Pin the held weapon to the wielder's hand for the CURRENT animation frame — called every tick (not
    * on `animationupdate`, so the lunge/swing slide between frame changes without the pin going stale).
    * Reads the active strip's per-frame `mainHand` anchor, runs the pure {@link weaponTransform} with the
@@ -305,6 +360,7 @@ export class MonsterCharacter extends Character {
    * is owned by the swing tween, so it's untouched here.
    */
   private syncAttachments(): void {
+    if (this.dir4Actor) return; // dir4 mobs carry no weapon/hands — nothing to pin
     const enemy = ACTIVE_TILESET.actors.enemy;
     const strip = this.activeStrip === 'idle' ? enemy.idle : enemy.walk;
     const frameW = strip.frameWidth ?? strip.frameSize;
@@ -366,6 +422,7 @@ export class MonsterCharacter extends Character {
    * so there's no positional jump — only the drawn pixels reflow around the same anchor.
    */
   private setFootprint(which: 'idle' | 'walk'): void {
+    if (this.dir4Actor) return; // dir4 uses one footprint for every strip — no idle/walk swap
     if (this.activeStrip === which) return;
     this.activeStrip = which;
     const enemy = ACTIVE_TILESET.actors.enemy;
@@ -398,6 +455,11 @@ export class MonsterCharacter extends Character {
     }
     this.sprite.body.setVelocity(0, 0);
     this.sprite.body.enable = false;
+    if (this.dir4Actor) {
+      // dir4: one footprint for every strip (nothing to undo), collapse on the last-faced Death strip.
+      this.sprite.anims.play(dirEnemyAnimKey(this.def.id, 'death', this.dir4Facing));
+      return;
+    }
     // Reset to the default 64px footprint before the collapse — undoes any flinch squash AND the 32px
     // Idle bob's scale:2/origin (dying mid-bob would otherwise play the Death strip double-size, off-tile).
     const { render } = ACTIVE_TILESET.actors.enemy;

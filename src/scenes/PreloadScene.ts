@@ -8,6 +8,7 @@ import {
   enemyWalkKey,
   enemyIdleKey,
   enemyDeathKey,
+  dirEnemyAnimKey,
   campfireBaseKey,
   campfireFlameLargeKey,
   campfireFlameSmallKey,
@@ -16,6 +17,8 @@ import {
   type TileSource,
   type StripAnim,
   type Facing,
+  type Facing4,
+  type DirEnemyState,
   type PlayerState,
 } from '../data/tileset';
 import { ITEMS } from '../data/items';
@@ -120,6 +123,25 @@ export class PreloadScene extends Phaser.Scene {
     loadStrip(enemyWalkKey, enemy.walk);
     loadStrip(enemyIdleKey, enemy.idle); // 32px Idle bob — its own footprint (Phase B)
     loadStrip(enemyDeathKey, enemy.death);
+
+    // Directional enemies (dir4, e.g. the boar): each state×facing strip is its own spritesheet, keyed
+    // by `dirEnemyAnimKey` (== the anim key). These load from the creature's OWN pack (the boar is in
+    // craftpix-creatures, not the manifest's pixel-crawler), so route through `tilesetAssetUrl`, not the
+    // manifest-base `url()`. Loaded unconditionally like the skeleton so a dev spawn / scenario boar
+    // always has a resident texture.
+    const dirStates: DirEnemyState[] = ['idle', 'walk', 'run', 'attack', 'hurt', 'death'];
+    for (const [id, dirActor] of Object.entries(manifest.actors.directional)) {
+      for (const state of dirStates) {
+        for (const facing of ['down', 'up', 'left', 'right'] as Facing4[]) {
+          const strip = dirActor[state][facing];
+          this.load.spritesheet(
+            dirEnemyAnimKey(id, state, facing),
+            tilesetAssetUrl(dirActor.pack, strip.path),
+            { frameWidth: strip.frameWidth ?? strip.frameSize, frameHeight: strip.frameSize },
+          );
+        }
+      }
+    }
 
     // Stations: the campfire's four layers — stone-ring base + large/small flame sheets + smoke (plan
     // 016 follow-up). Registered as Phaser anims later (registerActorAnims), not here — this just loads

@@ -4,7 +4,7 @@ import { NODES } from '../nodes';
 import { BUILDABLES } from '../buildables';
 import { ENEMIES } from '../enemies';
 import { MONSTER_WEAPONS } from '../weapons';
-import { ACTIVE_TILESET } from '../tileset';
+import { ACTIVE_TILESET, dirEnemyAnimKey, facing4FromVelocity, type Facing4 } from '../tileset';
 
 // Pure-data invariant tests: catch a data-edit regression (a typo'd item id, a stat that breaks
 // an assumption another test suite relies on) cheaply, without touching Phaser or the systems
@@ -142,6 +142,59 @@ describe('ENEMIES', () => {
     expect(ENEMIES.kidZombie.strength).toBe(1);
     expect(ENEMIES.kidZombie.armour).toBe(0);
     expect(ENEMIES.kidZombie.dodge).toBe(0);
+  });
+
+  it('the boar is a dir4 charger — faster than the zombie, weaponless', () => {
+    // Pins the plan-035b intent (fast, dangerous, natural bite) so a stat edit that neuters the charge
+    // or accidentally arms it is caught here rather than felt only in playtest.
+    expect(ENEMIES.boar.actorKind).toBe('dir4');
+    expect(ENEMIES.boar.speed).toBeGreaterThan(ENEMIES.kidZombie.speed);
+    expect(ENEMIES.boar.weaponPool ?? []).toEqual([]); // bites unarmed — no held weapon
+  });
+});
+
+describe('directional (dir4) enemy actors', () => {
+  const dirStates = ['idle', 'walk', 'run', 'attack', 'hurt', 'death'] as const;
+  const facings: Facing4[] = ['down', 'up', 'left', 'right'];
+
+  it('every dir4 EnemyDef has a complete directional manifest entry (all 6 states × 4 facings)', () => {
+    // The render-path discriminator (EnemyDef.actorKind==='dir4') and the manifest art must stay in
+    // lockstep: MonsterCharacter renders a dir4 mob from actors.directional[id], and a missing state or
+    // facing would render the green missing-texture box. Guards that link at data-time, not in-game.
+    for (const enemy of Object.values(ENEMIES)) {
+      if (enemy.actorKind !== 'dir4') continue;
+      const actor = ACTIVE_TILESET.actors.directional[enemy.id];
+      expect(actor, `dir4 enemy '${enemy.id}' has no directional manifest entry`).toBeDefined();
+      expect(actor.pack.length).toBeGreaterThan(0);
+      for (const state of dirStates) {
+        for (const facing of facings) {
+          const strip = actor[state][facing];
+          expect(strip, `${enemy.id} ${state}/${facing} strip missing`).toBeDefined();
+          expect(strip.frames).toBeGreaterThan(0);
+          expect(strip.path.length).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it('dirEnemyAnimKey is id/state/facing-scoped (distinct from the skeleton enemy-* keys)', () => {
+    expect(dirEnemyAnimKey('boar', 'run', 'left')).toBe('enemy-boar-run-left');
+    // Different creature, state, or facing → a different key (no collision across dir4 mobs).
+    expect(dirEnemyAnimKey('boar', 'walk', 'left')).not.toBe(
+      dirEnemyAnimKey('boar', 'run', 'left'),
+    );
+    expect(dirEnemyAnimKey('deer', 'run', 'left')).not.toBe(dirEnemyAnimKey('boar', 'run', 'left'));
+  });
+
+  it('facing4FromVelocity picks the dominant axis (horizontal on a tie, +y is screen-down)', () => {
+    expect(facing4FromVelocity(10, 0)).toBe('right');
+    expect(facing4FromVelocity(-10, 0)).toBe('left');
+    expect(facing4FromVelocity(0, 10)).toBe('down'); // +y points down in screen space
+    expect(facing4FromVelocity(0, -10)).toBe('up');
+    expect(facing4FromVelocity(10, 5)).toBe('right'); // |vx| dominates
+    expect(facing4FromVelocity(-3, 9)).toBe('down'); // |vy| dominates
+    expect(facing4FromVelocity(7, 7)).toBe('right'); // exact tie → horizontal
+    expect(facing4FromVelocity(7, -7)).toBe('right'); // exact tie → horizontal
   });
 });
 

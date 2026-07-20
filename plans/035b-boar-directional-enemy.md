@@ -70,7 +70,22 @@ an actor discriminator on `EnemyDef` + an id-keyed directional-actor map — so 
   - Done when: types compile, skeleton renders/behaves identically (refactor-tripwire + `monster.spec.ts`
     green), and a boar manifest entry can be expressed (even if not yet loaded).
 
-- [ ] **Step 2: Wire the boar as a directional enemy** `[inline]`
+- [x] **Step 2: Wire the boar as a directional enemy** `[inline]`
+  - Outcome: `src/data/enemies.ts` — added `ENEMIES.boar` (`actorKind:'dir4'`, maxHp 5, speed 70 > zombie's
+    45, vision 100, strength 2, hurtbox `{2,1}` wide/short, no weaponPool). `src/data/tileset.ts` — added a
+    `pack` field to `DirectionalEnemyActor` (boar lives in `craftpix-creatures`, not pixel-crawler), a
+    `boarStrips` builder + the `directional.boar` manifest entry (render scale 1 / originY 0.82; Idle 4 /
+    Walk 6 / Run 5 / Attack 5 / Hurt 4 / Death 6 × 4 dirs), and moved the pure `facing4FromVelocity` helper
+    here (Phaser-free, unit-testable). `actorAnims.ts` — id-scoped dir4 anim registration (idle/walk/run loop;
+    attack/hurt/death one-shot). `PreloadScene.ts` — static load of every dir4 strip via `tilesetAssetUrl`
+    (cross-pack), unconditional like the skeleton. `MonsterCharacter.ts` — `dir4Actor` discriminator: dir4
+    sprite/render/initial-strip in the constructor, weapon+hand rig gated to flip3 only, new `updateAnimDir4`
+    (facing from velocity via `facing4FromVelocity`, run-on-chase/walk/idle, no flip), and dir4 guards in
+    `syncAttachments`/`setFootprint`/`die` (Death strip on last facing). Tests: 4 new unit tests
+    (`data.test.ts`: boar stats, dir4-def↔manifest lockstep, `dirEnemyAnimKey`, `facing4FromVelocity`) + new
+    `tests/e2e/boar.spec.ts` (cross-pack strips+anims resident; chases+bites; 5 melee hits→corpse; bow hit).
+    Verified: typecheck 0 new errors; vitest 806/806; boar e2e 4/4; skeleton regression e2e (combat + monster
+    - refactor-tripwire) 22/22 green; eslint 0 errors; screenshot confirmed all 4 facings render on-tile.
   - Add `ENEMIES.boar` in `src/data/enemies.ts` (fast, dangerous charger: modest `maxHp`, higher `speed`
     than the zombie, `strength` for a solid bite, `hurtbox:{width:2,height:1}` — wide/short; `actorKind:
     'dir4'`; **no `weaponPool`** — natural bite in Step 3). Register the boar's anims (idle/walk/run/attack/

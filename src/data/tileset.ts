@@ -138,6 +138,10 @@ export interface HandArt {
  * an individual `StripAnim` still apply. No hand/weapon rig — dir4 mobs bite (see `EnemyDef.weaponPool`).
  */
 export interface DirectionalEnemyActor {
+  /** Pack folder under `public/assets/tilesets/` these strips load from — a dir4 creature may live in
+   *  a DIFFERENT pack than the base `TilesetManifest.id` (the boar is `craftpix-creatures`, not
+   *  `pixel-crawler`), so its strips load via `tilesetAssetUrl(pack, strip.path)`, not the manifest base. */
+  pack: string;
   render: ActorRender;
   idle: Record<Facing4, StripAnim>;
   walk: Record<Facing4, StripAnim>;
@@ -218,6 +222,19 @@ export interface TilesetManifest {
     };
   };
 }
+
+/**
+ * Build the boar's 4-facing strip set for one action. All boar sheets are horizontal strips of 32px
+ * SQUARE frames (frameWidth == frameSize, so no override), one PNG per direction, named
+ * `Boar/Boar_<Action>_<dir>.png` under the craftpix-creatures pack (see asset-catalog.json).
+ */
+const boarStrips = (action: string, frames: number): Record<Facing4, StripAnim> =>
+  Object.fromEntries(
+    (['down', 'up', 'left', 'right'] as Facing4[]).map((dir) => [
+      dir,
+      { path: `Boar/Boar_${action}_${dir}.png`, frameSize: 32, frames } satisfies StripAnim,
+    ]),
+  ) as Record<Facing4, StripAnim>;
 
 /**
  * Pixel Crawler pack (CC0-ish, see Terms.txt). Files load IN-PLACE from the pack root with their
@@ -485,9 +502,22 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
         offZ: 1,
       },
     },
-    // 4-way directional enemies (boar wired in plan 035b Step 2). Empty keeps the skeleton the only
-    // actor until then; a `dir4` def with no entry here would fail to resolve its strips.
-    directional: {},
+    // 4-way directional enemies (plan 035b). The boar lives in the craftpix-creatures pack (not
+    // pixel-crawler) — `pack` routes its loads there. All strips are 32px square; `render` grounds the
+    // ~28px-tall content on the 16px tile (originY tuned so the hooves sit on the feet tile). Frame
+    // counts from asset-catalog.json: Idle 4, Walk 6, Run 5, Attack 5, Hurt 4, Death 6.
+    directional: {
+      boar: {
+        pack: 'craftpix-creatures',
+        render: { scale: 1, originX: 0.5, originY: 0.82 },
+        idle: boarStrips('Idle', 4),
+        walk: boarStrips('Walk', 6),
+        run: boarStrips('Run', 5),
+        attack: boarStrips('Attack', 5),
+        hurt: boarStrips('Hurt', 4),
+        death: boarStrips('Death', 6),
+      },
+    },
   },
   stations: {
     // base = Bonfire_01 (a ring of stones with glowing embers, 128×32 = 4 frames of 32×32) — the fire
@@ -565,6 +595,15 @@ export const enemyDeathKey = 'enemy-death';
  */
 export const dirEnemyAnimKey = (id: string, state: DirEnemyState, facing: Facing4): string =>
   `enemy-${id}-${state}-${facing}`;
+
+/**
+ * Pick a 4-way `Facing4` from a velocity vector — the dominant axis wins (horizontal on an exact tie).
+ * Drives a `dir4` enemy's directional strip selection (see `MonsterCharacter`); screen-space, so +y
+ * points DOWN (`vy > 0` ⇒ `'down'`). Pure — lives here (Phaser-free) so it's unit-testable without the
+ * entity/Phaser graph. The skeleton's flip3 facing is just `vx < 0`, so it doesn't need this.
+ */
+export const facing4FromVelocity = (vx: number, vy: number): Facing4 =>
+  Math.abs(vx) >= Math.abs(vy) ? (vx < 0 ? 'left' : 'right') : vy < 0 ? 'up' : 'down';
 
 /** Texture/anim key for the campfire's stone-ring ember base layer (see `stations.campfire.base`). */
 export const campfireBaseKey = (): string => 'campfire-base';
