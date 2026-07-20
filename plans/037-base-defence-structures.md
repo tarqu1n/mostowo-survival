@@ -15,9 +15,10 @@ seam is what the deferred night wave (roadmap Step 2) will reuse. Art is the Cra
 `Traps/Barricades/*` (walls + gate) and `Traps/Spikes/*` (trap).
 
 **Milestones** (natural stopping points across the steps): **①** Step 1 — StructureManager foundation
-(campfire migrated, no behaviour change). **②** Steps 2–4 — destructible walls (data+art → player
-damages them → enemy attacks a blocking wall). **③** Step 5 — gate. **④** Steps 6–7 — spike trap +
-re-arm loop. **⑤** Step 8 — scenario API, tests, tripwire, docs.
+(campfire migrated, no behaviour change). **②** Step 2 — art curation (pick the wall/gate/trap sprites
+from the CraftPix set). **③** Steps 3–5 — destructible walls (data+art → player damages them → enemy
+attacks a blocking wall). **④** Step 6 — gate. **⑤** Steps 7–8 — spike trap + re-arm loop. **⑥** Step 9
+— scenario API, tests, tripwire, docs.
 
 ## Context & decisions
 
@@ -105,15 +106,18 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
   `applyFlame`). **Cross-pack loading precedent:** the boar loads from a different pack via a `pack`
   field (`tileset.ts:143`, `DirectionalEnemyActor.pack`) — the CraftPix barricades/spikes are
   `craftpix-dungeon`, not the active `pixel-crawler`, so they load the same cross-pack way.
-- **Chosen art (catalogued in `public/assets/asset-catalog.json`, pack `craftpix-dungeon`, tileSize 16):**
-  - Wall → `Traps/Barricades/D_1.png` (idle/damage-stage strip, **432×64**) + `D_1_Build.png` (**216×64**,
-    ~6 frames) + `D_1_Destroy.png` (**216×64**, ~4 frames). Directional set is `{D,S,U}_{1..4}`
-    (down/side/up × 4 variants). **MVP uses front-facing `D_` only**; per-orientation (`S`/`U`) auto-orient
-    is deferred. Exact frame slicing (frame width for the 432/216-wide sheets) derived at execution from
-    the sheet dims + catalog `regions`/`frames`.
-  - Gate → a **visually distinct barricade variant** (start with `Traps/Barricades/D_2.png`; swap at
-    execution if another variant reads more "gate"). Fallback only if none suit: `fantasy-tileset/Buildings/CityWall_Gate_1.png`.
-  - Trap → `Traps/Spikes/1.png` (**192×32**, animated extend/retract; armed-idle / trigger / spent).
+- **Art candidates (catalogued in `public/assets/asset-catalog.json`, pack `craftpix-dungeon`, tileSize 16)
+  — the final per-role pick is made in Step 2, not assumed here:**
+  - Walls/gate → the `Traps/Barricades/` set: `{D,S,U}_{1..4}` (down/side/up facing × 4 style variants),
+    each with a `_Build` and `_Destroy` companion (idle strips ~432×64, build/destroy ~216×64). **MVP uses
+    front-facing `D_` only**; per-orientation (`S`/`U`) auto-orient is deferred. Wall vs gate must be two
+    **visually distinct** variants. Fallback for the gate only if no barricade reads as one:
+    `fantasy-tileset/Buildings/CityWall_Gate_1.png`.
+  - Trap → the `Traps/Spikes/` set (`1..4`, ~192×32 animated extend/retract; armed-idle / trigger / spent).
+  - **Not this plan** (same folder, noted so Step 2 records them for later): `Traps/Lightning`,
+    `Traps/Barrel` (+ `Boom`), `Traps/Barricades/Archer` (turret with `Arrow` projectile).
+  - Exact frame slicing (frame widths/counts for the multi-frame sheets) is resolved in Step 2 from the
+    sheet dims + catalog `regions`/`frames`, so Step 3 consumes concrete numbers.
 - **StructureManager generalisation (the load-bearing call):** `docs/decisions/architecture.md:42–72`
   (indexed `DECISIONS.md:97`) — *"Buildable runtime stays bespoke for now; generalise on buildable #2…
   a `StructureManager` owning a homogeneous `PlacedStructure[]` + a behavior registry
@@ -149,28 +153,53 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
     Tier-1 + Tier-2 suites and `npm run smoke` pass; `refactor-tripwire` golden **unchanged** (no new
     `DebugState` field this step).
 
-- [ ] **Step 2: Destructible-wall data + CraftPix barricade art** `[inline]`
+- [ ] **Step 2: Curate & choose the barricade / spike art assets** `[inline]`
+  - Visually review the CraftPix candidates so the roles are pinned before any rendering code is written.
+    There are lots of barricades (`{D,S,U}_{1..4}` × build/destroy) — don't pick blind. Render/inspect the
+    sprites: prefer the repo's preview path (check `docs/README.md` art-pipeline + `scripts/` for a sheet
+    previewer / contact-sheet tool; the guppi widget-shots harness is a *separate* repo — do not reach for
+    it) and otherwise `Read` the PNGs directly under
+    `public/assets/tilesets/craftpix-dungeon/Traps/{Barricades,Spikes}/`.
+  - Decide and **record** (see Docs): (a) which barricade variant is the **wall** and which distinct
+    variant is the **gate** — they must read as clearly different; (b) confirm the **spike** variant for the
+    trap; (c) confirm **front-facing `D_` only** for MVP (walls/gate render one facing); (d) for each chosen
+    sheet, the **exact frame slicing** — frame width, frame count, and which frames are build / idle /
+    damage-stages / destroy (idle strips ~432×64, build/destroy ~216×64, spikes ~192×32; cross-check the
+    catalog `regions`/`frames` and the pack `tileSize` 16). This removes all "start with X, swap later"
+    guesswork from Steps 3/6/7.
+  - Note the deferred siblings in the same folder (`Lightning`, `Barrel`+`Boom`, `Barricades/Archer` turret
+    + `Arrow`) as catalogued future defence art so a later session doesn't re-discover them.
+  - Side effects: none (no code) — pure decision + asset verification. Independent of Step 1, so it can be
+    done first or alongside it.
+  - Docs: create/extend an art-mapping note (an art-decisions shard under `docs/decisions/` or the art
+    section referenced from `docs/README.md`) capturing the wall/gate/trap → file mappings, frame slicing,
+    the front-facing-only MVP simplification, and the deferred siblings. This shard is the single source
+    Step 3 (and later steps) reads the exact asset paths + frame data from.
+  - Done when: the art shard names the exact wall, gate, and trap sprite files with verified frame slicing,
+    and the wall/gate variants are confirmed visually distinct — enough that Step 3 needs no further art
+    judgement.
+
+- [ ] **Step 3: Destructible-wall data + CraftPix barricade art** `[inline]`
   - Rework `wall` in `src/data/buildables.ts`: add `behavior:'wall'` (now a live structure), keep
     `cost {wood:2}`, set a real `maxHp` (placeholder **40**, flagged for wave-time tuning), keep
-    `blocksPath:true`. Add `animKey`/art references for the barricade (front-facing `D_1`).
-  - Register the cross-pack CraftPix barricade art (idle strip `Traps/Barricades/D_1.png` 432×64,
-    `D_1_Build.png` 216×64, `D_1_Destroy.png` 216×64) following the boar `pack`-field precedent
-    (`tileset.ts:143`); add StripAnim manifest entries + key helpers mirroring the campfire flame setup.
-    Ensure the **Preload** scene loads the new sheets. Derive exact frame widths at execution from the
-    sheet dims (tileSize 16) + catalog `regions`.
+    `blocksPath:true`. Add `animKey`/art references for the **wall barricade sprite chosen in Step 2**.
+  - Register the cross-pack CraftPix barricade art (the idle/build/destroy sheets picked in Step 2)
+    following the boar `pack`-field precedent (`tileset.ts:143`); add StripAnim manifest entries + key
+    helpers mirroring the campfire flame setup, using the **frame slicing recorded in Step 2's art shard**
+    (no re-deriving here). Ensure the **Preload** scene loads the new sheets.
   - Add a `wall` behavior module (StructureManager): on `materialise` play the **Build** anim → settle
-    on the intact idle frame; expose a `takeDamage`/hp-stage render hook (used in Step 3) that swaps to a
-    more-damaged frame of the `D_1` strip as hp drops; on destruction play **Destroy** anim then remove.
+    on the intact idle frame; expose a `takeDamage`/hp-stage render hook (used in Step 4) that swaps to a
+    more-damaged idle frame as hp drops; on destruction play **Destroy** anim then remove.
   - `finishSite`: walls now take the `behavior` (live) route instead of the static-tile render — verify
     the static-wall branch is no longer used by `wall` (campfire is still the only other behavior).
   - Side effects: `src/data/tileset.ts` manifest; `Preload` asset list; `finishSite` branch usage;
     editor palette (walls may appear in the Map Builder — confirm nothing assumes the static render).
-  - Docs: `docs/STATUS.md`; add/extend an art-mapping note (art decisions shard) recording the CraftPix
-    barricade → wall mapping and the "front-facing only for MVP" simplification.
+  - Docs: `docs/STATUS.md`; the art mapping already lives in Step 2's art shard — reference it, don't
+    duplicate.
   - Done when: placing a wall in-scene plays the build animation and stands as a barricade sprite; a
     scenario can read the wall's `hp`/`maxHp`.
 
-- [ ] **Step 3: Player can damage & destroy structures** `[inline]`
+- [ ] **Step 4: Player can damage & destroy structures** `[inline]`
   - Give `PlacedStructure` a `takeDamage(amount)` and `hp`. Add an **ObjectStats-as-defender adapter**
     so `resolveMeleeAttack` accepts a structure (wrap `ObjectStats` with zeroed `strength/dex/dodge`, or
     widen the defender type in `combat.ts` — prefer the adapter to keep `combat.ts` pure and unchanged).
@@ -184,7 +213,7 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
   - Done when: Tier-2 scenario — player attacks a wall repeatedly → `hp` drops per hit → wall destroyed
     → its tile becomes passable (assert via `state()` + a pathing check).
 
-- [ ] **Step 4: Enemy attacks a blocking wall (structure target seam)** `[inline]`
+- [ ] **Step 5: Enemy attacks a blocking wall (structure target seam)** `[inline]`
   - Extend `MonsterTickEnv` with a generic **structure-target** channel + an `attackStructure(id, dmg)`
     callback (mirror `damagePlayer`). Written generically for structure / player / (future) fire so the
     night wave reuses it.
@@ -195,14 +224,14 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
   - Side effects: `EnemyManager.update` env construction (`EnemyManager.ts:154`); `monsterAI` FSM (add a
     "blocked → attack structure" transition if needed); `MonsterTickEnv` type.
   - Docs: `docs/STATUS.md`; note in the architecture/decisions log that this seam is the wave's future
-    attack-target hook (avoids Step-2 rework).
+    attack-target hook (avoids reworking it in roadmap Step 2, the night wave).
   - Done when: Tier-2 scenario — enemy spawned walled off from the player attacks the wall, destroys it,
     then reaches the player (assert wall hp→0 then enemy contact), driven by `step()` only.
 
-- [ ] **Step 5: Gate — ally-permeable destructible barrier** `[inline]`
+- [ ] **Step 6: Gate — ally-permeable destructible barrier** `[inline]`
   - New `gate` buildable in `buildables.ts` (`behavior:'gate'`, or a `wall`-behavior flag `passableToAllies`
-    — prefer a distinct `gate` entry for clarity), cost + `maxHp` set, destructible (reuses Steps 3–4),
-    art = a distinct barricade variant (`Traps/Barricades/D_2.png` to start).
+    — prefer a distinct `gate` entry for clarity), cost + `maxHp` set, destructible (reuses Steps 4–5),
+    art = the **distinct gate barricade variant chosen in Step 2**.
   - Introduce the **split blocked predicate**: keep player/worker `GameScene.isBlocked` treating gate
     tiles as passable, and build a `mobIsBlocked` variant (gate tiles = blocked) fed into
     `MonsterTickEnv.isBlocked` (`EnemyManager.ts:154`). BuildManager `occupied` stays the single writer;
@@ -212,13 +241,13 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
     player's own pathing (worker A*) uses the ally predicate; Vision/lighting unaffected.
   - Docs: `docs/STATUS.md`; a decisions note on introducing per-faction pathing (first faction split).
   - Done when: Tier-2 scenario — player/worker paths through a gate tile; an enemy treats it as a wall
-    (paths around, or attacks it via Step 4); once the gate is destroyed, both pass freely.
+    (paths around, or attacks it via Step 5); once the gate is destroyed, both pass freely.
 
-- [ ] **Step 6: Spike trap — trigger-once damage tile** `[inline]`
+- [ ] **Step 7: Spike trap — trigger-once damage tile** `[inline]`
   - New `spike_trap` buildable: `behavior:'trap'`, `blocksPath:false`, cost set, damage placeholder
-    (flagged for wave-time tuning), art `Traps/Spikes/1.png` with **armed-idle / trigger / spent** states
-    (sheet-frame swap like the campfire flame). Use the existing `activationRange` field or exact
-    same-tile detection.
+    (flagged for wave-time tuning), art = the **spike variant chosen in Step 2** with **armed-idle /
+    trigger / spent** states (sheet-frame swap like the campfire flame). Use the existing `activationRange`
+    field or exact same-tile detection.
   - Trap behavior module `tick`: query enemy tile-occupancy (via `EnemyManager`); when an enemy enters an
     **armed** trap's tile → play the trigger anim, apply damage to that enemy (adapter/`resolveMeleeAttack`
     or flat), set `armed=false` and show the spent visual. One trigger = one hit. Deterministic under `step()`.
@@ -229,7 +258,7 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
   - Done when: Tier-2 scenario — place a trap, script an enemy onto its tile → enemy takes damage and the
     trap becomes **spent** (assert enemy hp drop + trap `armed=false`).
 
-- [ ] **Step 7: Trap re-arm order + dawn auto-enqueue** `[inline]`
+- [ ] **Step 8: Trap re-arm order + dawn auto-enqueue** `[inline]`
   - Add a `rearm` action to `src/systems/tasks.ts` (extend the union), mirroring `refuel`: `enqueue({kind:'rearm', trapId})`
     + `isRearmQueued`/`toggleRearm` de-dupe helpers; a `beginCurrent` rearm branch (resolve `structureById`
     the trap, `reachableAdjacent` stand tile, `pathTo`); a `runRearm` executor that **condition-terminates**
@@ -243,13 +272,13 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
   - Done when: Tier-2 scenario — trigger a trap (spent), `setDayPhase`/`step` to dawn → a rearm order is
     auto-enqueued → the worker re-arms it → trap `armed=true` again.
 
-- [ ] **Step 8: Scenario API surface, tests, tripwire & docs** `[inline]`
+- [ ] **Step 9: Scenario API surface, tests, tripwire & docs** `[inline]`
   - `testApi.ts`: add scenario spec fields for `traps` and `gate` (walls already place via the existing
     `walls` field and are now destructible-agnostic); expose new `DebugState` fields (e.g. `structures`
     with hp, `traps` with `armed`) **appended at the END** of the interface + serializer (`:394`), and
     update `tests/e2e/harness.ts` + the `refactor-tripwire` golden together (intentional golden bump).
   - Tests: Tier-1 pure tests for any new pure logic (e.g. the ObjectStats-as-defender adapter, structure
-    hp-stage frame selection); consolidate the Tier-2 scenario specs from Steps 3–7. Confirm `npm run smoke`.
+    hp-stage frame selection); consolidate the Tier-2 scenario specs from Steps 4–8. Confirm `npm run smoke`.
   - Docs: `docs/ROADMAP.md` — mark Step 3 (trap) delivered, note it (+ walls/gate) was pulled ahead of the
     night wave and that numeric tuning is deferred to Step 2; `docs/STATUS.md`; `docs/GAME-DESIGN.md` /
     `docs/DECISIONS.md` touch-ups if the built behaviour refines the design; CLAUDE.md Status line if warranted.
