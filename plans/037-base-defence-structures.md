@@ -182,7 +182,22 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
     Tier-1 + Tier-2 suites and `npm run smoke` pass; `refactor-tripwire` golden **unchanged** (no new
     `DebugState` field this step).
 
-- [ ] **Step 2: Curate & choose the barricade / spike art assets** `[inline]`
+- [x] **Step 2: Curate & choose the barricade / spike art assets** `[inline]`
+  - Outcome (2026-07-20, resequence item 1): reviewed the CraftPix `D_{1..4}` barricades + `Spikes/{1..4}`
+    (contact sheet in scratchpad). Picks recorded in `docs/wired-art.md` → "Base-defence structures
+    (plan 037)": **Wall = `Traps/Barricades/D_2`** (owner pick — open lashed-stake palisade, not a solid
+    wall); **Trap = `Traps/Spikes/2`** (wood-tone). Frame slicing pinned: barricades **6f×36×64** per
+    `_Build`/`_Destroy` sheet (base `D_x.png` = Build+Destroy concatenated; `_Destroy` frame0=intact →
+    frame5=rubble = the HP-stage source); spikes **6f×32×32** (frame0 retracted → frame2 full extend).
+    **Gate deferred/provisional** (owner picked D_2 for both wall+gate — conflict; wall took D_2, so gate
+    proposed as the solid `D_1` to contrast, reconfirm at the gate step). Deferred siblings (`Lightning`,
+    `Barrel`, `Archer` turret) catalogued. No code touched.
+  - Outcome addendum (owner, 2026-07-20): walls are now **full 4-way** — `{D,S,U}_2` (D=front, U=back,
+    S=side; `S_2` flipX = left) with **player-rotate at placement** choosing facing; neighbour
+    auto-orient stays deferred. Verified `S_2`/`U_2` share `D_2`'s slicing (Build 0–5 + Destroy 6–11,
+    36×64). Gate provisional pick `D_1` inherits the same 4-way set. Recorded in `docs/wired-art.md`;
+    "Out of scope" line updated. This expands the walls step: a `facing` field per placed wall + a
+    placement rotate control + rendering the oriented sheet.
   - Visually review the CraftPix candidates so the roles are pinned before any rendering code is written.
     There are lots of barricades (`{D,S,U}_{1..4}` × build/destroy) — don't pick blind. Render/inspect the
     sprites: prefer the repo's preview path (check `docs/README.md` art-pipeline + `scripts/` for a sheet
@@ -321,8 +336,11 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
   fire-heart defense, loop-close. Only the reusable enemy structure-target *seam* is built here.
 - **Final combat/tuning numbers** — wall HP vs wave DPS, funnel width, trap damage/cost economy; tuned
   once the live wave exists.
-- **Directional wall orientation** (side/up `S`/`U` barricade art, auto-orient by neighbours) — MVP uses
-  front-facing `D_` only.
+- **Neighbour auto-orient** of walls (autotile-style facing inference) — still deferred. **But 4-way
+  directional walls ARE now in scope** (owner, 2026-07-20): `{D,S,U}_2` art with **player-rotate at
+  placement** picking the facing (`S_` flipX = left). This reverses the original front-`D_`-only MVP
+  note; see the wall entry in `docs/wired-art.md` and the walls step below. The placement UI gains a
+  rotate affordance; each placed wall stores its facing.
 - **Gate open/close toggle**, multiple gate widths, gate-as-interactable.
 - **Additional traps** (snare/bear trap, bait/lure, fire trap, barrel, lightning, Archer barricade turret)
   — assets exist (`Traps/{Spikes,Lightning,Barrel,Barricades/Archer}`) but only the spike trap ships now.

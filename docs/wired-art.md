@@ -195,6 +195,45 @@ inheriting the actor default — see the `ActorRender`/`StripAnim.render` doc in
 Full decision rationale (this supersedes plan 010's anchor-stamp tool for rigid attachments) —
 [DECISIONS.md](DECISIONS.md).
 
+### Base-defence structures — barricade wall, gate & spike trap (plan 037)
+
+Art picks + exact frame slicing for the defence buildables, from the **`craftpix-dungeon`** pack
+(`tileSize` 16, but these sheets are authored at their own native frame sizes below — loaded
+cross-pack via a `pack:'craftpix-dungeon'` field, the boar precedent, `tileset.ts:143`). **Walls are
+4-way, facing chosen by player-rotate at placement** (owner, 2026-07-20 — reverses the plan's original
+front-`D_`-only MVP note; neighbour auto-orient stays deferred). This section is the single source the
+wall/gate/trap render steps read paths + frames from.
+
+- **Wall → `Traps/Barricades/*_2` (owner pick, 2026-07-20):** the open lashed-stake palisade (spike
+  logs with gaps), *not* a solid plank wall — the grotty basic-barricade look. **Full 4-way**, frames
+  **36w×64h** throughout. Each orientation's base `*_2.png` (432×64, 12f) is just **Build(0–5) +
+  Destroy(6–11) concatenated**, so the two companion sheets per orientation are the real assets (no
+  need to load the base `*_2.png`):
+  - **Orientations:** `D_2` = **front/down**, `U_2` = **back/up**, `S_2` = **side** — `S_2` is the
+    **right** wall and is `flipX`-mirrored for the **left** (one side sheet serves both, the
+    player/skeleton side-flip precedent). Placement rotate cycles down→right→up→left; left is `S_2`+flip.
+  - **Build anim** — `{D,S,U}_2_Build.png` (216×64, **6 frames × 36×64**), played once on `materialise`,
+    settles on **frame 5** = the assembled standing barricade.
+  - **Damage stages + destroy** — `{D,S,U}_2_Destroy.png` (216×64, **6 frames × 36×64**): **frame 0 =
+    intact** (identical to Build frame 5), **frame 5 = rubble**. HP-stage render hook picks a frame by
+    `round((1 − hp/maxHp) × 5)`; on `hp≤0` play the sheet 0→5 through, then remove. Same slicing for all
+    three orientations (verified: `S_2`/`U_2` fill curves match `D_2`'s Build+Destroy split).
+- **Gate → PROVISIONAL, reconfirm at the gate step.** The owner picked `D_2` for *both* wall and
+  gate, but wall/gate must read as clearly distinct and the wall is now `D_2`. Proposed contrast:
+  **`Traps/Barricades/D_1`** (the *solid* horizontal-plank barricade) — same 36×64 slicing, same
+  `_Build`(6f)/`_Destroy`(6f) split, and the same **4-way `{D,S,U}_1`** orientation set as the wall
+  (player-rotate, `S_1` flipX for left) — so a solid barrier reads against the open-stake wall. **Not
+  finalised** — the gate is a later step in the resequenced order; confirm the variant then.
+- **Spike trap → `Traps/Spikes/2` (wood-tone, owner pick; `Spikes/1` is the equivalent lighter
+  variant).** `2.png` = **192×32, 6 frames × 32×32**, a symmetric retract→extend→retract: **frame 0 =
+  retracted** (flush, spikes hidden), **frame 2 = full extend** (peak), frames 3–5 retract back. The
+  exact **armed / trigger / spent** frame assignment is finalised at the trap step (candidate: armed =
+  a low frame, trigger = play 0→2 as the strike + apply damage on the extend, spent = hold extended,
+  re-arm = retract to armed) — recorded here so that step consumes concrete frames.
+- **Deferred siblings (catalogued so a later session doesn't re-discover them):** same `Traps/` folder
+  — `Lightning`, `Barrel` (+`Boom`), and `Barricades/Archer` (turret + its `Arrow` projectile). Not
+  wired by plan 037; only the spike trap ships now.
+
 > **Sourcing / generating new art?** The tileset candidates weighed up, the AI-gen service trials
 > (Retro Diffusion / PixelLab), the Gemini bespoke-asset pipeline, and **`style_match.py`** (snaps
 > off-palette gen art onto the pack's look — reach for it whenever generated art's shape is right but
