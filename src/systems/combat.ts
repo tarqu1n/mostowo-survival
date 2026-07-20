@@ -3,10 +3,18 @@
  * attack go through `resolveMeleeAttack` rather than each hand-rolling damage math.
  */
 
-import type { CombatantStats } from '../data/types';
+import type { CombatantStats, ObjectStats } from '../data/types';
 
 export function meleeDamage(attacker: CombatantStats, weaponBaseDamage: number): number {
   return weaponBaseDamage + attacker.strength;
+}
+
+/** Adapt an inert object's stats (a structure) to a combat defender: it keeps its armour + maxHp but
+ *  has no offence/evasion, so strength/dex/dodge read 0 — a wall never dodges and never counter-scales.
+ *  Lets a structure be the `defender` of {@link resolveMeleeAttack} (plan 037 2c — the mob-vs-wall path,
+ *  the ObjectStats-as-defender adapter the plan anticipated). Pure. */
+export function objectAsDefender(stats: ObjectStats): CombatantStats {
+  return { ...stats, strength: 0, dex: 0, dodge: 0 };
 }
 
 /** Ranged damage: weapon base + the attacker's dexterity (the ranged analogue of `meleeDamage`'s

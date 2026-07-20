@@ -90,6 +90,22 @@ export interface MonsterTickEnv {
   /** Drain `amount` fuel from the fire (→ CampfireManager.damageFire) — the fire-strike effect, the
    *  mirror of `damagePlayer` for the fire objective. */
   attackFire: (id: string, amount: number) => void;
+  /** Plan 037 chunk 2c — the generic structure-target seam, written for structure / player / (future)
+   *  fire per decision #4 so it reads like `fire`/`attackFire`. `structureAt` finds the live structure
+   *  occupying a tile (today only a wall) with the combat `defender` + `thorns` needed to resolve a
+   *  strike, or `null` for empty/impassable-by-terrain tiles. Used both to resolve a bash and to walk
+   *  the frontier when hunting the blocking wall. */
+  structureAt: (
+    col: number,
+    row: number,
+  ) => { id: string; defender: CombatantStats; thorns: number } | null;
+  /** Deal `dmg` to the structure (→ WallManager.takeDamage) — the mirror of `damagePlayer`/`attackFire`
+   *  for a blocking structure; returns whether the blow destroyed it (so the mob can repath through). */
+  attackStructure: (id: string, dmg: number) => boolean;
+  /** Apply retaliation/other damage back to a live monster (decision #7 thorns) through the SAME
+   *  damage/kill path a player hit uses — a low-HP mob can die to it. Takes the monster so it mirrors
+   *  `lungeAt`/`beginWindUp` (which also pass the monster). */
+  hurtMonster: (monster: MonsterCharacter, amount: number) => void;
 }
 
 /**
@@ -111,6 +127,10 @@ export class MonsterCharacter extends Character {
   /** Plan 038 Step 4 — this mob's default objective is the fire-heart (a WaveDirector spawn). Drives
    *  the `seek` FSM branch; player-acquire still preempts. Fixed at spawn (from `opts.objective`). */
   readonly seeksFire: boolean;
+  /** Plan 037 chunk 2c — the wall this mob is bashing because it's walled off from its objective, or
+   *  `null` when it has a clear route. Resolved here (this class owns the `findPath` that detects the
+   *  walled-off case) and fed into the FSM's `siege` branch; cleared when the wall breaks or vanishes. */
+  private siegeTarget: Cell | null = null;
   lastContactAt = 0;
   /** >0 while the enemy is in an attack wind-up (plan 035a Step 1): the timestamp its strike lands.
    *  Set caller-side on entering the wind-up window in melee contact; cleared on the strike or on a
@@ -245,6 +265,7 @@ export class MonsterCharacter extends Character {
         isBlocked: env.isBlocked,
         seeksFire: this.seeksFire, // plan 038 Step 4 — wave mobs seek the fire when not chasing
         fireTile: env.fire?.tile ?? null,
+        siegeTarget: this.siegeTarget, // plan 037 2c — walled off? bash this wall (resolved below)
       },
       env.rng,
     );
@@ -278,18 +299,45 @@ export class MonsterCharacter extends Character {
       }
       this.cancelWindUp(env);
     }
-    // Mode left chase/seek entirely mid-wind-up (e.g. the fire went dark under this mob) — clear the
-    // stale telegraph so no tint/anim lingers into a calm beat.
+    // Siege + in contact with the blocking wall: the SAME telegraphed strike, generalised to a
+    // structure (plan 037 2c). Resolves the mob's own weapon/contact damage against the wall through the
+    // shared combat path, then — if the wall has `thorns` (the spiked palisade, decision #7) — bites the
+    // mob back the same way a player hit would, which can KILL a low-HP mob. On a lethal blow the wall
+    // frees its tile immediately, so clearing `siegeTarget` drops the mob back to chase/seek next tick.
+    else if (this.ai.mode === 'siege' && this.siegeTarget) {
+      const wallTile = this.siegeTarget;
+      const wall = env.structureAt(wallTile.col, wallTile.row);
+      if (!wall) {
+        this.siegeTarget = null; // the wall's gone (broken elsewhere) → re-evaluate the route next tick
+        this.cancelWindUp(env);
+      } else if (this.inContactWith([wallTile])) {
+        const baseDmg = this.weapon ? this.weapon.def.damage : UNARMED_BASE_DAMAGE;
+        const wx = tileToWorldCenter(wallTile.col);
+        const wy = tileToWorldCenter(wallTile.row);
+        this.strikeContact(env, wx, wy, () => {
+          const dmg = resolveMeleeAttack(this.def, wall.defender, baseDmg, env.rng);
+          const destroyed = env.attackStructure(wall.id, dmg);
+          if (wall.thorns > 0) env.hurtMonster(this, wall.thorns); // thorns fire ONLY on this attack tick
+          if (destroyed) this.siegeTarget = null; // broke through → chase/seek resumes (repaths) next tick
+        });
+        return;
+      } else {
+        this.cancelWindUp(env);
+      }
+    }
+    // Mode left chase/seek/siege entirely mid-wind-up (e.g. the fire went dark under this mob) — clear
+    // the stale telegraph so no tint/anim lingers into a calm beat.
     else {
       this.cancelWindUp(env);
     }
 
     // Otherwise honour the FSM's move command: repath when asked, then walk (or stand if no target). A
-    // `seek` target is the (blocked) fire tile, so path to a walkable tile ADJACENT to it instead
-    // (reachableAdjacent) — the same "stand next to a target" the harvest/refuel workers use.
+    // `seek` target is the (blocked) fire tile and a `siege` target is the (blocked) wall tile, so both
+    // path to a walkable tile ADJACENT to it instead (reachableAdjacent) — the same "stand next to a
+    // target" the harvest/refuel workers (and the fire-strike) use.
     if (decision.repath && decision.targetTile) {
       const goal: Cell | null =
-        this.ai.mode === 'seek'
+        this.ai.mode === 'seek' || this.ai.mode === 'siege'
           ? reachableAdjacent(
               { col: this.col, row: this.row },
               decision.targetTile,
@@ -302,11 +350,18 @@ export class MonsterCharacter extends Character {
         : null;
       this.path = path ?? [];
       this.pathIndex = 0;
+      // Walled off (plan 037 2c): a chasing/seeking mob with NO route to its objective resolves the wall
+      // on the frontier toward it and switches to `siege` next tick (the FSM reads `siegeTarget`); a
+      // route that exists clears any prior siege. Only chase/seek arm the trigger, so this never fires
+      // for a calm mob or affects a mob that can still route around a wall.
+      if (this.ai.mode === 'chase' || this.ai.mode === 'seek') {
+        this.siegeTarget = path === null ? this.blockingStructure(decision.targetTile, env) : null;
+      }
       // Only a truly UNREACHABLE calm-mode pick (findPath → null) strands the monster — drop to idle
       // so it re-picks next beat. An empty path ([]) is "already on the target" (e.g. a patroller
-      // sitting on its first waypoint): keep the mode so the FSM's arrival logic runs. chase AND seek
-      // keep trying regardless (the player/fire may be briefly unreachable).
-      if (path === null && this.ai.mode !== 'chase' && this.ai.mode !== 'seek') {
+      // sitting on its first waypoint): keep the mode so the FSM's arrival logic runs. chase, seek AND
+      // siege keep trying regardless (the player/fire/wall may be briefly unreachable).
+      else if (path === null && this.ai.mode !== 'siege') {
         this.ai = {
           ...this.ai,
           mode: 'idle',
@@ -324,6 +379,28 @@ export class MonsterCharacter extends Character {
   /** True if the monster's feet tile is within melee contact (Chebyshev ≤ 1) of ANY of `tiles`. */
   private inContactWith(tiles: Cell[]): boolean {
     return tiles.some((t) => Math.max(Math.abs(t.col - this.col), Math.abs(t.row - this.row)) <= 1);
+  }
+
+  /**
+   * Resolve the wall to bash when walled off (plan 037 2c). Pathfind toward the objective treating
+   * STRUCTURES as passable (so only they, not real terrain, gate the route), then return the first tile
+   * on that route that currently holds a structure — the wall on the frontier toward the objective.
+   * Returns `null` when even structure-passable there's no route (sealed by terrain, not a wall), in
+   * which case the mob just stands. The objective tile itself may be un-standable (the fire ring), so
+   * aim for a structure-passable tile adjacent to it in that case.
+   */
+  private blockingStructure(objectiveTile: Cell, env: MonsterTickEnv): Cell | null {
+    const from = { col: this.col, row: this.row };
+    const wallsPassable = (c: number, r: number) =>
+      env.structureAt(c, r) ? false : env.isBlocked(c, r);
+    const goal = env.isBlocked(objectiveTile.col, objectiveTile.row)
+      ? reachableAdjacent(from, objectiveTile, wallsPassable, env.dims)
+      : objectiveTile;
+    if (!goal) return null;
+    const route = findPath(from, goal, wallsPassable, env.dims);
+    if (!route) return null;
+    for (const step of route) if (env.structureAt(step.col, step.row)) return { ...step };
+    return null;
   }
 
   /** Cancel an in-flight wind-up telegraph (the target left contact, or the mob left its strike mode). */
@@ -361,6 +438,8 @@ export class MonsterCharacter extends Character {
         env.endWindUp(this); // drop the warning tint — the strike is landing
         env.lungeAt(this, lungeX, lungeY); // the forward strike-lunge + weapon swing
         onStrike();
+        if (!this.alive) return; // thorns retaliation killed us mid-strike (plan 037 2c) — no dangling
+        //                          anim/updateAnim on a corpse; killEnemy already ran the death collapse
       }
     } else if (env.nowMs - this.lastContactAt >= cooldown - windupMs) {
       // Cadence gate open → begin the wind-up telegraph (the cue to disengage / defend the fire).

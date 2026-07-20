@@ -46,6 +46,18 @@ export interface EnemyManagerDeps {
   litHearth(): { id: string; tile: Cell; pos: { x: number; y: number } } | null;
   /** Drain `amount` fuel from the fire (→ CampfireManager.damageFire) — the fire-strike effect. */
   attackFire(id: string, amount: number): void;
+  /** Plan 037 chunk 2c — the live structure occupying `(col,row)` (today a wall), with the combat
+   *  `defender` (armour + zeroed offence) and `thorns` a mob's strike needs; null when the tile holds
+   *  no structure. Assembled by GameScene closing over `wallManager`. */
+  structureAt(
+    col: number,
+    row: number,
+  ): { id: string; defender: CombatantStats; thorns: number } | null;
+  /** Deal `dmg` to the structure (→ WallManager.takeDamage); returns whether the blow destroyed it. */
+  attackStructure(id: string, dmg: number): boolean;
+  /** Red flash + flinch on a sprite that took a survived hit (routes to CombatFxManager.flashHit) —
+   *  reused for the thorns retaliation feedback, exactly as the player's melee/bow hit uses it. */
+  flashHit(sprite: CharacterSprite): void;
   /** Visible attack tell + weapon swing (routes to CombatFxManager.lungeAt). */
   lungeAt(monster: MonsterCharacter, targetX: number, targetY: number): void;
   /** Play the wind-up telegraph before a strike (routes to CombatFxManager.beginWindUp). */
@@ -180,11 +192,28 @@ export class EnemyManager {
       damagePlayer: (amount) => this.deps.damagePlayer(amount),
       fire: this.deps.litHearth(), // plan 038 Step 4 — shared fire target for this tick's wave mobs
       attackFire: (id, amount) => this.deps.attackFire(id, amount),
+      // Plan 037 chunk 2c — the generic structure-target seam (mirrors the fire seam above): find the
+      // blocking wall, bash it, and route its thorns retaliation back through the kill path.
+      structureAt: (col, row) => this.deps.structureAt(col, row),
+      attackStructure: (id, dmg) => this.deps.attackStructure(id, dmg),
+      hurtMonster: (m, amount) => this.hurtMonster(m, amount),
     };
     for (const z of this.enemies) {
       if (!z.alive) continue;
       z.update(env);
     }
+  }
+
+  /**
+   * Apply damage to a live monster through the SAME path the player's attack uses (plan 037 2c thorns):
+   * a survived blow gets the red hit-flash, a lethal one runs the full {@link killEnemy} collapse — so a
+   * low-HP mob genuinely dies to a spiked wall's retaliation. No-op on an already-dead mob or a ≤0 amount.
+   */
+  private hurtMonster(z: MonsterCharacter, amount: number): void {
+    if (!z.alive || amount <= 0) return;
+    z.takeDamage(amount);
+    if (z.hp <= 0) this.killEnemy(z);
+    else this.deps.flashHit(z.sprite);
   }
 
   // --- Combat ----------------------------------------------------------------------

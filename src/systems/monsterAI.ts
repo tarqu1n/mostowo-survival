@@ -9,7 +9,11 @@
  * flagged `seeksFire` with a lit hearth to attack walks to it and (caller-side) strikes it, but player
  * radius-acquire still **preempts** seek (near the player it fights the player — the roaming-pull),
  * returning to the fire once the player is gone. `seek` needs `fireTile` in the inputs; with no lit
- * fire the mob falls back to the calm modes (and will still acquire the player).
+ * fire the mob falls back to the calm modes (and will still acquire the player). `siege` (plan 037 2c
+ * — base-defence) preempts everything: when the caller finds its objective (player/fire) is **walled
+ * off** (`findPath` → null) it resolves the blocking structure and feeds its tile as `siegeTarget`; the
+ * mob then walks adjacent to that wall and (caller-side) bashes it, resuming chase/seek once it breaks
+ * through. `siegeTarget` is caller-computed (it owns the A*), so the pure FSM never runs pathfinding.
  *  - **Acquire** is radius-only (world px) using the enemy's own `acquireRadiusPx` (= `EnemyDef.vision`);
  *    no line-of-sight / wall occlusion.
  *  - **De-aggro** is distance-only (no timeout): as the player nears the outer edge of chase range the
@@ -24,7 +28,7 @@
 
 import type { Cell, Dims } from './pathfind';
 
-export type MonsterMode = 'idle' | 'wander' | 'patrol' | 'chase' | 'seek';
+export type MonsterMode = 'idle' | 'wander' | 'patrol' | 'chase' | 'seek' | 'siege';
 
 /** A world-pixel position (radius aggro/de-aggro is measured in world px, not tiles). */
 export interface Vec2 {
@@ -83,6 +87,12 @@ export interface MonsterInputs {
   /** The tile of the nearest lit hearth to attack, or `null` when none is lit (mob falls back to calm
    *  modes). Stationary, so `seek` re-paths only when it changes. */
   fireTile?: Cell | null;
+  /** Plan 037 chunk 2c — the tile of the structure (wall) barring this mob's route to its objective, or
+   *  `null` when the objective is reachable / nothing blocks. Computed caller-side (MonsterCharacter,
+   *  which owns the `findPath` call): a chase/seek mob whose path to its objective is `null` (walled
+   *  off) resolves the blocking wall on the frontier and feeds it here, flipping the FSM into `siege`.
+   *  Kept out of the FSM so the pure module never runs A* itself. */
+  siegeTarget?: Cell | null;
 }
 
 export interface MonsterDecision {
@@ -238,6 +248,22 @@ function stepSeek(prev: MonsterState, fireTile: Cell): MonsterDecision {
   };
 }
 
+/**
+ * Siege the wall barring the route to the objective (plan 037 chunk 2c): head for `wallTile` and hold
+ * `siege` mode. Directly analogous to {@link stepSeek} — the caller (MonsterCharacter.update) paths to a
+ * walkable tile ADJACENT to the (blocked) wall and drives the telegraphed strike, and clears the mob's
+ * `siegeTarget` once the wall falls so the FSM resumes chase/seek. Only sets the mode + goal + asks for a
+ * repath when the target wall changes (a fresh siege / a different frontier wall).
+ */
+function stepSiege(prev: MonsterState, wallTile: Cell): MonsterDecision {
+  const changed = prev.mode !== 'siege' || !prev.goalTile || !sameTile(prev.goalTile, wallTile);
+  return {
+    state: { ...prev, mode: 'siege', goalTile: wallTile, timerMs: 0 },
+    targetTile: wallTile,
+    repath: changed,
+  };
+}
+
 function stepPatrol(prev: MonsterState, inputs: MonsterInputs): MonsterDecision {
   const route = prev.patrolRoute;
   if (!route || route.length === 0) {
@@ -282,6 +308,14 @@ export function stepMonster(
   rng: () => number = Math.random,
 ): MonsterDecision {
   const d = distPx(inputs.monsterPos, inputs.playerPos);
+
+  // Siege (plan 037 chunk 2c): the caller found the objective walled off and resolved the blocking wall
+  // — bash it until it falls. Preempts EVERYTHING, including acquire: a walled-off mob has the player in
+  // radius but unreachable, so it must break through rather than re-acquire-and-fail-to-path each tick.
+  // Cleared caller-side (siegeTarget → null) once the wall breaks, dropping straight back to acquire.
+  if (inputs.siegeTarget) {
+    return stepSiege(prev, inputs.siegeTarget);
+  }
 
   // Acquire: any calm mode flips to chase the instant the player is within radius.
   if (prev.mode !== 'chase' && d <= inputs.acquireRadiusPx) {

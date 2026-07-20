@@ -210,7 +210,7 @@ CampfireManager's `fire:changed` — orange while lit, red when knocked out, hid
 **NIGHT WAVE** indicator beside the day/night readout (shown during night). A **FORCE WAVE** dev-menu
 button (+ `debug:forceWave` hook) jumps to night and starts a wave on demand for manual playtesting.
 
-## Base-defence walls (plan 037, chunks 2a–2b)
+## Base-defence walls (plan 037, chunks 2a–2c)
 
 The `wall` buildable is now a **live, 4-way, mob-destructible structure** (was a static tile),
 materialised by an interim **`src/scenes/world/WallManager.ts`** — mirrors `CampfireManager`'s
@@ -235,8 +235,22 @@ removes it (a clean removal, no crumble anim; shared tile-free/repath teardown w
 path) and **credits a partial refund** — `floor(cost × DECONSTRUCT_REFUND_FRACTION)` (0.5, `config.ts`
 tuning knob) per resource (wall `{wood:2}` → 1 wood back). A queued deconstruct shows a yellow outline
 (like a queued refuel). DEV test seams: `__test.walls()` / `__test.damageWall(index, amount)` /
-`__test.deconstructWall(index)` — none part of `DebugState`, so the tripwire golden is untouched.
-**Deferred to 2c:** enemy-attacks-a-wall + thorns firing — `thorns` is data-only for now.
+`__test.deconstructWall(index)` / `__test.enemyHps()` — none part of `DebugState`, so the tripwire
+golden is untouched.
+
+**Mob attacks a blocking wall + thorns (chunk 2c).** A mob **walled off** from its objective bashes
+the blocking wall via a **generic structure-target seam** on `MonsterTickEnv` — `structureAt` /
+`attackStructure` / `hurtMonster`, mirroring the wave's `fire` / `attackFire` seam and written for
+structure/player/future-fire (decision #4). New `monsterAI` FSM state **`siege`** (preempts everything,
+incl. player-acquire): the trigger is caller-side — when a chasing/seeking mob's `findPath` to its
+objective returns `null`, `MonsterCharacter` resolves the frontier wall (a structure-passable pathfind,
+first structure on the route) and feeds it as `siegeTarget`; the FSM stays pure. The mob walks adjacent
+and drives the **same telegraphed wind-up/strike** it uses on the player/fire, resolving its own
+weapon/contact damage against the wall (`resolveMeleeAttack` + an `objectAsDefender` adapter), and
+repaths through on destruction. **Thorns (decision #7):** on each landed strike a `thorns` wall bites
+the attacker back through the same damage/kill path a player hit uses (`hurtMonster` → `takeDamage` /
+`killEnemy`) — so a low-HP mob genuinely **dies** to the spiked palisade; thorns fire only on the mob's
+own attack tick, never passively. Tier-2: `wall-enemy-attack.spec.ts` (siege-then-reach + thorns-kill).
 
 ## Node harvest feel (plan 031)
 

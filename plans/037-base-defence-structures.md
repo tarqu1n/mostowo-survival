@@ -316,10 +316,30 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
   - Done when: Tier-2 scenario — player attacks a wall repeatedly → `hp` drops per hit → wall destroyed
     → its tile becomes passable (assert via `state()` + a pathing check).
 
-- [ ] **Step 5: Enemy attacks a blocking wall (structure target seam)** `[inline]`
+- [x] **Step 5: Enemy attacks a blocking wall (structure target seam)** `[inline]` — DELIVERED as chunk **2c**.
   - **Extended by decision #7 (owner, 2026-07-20) → see resequence chunk 2c.** In addition to the seam
     below, a mob hitting a `thorns` wall takes **retaliation damage** per strike; the spiked D_2 wall is
     the low-HP/thorns early-game archetype. Otherwise as described.
+  - Outcome (2026-07-20, chunk 2c — delegated + reviewed): a mob **walled off** from its objective sieges
+    the blocking wall. New generic structure-target seam on `MonsterTickEnv` (mirrors plan-038 `attackFire`):
+    `structureAt(col,row) → {id,defender,thorns}` + `attackStructure(id,dmg)` + `hurtMonster(m,amount)`,
+    wired in EnemyManager over `wallManager` + a new pure `objectAsDefender` adapter (`combat.ts`, zeroes
+    strength/dex/dodge). New **`siege` FSM state** (`monsterAI`, genuinely new per critique #5, not a
+    target swap): trigger is caller-side — when a chasing/seeking mob's `findPath` to its objective returns
+    **null** (truly enclosed; walls are in `occupied` so a routable wall is walked around, not sieged),
+    `MonsterCharacter` resolves the frontier wall and stores `siegeTarget`; the mob walks adjacent and
+    **reuses the telegraphed wind-up/strike** to `attackStructure` → `WallManager.takeDamage`; on
+    destruction it repaths through. **Thorns:** each landed strike, if `thorns>0`, bites the attacker back
+    via `hurtMonster` → the player-hit damage/kill path (a low-HP mob dies to thorns — verified hp-3 mob
+    dies on its 3rd strike). Player-target + fire-seek behaviours unchanged. Files: combat/monsterAI/
+    MonsterCharacter/EnemyManager/GameScene/testApi/entities.testTypes/harness + STATUS.md + Tier-1
+    combat+monsterAI tests; new `tests/e2e/wall-enemy-attack.spec.ts` (siege + thorns). **Verified:** build
+    clean, Tier-1 834 pass, lint 0 errors, prettier clean, new e2e spec + `refactor-tripwire` PASS (golden
+    unchanged — `__test.enemyHps()` not in DebugState); the enemy/wave/combat/boar specs pass. **Flagged
+    (pre-existing, NOT 2c):** `wave.spec` `beginWave` is flaky — a latent `CampfireManager.applyFlame` crash
+    when a wave mob drains the fire below the 50% flame-swap threshold (timing/wall-clock-seeded); 2c touches
+    no campfire/flame file and `wave.spec` has no walls (siege path dead). Worth a separate fix (may be a
+    live wave crash, not just a test flake).
   - Extend `MonsterTickEnv` with a generic **structure-target** channel + an `attackStructure(id, dmg)`
     callback (mirror `damagePlayer`). Written generically for structure / player / (future) fire so the
     night wave reuses it.

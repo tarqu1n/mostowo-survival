@@ -36,7 +36,7 @@ import { zoneAt } from '../systems/mapZones';
 import type { MapFile, DecorObject, NodeObject, PortalObject } from '../systems/mapFormat';
 import { breadcrumb, setCrashContext } from '../debug/crashReporter';
 import { TaskQueue, type Action } from '../systems/tasks';
-import { resolveMeleeAttack, resolveRangedAttack } from '../systems/combat';
+import { resolveMeleeAttack, resolveRangedAttack, objectAsDefender } from '../systems/combat';
 import { attackTiles } from '../systems/hurtbox';
 import type { UIScene } from './UIScene';
 import type { GameTestApi } from '../entities/testTypes';
@@ -373,6 +373,20 @@ export class GameScene extends Phaser.Scene {
       damagePlayer: (amount) => this.damagePlayer(amount),
       litHearth: () => this.litHearth(),
       attackFire: (id, amount) => this.campfireManager.damageFire(id, amount),
+      // Structure-target seam (plan 037 2c) — the wall a walled-off mob bashes, plus its combat defender
+      // (armour, zeroed offence) + thorns; closes over wallManager (the sole wall owner). A single wall
+      // archetype today, so the defender comes straight off BUILDABLES.wall (as WallManager itself does).
+      structureAt: (col, row) => {
+        const w = this.wallManager.wallAt(col, row);
+        if (!w) return null;
+        return {
+          id: w.id,
+          defender: objectAsDefender(BUILDABLES.wall),
+          thorns: this.wallManager.thornsOf(w.id),
+        };
+      },
+      attackStructure: (id, dmg) => this.wallManager.takeDamage(id, dmg),
+      flashHit: (sprite) => this.fx.flashHit(sprite),
       lungeAt: (m, x, y) => this.fx.lungeAt(m, x, y),
       beginWindUp: (m, ms) => this.fx.beginWindUp(m, ms),
       endWindUp: (m) => this.fx.endWindUp(m),
@@ -719,6 +733,7 @@ export class GameScene extends Phaser.Scene {
       damageFire: (i, amount) => testApi.damageFire(i, amount),
       walls: () => testApi.walls(),
       damageWall: (i, amount) => testApi.damageWall(i, amount),
+      enemyHps: () => testApi.enemyHps(),
       // Enqueue the real deconstruct worker order for the wall at `index` (the order the demolish-mode
       // tap enqueues) — drives the full walk-adjacent → remove + refund path under step() (plan 037 2b).
       deconstructWall: (i) => {

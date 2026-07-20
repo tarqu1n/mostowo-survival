@@ -421,6 +421,16 @@ export class TestApi {
     return this.deps.wallManager.takeDamage(w.id, amount);
   }
 
+  /** DEV/test-only: live enemies' current HP, spec order — a standalone read seam (like {@link walls})
+   *  for the enemy-attack spec to watch a mob's HP fall to thorns (plan 037 2c). NOT part of the
+   *  serialized {@link DebugState}, so the refactor-tripwire golden stays untouched. */
+  enemyHps(): number[] {
+    return this.deps
+      .enemies()
+      .filter((z) => z.alive)
+      .map((z) => z.hp);
+  }
+
   /** DEV/test-only: start a night wave immediately (plan 038 Step 3) — the deterministic entry point
    *  for spawn/pacing specs, independent of crossing a day→night clock edge. Idempotent (no-op if a
    *  wave is already running). Also the target of the dev force-wave hook (Step 6). */

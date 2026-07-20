@@ -19,7 +19,7 @@ export interface DebugState {
   px: number;
   py: number;
   enemies: number;
-  enemyModes: Array<'idle' | 'wander' | 'patrol' | 'chase' | 'seek'>;
+  enemyModes: Array<'idle' | 'wander' | 'patrol' | 'chase' | 'seek' | 'siege'>;
   enemyTiles: Array<{ col: number; row: number }>;
   enemyWeapons: Array<string | null>;
   corpses: number;
@@ -204,6 +204,12 @@ export function damageWall(page: Page, index: number, amount: number): Promise<b
  *  remove + partial refund; returns false if there's no wall at that index. */
 export function deconstructWall(page: Page, index: number): Promise<boolean> {
   return page.evaluate((i) => (window as any).game.__test.deconstructWall(i), index);
+}
+
+/** Live enemies' current HP, spec order (plan 037 2c) — lets the enemy-attack spec watch a mob's HP
+ *  fall to a spiked wall's thorns. NOT part of DebugState. */
+export function enemyHps(page: Page): Promise<number[]> {
+  return page.evaluate(() => (window as any).game.__test.enemyHps());
 }
 
 /** Start a night wave immediately (plan 038 Step 3), independent of the day→night clock edge. */

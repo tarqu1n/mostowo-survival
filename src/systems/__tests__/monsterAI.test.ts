@@ -305,3 +305,48 @@ describe('seek (fire objective — plan 038 Step 4)', () => {
     expect(state.mode).toBe('idle'); // stands its idle pause — never seeks
   });
 });
+
+describe('siege (walled-off objective — plan 037 chunk 2c)', () => {
+  const WALL = { col: 6, row: 5 };
+
+  it('a walled-off mob sieges the blocking wall — preempting even player-acquire', () => {
+    // Player well inside acquire radius (would normally chase), but the caller found no route and fed a
+    // siegeTarget: siege must win, since chasing would just fail to path each tick.
+    const prev: MonsterState = {
+      ...initialMonsterState(),
+      mode: 'chase',
+      lastChaseRepathMs: -1000,
+    };
+    const { state, targetTile, repath } = stepMonster(
+      prev,
+      baseInputs({ playerPos: { x: 40, y: 0 }, siegeTarget: WALL }), // dist 40 < acquire 80
+      mulberry32(1),
+    );
+    expect(state.mode).toBe('siege');
+    expect(targetTile).toEqual(WALL);
+    expect(repath).toBe(true); // first entry → path adjacent to the wall
+  });
+
+  it('re-sieges the same wall without a redundant repath', () => {
+    const prev: MonsterState = { ...initialMonsterState(), mode: 'siege', goalTile: WALL };
+    const { state, targetTile, repath } = stepMonster(
+      prev,
+      baseInputs({ siegeTarget: WALL }),
+      mulberry32(1),
+    );
+    expect(state.mode).toBe('siege');
+    expect(targetTile).toEqual(WALL);
+    expect(repath).toBe(false); // goal wall unchanged → keep the existing path
+  });
+
+  it('drops straight back to chase once the wall breaks (siegeTarget cleared)', () => {
+    // The caller clears siegeTarget when the wall falls; with the player still in radius, acquire fires.
+    const prev: MonsterState = { ...initialMonsterState(), mode: 'siege', goalTile: WALL };
+    const { state } = stepMonster(
+      prev,
+      baseInputs({ playerPos: { x: 40, y: 0 }, siegeTarget: null }),
+      mulberry32(1),
+    );
+    expect(state.mode).toBe('chase');
+  });
+});

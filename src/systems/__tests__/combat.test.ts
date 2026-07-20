@@ -6,8 +6,9 @@ import {
   damageTaken,
   resolveMeleeAttack,
   resolveRangedAttack,
+  objectAsDefender,
 } from '../combat';
-import type { CombatantStats } from '../../data/types';
+import type { CombatantStats, ObjectStats } from '../../data/types';
 
 function makeStats(overrides: Partial<CombatantStats> = {}): CombatantStats {
   return {
@@ -100,6 +101,25 @@ describe('resolveMeleeAttack', () => {
     }
 
     expect(hp).toBe(0);
+  });
+});
+
+describe('objectAsDefender (structure-as-defender adapter, plan 037 2c)', () => {
+  const wall: ObjectStats = { maxHp: 12, armour: 2, speed: 0 };
+
+  it('keeps armour + maxHp and zeroes the offence/evasion stats', () => {
+    const def = objectAsDefender(wall);
+    expect(def.maxHp).toBe(12);
+    expect(def.armour).toBe(2);
+    expect(def.strength).toBe(0);
+    expect(def.dex).toBe(0);
+    expect(def.dodge).toBe(0);
+  });
+
+  it('lets a structure be the defender of resolveMeleeAttack (never dodges; armour reduces)', () => {
+    const attacker = makeStats({ strength: 2 });
+    // dodge 0 → always hits regardless of the roll; meleeDamage 1+2=3, minus armour 2 = 1.
+    expect(resolveMeleeAttack(attacker, objectAsDefender(wall), 1, () => 0.99)).toBe(1);
   });
 });
 
