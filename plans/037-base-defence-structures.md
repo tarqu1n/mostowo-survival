@@ -300,3 +300,26 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
 - **Plan 036 (weapon reach/arc)** — structure damage hooks into today's single-tile attack; folding into
   `attackTiles` happens when 036 lands.
 - **Line-paint trap placement UX** (mobile) and **crafting-station gating** of defence buildables.
+
+## Critique
+
+> Independent fresh-eyes review (critique-plan), 2026-07-20. **Unresolved — read before executing.**
+
+**Verdict:** Technically sound and well-grounded in the code, but strategically inverted — it
+front-loads three defence buildables, a foundation refactor, and a partial enemy-AI abstraction ahead
+of the night wave (roadmap Step 2), on a premise ("a wave needs something to defend with") that the
+roadmap contradicts; resequence and split before executing.
+
+| # | Finding | Lens | Severity | Suggested action |
+| - | ------- | ---- | -------- | ---------------- |
+| 1 | Pulls walls/gate/trap ahead of the wave on the claim they're needed "to defend with," but ROADMAP Step 2's defend-target is the fire-heart + player, not walls (walls already prove the build path). Doesn't unblock the wave; defers the riskiest "first playable loop" milestone. | Roadmap / strategic fit | **High** | Reconsider order: do the wave (Step 2) first, or get explicit sign-off that defence-first is intended despite the roadmap rationale. |
+| 2 | The "generic enemy structure-target seam, reused by the wave" is built from the wrong example: this is obstacle-based targeting (attack what blocks path to player), while the wave is objective-based (target the fire); and destructible-vs-funnel-gap + wall-HP-vs-DPS can't be validated without the wave — the roadmap's stated reason to order trap after wave. | Alternative approaches / gaps | **High** | Defer the enemy-structure AI + destructible-wall mechanics until the wave exists to drive/tune them, or scope the seam to the callback (`attackStructure`) only and defer target-selection. |
+| 3 | 9 steps: foundation refactor + art + 3 features + first faction-pathing split + enemy AI + worker-order type + re-arm loop + dawn hook + test surface. Roadmap treats "one trap" and "the wave" each as a single step; plan self-defines 6 milestones. | Right-sizing / scope | Medium | Split into ~3 plans (StructureManager refactor; walls+enemy-AI+gate; trap+re-arm). |
+| 4 | Step 1 dissolves CampfireManager (load-bearing MVP mechanic) into StructureManager as a no-feature refactor, interface designed from campfire alone — yet Steps 3-8 keep adding `takeDamage`/hp/`armed`/enemy-tile-query, so the interface churns anyway. | Reversibility / sequencing | Medium | Land destructible walls (real example #2) first, then generalise against concrete shapes — matches the decision's own "abstraction from a population of one is wrong" logic. Test-netted, so risk is churn not breakage. |
+| 5 | "Only target-selection changes" undersells the work: the monsterAI FSM knows only chase/wander/patrol/idle; a "blocked → attack structure" state is genuinely new AI. | Executability | Low | Budget Step 5 as a new FSM state, not a target swap. |
+| 6 | Wall destructibility reverses a comment citing "plan 003 Context & decisions"; plan treats it as free-to-reverse. | Cross-cutting consistency | Low | Confirm no settled DECISIONS entry mandates indestructible walls before reversing. |
+| 7 | Dawn auto-enqueue of rearm orders is a new system-initiated worker-order pattern (vs player-initiated). | Consistency | Low | Verify interaction with build/refuel queueing and player agency (plan already flags this). |
+
+**Start with #1 and #2** — they question whether this plan should run in its current order at all. If
+defence-first is a deliberate, signed-off steer, capture it in `docs/ROADMAP.md`, then address #3 and
+#4 (split the plan; land a feature before the refactor). #5–#7 are execution-time cleanups.
