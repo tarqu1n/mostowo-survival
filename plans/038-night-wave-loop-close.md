@@ -1,6 +1,6 @@
 # The Night Wave + Loop-Close
 
-> Status: planned — run /execute-plan to begin.
+> Status: in review
 
 ## Summary
 
