@@ -1286,7 +1286,10 @@ export class GameScene extends Phaser.Scene {
         for (let row = pt.row - dist; row <= pt.row + dist; row++) {
           if (Math.max(Math.abs(col - pt.col), Math.abs(row - pt.row)) !== dist) continue; // ring edge only
           if (canSpawn(col, row)) {
-            this.enemyManager.addEnemy('kidZombie', col, row);
+            // The boar is the default dev spawn (plan 035b Step 4) — fighting it exercises the full
+            // loop: 4-way facing, the Attack-anim telegraph, melee, bow, and the HP bar. The skeleton
+            // stays reachable via scenarios (the combat/monster e2e specs) as a regression anchor.
+            this.enemyManager.addEnemy('boar', col, row);
             return;
           }
         }

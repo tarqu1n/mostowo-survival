@@ -122,7 +122,14 @@ an actor discriminator on `EnemyDef` + an id-keyed directional-actor map — so 
   - Done when: the boar visibly winds up (its Attack anim) before biting, giving a window to disengage; a
     Tier-2 spec asserts the wind-up + strike.
 
-- [ ] **Step 4: Make the boar the default dev spawn** `[delegate]`
+- [x] **Step 4: Make the boar the default dev spawn** `[inline]` (was `[delegate]` — trivial one-liner
+  with an embedded decision, faster inline than briefing a sub-agent)
+  - Outcome: `src/scenes/GameScene.ts` — `spawnEnemyNearPlayer` now `addEnemy('boar', …)` instead of
+    `'kidZombie'`. Single dev spawn (open question resolved): a second button needs a DEV-panel layout
+    reshuffle (non-trivial), and the skeleton stays reachable via scenarios (all combat/monster e2e specs),
+    so boar-as-single-dev-spawn per the plan's sanctioned fallback. Button label kept generic ('SPAWN
+    ENEMY'). Verified: DEV `debug:spawnEnemy` → a boar (def id asserted `'boar'`, screenshot confirmed it
+    renders + is fightable); typecheck 0 new errors, eslint 0 errors.
   - Update 035a's `spawnEnemyNearPlayer` to spawn `'boar'` by default (leave the skeleton reachable via a
     scenario / keep both if a second button is trivial — otherwise boar is fine as the single dev spawn).
   - Side effects: none beyond the handler.
@@ -152,4 +159,5 @@ flip). Only Step 4 is `[delegate]`.
 ## Open questions (playtest-tuned or decided at execution)
 
 - Boar stats + hurtbox + bite dmg/cadence + wind-up ms — starting values proposed; playtest-tune.
-- Whether to keep a separate skeleton dev-spawn alongside the boar (Step 4).
+- ~~Whether to keep a separate skeleton dev-spawn alongside the boar (Step 4).~~ **Resolved:** boar is the
+  single dev spawn (a 2nd button needs a panel-layout reshuffle); skeleton stays reachable via scenarios.
