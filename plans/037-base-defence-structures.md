@@ -1,6 +1,8 @@
 # Base-Defence Structures — Destructible Walls, Gate & Spike Trap
 
-> Status: planned — run /execute-plan to begin.
+> Status: **deferred** — shelved behind the night wave (roadmap Step 2) per the critique below
+> (defence structures are tuned against a live wave, so the wave lands first). Revisit after the wave;
+> expect to split + resequence per critique findings #3/#4. Do **not** run /execute-plan on this yet.
 
 ## Summary
 
