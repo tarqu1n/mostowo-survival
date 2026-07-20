@@ -26,6 +26,7 @@ import {
 } from '../config';
 import { ITEMS } from '../data/items';
 import { NODES } from '../data/nodes';
+import { BUILDABLES } from '../data/buildables';
 import { Inventory } from '../systems/Inventory';
 import { tileKey, tileToWorldCenter } from '../systems/grid';
 import { findPath, reachableAdjacent, type Cell } from '../systems/pathfind';
@@ -52,6 +53,7 @@ import { ResourceNodeManager } from './world/ResourceNodeManager';
 import { DecorManager } from './world/DecorManager';
 import { EnemyManager } from './world/EnemyManager';
 import { CampfireManager } from './world/CampfireManager';
+import { WallManager } from './world/WallManager';
 import { SurvivalClock } from './world/SurvivalClock';
 import { WaveDirector } from './world/WaveDirector';
 import { VisionController } from './fx/VisionController';
@@ -170,6 +172,12 @@ export class GameScene extends Phaser.Scene {
   // both SurvivalClock (night-overlay mask) and VisionController (fog reveal) read via the scene.
   // Constructed fresh in buildWorld() each (re)start; wires its own SHUTDOWN teardown directly.
   private campfireManager!: CampfireManager;
+
+  // Barricade walls (plan 037) — the interim live/destructible structure manager (pre-StructureManager):
+  // owns each placed wall's oriented sprite + hp, plays build/destroy anims, and frees a destroyed
+  // wall's tile back through BuildManager. Constructed fresh in buildWorld() beside CampfireManager;
+  // wires its own SHUTDOWN teardown directly. Event-driven (no per-frame tick — walls have no fuel).
+  private wallManager!: WallManager;
 
   // Pointer "raycast" + the tap/inspect intent built on top of it (plan 015 Step 5) — see
   // src/scenes/input/ScenePicker.ts. Stateless (no fields but scene+deps, no SHUTDOWN teardown — see
@@ -389,7 +397,13 @@ export class GameScene extends Phaser.Scene {
       canAfford: (cost) => this.inv.canAfford(cost),
       spend: (cost) => this.inv.spend(cost),
       enqueueBuild: (siteId) => this.enqueue({ kind: 'build', siteId }),
-      materialiseBuildable: (site) => this.campfireManager.materialise(site),
+      // Dispatch a completed live buildable to its runtime manager on its `behavior` (finishSite only
+      // calls this for buildables with one): campfire → CampfireManager, wall → WallManager.
+      materialiseBuildable: (site) => {
+        const behavior = BUILDABLES[site.buildableId].behavior;
+        if (behavior === 'wall') this.wallManager.materialise(site);
+        else this.campfireManager.materialise(site);
+      },
       repath: () => this.repath(),
     });
 
@@ -398,6 +412,13 @@ export class GameScene extends Phaser.Scene {
     // finishSite routes a `behavior` buildable to materialise(). Wires its own SHUTDOWN teardown.
     this.campfireManager = new CampfireManager(this, {
       spend: (cost) => this.inv.spend(cost),
+    });
+
+    // Barricade walls (plan 037) — beside CampfireManager; a destroyed wall frees its tile back through
+    // BuildManager (the sole occupancy/collision writer) then repaths. Wires its own SHUTDOWN teardown.
+    this.wallManager = new WallManager(this, {
+      freeTile: (c, r) => this.buildManager.releaseTile(c, r),
+      repath: () => this.repath(),
     });
 
     // Pointer "raycast" + tap/inspect intent (plan 015 Step 5) — constructed here, after
@@ -525,6 +546,7 @@ export class GameScene extends Phaser.Scene {
    *  those methods), then push the first queue-highlight refresh. */
   private wireBus(): void {
     this.game.events.on('build:toggle', this.buildManager.toggleBuild, this.buildManager);
+    this.game.events.on('build:rotate', this.buildManager.rotatePlacement, this.buildManager);
     this.game.events.on('build:select', this.onBuildSelect, this);
     this.game.events.on('tasks:cancel', this.cancelAll, this);
     this.game.events.on('debug:randomise', this.randomiseWorld, this); // dev menu: scatter nodes + enemies
@@ -544,6 +566,7 @@ export class GameScene extends Phaser.Scene {
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off('build:toggle', this.buildManager.toggleBuild, this.buildManager);
+      this.game.events.off('build:rotate', this.buildManager.rotatePlacement, this.buildManager);
       this.game.events.off('build:select', this.onBuildSelect, this);
       this.game.events.off('tasks:cancel', this.cancelAll, this);
       this.game.events.off('debug:randomise', this.randomiseWorld, this);
@@ -582,6 +605,7 @@ export class GameScene extends Phaser.Scene {
     const testApi = new TestApi(this, {
       buildManager: this.buildManager,
       campfireManager: this.campfireManager,
+      wallManager: this.wallManager,
       waveDirector: this.waveDirector,
       taskGlowRenderer: this.taskGlowRenderer,
       fx: this.fx,
@@ -662,6 +686,8 @@ export class GameScene extends Phaser.Scene {
       inLight: (c, r) => testApi.inLight(c, r),
       feedCampfire: (i) => testApi.feedCampfire(i),
       damageFire: (i, amount) => testApi.damageFire(i, amount),
+      walls: () => testApi.walls(),
+      damageWall: (i, amount) => testApi.damageWall(i, amount),
       beginWave: () => testApi.beginWave(),
       zoneAt: (c, r) => this.zoneAt(c, r),
       moveEnemy: (i, c, r) => testApi.moveEnemy(i, c, r),

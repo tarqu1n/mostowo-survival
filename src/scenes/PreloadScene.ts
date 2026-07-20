@@ -13,6 +13,8 @@ import {
   campfireFlameLargeKey,
   campfireFlameSmallKey,
   campfireSmokeKey,
+  barricadeBuildKey,
+  barricadeDestroyKey,
   iconKey,
   type TileSource,
   type StripAnim,
@@ -150,6 +152,23 @@ export class PreloadScene extends Phaser.Scene {
     loadStrip(campfireFlameLargeKey(), manifest.stations.campfire.flameLarge);
     loadStrip(campfireFlameSmallKey(), manifest.stations.campfire.flameSmall);
     loadStrip(campfireSmokeKey(), manifest.stations.campfire.smoke);
+
+    // Barricade wall structure (plan 037): 6 sheets (down/side/up × Build/Destroy). These live in the
+    // craftpix-dungeon pack (cross-pack, like the boar dir4 strips above), so route through
+    // `tilesetAssetUrl`, NOT the manifest-base `url()` (which resolves to the active pixel-crawler pack).
+    // Loaded unconditionally like the campfire station so a placed/scenario wall always has a texture.
+    const barricade = manifest.structures.barricade;
+    for (const orient of ['down', 'side', 'up'] as Facing[]) {
+      for (const [key, strip] of [
+        [barricadeBuildKey(orient), barricade.build[orient]],
+        [barricadeDestroyKey(orient), barricade.destroy[orient]],
+      ] as const) {
+        this.load.spritesheet(key, tilesetAssetUrl(barricade.pack, strip.path), {
+          frameWidth: strip.frameWidth ?? strip.frameSize,
+          frameHeight: strip.frameSize,
+        });
+      }
+    }
 
     // Monster weapon art + the two hand images (off-hand fist + main-hand open grip): one static image
     // each (no anim), keyed like the derived tiles. GameScene resolves them via resolveTile(source).

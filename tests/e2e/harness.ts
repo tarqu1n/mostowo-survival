@@ -183,6 +183,23 @@ export function damageFire(page: Page, index: number, amount: number): Promise<b
   );
 }
 
+/** The live barricade walls (col/row/facing/hp/maxHp), placement order (plan 037) — NOT part of
+ *  DebugState, a standalone read seam for the wall spec. */
+export function walls(
+  page: Page,
+): Promise<Array<{ col: number; row: number; facing: string; hp: number; maxHp: number }>> {
+  return page.evaluate(() => (window as any).game.__test.walls());
+}
+
+/** Damage the wall at `index` by `amount` (WallManager.takeDamage, plan 037); returns whether the
+ *  blow destroyed it (false if no wall at that index). */
+export function damageWall(page: Page, index: number, amount: number): Promise<boolean> {
+  return page.evaluate(
+    ({ index, amount }) => (window as any).game.__test.damageWall(index, amount),
+    { index, amount },
+  );
+}
+
 /** Start a night wave immediately (plan 038 Step 3), independent of the day→night clock edge. */
 export function beginWave(page: Page): Promise<void> {
   return page.evaluate(() => (window as any).game.__test.beginWave());

@@ -59,6 +59,11 @@ export class UIScene extends Phaser.Scene {
   // nested Buttons on the panel (like the Wellbeing eat-rows), so only the panel is in hudElements.
   private buildPalette!: Panel;
   private buildRows: Array<{ id: string; button: Button; cost: Record<string, number> }> = [];
+  // Placement-facing rotate control (plan 037): a ROTATE button shown only in build mode when the
+  // selected buildable is `orientable` (the wall). Emits `build:rotate` (also bound to the R key);
+  // `selectedBuildableId` tracks the palette pick so the button's visibility can key off it.
+  private rotateButton!: Button;
+  private selectedBuildableId: string | null = null;
   private cancelButton!: Button;
   private queueText!: Phaser.GameObjects.Text;
   private zoomText!: Phaser.GameObjects.Text;
@@ -228,6 +233,19 @@ export class UIScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setVisible(false);
     this.hudElements.push(this.modeIndicator);
+
+    // ROTATE — cycles the placement facing (plan 037), shown only in build mode with an orientable
+    // buildable selected (see refreshRotateButton). Bottom-centre, just above the build-mode indicator.
+    const rbw = 76;
+    const rbh = 24;
+    this.rotateButton = new Button(this, BASE_WIDTH / 2, BASE_HEIGHT - 40, {
+      width: rbw,
+      height: rbh,
+      label: 'ROTATE',
+      fontSize: 10,
+      onDown: () => this.game.events.emit('build:rotate'),
+    }).setVisible(false);
+    this.hudElements.push(this.rotateButton);
 
     // Cancel button — clears the worker's task queue. Sits under the Build button, top-right.
     const cbw = 60;
@@ -569,11 +587,14 @@ export class UIScene extends Phaser.Scene {
     // ESC closes the palette if open, else exits build mode (mirrors tapping BUILD again). Keyboard
     // is scene-scoped input, torn down with the scene — no manual off needed.
     this.input.keyboard?.on('keydown-ESC', this.onEscape, this);
+    // R rotates the placement facing while in build mode — the keyboard mirror of the ROTATE button.
+    this.input.keyboard?.on('keydown-R', this.onRotateKey, this);
 
     // Seed + subscribe: read the shared Inventory's own 'change' directly (no event-bus hop).
     this.refreshInventory();
     this.inv?.on('change', this.refreshInventory, this);
     this.game.events.on('build:modeChanged', this.onBuildMode, this);
+    this.game.events.on('build:select', this.onBuildSelected, this);
     this.game.events.on('tasks:changed', this.onTasks, this);
     this.game.events.on('zoom:changed', this.onZoomChanged, this);
     this.game.events.on('camera:followChanged', this.onFollowChanged, this);
@@ -591,6 +612,7 @@ export class UIScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.inv?.off('change', this.refreshInventory, this);
       this.game.events.off('build:modeChanged', this.onBuildMode, this);
+      this.game.events.off('build:select', this.onBuildSelected, this);
       this.game.events.off('tasks:changed', this.onTasks, this);
       this.game.events.off('zoom:changed', this.onZoomChanged, this);
       this.game.events.off('camera:followChanged', this.onFollowChanged, this);
@@ -743,6 +765,26 @@ export class UIScene extends Phaser.Scene {
   private onEscape(): void {
     if (this.buildPalette.visible) this.setBuildPaletteOpen(false);
     else if (this.buildButton.isToggled()) this.game.events.emit('build:toggle');
+  }
+
+  /** R (build mode only): rotate the placement facing — the keyboard mirror of the ROTATE button. */
+  private onRotateKey(): void {
+    if (this.buildButton.isToggled()) this.game.events.emit('build:rotate');
+  }
+
+  /** Remember which buildable the palette picked so ROTATE can key its visibility off it (plan 037).
+   *  Refreshes the button now; `onBuildMode` (which fires right after `select` enters build mode) will
+   *  also refresh, so the two converge on the right state regardless of listener order. */
+  private onBuildSelected({ id }: { id: string }): void {
+    this.selectedBuildableId = id;
+    this.refreshRotateButton();
+  }
+
+  /** Show ROTATE only in build mode with an `orientable` buildable selected (the wall). */
+  private refreshRotateButton(): void {
+    const selected = this.selectedBuildableId;
+    const orientable = selected != null && (BUILDABLES[selected]?.orientable ?? false);
+    this.rotateButton.setVisible(this.buildButton.isToggled() && orientable);
   }
 
   // ---- Always-on HUD meters ------------------------------------------------
@@ -1011,6 +1053,7 @@ export class UIScene extends Phaser.Scene {
     this.modeIndicator.setVisible(active);
     this.buildButton.setToggled(active);
     if (active) this.setBuildPaletteOpen(false); // a picked buildable enters build mode → drop the palette
+    this.refreshRotateButton(); // show/hide ROTATE with build mode (plan 037)
   }
 
   /** Reflect the worker's live task state: current action label + queued count, and Cancel visibility. */

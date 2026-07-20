@@ -11,6 +11,8 @@ import {
   campfireFlameLargeKey,
   campfireFlameSmallKey,
   campfireSmokeKey,
+  barricadeBuildKey,
+  barricadeDestroyKey,
   type Facing,
   type Facing4,
   type DirEnemyState,
@@ -134,5 +136,25 @@ export function registerActorAnims(scene: Phaser.Scene): void {
       frameRate: 8, // steady flame flicker
       repeat: -1,
     });
+  }
+
+  // Barricade wall (structure, plan 037): a Build strip played once on placement + a Destroy strip
+  // (its frame 0 = the intact idle; the HP-stage hook steps through it to rubble, and it plays through
+  // once on destruction). Both one-shot (repeat 0), per orientation (down/side/up — left reuses side
+  // flipped). Keys + frame counts from the manifest; guarded like the blocks above.
+  const barricade = ACTIVE_TILESET.structures.barricade;
+  for (const orient of ['down', 'side', 'up'] as Facing[]) {
+    for (const [key, strip] of [
+      [barricadeBuildKey(orient), barricade.build[orient]],
+      [barricadeDestroyKey(orient), barricade.destroy[orient]],
+    ] as const) {
+      if (scene.anims.exists(key)) continue;
+      scene.anims.create({
+        key,
+        frames: scene.anims.generateFrameNumbers(key, { start: 0, end: strip.frames - 1 }),
+        frameRate: ACTION_ANIM_FRAMERATE,
+        repeat: 0,
+      });
+    }
   }
 }

@@ -6,15 +6,23 @@ import type { BuildableDef } from './types';
 
 export const BUILDABLES: Record<string, BuildableDef> = {
   // maxHp is a real display stat (Inspect-mode panel); armour/speed are inert for objects — see
-  // plan 003 Context & decisions. Walls remain indestructible in combat this slice.
+  // plan 003 Context & decisions. Walls are mob-DESTRUCTIBLE (plan 037 decision #1, reverses the old
+  // "indestructible this slice" note): a live WallManager structure with an HP-stage render. Players
+  // never damage them in combat — removal is a deconstruct order (chunk 2b); only mob attacks lower HP.
   wall: {
     id: 'wall',
     name: 'Wall',
     cost: { wood: 2 },
     color: 0x6b6b6b,
-    maxHp: 10,
+    // Low-HP early-game archetype: the spiked palisade chips the horde but won't hold long (the later
+    // solid high-HP no-thorns wall is the tradeoff). Placeholder — wave-time tuning knob (vs wave DPS).
+    maxHp: 12,
     armour: 0,
     speed: 0,
+    blocksPath: true,
+    behavior: 'wall', // live/simulated — routed to WallManager on completion (see finishSite dispatch)
+    thorns: 1, // wave-time tuning knob
+    orientable: true, // player-rotate at placement picks the facing (down/right/up/left)
   },
   // Base-only light source; always burning once built, drains fuel continuously (see
   // config.CAMPFIRE_FUEL_* — plan 012 Context & decisions). Renders as two layers (ember base + a

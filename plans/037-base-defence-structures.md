@@ -78,9 +78,11 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
 3. **Spike trap = trigger-once, spent after firing, re-armed each morning** by a queued worker order
    (mirrors campfire refuel). Not always-on, not cooldown.
 4. **Enemy dependency handled by "model + seam + scripted-enemy tests".** Build structure HP/destruction
-   + a generic enemy structure-target seam now, proven via scenario-API scripted enemies; the full
+   and a generic enemy structure-target seam now, proven via scenario-API scripted enemies; the full
    night-wave AI stays deferred. The seam is written generically (structure / player / future fire) so
    Step 2 (wave) wires into it rather than reworking it.
+5. **This triggers the StructureManager generalisation now** (architecture decision, see below) — walls,
+   gate and trap are behavior-modules, not three more bespoke managers.
 6. **Player removes a wall by DECONSTRUCT, not combat** (owner, 2026-07-20). A **worker deconstruct
    order** (mirrors the build/refuel order pattern): tap a finished wall in a demolish affordance →
    worker walks over → removes it → tile freed. **Partial resource refund** (a fraction of `cost`, e.g.
@@ -94,8 +96,6 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
    wall choice is a real decision, not a straight upgrade. **Thorns fire only on a mob's *attack*** on
    the wall, never passively to nearby mobs — keeping the spiked wall distinct from the spike *trap*
    (the step-on-tile damage). Thorns amount + wall HP are wave-time tuning knobs.
-5. **This triggers the StructureManager generalisation now** (architecture decision, see below) — walls,
-   gate and trap are behavior-modules, not three more bespoke managers.
 
 **Key files & patterns to mirror (from repo sweep):**
 
@@ -232,7 +232,7 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
     catalog `regions`/`frames` and the pack `tileSize` 16). This removes all "start with X, swap later"
     guesswork from Steps 3/6/7.
   - Note the deferred siblings in the same folder (`Lightning`, `Barrel`+`Boom`, `Barricades/Archer` turret
-    + `Arrow`) as catalogued future defence art so a later session doesn't re-discover them.
+    - `Arrow`) as catalogued future defence art so a later session doesn't re-discover them.
   - Side effects: none (no code) — pure decision + asset verification. Independent of Step 1, so it can be
     done first or alongside it.
   - Docs: create/extend an art-mapping note (an art-decisions shard under `docs/decisions/` or the art
@@ -243,7 +243,26 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
     and the wall/gate variants are confirmed visually distinct — enough that Step 3 needs no further art
     judgement.
 
-- [ ] **Step 3: Destructible-wall data + CraftPix barricade art** `[inline]`
+- [x] **Step 3: Destructible-wall data + CraftPix barricade art** `[inline]` — DELIVERED as resequence chunk **2a**.
+  - Outcome (2026-07-20, chunk 2a — delegated + reviewed): `wall` is now a LIVE, **4-way**, destructible
+    structure via an interim **`WallManager`** (`src/scenes/world/WallManager.ts`, mirrors CampfireManager),
+    NOT the static-tile branch — the StructureManager refactor stays a later chunk. `wall` gained
+    `behavior:'wall'`, `maxHp:12` (low-HP archetype, tuning knob), `thorns:1` (2c consumes it),
+    `orientable:true`, `tilesTall:3`/`originY:0.95`. New `structures.barricade` manifest entry (`pack:
+    'craftpix-dungeon'`, `{D,S,U}_2` Build/Destroy StripAnims 36×64×6f) + `barricadeBuild/DestroyKey`
+    helpers; loaded cross-pack in Preload + registered one-shot in `actorAnims`. **Player-rotate placement**:
+    `BuildManager.placeFacing` + `rotatePlacement()` (down→right→up→left), `BuildSite.facing`, a `build:rotate`
+    event, a ROTATE button (UIScene, shown for orientable buildables, bottom-centre) + `R` key. `materialiseBuildable`
+    now dispatches on `behavior` (campfire vs wall); WallManager `takeDamage`/HP-stage frame + destroy-through
+    +tile-free via new `BuildManager.releaseTile` (the seam 2c/2b use). Files: buildables/types/tileset/
+    Preload/actorAnims/GameScene/BuildManager/UIScene/testApi/entities.types+testTypes/harness + STATUS.md;
+    new WallManager.ts + tests/e2e/wall.spec.ts. **Verified:** `npm run build` clean, `npm test` 829 pass,
+    `npm run lint` 0 errors, prettier clean, e2e `wall.spec` + `refactor-tripwire` PASS (golden unchanged —
+    `walls()`/`damageWall()` are `__test`-only, not DebugState); the 5 other e2e reds are pre-existing
+    (`SPAWN_TILE`/`HUNGER_LETHAL`/base-zone coord drift, config.ts untouched). Visually eyeballed: 4-way
+    barricade renders + settles, ROTATE button placed (scratchpad screenshots). **Deferred within 2a:** the
+    ghost facing-preview (ghost stays a plain rect; the built wall orients correctly) — flagged, not blocking.
+- [ ] **Step 3 (original detail, superseded by the 2a outcome above):**
   - Rework `wall` in `src/data/buildables.ts`: add `behavior:'wall'` (now a live structure), keep
     `cost {wood:2}`, set a real `maxHp` (placeholder **40**, flagged for wave-time tuning), keep
     `blocksPath:true`. Add `animKey`/art references for the **wall barricade sprite chosen in Step 2**.
@@ -331,7 +350,7 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
 
 - [ ] **Step 8: Trap re-arm order + dawn auto-enqueue** `[inline]`
   - Add a `rearm` action to `src/systems/tasks.ts` (extend the union), mirroring `refuel`: `enqueue({kind:'rearm', trapId})`
-    + `isRearmQueued`/`toggleRearm` de-dupe helpers; a `beginCurrent` rearm branch (resolve `structureById`
+    - `isRearmQueued`/`toggleRearm` de-dupe helpers; a `beginCurrent` rearm branch (resolve `structureById`
     the trap, `reachableAdjacent` stand tile, `pathTo`); a `runRearm` executor that **condition-terminates**
     when the trap is armed (like "topped up"). Tapping a **spent** trap queues a rearm order (`ScenePicker`).
   - Dawn hook: at the day-phase (dawn) transition (`SurvivalClock`/`systems/daynight.ts`), auto-enqueue a
@@ -384,16 +403,16 @@ front-loads three defence buildables, a foundation refactor, and a partial enemy
 of the night wave (roadmap Step 2), on a premise ("a wave needs something to defend with") that the
 roadmap contradicts; resequence and split before executing.
 
-| # | Finding | Lens | Severity | Suggested action |
-| - | ------- | ---- | -------- | ---------------- |
-| 1 | Pulls walls/gate/trap ahead of the wave on the claim they're needed "to defend with," but ROADMAP Step 2's defend-target is the fire-heart + player, not walls (walls already prove the build path). Doesn't unblock the wave; defers the riskiest "first playable loop" milestone. | Roadmap / strategic fit | **High** | Reconsider order: do the wave (Step 2) first, or get explicit sign-off that defence-first is intended despite the roadmap rationale. |
-| 2 | The "generic enemy structure-target seam, reused by the wave" is built from the wrong example: this is obstacle-based targeting (attack what blocks path to player), while the wave is objective-based (target the fire); and destructible-vs-funnel-gap + wall-HP-vs-DPS can't be validated without the wave — the roadmap's stated reason to order trap after wave. | Alternative approaches / gaps | **High** | Defer the enemy-structure AI + destructible-wall mechanics until the wave exists to drive/tune them, or scope the seam to the callback (`attackStructure`) only and defer target-selection. |
-| 3 | 9 steps: foundation refactor + art + 3 features + first faction-pathing split + enemy AI + worker-order type + re-arm loop + dawn hook + test surface. Roadmap treats "one trap" and "the wave" each as a single step; plan self-defines 6 milestones. | Right-sizing / scope | Medium | Split into ~3 plans (StructureManager refactor; walls+enemy-AI+gate; trap+re-arm). |
-| 4 | Step 1 dissolves CampfireManager (load-bearing MVP mechanic) into StructureManager as a no-feature refactor, interface designed from campfire alone — yet Steps 3-8 keep adding `takeDamage`/hp/`armed`/enemy-tile-query, so the interface churns anyway. | Reversibility / sequencing | Medium | Land destructible walls (real example #2) first, then generalise against concrete shapes — matches the decision's own "abstraction from a population of one is wrong" logic. Test-netted, so risk is churn not breakage. |
-| 5 | "Only target-selection changes" undersells the work: the monsterAI FSM knows only chase/wander/patrol/idle; a "blocked → attack structure" state is genuinely new AI. | Executability | Low | Budget Step 5 as a new FSM state, not a target swap. |
-| 6 | Wall destructibility reverses a comment citing "plan 003 Context & decisions"; plan treats it as free-to-reverse. | Cross-cutting consistency | Low | Confirm no settled DECISIONS entry mandates indestructible walls before reversing. |
-| 7 | Dawn auto-enqueue of rearm orders is a new system-initiated worker-order pattern (vs player-initiated). | Consistency | Low | Verify interaction with build/refuel queueing and player agency (plan already flags this). |
+|#|Finding|Lens|Severity|Suggested action|
+|-|-------|----|--------|----------------|
+|1|Pulls walls/gate/trap ahead of the wave on the claim they're needed "to defend with," but ROADMAP Step 2's defend-target is the fire-heart + player, not walls (walls already prove the build path). Doesn't unblock the wave; defers the riskiest "first playable loop" milestone.|Roadmap / strategic fit|**High**|Reconsider order: do the wave (Step 2) first, or get explicit sign-off that defence-first is intended despite the roadmap rationale.|
+|2|The "generic enemy structure-target seam, reused by the wave" is built from the wrong example: this is obstacle-based targeting (attack what blocks path to player), while the wave is objective-based (target the fire); and destructible-vs-funnel-gap + wall-HP-vs-DPS can't be validated without the wave — the roadmap's stated reason to order trap after wave.|Alternative approaches / gaps|**High**|Defer the enemy-structure AI + destructible-wall mechanics until the wave exists to drive/tune them, or scope the seam to the callback (`attackStructure`) only and defer target-selection.|
+|3|9 steps: foundation refactor + art + 3 features + first faction-pathing split + enemy AI + worker-order type + re-arm loop + dawn hook + test surface. Roadmap treats "one trap" and "the wave" each as a single step; plan self-defines 6 milestones.|Right-sizing / scope|Medium|Split into ~3 plans (StructureManager refactor; walls+enemy-AI+gate; trap+re-arm).|
+|4|Step 1 dissolves CampfireManager (load-bearing MVP mechanic) into StructureManager as a no-feature refactor, interface designed from campfire alone — yet Steps 3-8 keep adding `takeDamage`/hp/`armed`/enemy-tile-query, so the interface churns anyway.|Reversibility / sequencing|Medium|Land destructible walls (real example #2) first, then generalise against concrete shapes — matches the decision's own "abstraction from a population of one is wrong" logic. Test-netted, so risk is churn not breakage.|
+|5|"Only target-selection changes" undersells the work: the monsterAI FSM knows only chase/wander/patrol/idle; a "blocked → attack structure" state is genuinely new AI.|Executability|Low|Budget Step 5 as a new FSM state, not a target swap.|
+|6|Wall destructibility reverses a comment citing "plan 003 Context & decisions"; plan treats it as free-to-reverse.|Cross-cutting consistency|Low|Confirm no settled DECISIONS entry mandates indestructible walls before reversing.|
+|7|Dawn auto-enqueue of rearm orders is a new system-initiated worker-order pattern (vs player-initiated).|Consistency|Low|Verify interaction with build/refuel queueing and player agency (plan already flags this).|
 
 **Start with #1 and #2** — they question whether this plan should run in its current order at all. If
-defence-first is a deliberate, signed-off steer, capture it in `docs/ROADMAP.md`, then address #3 and
-#4 (split the plan; land a feature before the refactor). #5–#7 are execution-time cleanups.
+defence-first is a deliberate, signed-off steer, capture it in `docs/ROADMAP.md`, then address #3
+and #4 (split the plan; land a feature before the refactor). #5–#7 are execution-time cleanups.

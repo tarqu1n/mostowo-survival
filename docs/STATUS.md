@@ -210,6 +210,25 @@ CampfireManager's `fire:changed` — orange while lit, red when knocked out, hid
 **NIGHT WAVE** indicator beside the day/night readout (shown during night). A **FORCE WAVE** dev-menu
 button (+ `debug:forceWave` hook) jumps to night and starts a wave on demand for manual playtesting.
 
+## Base-defence walls (plan 037, chunk 2a)
+
+The `wall` buildable is now a **live, 4-way, mob-destructible structure** (was a static tile),
+materialised by an interim **`src/scenes/world/WallManager.ts`** — mirrors `CampfireManager`'s
+materialise/reset/destroy discipline, stood up before the general `StructureManager` refactor (a later
+chunk) so that abstraction is designed against two real shapes (campfire + wall). Each placed wall
+owns one bottom-anchored oriented sprite: it plays the CraftPix barricade **Build** strip once, then
+settles on the **Destroy** strip's frame 0 (intact idle); `takeDamage` steps the Destroy sheet toward
+rubble by HP fraction and, at `hp≤0`, plays it through and removes the wall (its tile freed via
+`BuildManager.releaseTile`, then repath). Data: low `maxHp` (12, placeholder — wave-time knob) +
+`thorns` (1, placeholder) + `orientable`. **Player-rotate placement** (`build:rotate` — HUD ROTATE
+button + R key; `BuildManager.rotatePlacement` cycles down→right→up→left, stamped per site as `facing`;
+left = the side sheet flipped). `finishSite` routes `wall` through the `behavior` dispatch
+(`campfire`→CampfireManager, `wall`→WallManager) — the static-tile branch is now dead for walls.
+Art paths + frame slicing: [wired-art.md](wired-art.md). DEV test seam: `__test.walls()` /
+`__test.damageWall(index, amount)` (NOT part of `DebugState`, so the tripwire golden is untouched).
+**Deferred to later chunks:** player deconstruct/unbuild + refund (2b), enemy-attacks-a-wall + thorns
+firing (2c) — `thorns` is data-only for now.
+
 ## Node harvest feel (plan 031)
 
 - **Per-hit recoil:** each chop/mine hit nudges the node sprite directionally away from the actor

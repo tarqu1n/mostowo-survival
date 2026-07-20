@@ -23,6 +23,7 @@ import type { PlayerCharacter } from '../entities/PlayerCharacter';
 import type { MonsterCharacter, MonsterSpawnOpts } from '../entities/MonsterCharacter';
 import type { BuildManager } from './build/BuildManager';
 import type { CampfireManager } from './world/CampfireManager';
+import type { WallManager } from './world/WallManager';
 import type { WaveDirector } from './world/WaveDirector';
 import type { TaskGlowRenderer } from './fx/TaskGlowRenderer';
 import type { CombatFxManager } from './fx/CombatFxManager';
@@ -103,6 +104,7 @@ export interface DebugState {
 export interface TestApiDeps {
   readonly buildManager: BuildManager;
   readonly campfireManager: CampfireManager;
+  readonly wallManager: WallManager;
   readonly waveDirector: WaveDirector;
   readonly taskGlowRenderer: TaskGlowRenderer;
   readonly fx: CombatFxManager;
@@ -202,6 +204,7 @@ export class TestApi {
     this.deps.resetTreesAndEnemies();
     this.deps.buildManager.reset(); // sites/siteTiles/occupied/walls/nextSiteId/buildMode
     this.deps.campfireManager.reset(); // destroy fire sprites + clear the collection (RUNTIME path)
+    this.deps.wallManager.reset(); // destroy wall sprites + clear the collection (RUNTIME path, plan 037)
     this.deps.waveDirector.reset(); // clear any running wave + its first-tick reconcile flag (plan 038)
     this.deps.taskGlowRenderer.reset(); // queue markers + glow halos/pulse + outlinedTreeIds
 
@@ -398,6 +401,24 @@ export class TestApi {
     const c = this.deps.campfireManager.all()[index];
     if (!c) return false;
     return this.deps.campfireManager.damageFire(c.id, amount);
+  }
+
+  /** DEV/test-only: the live barricade walls (col/row/facing/hp/maxHp), placement order — a standalone
+   *  read seam for the wall spec (plan 037). NOT part of the serialized {@link DebugState}, so the
+   *  refactor-tripwire golden stays untouched (new DebugState fields are deferred to a later step). */
+  walls(): { col: number; row: number; facing: string; hp: number; maxHp: number }[] {
+    return this.deps.wallManager
+      .all()
+      .map((w) => ({ col: w.col, row: w.row, facing: w.facing, hp: w.hp, maxHp: w.maxHp }));
+  }
+
+  /** DEV/test-only: damage the wall at `index` by `amount` — the real {@link WallManager.takeDamage}
+   *  (the path chunk 2c's enemy will drive). Returns whether that blow destroyed the wall; false if
+   *  there's no wall at that index. Mirrors {@link damageFire}. */
+  damageWall(index: number, amount: number): boolean {
+    const w = this.deps.wallManager.all()[index];
+    if (!w) return false;
+    return this.deps.wallManager.takeDamage(w.id, amount);
   }
 
   /** DEV/test-only: start a night wave immediately (plan 038 Step 3) — the deterministic entry point

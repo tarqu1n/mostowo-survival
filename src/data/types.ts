@@ -133,6 +133,12 @@ export interface BuildableDef extends ObjectStats {
    *  tile). Independent of `behavior` (a buildable can be simulated without being animated, or vice
    *  versa) — though today the campfire is the only one and is both. */
   animKey?: string;
+  /** Retaliation damage a mob takes when it *attacks* this structure (only spiky walls set it, so a
+   *  plain wall never retaliates) — consumed by the enemy-attack chunk (plan 037 2c); omit ⇒ no thorns. */
+  thorns?: number;
+  /** Marks a buildable whose placement facing can be rotated by the player before placing (plan 037):
+   *  each placed instance stores its own `facing`. The wall sets it; omit ⇒ a fixed-orientation buildable. */
+  orientable?: boolean;
   /** Height (in tiles) the sprite is scaled to stand — for multi-tile animated buildables. */
   tilesTall?: number;
   /** Sprite anchor Y (mirrors ResourceNodeDef.originY) — bottom-anchored so a tall structure overhangs upward. */

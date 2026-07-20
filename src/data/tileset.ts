@@ -221,6 +221,22 @@ export interface TilesetManifest {
       smoke: StripAnim;
     };
   };
+  /**
+   * Placeable *structure* animations, keyed by structure role — a live/destructible buildable's art,
+   * separate from `stations` (crafting stations) and `actors` (characters). The barricade wall
+   * composites nothing: WallManager makes ONE sprite per placed wall that plays a Build strip once,
+   * then settles on the Destroy strip's frame 0 (the intact idle) — the HP-stage hook steps the Destroy
+   * strip toward rubble as HP drops. Full 4-way facing from three sheets each (down/up/side; left =
+   * side flipped) for Build + Destroy, loaded cross-pack from `pack` (the boar precedent). Frame slicing
+   * is authoritative in docs/wired-art.md.
+   */
+  structures: {
+    barricade: {
+      pack: string;
+      build: Record<Facing, StripAnim>;
+      destroy: Record<Facing, StripAnim>;
+    };
+  };
 }
 
 /**
@@ -553,6 +569,36 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
       },
     },
   },
+  structures: {
+    // Barricade wall (plan 037) — the open lashed-stake palisade `Traps/Barricades/*_2`, full 4-way
+    // (D=down/front, U=up/back, S=side; left reuses S flipped, see WallManager). Each orientation ships
+    // a Build (6f, played once on placement) + a Destroy (6f, frame 0 = intact idle → frame 5 = rubble)
+    // sheet, 36w×64h frames throughout. Loaded cross-pack from craftpix-dungeon (via `pack`, not the
+    // manifest base). Slicing verified in docs/wired-art.md.
+    barricade: {
+      pack: 'craftpix-dungeon',
+      build: {
+        down: { path: 'Traps/Barricades/D_2_Build.png', frameWidth: 36, frameSize: 64, frames: 6 },
+        side: { path: 'Traps/Barricades/S_2_Build.png', frameWidth: 36, frameSize: 64, frames: 6 },
+        up: { path: 'Traps/Barricades/U_2_Build.png', frameWidth: 36, frameSize: 64, frames: 6 },
+      },
+      destroy: {
+        down: {
+          path: 'Traps/Barricades/D_2_Destroy.png',
+          frameWidth: 36,
+          frameSize: 64,
+          frames: 6,
+        },
+        side: {
+          path: 'Traps/Barricades/S_2_Destroy.png',
+          frameWidth: 36,
+          frameSize: 64,
+          frames: 6,
+        },
+        up: { path: 'Traps/Barricades/U_2_Destroy.png', frameWidth: 36, frameSize: 64, frames: 6 },
+      },
+    },
+  },
 };
 
 /** Swap this to trial a different pack — see the module doc above. */
@@ -616,6 +662,16 @@ export const campfireFlameSmallKey = (): string => 'campfire-flame-small';
 
 /** Texture/anim key for the campfire's smoke plume, always drawn above the flame (see `stations.campfire.smoke`). */
 export const campfireSmokeKey = (): string => 'campfire-smoke';
+
+/** Texture/anim key for the barricade wall's BUILD strip for an orientation (down/side/up — LEFT
+ *  facing reuses the `side` sheet flipped at the manager, so it maps to `side`). Played once on
+ *  placement, then the sprite settles on the Destroy strip's frame 0. See `structures.barricade`. */
+export const barricadeBuildKey = (facing: Facing): string => `barricade-build-${facing}`;
+
+/** Texture/anim key for the barricade wall's DESTROY strip for an orientation — frame 0 = the intact
+ *  idle (identical to the Build strip's last frame), stepping to rubble (frame 5) as HP drops (the
+ *  damage-stage render hook) and played through on destruction. See `structures.barricade`. */
+export const barricadeDestroyKey = (facing: Facing): string => `barricade-destroy-${facing}`;
 
 /** Texture key for an item's icon image (loaded from `public/assets/icons/<icon>`). */
 export const iconKey = (id: string): string => `icon:${id}`;

@@ -50,6 +50,10 @@ export interface BuildSite {
   visual: Phaser.GameObjects.Image | null;
   progress: number;
   done: boolean;
+  /** Placement facing for an `orientable` buildable (the wall) — stamped by `createBlueprint` from the
+   *  build manager's rotate state (plan 037); undefined for a fixed-orientation buildable. Drives the
+   *  oriented sprite WallManager materialises (left = the side sheet flipped). */
+  facing?: FacingSpec;
 }
 
 /**
@@ -77,6 +81,23 @@ export interface CampfireUnit {
   flameBaseScale: number;
   /** Which flame sheet is currently rendered (large >50% fuel, small ≤50%) — swap state, so the anim isn't replayed every tick. */
   flameLevel: 'large' | 'small';
+}
+
+/**
+ * A built barricade wall in the world: its single oriented sprite + HP. Owned by WallManager, the sole
+ * writer of the sprite's anim/frame (and its sole destroyer) — mirrors {@link CampfireUnit}. `hp` drops
+ * when a mob attacks it (plan 037 chunk 2c wires the enemy); the HP-stage render steps the Destroy
+ * sheet toward rubble, and at `hp <= 0` the wall plays the Destroy anim and is removed (its tile freed
+ * through BuildManager). `facing` is the player-rotate placement facing (left = the side sheet flipped).
+ */
+export interface PlacedWall {
+  id: string;
+  col: number;
+  row: number;
+  facing: FacingSpec;
+  sprite: Phaser.GameObjects.Sprite;
+  hp: number;
+  maxHp: number;
 }
 
 /**

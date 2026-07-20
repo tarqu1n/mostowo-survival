@@ -6,7 +6,7 @@ import { ACTIVE_TILESET, resolveTile } from '../../data/tileset';
 import { BUILDABLES } from '../../data/buildables';
 import { isInBase, baseZoneFromSpawn, type Rect } from '../../systems/base';
 import { rowDepthOffset } from '../../systems/mapFormat';
-import type { BuildSite } from '../../entities/types';
+import type { BuildSite, FacingSpec } from '../../entities/types';
 import type { CharacterSprite } from '../../entities/Character';
 import type { GameScene } from '../GameScene';
 
@@ -61,6 +61,11 @@ export class BuildManager {
    *  Defaults to `'wall'` so pre-palette behaviour (and the wall e2e) is unchanged; `reset()` restores
    *  it (so a `tryPlaceAt` after a campfire selection can't leak `'campfire'` into a later scenario). */
   private selectedBuildableId = 'wall';
+
+  /** Placement facing for the next `orientable` buildable (the wall), cycled by {@link rotatePlacement}
+   *  (plan 037). Reset to `'down'` on {@link select} + {@link reset} so a fresh selection/scenario
+   *  starts front-facing; ignored for non-orientable buildables (createBlueprint stamps undefined). */
+  private placeFacing: FacingSpec = 'down';
 
   private readonly walls: Phaser.Physics.Arcade.StaticGroup;
   private readonly ghost: Phaser.GameObjects.Rectangle;
@@ -196,8 +201,18 @@ export class BuildManager {
    *  scene; emits `build:modeChanged` so the HUD reflects build mode (mirrors {@link toggleBuild}). */
   select(id: string): void {
     this.selectedBuildableId = id;
+    this.placeFacing = 'down'; // a fresh selection starts front-facing (rotate cycles from here)
     this.buildMode = true;
     this.scene.game.events.emit('build:modeChanged', this.buildMode);
+  }
+
+  /** Cycle the placement facing for an `orientable` buildable: down → right → up → left → down (plan
+   *  037). Wired to the `build:rotate` game event (the HUD ROTATE button + the R key). No-op visual-wise
+   *  for a non-orientable selection — createBlueprint only stamps the facing when the buildable is
+   *  orientable, so the extra state is harmless. */
+  rotatePlacement(): void {
+    const order: FacingSpec[] = ['down', 'right', 'up', 'left'];
+    this.placeFacing = order[(order.indexOf(this.placeFacing) + 1) % order.length];
   }
 
   /** Add a passable, unbuilt blueprint at a tile and register its occupancy (shared by real build
@@ -231,6 +246,9 @@ export class BuildManager {
       visual: null,
       progress: 0,
       done: false,
+      // Stamp the current rotate facing only for an orientable buildable (the wall); a fixed-orientation
+      // buildable leaves it undefined. WallManager reads it to render the oriented sprite.
+      facing: BUILDABLES[buildableId].orientable ? this.placeFacing : undefined,
     };
     this.sites.push(site);
     this.siteTiles.add(key);
@@ -279,6 +297,24 @@ export class BuildManager {
     this.deps.repath();
   }
 
+  /** Free a completed *live* buildable's tile when its runtime manager removes it (a destroyed wall —
+   *  WallManager calls this through its `freeTile` dep so BuildManager stays the sole occupancy/collision
+   *  writer). Fully retires the finished site: drop its rect from the walls group + destroy it (which
+   *  frees the static collision body with it), and clear the occupancy/site-slot keys — so the tile is
+   *  passable AND re-placeable again, with no dangling destroyed-rect reference left for `reset()`. */
+  releaseTile(col: number, row: number): void {
+    const key = tileKey(col, row);
+    const idx = this.sites.findIndex((s) => s.done && s.col === col && s.row === row);
+    if (idx !== -1) {
+      const [site] = this.sites.splice(idx, 1);
+      this.walls.remove(site.rect, false, false); // drop from the static group (we destroy the rect next)
+      site.visual?.destroy();
+      site.rect.destroy(); // frees the attached static body with it
+    }
+    this.siteTiles.delete(key);
+    this.occupied.delete(key);
+  }
+
   /** Flip build-mode; hides the ghost when leaving it. Wired to `game.events` `build:toggle` by the
    *  scene (in), emits `build:modeChanged` (out) — names unchanged from the pre-move scene method. */
   toggleBuild(): void {
@@ -304,6 +340,7 @@ export class BuildManager {
     this.nextSiteId = 0;
     this.buildMode = false;
     this.selectedBuildableId = 'wall'; // don't leak a prior campfire selection into a fresh scenario
+    this.placeFacing = 'down'; // nor a prior rotate facing (a fresh scenario places walls front-facing)
   }
 
   /**
