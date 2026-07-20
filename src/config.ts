@@ -235,6 +235,14 @@ export const BOAR_ATTACK_WINDUP_MS = 250;
 export const COMBAT_ACTIVE_RADIUS_TILES = 7;
 
 /**
+ * Hysteresis band for the auto-surface predicate above (playtest fix). The controls ENGAGE when an
+ * enemy is within `COMBAT_ACTIVE_RADIUS_TILES`, but only RETRACT once every enemy is beyond
+ * `COMBAT_ACTIVE_RADIUS_TILES + this`. Without the wider release band a boar hovering at the exact
+ * trigger range flicked the fighting HUD on/off every frame it crossed the line. Playtest-tune.
+ */
+export const COMBAT_ACTIVE_HYSTERESIS_TILES = 3;
+
+/**
  * Hit feedback (see render/hitFlashPipeline.ts + GameScene.flashHit). When an actor takes damage it
  * flashes red and does a quick squash "flinch". `HIT_FLASH_MS` is how long the reaction lasts;
  * `HIT_FLASH_PEAK` is the max red mix (0..1) at impact — near 1 so the hit is unmistakable, a shade

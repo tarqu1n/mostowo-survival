@@ -19,6 +19,7 @@ import {
   BOW_RANGE_TILES,
   BOW_BASE_DAMAGE,
   COMBAT_ACTIVE_RADIUS_TILES,
+  COMBAT_ACTIVE_HYSTERESIS_TILES,
   INVENTORY_SLOTS,
   DEFAULT_MAX_STACK,
 } from '../config';
@@ -1151,18 +1152,21 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Recompute {@link combatActive} and emit `combat:activeChanged` only when it flips (UIScene
-   *  shows/hides the fighting HUD on it). Active ⇒ a live enemy within COMBAT_ACTIVE_RADIUS_TILES
-   *  (Chebyshev) OR the night phase — the moments the fighting controls are wanted. Deliberately does
-   *  NOT call setMode('combat') (that cancelAll()s the task queue — critique #2). */
+   *  shows/hides the fighting HUD on it). Engages when a live enemy is within COMBAT_ACTIVE_RADIUS_TILES
+   *  (Chebyshev) OR it's night; retracts only past the wider hysteresis radius (see below) to stop
+   *  boundary flicker. Deliberately does NOT call setMode('combat') (that cancelAll()s the queue). */
   private updateCombatActive(): void {
     const pt = this.playerChar.tile();
+    // Hysteresis: engage at the tight activation radius, but once engaged don't retract until every
+    // enemy is beyond the wider release radius. A boar loitering at the exact trigger range would
+    // otherwise flick the fighting HUD on/off every frame it stepped across the line (playtest bug).
+    const radius = this.combatActive
+      ? COMBAT_ACTIVE_RADIUS_TILES + COMBAT_ACTIVE_HYSTERESIS_TILES
+      : COMBAT_ACTIVE_RADIUS_TILES;
     const enemyNear = this.enemyManager
       .all()
       .some(
-        (z) =>
-          z.alive &&
-          Math.max(Math.abs(z.col - pt.col), Math.abs(z.row - pt.row)) <=
-            COMBAT_ACTIVE_RADIUS_TILES,
+        (z) => z.alive && Math.max(Math.abs(z.col - pt.col), Math.abs(z.row - pt.row)) <= radius,
       );
     const next = enemyNear || this.survivalClock.dayPhase === 'night';
     if (next === this.combatActive) return;
