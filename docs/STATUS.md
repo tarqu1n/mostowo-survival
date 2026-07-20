@@ -109,6 +109,25 @@ Sibling plan **035b** (deferred) adds the boar + the 4-way directional-actor pip
 stand-in / flagged for playtest: the bow release anim + unlimited arrows (no ammo economy), plus all
 `035a` tuning knobs.
 
+## Melee attack shapes (plan 036)
+
+Player melee is now a **data-driven tile-space attack shape** — `AttackShape = { reach; arc }` on a
+weapon, resolved by pure `attackTiles(feet, facing, shape)` (`src/systems/hurtbox.ts`) into the set of
+target tiles, oriented to a cardinal-snapped facing. `GameScene.attack()` runs the shape →
+`EnemyManager.enemiesInTiles(tiles)` (every distinct alive enemy whose hurtbox covers any target tile)
+→ per-target `resolveMeleeAttack` + `takeDamage`; **cleave hits every enemy in the shape, flat damage
+each**, one camera shake if anything connected, a whiff still swings. `PlayerCharacter` carries an
+optional `meleeWeapon?` (undefined = unarmed) resolved via `meleeShape()`/`meleeBaseDamage()`. Demo
+`MELEE_WEAPONS` (`src/data/weapons.ts`, dev/test-only — no inventory/equipment): **spear** (reach 2,
+`line`) and **cleaver** (reach 1, `wide`); unarmed = `UNARMED_MELEE_SHAPE` (reach 1, `single`) =
+today's single-front-tile behaviour, unchanged. Numbers → [GAME-MECHANICS.md](GAME-MECHANICS.md);
+rationale → [decisions/gameplay.md](decisions/gameplay.md) (2026-07-20).
+
+**Enemies still use the proximity contact-bite** (Chebyshev ≤1 vs player body tiles, telegraphed) — a
+type-only `attackShape?` seam exists on `MonsterWeapon` but nothing consumes it, so no enemy AI change.
+Selectable in tests via the `setPlayerMelee(id)` `__test` seam + a `ScenarioSpec.melee?` field
+(Tier-2 `tests/e2e/weapon-reach-arc.spec.ts`); no `DebugState` field added (tripwire golden unchanged).
+
 ## Day/night + hunger survival slice (plan 004)
 
 Real-time **day/night cycle** (`src/systems/daynight.ts`, pure): a continuous clock drives a map-sized

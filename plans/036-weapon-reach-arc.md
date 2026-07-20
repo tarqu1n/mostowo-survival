@@ -1,6 +1,6 @@
 # Weapon Reach / Arc — Tile-Space Attack Shapes
 
-> Status: planned — run /execute-plan to begin.
+> Status: in review
 
 ## Summary
 
@@ -173,7 +173,8 @@ Unarmed default (no weapon) = `{reach:1, arc:'single'}`, `damage = UNARMED_BASE_
   - Docs: none (Step 5).
   - Done when: new e2e green; `combat.spec` + `refactor-tripwire` still green; typecheck + lint clean.
 
-- [ ] **Step 5: Docs + full test sweep** `[inline]`
+- [x] **Step 5: Docs + full test sweep** `[inline]`
+  - Outcome: docs-only diff (4 files). `docs/STATUS.md` — "Melee attack shapes (plan 036)" section. `docs/GAME-MECHANICS.md` — shape model + `attackTiles` semantics + demo stats + `UNARMED_MELEE_SHAPE` knob. `docs/decisions/gameplay.md` — dated `[DECIDED]` entry (tile-space reach/arc, not physics hitboxes; attacker-shape vs defender-hurtbox split; cleave-flat; shape-as-data seam; enemy bite unchanged). `docs/CONVENTIONS.md` — one bullet on the attacker-shape vs defender-hurtbox pattern. Sweep: typecheck clean; vitest 813 green; eslint 0 errors (98 pre-existing `no-explicit-any` warnings on the harness `window as any` idiom); markdownlint + prettier clean on edited docs; plan-036 e2e (`weapon-reach-arc`+`combat`+`refactor-tripwire`) 22 passed. Full e2e had 9 non-deterministic flakes in unrelated timing-sensitive specs (campfire/death/follow/daynight/hunger/monster-patrol/menu-start) — environmental (docs-only diff → runtime byte-identical to base; failure set shrank 9→5 across runs), not a regression. Tripwire/golden/harness/testApi untouched.
   - `docs/STATUS.md`: melee now uses a tile-space `AttackShape` (reach + arc); demo `MELEE_WEAPONS`;
     cleave/spear; note enemies still use proximity bite.
   - `docs/GAME-MECHANICS.md`: the shape model + `attackTiles` semantics (single/line/wide, cardinal-snap),

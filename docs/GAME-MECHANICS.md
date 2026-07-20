@@ -88,6 +88,31 @@ All knobs in [src/config.ts](../src/config.ts); behaviour in [STATUS.md](STATUS.
 
 All numbers are **proposed starting values — playtest-tune.**
 
+## Melee attack shape (plan 036)
+
+Player melee hits a **set of tiles** derived from the equipped weapon's `AttackShape = { reach; arc }`
+([src/data/types.ts](../src/data/types.ts)), not a single fixed front tile. Pure
+`attackTiles(feet, facing, shape)` ([src/systems/hurtbox.ts](../src/systems/hurtbox.ts)) generates them;
+behaviour in [STATUS.md](STATUS.md), rationale in [decisions/gameplay.md](decisions/gameplay.md).
+
+- **`reach`** — forward depth in tiles (clamped `≥1`). **`arc`** — lateral profile: `single` / `line` /
+  `wide`. **Facing is snapped to a cardinal unit** (dominant axis wins; a `(0,0)` facing defaults to
+  down), so an arc is always cardinal-oriented (no 8-way). The feet tile is never included; cells dedupe.
+- **`single`** → just the tip, `feet + reach·f` (with `reach:1` = exactly today's one front tile).
+- **`line`** → the straight column, `feet + d·f` for `d = 1..reach` (a spear thrust that reaches past
+  the first tile).
+- **`wide`** → a 3-wide swath to depth `reach`: for each `d = 1..reach`, the column tile plus both
+  perpendicular flanks (`± p`, `p` perpendicular to facing) — a cleave that catches a crowd.
+- **Every distinct alive enemy** whose hurtbox covers **any** target tile is hit once per swing
+  (`EnemyManager.enemiesInTiles`); **cleave = flat damage to each**, not split.
+- **Demo weapons** (`MELEE_WEAPONS`, [src/data/weapons.ts](../src/data/weapons.ts), dev/test-only):
+  **spear** `{ reach: 2, arc: 'line', damage: 1 }`, **cleaver** `{ reach: 1, arc: 'wide', damage: 1 }`.
+- **Unarmed** (no weapon) = `UNARMED_MELEE_SHAPE` `{ reach: 1, arc: 'single' }`
+  ([src/config.ts](../src/config.ts), near `UNARMED_BASE_DAMAGE` **1**) — identical to pre-036 melee.
+
+Demo weapon reach/damage are **starting values — playtest-tune.** Enemies keep their proximity bite (see
+above); the `MonsterWeapon.attackShape?` seam is defined but unconsumed.
+
 ## Base zone
 
 A constant-size rect anchored at (centred on) the spawn tile: `BASE_ZONE_SIZE` (tile extent) in

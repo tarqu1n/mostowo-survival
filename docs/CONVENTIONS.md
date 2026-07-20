@@ -41,6 +41,12 @@ _To be firmed up as we go. Starting position:_
   `src/systems/hurtbox.ts`, consumed by `GameScene.zombieAt` + contact). New enemies just declare a
   `hurtbox` (omit → `DEFAULT_HURTBOX`, one tile); no targeting code changes. Keeps a ~2-tile sprite
   hittable by its drawn torso without letting it _occupy_ two tiles.
+- **Attacker shape vs defender hurtbox (plan 036).** A melee hit is **tile-set membership**, not physics:
+  the attacker projects an `AttackShape` (`{reach, arc}`, data on a weapon) through pure
+  `attackTiles(feet, facing, shape)` (`src/systems/hurtbox.ts`) into a set of target tiles; the defender
+  owns its `hurtbox` tiles; a hit is the intersection (`EnemyManager.enemiesInTiles`). Both sides live in
+  the same `col`/`row` space as footprint/pathfinding — deterministic, harness-testable, no AABB/pixel
+  collision. New reach/area = new shape data, not new targeting code.
 - **Pointer picking is a sprite raycast, not a tile lookup.** `GameScene.pickSpriteAt` resolves which
   world entity a tap landed on by walking the _drawn sprites_: a candidate is hit on its logical
   footprint (a node's foot tile, a zombie's hurtbox, a site's tile — so the base is always a reliable

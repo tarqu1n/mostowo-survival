@@ -6,6 +6,34 @@ Part of the [decision log index](../DECISIONS.md). Newest first.
 
 ---
 
+## 2026-07-20 — [DECIDED] Melee hit detection is tile-space reach/arc, not physics/geometric hitboxes (plan 036)
+
+Melee was one hardcoded front tile (`feet + facing`). Plan 036 makes it a data-driven **attack shape** —
+`AttackShape = { reach; arc: 'single' | 'wide' | 'line' }` on a weapon, resolved by pure
+`attackTiles(feet, facing, shape)` (`src/systems/hurtbox.ts`) into a set of target tiles hit-tested
+against enemy hurtboxes. The prompting question was "how should a weapon express reach/area?" — a spear
+that reaches 2, a cleave that hits a crowd, and (falls out) melee that connects with a wide/tall enemy's
+whole hurtbox, not just its feet tile.
+
+- **Chosen: stay grid-native — one source of truth on `col`/`row`.** Physics/AABB/pixel hitboxes
+  (Arcade overlap, geometric collision) were **explicitly rejected**: the whole combat/targeting stack
+  already keys off tiles (footprint, hurtbox, pathfinding), so a shape in the same space is deterministic
+  and unit/scenario-testable via the existing Tier-1/2 harness — no float geometry, no frame-timing
+  flake. This is the **attacker-shape vs defender-hurtbox** split: the attacker projects a tile set, the
+  defender owns a tile extent, and a hit is set-membership.
+- **`arc` is a small preset set** (`single`/`line`/`wide`) over a numeric width or an offset list —
+  authorable and a fully-testable combo space. **Facing snaps to the dominant cardinal axis** inside the
+  generator (mirrors combat-move's snap); true 8-way arcs are out of scope.
+- **Cleave hits every enemy in the shape, flat damage each** (one swing = N independent hits), not a
+  split or falloff — base-defense crowds (the night wave) are the motivating use.
+- **Shape is data, so it travels.** Weapons carry their shape (`MELEE_WEAPONS` demo map); a type-only
+  `attackShape?` seam exists on `MonsterWeapon` so mobs *could* later carry one. **Enemy bite stays
+  proximity** (Chebyshev ≤1, telegraphed) — unchanged this plan; the seam is unconsumed.
+- **No player equipment system** — demo weapons (spear/cleaver) are data + a dev/test seam
+  (`setPlayerMelee`), not inventory/economy items. Unarmed = `{reach:1, arc:'single'}`, byte-for-byte
+  today's behaviour (regression anchor). No `DebugState` field, so the `refactor-tripwire` golden is
+  untouched. Mechanic numbers in [GAME-MECHANICS.md](../GAME-MECHANICS.md).
+
 ## 2026-07-20 — [DECIDED] Enemy rendering is a data discriminator (`EnemyDef.actorKind`), not a subclass
 
 Adding the boar (plan 035b) generalized the enemy actor pipeline from the single flip-mirrored skeleton
