@@ -1038,6 +1038,14 @@ export class UIScene extends Phaser.Scene {
     this.inspectPanelBg.hide();
   }
 
+  /** True while a finger is held on the movepad (any pointer id — the pad tracks by id, so this is
+   *  reliable even when the pinch-count heuristic in PointerInputController undercounts a 3rd pointer).
+   *  Gates map order dispatch there: while you're driving, map taps/queue-paint stay inert until you
+   *  release the pad (playtest fix). Cleared on release and whenever the controls retract. */
+  isMovepadHeld(): boolean {
+    return this.movepadPointerId !== null;
+  }
+
   /** Drag the movepad knob toward the pointer (clamped to the base radius) and emit the
    * normalized {dx, dy} vector for GameScene to drive the player's velocity directly. */
   private updateMovepad(pointer: Phaser.Input.Pointer): void {

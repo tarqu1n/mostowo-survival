@@ -426,6 +426,7 @@ export class GameScene extends Phaser.Scene {
       },
       onBuildMove: (pointer) => this.buildManager.updateGhost(pointer),
       getMode: () => this.mode,
+      isMovepadHeld: () => this.ui.isMovepadHeld(),
       onTap: (pointer) => {
         const action = this.scenePicker.actionAt(pointer.worldX, pointer.worldY);
         // A tap on a tree or a campfire queues a job (harvest / refuel): it falls in behind the current

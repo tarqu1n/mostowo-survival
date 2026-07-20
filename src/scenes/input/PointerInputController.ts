@@ -34,6 +34,10 @@ export interface PointerInputDeps {
   onBuildMove(pointer: Phaser.Input.Pointer): void;
   /** Current input mode ('command'/'combat'/'inspect') — gates tap/paint/inspect dispatch. */
   getMode(): 'command' | 'combat' | 'inspect';
+  /** True while a finger is held on the combat movepad. While it is, map order dispatch (tap-to-move,
+   *  queue-paint) and pan are suppressed for every OTHER pointer until the pad is released — the
+   *  driving thumb shouldn't also let a second finger queue a path across the map. */
+  isMovepadHeld(): boolean;
   /** Command-mode tap: move now, or queue if the target is a harvest / the press was a long-press. */
   onTap(pointer: Phaser.Input.Pointer): void;
   /** Command-mode queue-paint: resolve + enqueue the target under a tile not yet painted this gesture. */
@@ -155,6 +159,11 @@ export class PointerInputController {
     // surface never yields a dead movepad NOR a hijacked camera. Only the drive + onCombatMove gate in
     // GameScene rebase onto combatActive (see GameScene.movepadDrives).
     if (this.deps.getMode() === 'combat') return;
+    // While the movepad is held (driving with the other thumb), the map is inert for any other
+    // pointer — no queue-paint, no pan — until the pad is released. The pinch guard alone can't cover
+    // this: BootScene registers 3 touch pointers but activePointerCount() only sees pointer1/2, so a
+    // movepad finger on pointer3 slips the count and a map finger paints a path mid-drive (playtest bug).
+    if (this.deps.isMovepadHeld()) return;
     if (!pointer.isDown || this.downOnUI || this.pointerOnHud(pointer)) return;
 
     // Command-mode-only: queue-painting (long-press-drag) issues tap-to-pathfind orders, which
@@ -203,6 +212,9 @@ export class PointerInputController {
     if (!this.sawPointerDown) return;
     this.sawPointerDown = false;
     if (this.deps.isBuildMode() || this.downOnUI || this.pointerOnHud(pointer)) return;
+    // Movepad held → this release is a stray second-finger tap while driving; swallow it so it can't
+    // issue a move/queue order (mirrors the onPointerMove gate above).
+    if (this.deps.isMovepadHeld()) return;
     if (this.queuePainting) {
       this.queuePainting = false; // the drag already queued its targets
       return;
