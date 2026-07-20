@@ -35,10 +35,16 @@ CampfireManager, `wall` → WallManager). The later `StructureManager` step then
 into the behavior-module registry, designed against two real shapes.
 
 1. **Art curation** (orig. Step 2) — no code, no deps; do first so wall/gate/trap sprites are pinned.
-2. **Destructible walls** (orig. Steps 3–5, adapted): `wall` gains `behavior:'wall'` + CraftPix
-   barricade art, materialised by the interim **`WallManager`** (not StructureManager yet); player can
-   damage/destroy a wall (orig. Step 4); enemy attacks a blocking wall via the generic structure-target
-   seam (orig. Step 5). This is the "real example #2" the critique wants landed first.
+2. **Destructible walls** (orig. Steps 3–5, adapted), in three check-in-able chunks:
+   - **2a** — `wall` gains `behavior:'wall'` + the **4-way** CraftPix stake-barricade art, materialised
+     by the interim **`WallManager`** (not StructureManager yet), with **player-rotate placement**
+     (`facing` per wall). Low `maxHp` + a `thorns` field on the buildable (decision #7).
+   - **2b** — **player deconstruct/unbuild** (decision #6): a worker deconstruct order + partial refund;
+     walls immune to player weapons. *Replaces* orig. Step 4's "player damages structures in combat".
+   - **2c** — **enemy attacks a blocking wall** via the generic structure-target seam (orig. Step 5),
+     **plus thorns**: a mob hitting a `thorns` wall takes retaliation damage (decision #7). This is the
+     path that actually lowers wall HP.
+   This block is the "real example #2" the critique wants landed before the StructureManager refactor.
 3. **StructureManager generalisation** (orig. Step 1, now against two shapes): fold `CampfireManager`
    **and** `WallManager` into `StructureManager` + behavior-module registry. Interface is designed from
    campfire + wall (hp/takeDamage/damage-stage already concrete), not a population of one.
@@ -63,9 +69,10 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
 
 **Locked design decisions (from planning):**
 
-1. **Walls are destructible** (mobs can break through) — *not* indestructible-with-funnel-gap. Reverses
-   the `buildables.ts:8` "indestructible this slice" code comment (a comment, not a settled decision —
-   free to reverse).
+1. **Walls are destructible *by mobs*** (they can break through) — *not* indestructible-with-funnel-gap.
+   Reverses the `buildables.ts:8` "indestructible this slice" code comment (a comment, not a settled
+   decision — free to reverse). **Players do NOT damage walls in combat** — walls are immune to player
+   weapons; only mob attacks lower wall HP (decision #6). (Refined by owner, 2026-07-20.)
 2. **Gate = ally-permeable destructible barrier.** Always walkable by player/NPC, always blocking to
    mobs (a per-faction pathing filter), breakable like a wall. **No open/close toggle.**
 3. **Spike trap = trigger-once, spent after firing, re-armed each morning** by a queued worker order
@@ -74,6 +81,19 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
    + a generic enemy structure-target seam now, proven via scenario-API scripted enemies; the full
    night-wave AI stays deferred. The seam is written generically (structure / player / future fire) so
    Step 2 (wave) wires into it rather than reworking it.
+6. **Player removes a wall by DECONSTRUCT, not combat** (owner, 2026-07-20). A **worker deconstruct
+   order** (mirrors the build/refuel order pattern): tap a finished wall in a demolish affordance →
+   worker walks over → removes it → tile freed. **Partial resource refund** (a fraction of `cost`, e.g.
+   half; exact number a tuning knob). Walls take **no** player weapon damage — so the original "player
+   damages structures" step becomes an unbuild order (no ObjectStats-as-defender adapter on the player
+   path; the HP/damage path is driven solely by mobs, decision #7).
+7. **Spiked wall = thorns + low-HP early-game archetype** (owner, 2026-07-20). The D_2 stake palisade
+   deals **a little retaliation damage to a mob attacking it** — a data `thorns` field on the buildable,
+   so only spiky walls retaliate — and is **cheap + low `maxHp`**: it chips the horde but won't hold
+   long. This sets up a later **solid high-HP, no-thorns wall** (the `D_1` variant) as the tradeoff, so
+   wall choice is a real decision, not a straight upgrade. **Thorns fire only on a mob's *attack*** on
+   the wall, never passively to nearby mobs — keeping the spiked wall distinct from the spike *trap*
+   (the step-on-tile damage). Thorns amount + wall HP are wave-time tuning knobs.
 5. **This triggers the StructureManager generalisation now** (architecture decision, see below) — walls,
    gate and trap are behavior-modules, not three more bespoke managers.
 
@@ -244,6 +264,10 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
     scenario can read the wall's `hp`/`maxHp`.
 
 - [ ] **Step 4: Player can damage & destroy structures** `[inline]`
+  - **OVERRIDDEN by decision #6 (owner, 2026-07-20) → see resequence chunk 2b.** Players do NOT damage
+    walls in combat; this becomes a **worker deconstruct/unbuild order with partial refund**. Ignore the
+    combat-damage / ObjectStats-as-defender-on-the-player-path detail below; the HP/damage path is
+    mob-driven only (chunk 2c). Kept below for the enemy-side adapter reference only.
   - Give `PlacedStructure` a `takeDamage(amount)` and `hp`. Add an **ObjectStats-as-defender adapter**
     so `resolveMeleeAttack` accepts a structure (wrap `ObjectStats` with zeroed `strength/dex/dodge`, or
     widen the defender type in `combat.ts` — prefer the adapter to keep `combat.ts` pure and unchanged).
@@ -258,6 +282,9 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
     → its tile becomes passable (assert via `state()` + a pathing check).
 
 - [ ] **Step 5: Enemy attacks a blocking wall (structure target seam)** `[inline]`
+  - **Extended by decision #7 (owner, 2026-07-20) → see resequence chunk 2c.** In addition to the seam
+    below, a mob hitting a `thorns` wall takes **retaliation damage** per strike; the spiked D_2 wall is
+    the low-HP/thorns early-game archetype. Otherwise as described.
   - Extend `MonsterTickEnv` with a generic **structure-target** channel + an `attackStructure(id, dmg)`
     callback (mirror `damagePlayer`). Written generically for structure / player / (future) fire so the
     night wave reuses it.
