@@ -128,7 +128,8 @@ Unarmed default (no weapon) = `{reach:1, arc:'single'}`, `damage = UNARMED_BASE_
   - Done when: typecheck clean, `vitest` green (incl. `data.test.ts`), player still behaves unarmed
     (nothing consumes the new field yet).
 
-- [ ] **Step 3: Rewire `GameScene.attack()` to the shape + multi-hit** `[inline]`
+- [x] **Step 3: Rewire `GameScene.attack()` to the shape + multi-hit** `[inline]`
+  - Outcome: `src/scenes/world/EnemyManager.ts` — added `enemiesInTiles(tiles)` (filters alive enemies whose `hurtboxContains(.., def.hurtbox ?? DEFAULT_HURTBOX, t)` for any tile; dedup-by-reference inherent; `enemyAt` left untouched). `src/scenes/GameScene.ts` — `attack()` rewired: keep cooldown gate + `playAttackSwing()` on every accepted press → `meleeShape()`→`attackTiles(tile, lastFacing, shape)`→`enemiesInTiles`; per target `resolveMeleeAttack(stats, def, meleeBaseDamage(), rng)` + `takeDamage`; kill → `killEnemy` (no flash), else dmg>0 → `flashHit`; single `cameras.shake` gated on `anyHit`. Removed now-unused `UNARMED_BASE_DAMAGE` import. No `DebugState`/harness/testApi change. typecheck clean; `vitest` 813 green; e2e `combat.spec.ts`+`refactor-tripwire.spec.ts` 19 passed unchanged. Non-unarmed shape proven via a throwaway unit check (cleave/spear/unarmed), since removed.
   - Add `EnemyManager.enemiesInTiles(tiles: Cell[]): MonsterCharacter[]` — every **distinct alive** enemy
     whose hurtbox (`hurtboxContains`, `def.hurtbox ?? DEFAULT_HURTBOX`) covers **any** of `tiles` (dedupe by
     enemy reference; one enemy covering several arc tiles is returned once). Mirror `enemyAt`'s hurtbox use.

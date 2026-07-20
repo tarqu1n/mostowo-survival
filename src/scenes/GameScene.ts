@@ -9,7 +9,6 @@ import {
   CAMPFIRE_FEED_INTERVAL_MS,
   LONGPRESS_MS,
   BUILD_MS,
-  UNARMED_BASE_DAMAGE,
   PLAYER_HIT_SHAKE_MS,
   PLAYER_HIT_SHAKE_INTENSITY,
   ENEMY_HIT_SHAKE_MS,
@@ -37,6 +36,7 @@ import type { MapFile, DecorObject, NodeObject, PortalObject } from '../systems/
 import { breadcrumb, setCrashContext } from '../debug/crashReporter';
 import { TaskQueue, type Action } from '../systems/tasks';
 import { resolveMeleeAttack, resolveRangedAttack } from '../systems/combat';
+import { attackTiles } from '../systems/hurtbox';
 import type { UIScene } from './UIScene';
 import type { GameTestApi } from '../entities/testTypes';
 import type { CharacterSprite } from '../entities/Character';
@@ -1010,28 +1010,35 @@ export class GameScene extends Phaser.Scene {
     if (this.playerChar.hp <= 0) this.killPlayer();
   }
 
-  /** Attack the facing tile: flat damage via the shared combat formula, no range/arc beyond that
-   * tile — but an enemy is hit anywhere its hurtbox reaches it (see EnemyManager.enemyAt). Enemies
-   * only; trees keep using chop(). */
+  /** Attack the tiles the current melee swing covers: flat damage via the shared combat formula to
+   * EVERY distinct alive enemy the swing's shape reaches (plan 036 — a cleave/line hits all of them,
+   * each once; unarmed's single front tile reproduces the old one-target behaviour). Shape + base
+   * damage come from the equipped weapon (or the unarmed default); an enemy is hit anywhere its
+   * hurtbox reaches a swing tile (see EnemyManager.enemiesInTiles). Enemies only; trees keep chop(). */
   private attack(): void {
     // Cooldown gate (playtest fix): a press inside the window is ignored outright — no swing, no
     // damage — so mashing MELEE can't machine-gun hits or restart the swing mid-animation.
     if (this.time.now < this.playerChar.meleeReadyAt) return;
     this.playerChar.meleeReadyAt = this.time.now + ATTACK_COOLDOWN_MS;
     this.fx.playAttackSwing(); // swing on every (accepted) press, even a whiff, so the input feels heard
-    const pt = this.playerChar.tile();
-    const col = pt.col + this.playerChar.lastFacing.dCol;
-    const row = pt.row + this.playerChar.lastFacing.dRow;
-    const enemy = this.enemyManager.enemyAt(col, row);
-    if (!enemy) return;
-    const dmg = resolveMeleeAttack(this.playerChar.stats, enemy.def, UNARMED_BASE_DAMAGE, this.rng);
-    enemy.takeDamage(dmg);
-    if (enemy.hp <= 0) {
-      this.enemyManager.killEnemy(enemy); // play the death collapse, then remove the corpse
-    } else if (dmg > 0) {
-      this.fx.flashHit(enemy.sprite); // red flash + flinch on a hit it survived
-      this.cameras.main.shake(ENEMY_HIT_SHAKE_MS, ENEMY_HIT_SHAKE_INTENSITY); // light kick so a connect has impact
+    const shape = this.playerChar.meleeShape();
+    const tiles = attackTiles(this.playerChar.tile(), this.playerChar.lastFacing, shape);
+    const targets = this.enemyManager.enemiesInTiles(tiles);
+    const base = this.playerChar.meleeBaseDamage();
+    let anyHit = false;
+    for (const target of targets) {
+      const dmg = resolveMeleeAttack(this.playerChar.stats, target.def, base, this.rng);
+      target.takeDamage(dmg);
+      if (target.hp <= 0) {
+        this.enemyManager.killEnemy(target); // play the death collapse, then remove the corpse
+        anyHit = true;
+      } else if (dmg > 0) {
+        this.fx.flashHit(target.sprite); // red flash + flinch on a hit it survived (killing hits skip this)
+        anyHit = true;
+      }
     }
+    // One camera kick for the swing if it connected at all (not per enemy) — a whiff gets just the swing.
+    if (anyHit) this.cameras.main.shake(ENEMY_HIT_SHAKE_MS, ENEMY_HIT_SHAKE_INTENSITY);
   }
 
   /**

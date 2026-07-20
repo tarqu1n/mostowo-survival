@@ -136,6 +136,20 @@ export class EnemyManager {
     );
   }
 
+  /** Every DISTINCT alive enemy whose body (hurtbox, anchored at its feet tile) covers ANY of
+   *  `tiles` — the multi-hit query behind a wide/line melee swing (plan 036 Step 3). Mirrors
+   *  {@link enemyAt}'s hurtbox use; one enemy covering several arc tiles is returned once (dedupe by
+   *  reference, since `find`-per-tile would double-count a tall/wide body straddling the arc). */
+  enemiesInTiles(tiles: Cell[]): MonsterCharacter[] {
+    return this.enemies.filter(
+      (z) =>
+        z.alive &&
+        tiles.some((t) =>
+          hurtboxContains({ col: z.col, row: z.row }, z.def.hurtbox ?? DEFAULT_HURTBOX, t),
+        ),
+    );
+  }
+
   // --- Per-frame tick --------------------------------------------------------------
 
   /** Per-frame AI tick for every live monster. Builds the shared {@link MonsterTickEnv} world
