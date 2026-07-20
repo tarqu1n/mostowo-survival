@@ -1,6 +1,6 @@
 # Weapon Reach / Arc — Tile-Space Attack Shapes
 
-> Status: in review
+> Status: deployed
 
 ## Summary
 
