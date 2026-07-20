@@ -127,6 +127,14 @@ export interface EnemyDef extends CombatantStats {
   name: string;
   color: number; // placeholder tint until the real sprite is wired (Step 2)
   /**
+   * Rendering path this enemy uses. `'flip3'` (the default when omitted) = the skeleton's
+   * single-orientation Run strip with facing faked by `setFlipX` (art in `ACTIVE_TILESET.actors.enemy`);
+   * `'dir4'` = a 4-way directional creature with a distinct strip per facing, keyed by `id` under
+   * `ACTIVE_TILESET.actors.directional` (see {@link DirectionalEnemyActor}). Omitted on `kidZombie` so
+   * the skeleton is unaffected.
+   */
+  actorKind?: 'flip3' | 'dir4';
+  /**
    * Weapon ids this enemy may spawn holding — keys shared by data/weapons.ts (MONSTER_WEAPONS stats)
    * and the manifest weapons catalogue (art). One is rolled per spawn (Phase B); empty/undefined =
    * unarmed (contact bite only, UNARMED_BASE_DAMAGE).

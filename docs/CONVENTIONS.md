@@ -64,6 +64,13 @@ _To be firmed up as we go. Starting position:_
   2026-07-11 and 2026-07-13: behaviour classes yes, data hierarchy no). Decision/effect split
   preserved: a pure system (`monsterAI`, `attachment`) _decides_; the entity _executes_ (e.g.
   `MonsterCharacter.update` runs the FSM's decision, never re-derives it).
+- **Enemy rendering is a data discriminator, not a subclass (`EnemyDef.actorKind`, plan 035b).** A mob
+  picks its render path from data: `'flip3'` (default/omitted) = one single-orientation Run strip with
+  facing faked by `setFlipX` (skeleton — art in `ACTIVE_TILESET.actors.enemy`); `'dir4'` = a 4-way
+  directional creature with a distinct strip per facing (`Facing4` = down/up/left/right, no flip), keyed
+  by enemy `id` under `ACTIVE_TILESET.actors.directional` and animated via `dirEnemyAnimKey`. One
+  `MonsterCharacter` handles both — the discriminator branches the anim/footprint selection, so adding a
+  directional creature is a data + manifest entry, not a new actor class.
 - **Manager pattern (`src/scenes/{build,fx,input,world}/`, `src/scenes/testApi.ts`, plans 013/015).**
   Self-contained scene concerns — build placement (`BuildManager`), queue-glow rendering
   (`TaskGlowRenderer`), combat FX (`CombatFxManager`), pointer/camera gestures
