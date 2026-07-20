@@ -1,6 +1,6 @@
 # The Boar — a 4-Way Directional Enemy
 
-> Status: in review
+> Status: deployed
 > Split from plan 035 after critique. **Depends on plan 035a** (the combat control cluster, bow, monster
 > HP bars, dev spawn button, and telegraphed-enemy pattern must already exist — the boar plugs into them).
 
