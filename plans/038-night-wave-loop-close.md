@@ -1,6 +1,6 @@
 # The Night Wave + Loop-Close
 
-> Status: in review
+> Status: deployed
 
 ## Summary
 
