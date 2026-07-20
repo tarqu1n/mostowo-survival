@@ -43,6 +43,9 @@ export interface DebugState {
   combatActive: boolean;
   bowTargetId: string | null;
   enemyHpBarsVisible: number;
+  waveActive: boolean;
+  waveSpawns: number;
+  enemyKinds: string[];
 }
 
 /**

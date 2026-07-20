@@ -118,6 +118,16 @@ export class WaveDirector {
     this.active = false;
   }
 
+  /** Is a wave currently running? (DEV debugState — plan 038 Step 7.) */
+  isActive(): boolean {
+    return this.active;
+  }
+
+  /** How many mobs the current/last wave has spawned. (DEV debugState — plan 038 Step 7.) */
+  spawnedCount(): number {
+    return this.spawnedThisWave;
+  }
+
   // --- Per-frame tick --------------------------------------------------------------
 
   /** Advance the wave: reconcile a night-seeded scenario on the first tick, then (while active) meter

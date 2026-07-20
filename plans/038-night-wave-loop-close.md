@@ -309,7 +309,23 @@ new combat.
   - Done when: the dev force-wave control starts a wave on demand in-game; the fire-fuel bar tracks burn +
     `damageFire` + feed; the night indicator shows during night.
 
-- [ ] **Step 7: Scenario API surface, tests, tripwire & docs** `[inline]`
+- [x] **Step 7: Scenario API surface, tests, tripwire & docs** `[inline]`
+  - Outcome: appended 3 `DebugState` fields at END — `waveActive`, `waveSpawns`, `enemyKinds` (live
+    enemy def ids, for composition) — fed by new `WaveDirector.isActive()`/`spawnedCount()`; updated
+    `harness.ts` mirror + the `refactor-tripwire` golden together (deliberate bump: all three added,
+    values `false`/`0`/`[]` for the day scenario). `applyScenario` already seeds a hearth + night
+    (campfires + `startPhase`/`clockMs`) + fire-seekers (`enemies[].objective`, Step 4). Added the
+    **roadmap Step 2 acceptance** e2e (seed ~5s pre-dawn → wave active + edge spawns → cross dawn →
+    day 2 + player survives + wave ended); Tier-1 curves were added in Step 5's `wave.test.ts`. Docs:
+    `ROADMAP.md` Step 2 marked delivered, `CLAUDE.md` status line, `GAME-DESIGN.md` night-wave
+    delivered-note, `STATUS.md` (Steps 3–6). **Full sweep:** typecheck + lint + prod build clean;
+    829/829 unit; the tripwire golden + all 8 wave e2e (incl. acceptance) green. **Pre-existing red
+    (confirmed on clean `origin/master`, NOT this plan):** `tryPlace`/`death` (stale `SPAWN_TILE`
+    coords), `campfire-feed`/`menu-start` (headless single-tap pointer race), `survival-hunger`
+    (expects lethal hunger; `HUNGER_LETHAL` is the roadmap-Step-4 stopgap). `follow`/`monster`/
+    `survival-daynight` are fill-rate contention flakes under `fullyParallel` (green when run serially).
+    Boot canary: zero-console-error gate green on the prod bundle; its scene-activation asserts hit the
+    same pre-existing single-tap race (`smoke.mjs` lacks the harness's retried tap).
   - `testApi.ts`: consolidate the `__test` seams (`damageFire` from Step 1, `beginWave` from Step 3) and
     expose new `DebugState` fields (active-wave state, spawn count this night — **no `integrity` field**,
     decision #2; fuel/lit already surfaced in `campfires[]`) **appended at END** of the interface +

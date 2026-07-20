@@ -96,6 +96,35 @@ test('a fire-seeking mob with no player near attacks the fire (drains its fuel)'
   expect(s.campfires[0].lit).toBe(true); // 100 fuel doesn't fully douse in 6s — still lit (not a loss)
 });
 
+// Plan 038 Step 7 — the ROADMAP Step 2 acceptance test: night falls → a wave arrives from the treeline
+// → you defend to dawn → the next day begins (loop-close). Seeded ~5s before dawn of night 1 so it
+// crosses the boundary in a handful of frames (stepping a whole 240s night is far too many frames).
+test('roadmap Step 2 acceptance: wave at night → survive to dawn → day increments', async ({
+  page,
+}) => {
+  test.setTimeout(60_000); // ~510 driven frames + a live wave; fill-rate-heavy under fullyParallel load
+  await startGame(page);
+  await applyScenario(page, {
+    player: FAR_PLAYER, // out of the wave's reach → the player cleanly survives the crossing
+    campfires: [[CENTRE.col, CENTRE.row]],
+    clockMs: 895_000, // night of day 1, ~5s from dawn (cycle = 900_000; DAY_MS = 660_000)
+  });
+
+  await step(page, 500); // reconcile → the wave is on, mobs out of the treeline
+  const night = await state(page);
+  expect(night.dayPhase).toBe('night');
+  expect(night.waveActive).toBe(true);
+  expect(night.enemies).toBeGreaterThanOrEqual(1); // edge spawns arrived
+  expect(night.enemyKinds.every((k) => k === 'kidZombie' || k === 'boar')).toBe(true);
+
+  await step(page, 8000); // cross dawn (895_000 + 8500 > 900_000)
+  const dawn = await state(page);
+  expect(dawn.dayPhase).toBe('day'); // survived the night…
+  expect(dawn.dayCount).toBe(2); // …into day 2 (loop-close: the next day begins)
+  expect(dawn.playerHp).toBe(10); // player unharmed (far from the wave) — the run continues
+  expect(dawn.waveActive).toBe(false); // the wave ended at dawn (leftover mobs linger, but no new spawns)
+});
+
 // Plan 038 Step 6: the dev force-wave hook — jump to night AND start a wave on demand (the manual
 // playtest counterpart to beginWave). Drives the same `debug:forceWave` event the DEV button emits.
 test('the dev force-wave hook jumps to night and starts a wave on demand', async ({ page }) => {

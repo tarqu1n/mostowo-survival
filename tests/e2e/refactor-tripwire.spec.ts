@@ -131,5 +131,8 @@ test('golden debugState() snapshot survives a scripted world + combat sequence',
     combatActive: false, // plan 035a Step 3: enemy dead + day-1 daytime → auto-surface predicate off
     bowTargetId: null, // plan 035a Step 5: this scenario never fires the bow → no target
     enemyHpBarsVisible: 0, // plan 035a Step 6: enemy dead + long settle → its bar dropped, none left
+    waveActive: false, // plan 038 Step 7: day-1 daytime scenario (clockMs 20_000) → no night wave
+    waveSpawns: 0, // no wave ran → nothing spawned
+    enemyKinds: [], // the one scripted enemy is dead by snapshot time → no live enemies
   });
 });

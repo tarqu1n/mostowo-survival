@@ -80,6 +80,12 @@ export interface DebugState {
   // Appended (plan 035a Step 6) — count of monster HP bars currently rendered. Lets a Tier-2 spec
   // assert the on-hit reveal fires + fades and the bow target keeps a persistent bar.
   enemyHpBarsVisible: number;
+  // Appended (plan 038 Step 7) — night-wave state: whether a wave is running, how many mobs it has
+  // spawned this wave, and each live enemy's def id (composition — skeleton vs boar). Lets a Tier-2
+  // spec assert the wave starts/ends, paces, escalates, and survives to a day increment.
+  waveActive: boolean;
+  waveSpawns: number;
+  enemyKinds: string[];
 }
 
 /**
@@ -474,6 +480,9 @@ export class TestApi {
       combatActive: this.deps.getCombatActive(),
       bowTargetId: this.deps.getBowTargetId(),
       enemyHpBarsVisible: this.deps.fx.getVisibleHpBarCount(),
+      waveActive: this.deps.waveDirector.isActive(),
+      waveSpawns: this.deps.waveDirector.spawnedCount(),
+      enemyKinds: aliveEnemies.map((z) => z.def.id),
     };
   }
 }

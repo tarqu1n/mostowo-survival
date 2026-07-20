@@ -91,6 +91,16 @@ split out to **[plan 035b](../plans/035b-boar-directional-enemy.md)** (still to 
 *Done when:* night falls → a paced wave arrives → you defend the fire to dawn → the next night is harder.
 *Test:* clock to dusk, assert spawns from the edge, step to dawn, assert survival + day increment.
 
+**Progress — DELIVERED by [plan 038](../plans/038-night-wave-loop-close.md):** the `WaveDirector` paces
+a night wave from the "treeline" (trickle→push→lull), skeletons **seek + attack the fire's fuel** (new
+`seek` FSM state) with player-acquire preempting, the loop **closes** (survive → day N+1) and
+**escalates** per night (bigger rush, denser pacing, boars from night 2), plus the fire-fuel HUD bar, a
+night/wave indicator, and a **FORCE WAVE** dev hook. The roadmap acceptance test above passes end-to-end.
+**Two owner scope changes at execution (see the plan):** the fire is **not a loss condition** (only
+player death loses — a knocked-out fire floods darkness, relight to recover) and there's **no integrity
+meter** (mob attacks drain the existing fuel). **Deferred to the arena map (Step 0):** spawns anchor to
+the defended centre, not a real map treeline edge (the-moon's grid perimeter is void).
+
 ### 3. One trap
 
 A single trap buildable placed by day from gathered resources (walls already prove the build/blueprint

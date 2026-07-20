@@ -219,6 +219,12 @@ unfair — the cluster leaves room to add one).
 
 ## The night wave — shape, not just spawns
 
+> **Delivered (plan 038, first cut).** The trickle→push→lull beats below, treeline spawns, fire-seeking
+> mobs, per-night escalation, and loop-close are now built (see [STATUS.md](STATUS.md) / ROADMAP Step 2).
+> Two refinements landed at execution: the fire is **not a loss condition** (only player death loses — a
+> knocked-out fire floods darkness, relight to recover — [decisions/gameplay.md](decisions/gameplay.md)),
+> and spawns anchor to the defended centre until the arena map (Step 0) gives a real treeline edge.
+
 The wave is the biggest missing organ (night is tint-only today). The mistake to avoid is "N enemies
 spawn and beeline the player." The roaming/attacking distinction above should be the wave's *structure*:
 
