@@ -223,6 +223,25 @@ export class CampfireManager {
     });
   }
 
+  // --- Damage (mob attacks knock the light out) ----------------------------------
+
+  /** Drain a fire's fuel by `amount` — a mob attack on the fire-heart (plan 038). Deliberately drains
+   *  the SAME `fuel` meter that natural burn drains and feeding wood restores (decision #2: no separate
+   *  integrity meter), so an attacked fire dims (its {@link lightSources} radius lerps with fuel) and,
+   *  once emptied, douses on the same zero-crossing as a plain burn-out — the attacked-out and
+   *  starved-out states are identical by construction. **Not a loss** (decision #1): a doused fire just
+   *  floods darkness; relight it via the existing feed-wood path. No-op (returns false) if `id` is
+   *  unknown — tolerates a fire removed mid-attack, like {@link campfireById}'s consumers. */
+  damageFire(id: string, amount: number): boolean {
+    const c = this.campfireById(id);
+    if (!c) return false;
+    c.fuel = Math.max(0, c.fuel - amount);
+    if (c.lit && !isLit(c.fuel))
+      this.douse(c); // emptied → douse (same path as burn-out in tick)
+    else if (c.lit) this.applyFlame(c); // still lit → shrink the flame to the new fuel now, not next tick
+    return true;
+  }
+
   // --- Light source (read by SurvivalClock + VisionController via the scene) ------
 
   /** World-space light discs this manager contributes — the behavior-neutral "light source" seam both

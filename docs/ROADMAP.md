@@ -13,9 +13,9 @@ Everything not on this path is deferred (see "Post-MVP" at the bottom); the full
 
 By **day**, gather resources and keep hunger at bay; prep the base (walls + one trap). Your **campfire
 is the heart** — its light *is* your base/claim. By **night**, a wave of skeletons comes out of the
-treeline and **targets the fire to knock the light out** (as well as coming for you) — keep it lit and
-stay alive until dawn. Survive → the next night is harder. **Lose** if you die *or* the fire is knocked
-out → restart.
+treeline and **targets the fire to knock the light out** (as well as coming for you) — keep it lit, or
+fight on in the dark. Survive → the next night is harder. **Lose** only if *you die* → restart. The fire
+being knocked out is a dire, recoverable setback (relight it), **not** a loss (owner call, 2026-07-20).
 
 ## Scope decisions (locked 2026-07-19)
 
@@ -23,9 +23,10 @@ out → restart.
   fixed base rect for the one starting fire). Its light is **sustained by fuel and reduced by mob
   attacks** — mobs target the fire to **knock the light out**. *(Multiple hearths, walls extending the
   claim, and torches stay post-MVP.)*
-- **Defend target = the fire's light *and* the player.** Lose = player dies **or** the fire is knocked
-  out (fully extinguished). *(Open detail: is "light out" an instant loss, or a dire dark-flooded-in
-  state you can claw back from by relighting? Lean instant-loss for MVP clarity.)*
+- **Defend target = keep yourself alive; keep the fire lit if you can.** Lose = **player dies only**
+  (the 2026-07-19 open detail settled 2026-07-20, owner): the fire being knocked out is **not** a loss
+  but a dire dark-flooded-in state you claw back from by relighting. Mobs still target the fire — knocking
+  the light out is real pressure (you fight the rest of the night in the dark) — it just isn't a fail state.
 - **The campfire-fuel retune is now ON the MVP path** (reverses the earlier "no fuel retune" note): with
   the fire load-bearing — light = claim, plus mob damage on top of fuel burn — the fuel numbers (sized
   for the old ~3.5-min cycle) must be retuned for the 15-min cycle.
@@ -78,8 +79,10 @@ split out to **[plan 035b](../plans/035b-boar-directional-enemy.md)** (still to 
 - Spawn skeletons from the treeline at night, path them toward the **fire / player**, attack; wave
   ends at dawn. Drives off the existing day/night **phase state**.
 - **Fire-heart defense:** the campfire's **light = the base claim** (its lit radius). Mobs **target the
-  fire to knock the light out** — attacks reduce its light/integrity, fuel sustains it. **Lose** = fire
-  knocked out **or** player dead. **Retune campfire fuel for the 15-min cycle here** (now load-bearing).
+  fire to knock the light out** — attacks drain its **fuel** (the same meter feeding wood restores — no
+  separate integrity meter; owner, 2026-07-20). **Lose** = **player dead only**; a knocked-out fire
+  floods darkness (relight to recover), not a game-over. **Retune campfire fuel for the 15-min cycle
+  here** (now load-bearing — the fire is what stands between you and the dark).
 - **Loop-close:** night survived → dawn → **day N+1**, with a small **escalation bump** each night
   (more/tougher spawns). This is what makes it a *game*, not a sandbox.
 - **Debug trigger:** a "skip to night / force wave" dev hook for manual playtesting (the scenario API

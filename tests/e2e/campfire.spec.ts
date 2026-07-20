@@ -7,6 +7,7 @@ import {
   tryPlace,
   inLight,
   feedCampfire,
+  damageFire,
   enqueue,
   held,
 } from './harness';
@@ -94,6 +95,48 @@ test('fuel drains to 0 (douses) then feeding wood relights it', async ({ page })
   expect(relit.campfires[0].fuel).toBeGreaterThan(0);
   expect(relit.campfires[0].lit).toBe(true);
   expect(await held(page, 'wood')).toBe(woodBefore - 1);
+});
+
+// Plan 038 Step 1: a mob attack on the fire-heart drains its FUEL (CampfireManager.damageFire — the
+// same meter burn/feed use, decision #2: no separate integrity meter). Draining it to 0 knocks the
+// light out (douses → dark) — but that is explicitly NOT a loss (decision #1): the run continues and
+// feeding wood relights it. This is the mob→fire coupling Step 4's objective AI will call.
+test("a mob attack (damageFire) knocks the fire's light out — dark, not a loss — then feeding relights it", async ({
+  page,
+}) => {
+  const logs: string[] = [];
+  page.on('console', (m) => logs.push(m.text()));
+
+  await startGame(page);
+  await applyScenario(page, {
+    player: [22, 40],
+    campfires: [[22, 38]],
+    startPhase: 'night', // night → the fire's light hole is meaningful (inLight probes below)
+    inventory: { wood: 5 },
+  });
+
+  const lit = await state(page);
+  expect(lit.campfires[0].lit).toBe(true);
+  expect(await inLight(page, 22, 39)).toBe(true); // full-fuel fire lights its surroundings
+
+  // One heavy blow drains the whole tank → the fire douses inline (same path as a burn-out).
+  expect(await damageFire(page, 0, 999)).toBe(true);
+  // Run on for a beat: the loop keeps ticking, the fire stays out (no relight), and crucially nothing
+  // restarts the scene — a knocked-out fire is a dire dark state, not a game-over.
+  await step(page, 1000);
+
+  const out = await state(page);
+  expect(out.campfires[0].fuel).toBe(0);
+  expect(out.campfires[0].lit).toBe(false);
+  expect(await inLight(page, 22, 39)).toBe(false); // its light hole is gone → dark
+  expect(out.playerDying).toBe(false);
+  expect(logs.some((l) => l.includes('restarting'))).toBe(false); // NOT a loss — the run continues
+
+  // Claw-back: feeding wood relights the knocked-out fire (the existing recovery path, no new logic).
+  expect(await feedCampfire(page, 0)).toBe(true);
+  const relit = await state(page);
+  expect(relit.campfires[0].fuel).toBeGreaterThan(0);
+  expect(relit.campfires[0].lit).toBe(true);
 });
 
 // Plan 016: refuel is a *queued worker order* (walk adjacent, then tend — like chop/mine), NOT the

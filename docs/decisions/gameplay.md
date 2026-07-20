@@ -120,9 +120,12 @@ The first-playable target and the order to build it, captured in [ROADMAP.md](..
   riskiest missing piece and earliest loop-feel (promoted above "buildings"); the trap comes *after* the
   wave so it's tuned against real wave pathing; the NPC is most composite (reuses everything).
 - **Campfire-heart is IN the MVP (stage 1):** the single central fire's **lit radius is the base/claim**
-  (replaces the fixed base rect). Mobs **target the fire to knock the light out** — attacks reduce its
-  light/integrity, fuel sustains it. **Defend target = the fire's light AND the player**; lose = fire
-  knocked out OR player dead. *(Open: instant-loss vs relight-to-recover — lean instant-loss for MVP.)*
+  (replaces the fixed base rect). Mobs **target the fire to knock the light out** — attacks drain its
+  **fuel** (the same meter feeding wood restores — **no separate integrity meter**; owner, 2026-07-20),
+  fuel sustains it. **Defend target = the player; keep the fire lit if you can**; **lose = player dead
+  only** (the earlier "instant-loss vs relight-to-recover" open detail settled 2026-07-20: NOT
+  instant-loss — a knocked-out fire floods darkness and you relight to recover; kept fully dark, no
+  ambient floor).
   **Consequence: the campfire-fuel retune is now ON the MVP path** (fire is load-bearing) — reverses an
   earlier draft of this entry that kept the fixed rect + deferred the retune.
 - **Hunger is IN the MVP loop** (chosen over deferring): reuses the built needs/eat systems — author food

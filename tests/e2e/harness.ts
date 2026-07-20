@@ -171,6 +171,15 @@ export function feedCampfire(page: Page, index: number): Promise<boolean> {
   return page.evaluate((i) => (window as any).game.__test.feedCampfire(i), index);
 }
 
+/** Drain the campfire at `index` by `amount` fuel (a mob attack on the fire-heart, plan 038) — knocks
+ *  its light out without the wave AI; returns false if there's no campfire at that index. */
+export function damageFire(page: Page, index: number, amount: number): Promise<boolean> {
+  return page.evaluate(
+    ({ index, amount }) => (window as any).game.__test.damageFire(index, amount),
+    { index, amount },
+  );
+}
+
 /** The live campfires (col/row/fuel/lit), spec order — a shortcut over `state(page).campfires`. */
 export function campfires(page: Page): Promise<DebugState['campfires']> {
   return page.evaluate(() => (window as any).game.__test.state().campfires);

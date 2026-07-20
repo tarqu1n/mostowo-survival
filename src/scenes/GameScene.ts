@@ -632,6 +632,7 @@ export class GameScene extends Phaser.Scene {
       tryPlace: (id, c, r) => testApi.tryPlace(id, c, r),
       inLight: (c, r) => testApi.inLight(c, r),
       feedCampfire: (i) => testApi.feedCampfire(i),
+      damageFire: (i, amount) => testApi.damageFire(i, amount),
       zoneAt: (c, r) => this.zoneAt(c, r),
       moveEnemy: (i, c, r) => testApi.moveEnemy(i, c, r),
       setPlayerMelee: (id) => testApi.setPlayerMelee(id),

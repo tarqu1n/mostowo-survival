@@ -83,6 +83,10 @@ export interface GameTestApi {
   inLight(col: number, row: number): boolean;
   /** Run the real tap-to-feed path on the campfire at `index` (spend wood, top up, relight). */
   feedCampfire(index: number): boolean;
+  /** DEV/test-only: drain the campfire at `index` by `amount` fuel (a mob attack on the fire-heart,
+   *  plan 038) — knocks its light out (fuel→0 douses it → dark) without the wave AI. NOT a loss; relight
+   *  via feedCampfire. Returns false if there's no campfire at that index. */
+  damageFire(index: number, amount: number): boolean;
   /** The authored zone id at global tile `(col,row)`, `0` = no zone (plan 014 zones read path). */
   zoneAt(col: number, row: number): number;
   /** DEV/test-only: relocate the enemy at `index` (sprite + body + logical tile) without a world

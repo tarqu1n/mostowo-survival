@@ -118,8 +118,19 @@ new combat.
 
 ## Steps
 
-- [ ] **Step 1: Attackable fire (`damageFire` drains fuel) + test seam** `[inline]` — *rescoped
+- [x] **Step 1: Attackable fire (`damageFire` drains fuel) + test seam** `[inline]` — *rescoped
   2026-07-20 (owner): NO integrity meter, NO loss funnel — see decisions #1/#2.*
+  - Outcome: added `CampfireManager.damageFire(id, amount)` (drains the existing `fuel`, douses on the
+    zero-crossing exactly like burn-out — no new field, no `GameScene`/`entities/types.ts` change) +
+    `TestApi.damageFire(index, amount)` wired through `GameScene.installTestApi`, `GameTestApi`
+    (`testTypes.ts`), and the `harness.ts` wrapper. Purely additive — zero behaviour change to existing
+    flows (there was never a fire-loss to remove). Docs flipped: `ROADMAP.md` (both the intro + Step 2
+    bullet), `docs/decisions/gameplay.md`, `docs/STATUS.md` (new "Attackable fire" note). Tier-2 test
+    added to `tests/e2e/campfire.spec.ts` (douse-without-loss → relight); no `DebugState`/tripwire touch.
+    **Verified:** `typecheck` + `lint` clean; 813/813 unit tests pass; campfire e2e — my new test + the
+    existing burn-out/relight test pass. **Pre-existing (NOT mine):** `campfire.spec.ts` "tryPlace ...
+    base zone" fails on the clean tree too — a stale test using pre-`SPAWN_TILE`-move base-zone coords
+    (plan 039 base-claim territory), unrelated to this step.
   - Add a `CampfireManager.damageFire(id, amount)` seam that drains the fire's **existing `fuel`** (clamped
     ≥0), then douses on a zero-crossing exactly like the per-frame burn (`if (c.lit && !isLit(c.fuel))
     this.douse(c)`) so an attacked-out fire and a burned-out fire are identical state. No new field on
@@ -271,10 +282,10 @@ new combat.
 integrity as a distinct meter, code-side edge rule, instant-loss) — proceed after tightening a few Medium
 sequencing/testability items and reconsidering the Step 3 bundle; nothing High.
 
-| # | Finding | Lens | Severity | Suggested action |
-| - | ------- | ---- | -------- | ---------------- |
-| 1 | `time:changed` fires only on a transition; seeds into night don't emit it, so a WaveDirector on the event alone won't start; the fixing seam was scheduled too late. | Gaps/sequencing | Medium | ✔ Begin-wave seam + first-tick phase reconcile moved into Step 3; done-whens reworded. |
-| 2 | Milestone A's "testable with a scripted enemy" was false — integrity→loss needs objective AI (Step 4) or a `damageFire` seam (was deferred to Step 7). | Executability | Medium | ✔ `damageFire`/`loseGame` test seam added in Step 1; wording fixed. |
-| 3 | Base-rect→light-radius claim swap is orthogonal to the loop, carries the bootstrap one-way door, and changes placement (21×27 rect → fuel-fluctuating ~8-tile disc). | Scope discipline | Medium | ✔ Peeled to plan 039; 038 keeps the base rect. |
-| 4 | Objective AI built "generic for 037" risks the wrong abstraction before 037's needs are known. | Alt approaches | Low | ✔ Seam kept minimal (nearest-hearth + `attackFire`); 037 refactors later. |
-| 5 | Integrity-0 knockout left the fire visually "lit" until restart — two loss routes not symmetric. | Fire-model coherence | Low | ✔ `damageFire`-to-0 now also douses. |
+|#|Finding|Lens|Severity|Suggested action|
+|-|-------|----|--------|----------------|
+|1|`time:changed` fires only on a transition; seeds into night don't emit it, so a WaveDirector on the event alone won't start; the fixing seam was scheduled too late.|Gaps/sequencing|Medium|✔ Begin-wave seam + first-tick phase reconcile moved into Step 3; done-whens reworded.|
+|2|Milestone A's "testable with a scripted enemy" was false — integrity→loss needs objective AI (Step 4) or a `damageFire` seam (was deferred to Step 7).|Executability|Medium|✔ `damageFire`/`loseGame` test seam added in Step 1; wording fixed.|
+|3|Base-rect→light-radius claim swap is orthogonal to the loop, carries the bootstrap one-way door, and changes placement (21×27 rect → fuel-fluctuating ~8-tile disc).|Scope discipline|Medium|✔ Peeled to plan 039; 038 keeps the base rect.|
+|4|Objective AI built "generic for 037" risks the wrong abstraction before 037's needs are known.|Alt approaches|Low|✔ Seam kept minimal (nearest-hearth + `attackFire`); 037 refactors later.|
+|5|Integrity-0 knockout left the fire visually "lit" until restart — two loss routes not symmetric.|Fire-model coherence|Low|✔ `damageFire`-to-0 now also douses.|

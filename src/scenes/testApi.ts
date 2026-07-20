@@ -380,6 +380,16 @@ export class TestApi {
     return this.deps.campfireManager.feedAt(c.col, c.row);
   }
 
+  /** DEV/test-only: drain the campfire at `index` by `amount` fuel — the real
+   *  {@link CampfireManager.damageFire} (a mob attack on the fire-heart, plan 038). Lets a spec knock a
+   *  fire's light out (drive its fuel to 0 → douses → dark) without the wave AI. Returns false if there's
+   *  no campfire at that index. */
+  damageFire(index: number, amount: number): boolean {
+    const c = this.deps.campfireManager.all()[index];
+    if (!c) return false;
+    return this.deps.campfireManager.damageFire(c.id, amount);
+  }
+
   /** DEV-only: relocate the enemy at `index` to a tile — sprite, physics body AND logical col/row —
    *  so a spec can cross a distance threshold (e.g. the combat-active hysteresis band) mid-test
    *  WITHOUT a world reset, which would clear the state hysteresis depends on. Returns false if no

@@ -176,6 +176,13 @@ it one wood at a time, self-terminating when topped up or out of wood. A tap on 
 resolves to `refuel` (column-hit-tested over its whole tile stack). Tuned numbers:
 [GAME-MECHANICS.md](GAME-MECHANICS.md).
 
+**Attackable fire (plan 038 Step 1):** `CampfireManager.damageFire(id, amount)` drains the fire's
+**fuel** — the mob→fire coupling the night wave's objective AI calls (plan 038 Step 4). It reuses the
+existing fuel meter (no separate integrity meter) and douses on the same zero-crossing as a burn-out, so
+an attacked-out fire and a neglected one are one state; relight is the existing feed-wood path. A
+knocked-out fire is **not** a loss (only player death is) — it just floods darkness (decisions #1/#2 in
+the plan). Exposed on the DEV `__test.damageFire(index, amount)` seam.
+
 ## Node harvest feel (plan 031)
 
 - **Per-hit recoil:** each chop/mine hit nudges the node sprite directionally away from the actor
