@@ -502,7 +502,10 @@ export class GameScene extends Phaser.Scene {
       isBlocked: (col, row) => this.isBlocked(col, row),
       defendCentre: () => this.litHearth()?.tile ?? this.playerChar.tile(),
       rng: () => this.rng(),
-      phase: () => this.survivalClock.dayPhase,
+      dayContext: () => ({
+        phase: this.survivalClock.dayPhase,
+        dayCount: this.survivalClock.dayCount,
+      }),
     });
 
     // HUD overlay runs alongside this scene; grab its instance for the UI-tap guard. UIScene

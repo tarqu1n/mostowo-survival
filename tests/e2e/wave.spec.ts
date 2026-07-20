@@ -96,6 +96,33 @@ test('a fire-seeking mob with no player near attacks the fire (drains its fuel)'
   expect(s.campfires[0].lit).toBe(true); // 100 fuel doesn't fully douse in 6s — still lit (not a loss)
 });
 
+// Plan 038 Step 5: loop-close + per-night escalation. Surviving a night rolls into a harder one —
+// keyed off the in-game day count. Seed the clock straight into the night of day 1 vs day 2 and compare
+// the opening rush (cheap + deterministic; a full two-night run is far too many frames to step).
+// clockMs for the night of day N = DAY_MS (660_000) + (N-1)·cycleLength (900_000).
+test('later nights escalate — the opening rush grows (loop-close)', async ({ page }) => {
+  await startGame(page);
+
+  await applyScenario(page, {
+    player: FAR_PLAYER,
+    campfires: [[CENTRE.col, CENTRE.row]],
+    clockMs: 660_000, // night of day 1
+  });
+  await step(page, 200); // first-tick reconcile → begins the wave with day-1's opening burst
+  const night1 = (await state(page)).enemies;
+
+  await applyScenario(page, {
+    player: FAR_PLAYER,
+    campfires: [[CENTRE.col, CENTRE.row]],
+    clockMs: 1_560_000, // night of day 2
+  });
+  await step(page, 200);
+  const night2 = (await state(page)).enemies;
+
+  expect(night1).toBe(1); // day-1 baseline opening burst
+  expect(night2).toBeGreaterThan(night1); // day 2 opens with a bigger rush
+});
+
 // The player-aggro roaming-pull preempts the fire objective: a wave mob next to the player fights the
 // PLAYER instead of walking past to the fire.
 test('a fire-seeking mob next to the player chases the player instead of the fire', async ({

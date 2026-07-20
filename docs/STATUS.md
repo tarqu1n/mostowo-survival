@@ -194,8 +194,16 @@ player radius-acquire still **preempts** (near you it fights you, the roaming-pu
 fire after. Spawn source anchors to the defended centre, not the literal grid perimeter (the-moon's
 perimeter is ~140 tiles of void); switches to a real treeline edge with the arena map (roadmap Step 0).
 The objective-target seam (`MonsterTickEnv.fire`/`attackFire`) is the one **plan 037** (destructible
-walls/gate/trap) will build on. Loop-close/escalation is Step 5; the fire-fuel HUD + dev force button
-are Step 6.
+walls/gate/trap) will build on.
+
+**Loop-close + per-night escalation (plan 038 Step 5):** surviving a night rolls into a harder one —
+`WaveDirector` captures a `NightEscalation` at wave start keyed off the in-game `dayCount` (pure
+`systems/wave.ts`): each survived night opens with a bigger rush (`openingBurst`), paces denser
+(`intervalScale`), and — from night 2 — mixes **boars** into the skeleton stream (`boarEvery`), all
+clamped so a deep run can't wall you. Player death is still the only loss (`scene.restart`), which
+resets `dayCount` → night 1. The fire-attack drain (`WAVE_FIRE_ATTACK_DAMAGE`) is tuned to a
+deterministic anchor (a lone mob douses a full fire in ~24s — tense but reactable), the #1 feel knob
+for playtest. The fire-fuel HUD + dev force-wave button are Step 6.
 
 ## Node harvest feel (plan 031)
 

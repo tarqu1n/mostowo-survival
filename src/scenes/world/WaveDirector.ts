@@ -8,6 +8,12 @@ import {
 } from '../../config';
 import type { Cell, Dims } from '../../systems/pathfind';
 import type { DayPhase } from '../../systems/daynight';
+import {
+  escalationForNight,
+  intervalForNightProgress,
+  spawnKindForIndex,
+  type NightEscalation,
+} from '../../systems/wave';
 import type { MonsterSpawnOpts } from '../../entities/MonsterCharacter';
 import type { GameScene } from '../GameScene';
 
@@ -31,9 +37,10 @@ export interface WaveDirectorDeps {
   defendCentre(): Cell;
   /** Injectable rng (the scene's `this.rng`) — threaded so a pinned test rng makes spawns deterministic. */
   rng(): number;
-  /** Current day/night phase — read on the first tick to reconcile a scenario seeded straight into
-   *  night (which emits no `time:changed`; see {@link tick}). */
-  phase(): DayPhase;
+  /** Current phase + in-game day number. `phase` is read on the first tick to reconcile a scenario
+   *  seeded straight into night (which emits no `time:changed`; see {@link tick}); `dayCount` keys the
+   *  per-night escalation captured at {@link beginWave} (loop-close: each survived night is harder). */
+  dayContext(): { phase: DayPhase; dayCount: number };
 }
 
 /**
@@ -68,8 +75,10 @@ export class WaveDirector {
   private elapsedMs = 0;
   /** ms accumulated toward the next spawn (the chop-interval accumulator idiom). */
   private sinceSpawnMs = 0;
-  /** How many enemies this wave has spawned (surfaced for tests/HUD later). */
+  /** How many enemies this wave has spawned (drives boar composition + surfaced for tests/HUD later). */
   private spawnedThisWave = 0;
+  /** This wave's escalation shape, captured at {@link beginWave} from the in-game day (loop-close). */
+  private escalation: NightEscalation = escalationForNight(1);
 
   constructor(
     scene: GameScene,
@@ -97,7 +106,11 @@ export class WaveDirector {
     this.elapsedMs = 0;
     this.sinceSpawnMs = 0;
     this.spawnedThisWave = 0;
-    this.spawnOne();
+    // Loop-close/escalation (plan 038 Step 5): key this wave's shape off the in-game day — later nights
+    // open with a bigger rush, pace denser, and mix in boars. Captured once so the wave is stable even
+    // if the clock rolls over mid-wave.
+    this.escalation = escalationForNight(this.deps.dayContext().dayCount);
+    for (let i = 0; i < this.escalation.openingBurst; i++) this.spawnOne();
   }
 
   /** End the wave — stop spawning. Leftover mobs are deliberately NOT despawned ("the lull is a trap"). */
@@ -112,7 +125,7 @@ export class WaveDirector {
   tick(delta: number): void {
     if (!this.reconciled) {
       this.reconciled = true;
-      if (this.deps.phase() === 'night') this.beginWave();
+      if (this.deps.dayContext().phase === 'night') this.beginWave();
     }
     if (!this.active) return;
     this.elapsedMs += delta;
@@ -127,17 +140,22 @@ export class WaveDirector {
   }
 
   /** The spawn interval for the current point in the night, from the `NIGHT_WAVE_BEATS` pacing curve
-   *  (trickle → push → lull). Night progress is `elapsedMs / NIGHT_MS`, clamped to [0,1]. */
+   *  (trickle → push → lull) scaled by this night's escalation (denser later). Night progress is
+   *  `elapsedMs / NIGHT_MS`, clamped to [0,1]. */
   private currentIntervalMs(): number {
-    const norm = Phaser.Math.Clamp(this.elapsedMs / NIGHT_MS, 0, 1);
-    for (const beat of NIGHT_WAVE_BEATS) if (norm < beat.untilNorm) return beat.intervalMs;
-    return NIGHT_WAVE_BEATS[NIGHT_WAVE_BEATS.length - 1].intervalMs;
+    return intervalForNightProgress(
+      this.elapsedMs / NIGHT_MS,
+      NIGHT_WAVE_BEATS,
+      this.escalation.intervalScale,
+    );
   }
 
   private spawnOne(): void {
     const tile = this.pickSpawnTile();
-    // Wave mobs seek + attack the fire-heart (plan 038 Step 4); player-acquire still preempts.
-    this.deps.spawnEnemy('kidZombie', tile.col, tile.row, { objective: 'fire' });
+    // Composition escalates (plan 038 Step 5): later nights mix boars into the skeleton stream. Wave
+    // mobs seek + attack the fire-heart (plan 038 Step 4); player-acquire still preempts.
+    const id = spawnKindForIndex(this.spawnedThisWave, this.escalation.boarEvery);
+    this.deps.spawnEnemy(id, tile.col, tile.row, { objective: 'fire' });
     this.spawnedThisWave++;
   }
 
@@ -197,6 +215,7 @@ export class WaveDirector {
     this.elapsedMs = 0;
     this.sinceSpawnMs = 0;
     this.spawnedThisWave = 0;
+    this.escalation = escalationForNight(1); // day-1 baseline for a fresh scenario
   }
 
   /** SHUTDOWN: only drops references (the `time:changed` listener is `off`ed by GameScene.wireBus). No

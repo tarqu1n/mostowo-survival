@@ -453,11 +453,14 @@ export const NIGHT_WAVE_BEATS: readonly { untilNorm: number; intervalMs: number 
 /**
  * Fuel a wave mob drains from the fire per fire-strike (plan 038 Step 4 — the objective-target AI's
  * `attackFire`). The fire has no armour/dodge, so this is a flat drain on the same `fuel` meter burn +
- * feeding use (decision #2) — a seeking skeleton on the ~1s contact cadence knocks ~8 fuel/s off, so a
- * few undefended mobs douse a full fire in the back half of a night unless you fight them off / refuel.
- * Placeholder — the fire-fuel-vs-wave-DPS balance is tuned in plan 038 Step 5.
+ * feeding use (decision #2). Tuned (Step 5) against a deterministic anchor rather than by raw feel: a
+ * LONE mob on the ~1s contact cadence should knock a full fire (`CAMPFIRE_FUEL_MAX`) out in a
+ * *tense-but-reactable* window — >15s (not a blink; you can notice + respond) and well under a night —
+ * which at 120 fuel / ~1 strike-per-second lands around 5/strike (~24s). A crowd stacks, so several
+ * undefended mobs still douse it fast; feeding wood (30/wood) lets you claw back vs a mob or two.
+ * `wave.test.ts` guards this window. This is the #1 feel knob for playtest (raise = fire more fragile).
  */
-export const WAVE_FIRE_ATTACK_DAMAGE = 8;
+export const WAVE_FIRE_ATTACK_DAMAGE = 5;
 
 /** Semantic colour palette (dark & grotty). Expand as the art identity firms up. */
 export const COLORS = {

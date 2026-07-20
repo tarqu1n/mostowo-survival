@@ -256,7 +256,19 @@ new combat.
     (its `fuel` drops, assertable via `campfires[]` after `step`, and it can be driven to douse → dark);
     a skeleton near the player instead engages the player.
 
-- [ ] **Step 5: Loop-close + per-night escalation + tuning pass** `[inline]`
+- [x] **Step 5: Loop-close + per-night escalation + tuning pass** `[inline]`
+  - Outcome: new pure `src/systems/wave.ts` — `intervalForNightProgress` (pacing sampler, scalable),
+    `escalationForNight(dayCount)` (→ `openingBurst`/`intervalScale`/`boarEvery`, clamped), and
+    `spawnKindForIndex` (boar composition). `WaveDirector` captures the escalation at `beginWave` from
+    `deps.dayContext().dayCount` (was `phase()`): later nights open with a bigger burst, pace denser,
+    and mix boars in — loop-close is automatic since `dayCount` increments naturally and player-death
+    `scene.restart` resets it to night 1. `reset()` restores the day-1 baseline. **Tuning:** did a
+    *reasoned* pass (can't judge feel headlessly) — retuned `WAVE_FIRE_ATTACK_DAMAGE` 8→**5** against a
+    deterministic anchor (a lone mob douses a full fire in ~24s: >15s reactable, <night), guarded by a
+    `wave.test.ts` test; flagged it as the #1 playtest knob. Final feel-tuning is deferred to the
+    iterate-phase playtest (needs a human). **Verified:** typecheck + lint clean; 829/829 unit (9 new
+    `wave.test.ts` incl. the tuning anchor); wave e2e 6/6 (new escalation test: night 2 opens with a
+    bigger rush than night 1, via seeded `clockMs`).
   - On `phase==='day'` with an incremented `dayCount` (night survived), the WaveDirector records it and
     **escalates the next wave** via a data-driven curve (count + composition — more skeletons, later nights
     add a boar). `dayCount` already increments in the clock; the director keys difficulty off it.
