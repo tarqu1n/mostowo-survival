@@ -22,8 +22,9 @@ import type { CharacterSprite } from '../entities/Character';
 import type { PlayerCharacter } from '../entities/PlayerCharacter';
 import type { MonsterCharacter, MonsterSpawnOpts } from '../entities/MonsterCharacter';
 import type { BuildManager } from './build/BuildManager';
-import type { CampfireManager } from './world/CampfireManager';
-import type { WallManager } from './world/WallManager';
+import type { StructureManager } from './world/StructureManager';
+import type { CampfireBehavior } from './world/CampfireBehavior';
+import type { WallBehavior } from './world/WallBehavior';
 import type { WaveDirector } from './world/WaveDirector';
 import type { TaskGlowRenderer } from './fx/TaskGlowRenderer';
 import type { CombatFxManager } from './fx/CombatFxManager';
@@ -103,8 +104,7 @@ export interface DebugState {
  */
 export interface TestApiDeps {
   readonly buildManager: BuildManager;
-  readonly campfireManager: CampfireManager;
-  readonly wallManager: WallManager;
+  readonly structureManager: StructureManager;
   readonly waveDirector: WaveDirector;
   readonly taskGlowRenderer: TaskGlowRenderer;
   readonly fx: CombatFxManager;
@@ -194,6 +194,16 @@ export class TestApi {
     private readonly deps: TestApiDeps,
   ) {}
 
+  /** The campfire/wall behavior modules, reached through the structure registry — for the DEV seams
+   *  that drive behavior-SPECIFIC ops (feed/damageFire/inLight; wall damage/list). Re-points the old
+   *  direct `campfireManager`/`wallManager` deps internally; the `__test` surface is unchanged. */
+  private get campfire(): CampfireBehavior {
+    return this.deps.structureManager.behavior<CampfireBehavior>('campfire');
+  }
+  private get wall(): WallBehavior {
+    return this.deps.structureManager.behavior<WallBehavior>('wall');
+  }
+
   /**
    * Reset the live world to empty — destroy every tree/enemy/site/marker GameObject and clear all
    * the plain-data queue/occupancy state, mirroring create()'s reset block (which assumes a fresh
@@ -203,8 +213,7 @@ export class TestApi {
   private resetWorld(): void {
     this.deps.resetTreesAndEnemies();
     this.deps.buildManager.reset(); // sites/siteTiles/occupied/walls/nextSiteId/buildMode
-    this.deps.campfireManager.reset(); // destroy fire sprites + clear the collection (RUNTIME path)
-    this.deps.wallManager.reset(); // destroy wall sprites + clear the collection (RUNTIME path, plan 037)
+    this.deps.structureManager.reset(); // destroy campfire + wall sprites, clear both collections (RUNTIME path)
     this.deps.waveDirector.reset(); // clear any running wave + its first-tick reconcile flag (plan 038)
     this.deps.taskGlowRenderer.reset(); // queue markers + glow halos/pulse + outlinedTreeIds
 
@@ -287,17 +296,17 @@ export class TestApi {
     for (const [c, r] of spec.walls ?? [])
       this.deps.buildManager.finishSite(this.deps.buildManager.createBlueprint(c, r, 'wall'));
 
-    // Campfires: mirror the wall path (finishSite → the campfire branch → materialiseBuildable →
-    // CampfireManager.materialise). Bypassing tilePlaceable/isInBase is fine + intended for fixtures.
+    // Campfires: mirror the wall path (finishSite → materialiseBuildable → StructureManager.materialise
+    // → the campfire behavior). Bypassing tilePlaceable/isInBase is fine + intended for fixtures.
     const campfireIds: string[] = [];
     for (const [c, r] of spec.campfires ?? []) {
       this.deps.buildManager.finishSite(this.deps.buildManager.createBlueprint(c, r, 'campfire'));
-      const list = this.deps.campfireManager.all();
+      const list = this.campfire.all();
       campfireIds.push(list[list.length - 1].id);
     }
     // Optional: seed every placed campfire's fuel (e.g. a near-empty fire for a drain/relight test).
     if (spec.campfireFuel != null)
-      for (const cf of this.deps.campfireManager.all()) cf.fuel = spec.campfireFuel;
+      for (const cf of this.campfire.all()) cf.state.fuel = spec.campfireFuel;
 
     const siteIds: string[] = [];
     for (const [c, r] of spec.blueprints ?? [])
@@ -382,43 +391,47 @@ export class TestApi {
 
   /** True if the tile's centre is within any lit campfire's light radius (the reveal predicate). */
   inLight(col: number, row: number): boolean {
-    return this.deps.campfireManager.inLight(tileToWorldCenter(col), tileToWorldCenter(row));
+    return this.campfire.inLight(tileToWorldCenter(col), tileToWorldCenter(row));
   }
 
   /** Run the real tap-to-feed path on the campfire at `index` (spend one wood, top up + relight).
    *  Returns whether a feed happened (false if the index is out of range or there's no wood). */
   feedCampfire(index: number): boolean {
-    const c = this.deps.campfireManager.all()[index];
+    const c = this.campfire.all()[index];
     if (!c) return false;
-    return this.deps.campfireManager.feedAt(c.col, c.row);
+    return this.campfire.feedAt(c.col, c.row);
   }
 
   /** DEV/test-only: drain the campfire at `index` by `amount` fuel — the real
-   *  {@link CampfireManager.damageFire} (a mob attack on the fire-heart, plan 038). Lets a spec knock a
+   *  {@link CampfireBehavior.damageFire} (a mob attack on the fire-heart, plan 038). Lets a spec knock a
    *  fire's light out (drive its fuel to 0 → douses → dark) without the wave AI. Returns false if there's
    *  no campfire at that index. */
   damageFire(index: number, amount: number): boolean {
-    const c = this.deps.campfireManager.all()[index];
+    const c = this.campfire.all()[index];
     if (!c) return false;
-    return this.deps.campfireManager.damageFire(c.id, amount);
+    return this.campfire.damageFire(c.id, amount);
   }
 
   /** DEV/test-only: the live barricade walls (col/row/facing/hp/maxHp), placement order — a standalone
    *  read seam for the wall spec (plan 037). NOT part of the serialized {@link DebugState}, so the
    *  refactor-tripwire golden stays untouched (new DebugState fields are deferred to a later step). */
   walls(): { col: number; row: number; facing: string; hp: number; maxHp: number }[] {
-    return this.deps.wallManager
-      .all()
-      .map((w) => ({ col: w.col, row: w.row, facing: w.facing, hp: w.hp, maxHp: w.maxHp }));
+    return this.wall.all().map((w) => ({
+      col: w.col,
+      row: w.row,
+      facing: w.state.facing,
+      hp: w.state.hp,
+      maxHp: w.state.maxHp,
+    }));
   }
 
-  /** DEV/test-only: damage the wall at `index` by `amount` — the real {@link WallManager.takeDamage}
+  /** DEV/test-only: damage the wall at `index` by `amount` — the real {@link WallBehavior.takeDamage}
    *  (the path chunk 2c's enemy will drive). Returns whether that blow destroyed the wall; false if
    *  there's no wall at that index. Mirrors {@link damageFire}. */
   damageWall(index: number, amount: number): boolean {
-    const w = this.deps.wallManager.all()[index];
+    const w = this.wall.all()[index];
     if (!w) return false;
-    return this.deps.wallManager.takeDamage(w.id, amount);
+    return this.wall.takeDamage(w.id, amount);
   }
 
   /** DEV/test-only: live enemies' current HP, spec order — a standalone read seam (like {@link walls})
@@ -504,9 +517,9 @@ export class TestApi {
         .all()
         .filter((a): a is Extract<Action, { kind: 'harvest' }> => a.kind === 'harvest')
         .map((a) => a.treeId),
-      campfires: this.deps.campfireManager
+      campfires: this.campfire
         .all()
-        .map((c) => ({ col: c.col, row: c.row, fuel: c.fuel, lit: c.lit })),
+        .map((c) => ({ col: c.col, row: c.row, fuel: c.state.fuel, lit: c.state.lit })),
       enemyWindups: aliveEnemies.filter((z) => z.windupUntil > 0).length,
       combatActive: this.deps.getCombatActive(),
       bowTargetId: this.deps.getBowTargetId(),

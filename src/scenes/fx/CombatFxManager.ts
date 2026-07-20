@@ -73,7 +73,7 @@ export class CombatFxManager {
   // player→target, self-destroying on arrival) — tracked so a scenario reset / SHUTDOWN can kill any
   // still mid-flight before their target sprite is freed. `bowTargetBox` is the ONE persistent stroked
   // highlight round the bow's current auto-target, re-synced each frame to hug the target's bounds
-  // (mirrors TaskGlowRenderer.outlineCampfire + syncGlowTransforms — NOT a baked halo, which would
+  // (mirrors TaskGlowRenderer.outlineStructure + syncGlowTransforms — NOT a baked halo, which would
   // freeze on one frame of a moving/animating enemy); hidden when there's no target.
   private readonly arrows = new Set<Phaser.GameObjects.Rectangle>();
   private bowTargetBox?: Phaser.GameObjects.Rectangle;

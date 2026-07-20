@@ -7,7 +7,7 @@
 import { BUILDABLES } from '../data/buildables';
 import { CAMPFIRE_FUEL_MAX } from '../config';
 import type { CombatantStats, InspectableStats } from '../data/types';
-import type { TreeNode, BuildSite, CampfireUnit, PlacedWall } from '../entities/types';
+import type { TreeNode, BuildSite, CampfireStructure, WallStructure } from '../entities/types';
 import type { MonsterCharacter } from '../entities/MonsterCharacter';
 
 export function treeStats(node: TreeNode): InspectableStats {
@@ -23,24 +23,24 @@ export function wallStats(site: BuildSite): InspectableStats {
 }
 
 /** Inspect a LIVE barricade wall (plan 037): its running hp (the mob-damage path lowers it) vs maxHp.
- *  A finished wall is picked as a `wall` (its sprite draws over the hidden site rect), so this — not
- *  {@link wallStats}, which reads a BuildSite — is what the Inspect panel shows for a standing wall. */
-export function placedWallStats(wall: PlacedWall): InspectableStats {
+ *  A finished wall is picked as a `structure` (its sprite draws over the hidden site rect), so this —
+ *  not {@link wallStats}, which reads a BuildSite — is what the Inspect panel shows for a standing wall. */
+export function placedWallStats(wall: WallStructure): InspectableStats {
   return {
     name: 'Wall',
-    maxHp: wall.maxHp,
-    currentHp: wall.hp,
+    maxHp: wall.state.maxHp,
+    currentHp: wall.state.hp,
     extra: [{ label: 'Status', value: 'Built' }],
   };
 }
 
-export function campfireStats(unit: CampfireUnit): InspectableStats {
+export function campfireStats(unit: CampfireStructure): InspectableStats {
   return {
     name: 'Campfire',
     maxHp: BUILDABLES.campfire.maxHp,
     extra: [
-      { label: 'Fuel', value: `${Math.ceil(unit.fuel)}/${CAMPFIRE_FUEL_MAX}` },
-      { label: 'Status', value: unit.lit ? 'Lit' : 'Out' },
+      { label: 'Fuel', value: `${Math.ceil(unit.state.fuel)}/${CAMPFIRE_FUEL_MAX}` },
+      { label: 'Status', value: unit.state.lit ? 'Lit' : 'Out' },
     ],
   };
 }

@@ -96,7 +96,7 @@ not a power fantasy. Six pieces (numbers → [GAME-MECHANICS.md](GAME-MECHANICS.
 - **Bow:** `combat:bow` auto-targets the **facing-biased nearest** live enemy within `BOW_RANGE_TILES`,
   applies **ranged** damage (`resolveRangedAttack`, dex-based, `BOW_BASE_DAMAGE`) as a **hitscan**, and
   flies a coded **arrow tracer** (pure FX). **Unlimited ammo.** The current target wears a stroked
-  **highlight** re-synced each frame (`CombatFxManager`, mirrors `outlineCampfire` — not a baked halo);
+  **highlight** re-synced each frame (`CombatFxManager`, mirrors `outlineStructure` — not a baked halo);
   `bowTargetId` in `debugState`. Release body-pose is a **coded stand-in** (reuses the Pierce/`attack`
   strip — the pack has no bow rig/art yet).
 - **Monster HP bars:** thin floating green→red bars above enemy hurtboxes (`CombatFxManager`),
@@ -168,15 +168,15 @@ over Tailscale) and decoupled from the build; raw ~1024px generations are gitign
 
 The wall-hardcoded build path is generalised into a build **palette** (BUILD opens a panel listing
 every `BUILDABLES` entry with cost/affordability; pick one to select for placement). First non-wall
-buildable is the **campfire** — a base-zone-only light + vision source with fuel drain, owned by
-`CampfireManager` per the 013/015 manager pattern. Flame sprite **and** its light/vision radius
+buildable is the **campfire** — a base-zone-only light + vision source with fuel drain, owned by the
+`campfire` behavior module (`CampfireBehavior`) per the 013/015 manager pattern. Flame sprite **and** its light/vision radius
 **scale with fuel** (single sprite scaled) so the fire grows as fed and dims as it burns down.
 Refuelling is a **queued worker order** (`refuel` Action): tap the fire, worker walks over and tends
 it one wood at a time, self-terminating when topped up or out of wood. A tap on the fire always
 resolves to `refuel` (column-hit-tested over its whole tile stack). Tuned numbers:
 [GAME-MECHANICS.md](GAME-MECHANICS.md).
 
-**Attackable fire (plan 038 Step 1):** `CampfireManager.damageFire(id, amount)` drains the fire's
+**Attackable fire (plan 038 Step 1):** `CampfireBehavior.damageFire(id, amount)` drains the fire's
 **fuel** — the mob→fire coupling the night wave's objective AI calls (plan 038 Step 4). It reuses the
 existing fuel meter (no separate integrity meter) and douses on the same zero-crossing as a burn-out, so
 an attacked-out fire and a neglected one are one state; relight is the existing feed-wood path. A
@@ -206,31 +206,31 @@ deterministic anchor (a lone mob douses a full fire in ~24s — tense but reacta
 for playtest.
 
 **HUD + dev hook (plan 038 Step 6):** UIScene gains a top-left **FIRE fuel bar** (fed by
-CampfireManager's `fire:changed` — orange while lit, red when knocked out, hidden when no hearth) and a
+the campfire behavior's `fire:changed` — orange while lit, red when knocked out, hidden when no hearth) and a
 **NIGHT WAVE** indicator beside the day/night readout (shown during night). A **FORCE WAVE** dev-menu
 button (+ `debug:forceWave` hook) jumps to night and starts a wave on demand for manual playtesting.
 
 ## Base-defence walls (plan 037, chunks 2a–2c)
 
 The `wall` buildable is now a **live, 4-way, mob-destructible structure** (was a static tile),
-materialised by an interim **`src/scenes/world/WallManager.ts`** — mirrors `CampfireManager`'s
-materialise/reset/destroy discipline, stood up before the general `StructureManager` refactor (a later
-chunk) so that abstraction is designed against two real shapes (campfire + wall). Each placed wall
-owns one bottom-anchored oriented sprite: it plays the CraftPix barricade **Build** strip once, then
+materialised by the **`wall` behavior module** (`src/scenes/world/WallBehavior.ts`) in the
+StructureManager registry (see the GameScene-decomposition section — the campfire + wall
+generalisation landed in step 3, folding the interim `WallManager`/`CampfireManager` in). Each placed
+wall owns one bottom-anchored oriented sprite: it plays the CraftPix barricade **Build** strip once, then
 settles on the **Destroy** strip's frame 0 (intact idle); `takeDamage` steps the Destroy sheet toward
 rubble by HP fraction and, at `hp≤0`, plays it through and removes the wall (its tile freed via
 `BuildManager.releaseTile`, then repath). Data: low `maxHp` (12, placeholder — wave-time knob) +
 `thorns` (1, placeholder) + `orientable`. **Player-rotate placement** (`build:rotate` — HUD ROTATE
 button + R key; `BuildManager.rotatePlacement` cycles down→right→up→left, stamped per site as `facing`;
 left = the side sheet flipped). `finishSite` routes `wall` through the `behavior` dispatch
-(`campfire`→CampfireManager, `wall`→WallManager) — the static-tile branch is now dead for walls.
+(`StructureManager.materialise` → the `campfire`/`wall` module) — the static-tile branch is now dead for walls.
 Art paths + frame slicing: [wired-art.md](wired-art.md).
 
 **Player deconstruct/unbuild (chunk 2b).** Players do **not** damage walls in combat — walls are
 immune to player weapons (`GameScene.attack()` targets only enemies; decision #1). Removal is a
 **`deconstruct` worker order** (mirrors the `refuel` order): a **DEMOLISH** mode (HUD button below
 ITEMS + `demolish:toggle`/`demolish:modeChanged`, mutually exclusive with build mode, ESC-exitable,
-non-destructive to the queue) → tap a finished wall → the worker walks adjacent → `WallManager.deconstruct`
+non-destructive to the queue) → tap a finished wall → the worker walks adjacent → `WallBehavior.deconstruct`
 removes it (a clean removal, no crumble anim; shared tile-free/repath teardown with the mob-kill destroy
 path) and **credits a partial refund** — `floor(cost × DECONSTRUCT_REFUND_FRACTION)` (0.5, `config.ts`
 tuning knob) per resource (wall `{wood:2}` → 1 wood back). A queued deconstruct shows a yellow outline
@@ -302,6 +302,16 @@ from these primitives. Rationale in [DECISIONS.md](DECISIONS.md) (2026-07-12).
 spine (~260 lines) is a deliberate keep. No gameplay change; pinned by the `refactor-tripwire` Tier-2
 golden snapshot. Landed alongside the project's first lint/format/markdownlint + pre-commit tooling.
 See [DECISIONS.md](DECISIONS.md) (2026-07-13).
+
+**Structures generalisation (plan 037 step 3).** The bespoke `CampfireManager` + interim `WallManager`
+folded into one **`StructureManager`** (`src/scenes/world/StructureManager.ts`): it owns a homogeneous
+`PlacedStructure[]` behind a **behavior registry** (`register('campfire'|'wall', module)` in `buildWorld()`),
+dispatches `materialise` on `def.behavior`, and fans `tick`/`lightSources`/`stats`/`reset`/`destroy` out
+across modules — so ScenePicker/SurvivalClock/VisionController/TaskGlowRenderer each get one `structures`
+route. `CampfireBehavior`/`WallBehavior` are the two `StructureBehavior` modules (each with its own narrow
+deps); `CampfireUnit`/`PlacedWall` collapsed into `PlacedStructure<CampfireState|WallState>`. Pure refactor
+(`refactor-tripwire` golden unchanged); the `game.__test` signatures re-point internally. See
+[DECISIONS.md](DECISIONS.md) (2026-07-13 [DONE] note).
 
 ## Test harness (plan 007)
 

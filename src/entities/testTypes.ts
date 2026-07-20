@@ -92,7 +92,7 @@ export interface GameTestApi {
   /** DEV/test-only: the live barricade walls (col/row/facing/hp/maxHp), placement order (plan 037) —
    *  NOT part of DebugState, so the refactor-tripwire golden stays green. */
   walls(): { col: number; row: number; facing: string; hp: number; maxHp: number }[];
-  /** DEV/test-only: damage the wall at `index` by `amount` (WallManager.takeDamage — the path chunk
+  /** DEV/test-only: damage the wall at `index` by `amount` (WallBehavior.takeDamage — the path chunk
    *  2c's enemy drives). Returns whether the blow destroyed it; false if no wall at that index. */
   damageWall(index: number, amount: number): boolean;
   /** DEV/test-only: live enemies' current HP, spec order (plan 037 2c) — lets the enemy-attack spec

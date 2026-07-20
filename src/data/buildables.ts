@@ -7,7 +7,7 @@ import type { BuildableDef } from './types';
 export const BUILDABLES: Record<string, BuildableDef> = {
   // maxHp is a real display stat (Inspect-mode panel); armour/speed are inert for objects — see
   // plan 003 Context & decisions. Walls are mob-DESTRUCTIBLE (plan 037 decision #1, reverses the old
-  // "indestructible this slice" note): a live WallManager structure with an HP-stage render. Players
+  // "indestructible this slice" note): a live WallBehavior structure with an HP-stage render. Players
   // never damage them in combat — removal is a deconstruct order (chunk 2b); only mob attacks lower HP.
   wall: {
     id: 'wall',
@@ -20,13 +20,13 @@ export const BUILDABLES: Record<string, BuildableDef> = {
     armour: 0,
     speed: 0,
     blocksPath: true,
-    behavior: 'wall', // live/simulated — routed to WallManager on completion (see finishSite dispatch)
+    behavior: 'wall', // live/simulated — routed to WallBehavior on completion (see finishSite dispatch)
     thorns: 1, // wave-time tuning knob
     orientable: true, // player-rotate at placement picks the facing (down/right/up/left)
   },
   // Base-only light source; always burning once built, drains fuel continuously (see
   // config.CAMPFIRE_FUEL_* — plan 012 Context & decisions). Renders as two layers (ember base + a
-  // flame on top), bottom-anchored like a tall ResourceNodeDef — see CampfireManager (plan 016).
+  // flame on top), bottom-anchored like a tall ResourceNodeDef — see CampfireBehavior (plan 016).
   campfire: {
     id: 'campfire',
     name: 'Campfire',
@@ -38,7 +38,7 @@ export const BUILDABLES: Record<string, BuildableDef> = {
     light: 8,
     baseOnly: true,
     blocksPath: true,
-    behavior: 'campfire', // live/simulated — routed to CampfireManager on completion (see finishSite)
+    behavior: 'campfire', // live/simulated — routed to CampfireBehavior on completion (see finishSite)
     animKey: 'campfire',
     tilesTall: 3, // flame height (Fire_01 48px → 3 tiles native) + the tappable pick column
     originY: 1,

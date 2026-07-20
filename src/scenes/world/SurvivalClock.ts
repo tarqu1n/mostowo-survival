@@ -35,7 +35,7 @@ export interface SurvivalClockDeps {
   canAfford(cost: Record<string, number>): boolean;
   /** Deduct `cost` atomically; false (no-op) if unaffordable — eat()'s spend. */
   spend(cost: Record<string, number>): boolean;
-  /** World-space light discs (the behavior-neutral light-source seam — CampfireManager.lightSources()
+  /** World-space light discs (the behavior-neutral light-source seam — StructureManager.lightSources()
    *  today, via the scene, no manager↔manager edge). Each becomes a hole in the night overlay so a lit
    *  source is readable at night. Empty ⇒ no holes ⇒ full night, byte-identical to pre-campfire behaviour. */
   lightSources(): readonly { x: number; y: number; radius: number }[];

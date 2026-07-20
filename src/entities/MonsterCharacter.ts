@@ -87,7 +87,7 @@ export interface MonsterTickEnv {
   /** Plan 038 Step 4 — the nearest lit hearth the wave targets, or `null` when none is lit. Shared
    *  across the tick (one hearth in the MVP); a `seeksFire` mob paths to `tile` and strikes it. */
   fire: { id: string; tile: Cell; pos: Vec2 } | null;
-  /** Drain `amount` fuel from the fire (→ CampfireManager.damageFire) — the fire-strike effect, the
+  /** Drain `amount` fuel from the fire (→ CampfireBehavior.damageFire) — the fire-strike effect, the
    *  mirror of `damagePlayer` for the fire objective. */
   attackFire: (id: string, amount: number) => void;
   /** Plan 037 chunk 2c — the generic structure-target seam, written for structure / player / (future)
@@ -99,7 +99,7 @@ export interface MonsterTickEnv {
     col: number,
     row: number,
   ) => { id: string; defender: CombatantStats; thorns: number } | null;
-  /** Deal `dmg` to the structure (→ WallManager.takeDamage) — the mirror of `damagePlayer`/`attackFire`
+  /** Deal `dmg` to the structure (→ WallBehavior.takeDamage) — the mirror of `damagePlayer`/`attackFire`
    *  for a blocking structure; returns whether the blow destroyed it (so the mob can repath through). */
   attackStructure: (id: string, dmg: number) => boolean;
   /** Apply retaliation/other damage back to a live monster (decision #7 thorns) through the SAME

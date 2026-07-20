@@ -16,7 +16,7 @@ export interface VisionControllerDeps {
    *  applies the `PLAYER_START_VISION` fallback itself (see {@link vision}), same as the original
    *  inline `updateVision`/`inVisionRange` did. */
   getVision(): number | undefined;
-  /** World-space light discs (the behavior-neutral light-source seam — CampfireManager.lightSources()
+  /** World-space light discs (the behavior-neutral light-source seam — StructureManager.lightSources()
    *  today, via the scene, no manager↔manager edge). Each is also filled into the fog shape so the
    *  depth-5 dim rect is revealed around a lit source (plan 012). Empty ⇒ the reveal is just the player
    *  circle, as before. */

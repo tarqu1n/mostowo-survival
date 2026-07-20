@@ -52,8 +52,9 @@ import { TaskGlowRenderer } from './fx/TaskGlowRenderer';
 import { ResourceNodeManager } from './world/ResourceNodeManager';
 import { DecorManager } from './world/DecorManager';
 import { EnemyManager } from './world/EnemyManager';
-import { CampfireManager } from './world/CampfireManager';
-import { WallManager } from './world/WallManager';
+import { StructureManager } from './world/StructureManager';
+import { CampfireBehavior } from './world/CampfireBehavior';
+import { WallBehavior } from './world/WallBehavior';
 import { SurvivalClock } from './world/SurvivalClock';
 import { WaveDirector } from './world/WaveDirector';
 import { VisionController } from './fx/VisionController';
@@ -174,17 +175,26 @@ export class GameScene extends Phaser.Scene {
   // teardown directly.
   private buildManager!: BuildManager;
 
-  // Campfires (plan 012) — the first live, per-frame-simulated buildable: owns the campfire collection
-  // + each fire's animated sprite, drains fuel each tick, and exposes its lit fires as the light source
-  // both SurvivalClock (night-overlay mask) and VisionController (fog reveal) read via the scene.
-  // Constructed fresh in buildWorld() each (re)start; wires its own SHUTDOWN teardown directly.
-  private campfireManager!: CampfireManager;
+  // Live/simulated buildables (plan 037) — owns the world's structures as one homogeneous
+  // PlacedStructure population behind a behavior registry: a CampfireBehavior (plan 012 — fuel-drained
+  // per tick, casts the light both SurvivalClock and VisionController read) and a WallBehavior (plan
+  // 037 — destructible barricades). Every consumer (materialise/tick/lightSources/pick/stats/reset)
+  // routes through this single manager; behavior-SPECIFIC ops reach the module via `campfire`/`wall`
+  // (both resolve through it — see the getters). Constructed fresh in buildWorld() each (re)start; it
+  // wires ONE SHUTDOWN teardown that fans out to every module. See world/StructureManager.ts.
+  private structureManager!: StructureManager;
 
-  // Barricade walls (plan 037) — the interim live/destructible structure manager (pre-StructureManager):
-  // owns each placed wall's oriented sprite + hp, plays build/destroy anims, and frees a destroyed
-  // wall's tile back through BuildManager. Constructed fresh in buildWorld() beside CampfireManager;
-  // wires its own SHUTDOWN teardown directly. Event-driven (no per-frame tick — walls have no fuel).
-  private wallManager!: WallManager;
+  /** The campfire behavior module, reached through the structure registry — for the behavior-SPECIFIC
+   *  campfire ops the generic StructureManager route doesn't cover (feed/damageFire/flashNoFuel/…). */
+  private get campfire(): CampfireBehavior {
+    return this.structureManager.behavior<CampfireBehavior>('campfire');
+  }
+
+  /** The wall behavior module, reached through the structure registry — for the behavior-SPECIFIC wall
+   *  ops (takeDamage/thornsOf/deconstruct/wallAt/…) the generic StructureManager route doesn't cover. */
+  private get wall(): WallBehavior {
+    return this.structureManager.behavior<WallBehavior>('wall');
+  }
 
   // Pointer "raycast" + the tap/inspect intent built on top of it (plan 015 Step 5) — see
   // src/scenes/input/ScenePicker.ts. Stateless (no fields but scene+deps, no SHUTDOWN teardown — see
@@ -372,20 +382,20 @@ export class GameScene extends Phaser.Scene {
       onPlayerHurt: () => this.onPlayerHurt(),
       damagePlayer: (amount) => this.damagePlayer(amount),
       litHearth: () => this.litHearth(),
-      attackFire: (id, amount) => this.campfireManager.damageFire(id, amount),
+      attackFire: (id, amount) => this.campfire.damageFire(id, amount),
       // Structure-target seam (plan 037 2c) — the wall a walled-off mob bashes, plus its combat defender
-      // (armour, zeroed offence) + thorns; closes over wallManager (the sole wall owner). A single wall
-      // archetype today, so the defender comes straight off BUILDABLES.wall (as WallManager itself does).
+      // (armour, zeroed offence) + thorns; routes to the wall behavior module (the sole wall owner). A
+      // single wall archetype today, so the defender comes straight off BUILDABLES.wall (as the module does).
       structureAt: (col, row) => {
-        const w = this.wallManager.wallAt(col, row);
+        const w = this.wall.wallAt(col, row);
         if (!w) return null;
         return {
           id: w.id,
           defender: objectAsDefender(BUILDABLES.wall),
-          thorns: this.wallManager.thornsOf(w.id),
+          thorns: this.wall.thornsOf(w.id),
         };
       },
-      attackStructure: (id, dmg) => this.wallManager.takeDamage(id, dmg),
+      attackStructure: (id, dmg) => this.wall.takeDamage(id, dmg),
       flashHit: (sprite) => this.fx.flashHit(sprite),
       lungeAt: (m, x, y) => this.fx.lungeAt(m, x, y),
       beginWindUp: (m, ms) => this.fx.beginWindUp(m, ms),
@@ -420,34 +430,39 @@ export class GameScene extends Phaser.Scene {
       canAfford: (cost) => this.inv.canAfford(cost),
       spend: (cost) => this.inv.spend(cost),
       enqueueBuild: (siteId) => this.enqueue({ kind: 'build', siteId }),
-      // Dispatch a completed live buildable to its runtime manager on its `behavior` (finishSite only
-      // calls this for buildables with one): campfire → CampfireManager, wall → WallManager.
-      materialiseBuildable: (site) => {
-        const behavior = BUILDABLES[site.buildableId].behavior;
-        if (behavior === 'wall') this.wallManager.materialise(site);
-        else this.campfireManager.materialise(site);
-      },
+      // Dispatch a completed live buildable to its runtime behavior module (finishSite only calls this
+      // for buildables with a `behavior`) — StructureManager routes on `def.behavior` internally.
+      materialiseBuildable: (site) => this.structureManager.materialise(site),
       repath: () => this.repath(),
     });
 
-    // Campfires (plan 012) — the live, per-frame buildable. Constructed here so it exists before
-    // VisionController below (whose constructor calls update() → lightSources()) and before any
-    // finishSite routes a `behavior` buildable to materialise(). Wires its own SHUTDOWN teardown.
-    this.campfireManager = new CampfireManager(this, {
-      spend: (cost) => this.inv.spend(cost),
-    });
-
-    // Barricade walls (plan 037) — beside CampfireManager; a destroyed wall frees its tile back through
-    // BuildManager (the sole occupancy/collision writer) then repaths. Wires its own SHUTDOWN teardown.
-    this.wallManager = new WallManager(this, {
-      freeTile: (c, r) => this.buildManager.releaseTile(c, r),
-      repath: () => this.repath(),
-      // Deconstruct refund (plan 037 2b) — credit each refunded resource back the same way costs are
-      // spent (through the shared Inventory), mirroring CampfireManagerDeps.spend's decoupling.
-      addItems: (items) => {
-        for (const [id, n] of Object.entries(items)) this.inv.add(id, n);
-      },
-    });
+    // Live/simulated buildables (plan 037) — the StructureManager registry, constructed here so it
+    // exists before VisionController below (whose constructor calls update() → lightSources()) and
+    // before any finishSite routes a `behavior` buildable to materialise(). One register() line per
+    // buildable, each module built with its OWN narrow deps (013/015 coupling rule). StructureManager
+    // wires ONE SHUTDOWN teardown that fans out to every module.
+    this.structureManager = new StructureManager(this);
+    // Campfire (plan 012) — the per-frame buildable: drains fuel each tick, casts the light source.
+    this.structureManager.register(
+      'campfire',
+      new CampfireBehavior(this, {
+        spend: (cost) => this.inv.spend(cost),
+      }),
+    );
+    // Barricade walls (plan 037) — a destroyed wall frees its tile back through BuildManager (the sole
+    // occupancy/collision writer) then repaths.
+    this.structureManager.register(
+      'wall',
+      new WallBehavior(this, {
+        freeTile: (c, r) => this.buildManager.releaseTile(c, r),
+        repath: () => this.repath(),
+        // Deconstruct refund (plan 037 2b) — credit each refunded resource back the same way costs are
+        // spent (through the shared Inventory), mirroring CampfireBehaviorDeps.spend's decoupling.
+        addItems: (items) => {
+          for (const [id, n] of Object.entries(items)) this.inv.add(id, n);
+        },
+      }),
+    );
 
     // Pointer "raycast" + tap/inspect intent (plan 015 Step 5) — constructed here, after
     // ResourceNodeManager/EnemyManager/BuildManager all exist, so its deps close over their real
@@ -457,8 +472,8 @@ export class GameScene extends Phaser.Scene {
       enemies: () => this.enemyManager.all(),
       trees: () => this.resourceNodeManager.all(),
       allSites: () => this.buildManager.allSites(),
-      campfires: () => this.campfireManager.all(),
-      walls: () => this.wallManager.all(),
+      structures: () => this.structureManager.all(),
+      structureStats: (s) => this.structureManager.stats(s),
     });
 
     // Queue/glow presentation (plan 013 Step 6) — pure presentation over the queue, so it has no
@@ -469,8 +484,8 @@ export class GameScene extends Phaser.Scene {
       treeById: (id) => this.resourceNodeManager.treeById(id),
       allSites: () => this.buildManager.allSites(),
       siteById: (id) => this.buildManager.siteById(id),
-      campfireById: (id) => this.campfireManager.campfireById(id),
-      wallById: (id) => this.wallManager.wallById(id),
+      structureById: (id) => this.structureManager.byId(id),
+      structureBounds: (s) => this.structureManager.highlightBounds(s),
       nodeScale: (def, skin) => this.resourceNodeManager.nodeScale(def, skin),
     });
 
@@ -536,7 +551,7 @@ export class GameScene extends Phaser.Scene {
     this.visionController = new VisionController(this, {
       getPlayerSprite: () => this.player,
       getVision: () => this.playerChar.stats.vision,
-      lightSources: () => this.campfireManager.lightSources(),
+      lightSources: () => this.structureManager.lightSources(),
       worldPx, // fog dim-rect spans the loaded map (plan 018 A9) instead of fixed MAP_WIDTH/HEIGHT
     });
 
@@ -548,7 +563,7 @@ export class GameScene extends Phaser.Scene {
       damagePlayer: (amount) => this.damagePlayer(amount),
       canAfford: (cost) => this.inv.canAfford(cost),
       spend: (cost) => this.inv.spend(cost),
-      lightSources: () => this.campfireManager.lightSources(),
+      lightSources: () => this.structureManager.lightSources(),
       worldPx, // night overlay spans the loaded map (plan 018 A9) instead of fixed MAP_WIDTH/HEIGHT
     });
 
@@ -649,8 +664,7 @@ export class GameScene extends Phaser.Scene {
     if (!import.meta.env.DEV) return;
     const testApi = new TestApi(this, {
       buildManager: this.buildManager,
-      campfireManager: this.campfireManager,
-      wallManager: this.wallManager,
+      structureManager: this.structureManager,
       waveDirector: this.waveDirector,
       taskGlowRenderer: this.taskGlowRenderer,
       fx: this.fx,
@@ -737,7 +751,7 @@ export class GameScene extends Phaser.Scene {
       // Enqueue the real deconstruct worker order for the wall at `index` (the order the demolish-mode
       // tap enqueues) — drives the full walk-adjacent → remove + refund path under step() (plan 037 2b).
       deconstructWall: (i) => {
-        const w = this.wallManager.all()[i];
+        const w = this.wall.all()[i];
         if (!w) return false;
         this.enqueue({ kind: 'deconstruct', wallId: w.id });
         return true;
@@ -766,9 +780,9 @@ export class GameScene extends Phaser.Scene {
     // time passes whether or not a worker task is active. See src/scenes/world/SurvivalClock.ts.
     this.survivalClock.tick(delta);
 
-    // Campfire fuel drains every frame too (above the early-return), so a fire burns down whether or
-    // not a worker task is active — mirrors the survival tick. See src/scenes/world/CampfireManager.ts.
-    this.campfireManager.tick(delta);
+    // Live structures tick every frame too (above the early-return), so a campfire burns down whether
+    // or not a worker task is active — mirrors the survival tick. See src/scenes/world/StructureManager.ts.
+    this.structureManager.tick(delta);
 
     // Night wave scheduler (plan 038 Step 3) — meter out spawns during the night. Above the no-action
     // early-return (so it runs whether or not a task is active) but below the `playerChar.dying` freeze
@@ -920,13 +934,16 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (a.kind === 'refuel') {
-      const c = this.campfireManager.campfireById(a.campfireId);
+      const c = this.campfire.campfireById(a.campfireId);
       if (!c) return this.completeCurrent();
       // Nothing to do → flash a refusal and drop the order rather than walk over for a no-op: the bag's
       // empty, or the fire's already topped up (a full wood wouldn't fit — the no-waste rule runRefuel
       // also completes on). Mirrors harvest's "can't-start → flashBagFull + complete" abort.
-      if (!this.inv.canAfford({ wood: 1 }) || CAMPFIRE_FUEL_MAX - c.fuel < CAMPFIRE_FUEL_PER_WOOD) {
-        this.campfireManager.flashNoFuel(c);
+      if (
+        !this.inv.canAfford({ wood: 1 }) ||
+        CAMPFIRE_FUEL_MAX - c.state.fuel < CAMPFIRE_FUEL_PER_WOOD
+      ) {
+        this.campfire.flashNoFuel(c);
         return this.completeCurrent();
       }
       // Stand on any tile adjacent to the fire's foot tile (it blocks its own tile, like a rock).
@@ -940,7 +957,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (a.kind === 'deconstruct') {
-      const w = this.wallManager.wallById(a.wallId);
+      const w = this.wall.wallById(a.wallId);
       if (!w) return this.completeCurrent(); // wall already gone (e.g. a mob destroyed it) — drop the order
       // Stand on any tile adjacent to the wall's foot tile (it blocks its own tile, like the fire).
       const stand = reachableAdjacent(
@@ -1120,9 +1137,9 @@ export class GameScene extends Phaser.Scene {
    *    than idle-swing on a fire we can't feed (the harvest bag-full abort, applied to fuel).
    */
   private runRefuel(a: Extract<Action, { kind: 'refuel' }>, delta: number): void {
-    const c = this.campfireManager.campfireById(a.campfireId);
+    const c = this.campfire.campfireById(a.campfireId);
     if (!c) return this.completeCurrent();
-    if (CAMPFIRE_FUEL_MAX - c.fuel < CAMPFIRE_FUEL_PER_WOOD) return this.completeCurrent(); // topped up
+    if (CAMPFIRE_FUEL_MAX - c.state.fuel < CAMPFIRE_FUEL_PER_WOOD) return this.completeCurrent(); // topped up
     if (this.playerChar.advancePath()) {
       this.player.body.setVelocity(0, 0);
       this.playerChar.faceTile(c.col, c.row); // tend toward the fire, whatever side we stood on
@@ -1130,8 +1147,8 @@ export class GameScene extends Phaser.Scene {
       this.chopElapsed += delta;
       if (this.chopElapsed >= CAMPFIRE_FEED_INTERVAL_MS) {
         this.chopElapsed = 0;
-        if (!this.campfireManager.feedOne(c)) {
-          this.campfireManager.flashNoFuel(c); // bag ran dry mid-order — abort, don't idle-swing
+        if (!this.campfire.feedOne(c)) {
+          this.campfire.flashNoFuel(c); // bag ran dry mid-order — abort, don't idle-swing
           this.completeCurrent();
         }
       }
@@ -1144,15 +1161,15 @@ export class GameScene extends Phaser.Scene {
    * {@link runRefuel} it's a walk-adjacent-then-act order that self-terminates on a *condition* (the
    * wall is gone), not the target's death; but it's a single act (one wall, removed once), so there's
    * no per-interval feed loop. If the wall vanished before the worker arrived (e.g. a mob destroyed it
-   * mid-walk), drop the order rather than stall — WallManager.deconstruct also no-ops on a gone wall.
+   * mid-walk), drop the order rather than stall — WallBehavior.deconstruct also no-ops on a gone wall.
    */
   private runDeconstruct(a: Extract<Action, { kind: 'deconstruct' }>): void {
-    const w = this.wallManager.wallById(a.wallId);
+    const w = this.wall.wallById(a.wallId);
     if (!w) return this.completeCurrent();
     if (this.playerChar.advancePath()) {
       this.player.body.setVelocity(0, 0);
       this.playerChar.faceTile(w.col, w.row); // face the wall as it comes down
-      this.wallManager.deconstruct(a.wallId); // remove + credit the partial refund
+      this.wall.deconstruct(a.wallId); // remove + credit the partial refund
       this.completeCurrent(); // condition-terminate: the wall is gone
     }
   }
@@ -1173,7 +1190,7 @@ export class GameScene extends Phaser.Scene {
    *  tile + world-centre pos), or null when none is lit. Single hearth in the MVP; shared by the
    *  WaveDirector's spawn-anchor and the enemy AI's fire objective. */
   private litHearth(): { id: string; tile: Cell; pos: { x: number; y: number } } | null {
-    const c = this.campfireManager.all().find((f) => f.lit);
+    const c = this.campfire.all().find((f) => f.state.lit);
     if (!c) return null;
     return {
       id: c.id,
@@ -1218,7 +1235,7 @@ export class GameScene extends Phaser.Scene {
     const shape = this.playerChar.meleeShape();
     const tiles = attackTiles(this.playerChar.tile(), this.playerChar.lastFacing, shape);
     // Enemies only — walls are deliberately IMMUNE to player weapons (plan 037 decision #1): the only
-    // targets are the enemies in the swing tiles, never `wallManager`. A wall is removed by a worker
+    // targets are the enemies in the swing tiles, never the wall structures. A wall is removed by a worker
     // deconstruct order (decision #6, see runDeconstruct), not by hitting it; only mob attacks lower a
     // wall's HP (chunk 2c). (Plan 036 will fold this into the `attackTiles` generator when it lands.)
     const targets = this.enemyManager.enemiesInTiles(tiles);

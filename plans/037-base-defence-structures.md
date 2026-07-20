@@ -177,7 +177,28 @@ committed rules — **trigger-once + re-armed by a queued worker order each morn
 
 ## Steps
 
-- [ ] **Step 1: StructureManager generalisation — migrate the campfire** `[inline]`
+- [x] **Step 1: StructureManager generalisation** `[inline]` — DONE as resequence item 3 (folds campfire **and** wall).
+  - Outcome (2026-07-20, resequence item 3 — delegated + reviewed): the bespoke `CampfireManager` + interim
+    `WallManager` are **dissolved** into one generic `StructureManager` (`src/scenes/world/StructureManager.ts`,
+    NEW) behind a **behavior registry** (`register(behaviorId, module)` in `buildWorld()`), with the two
+    concrete modules `CampfireBehavior.ts` + `WallBehavior.ts` (NEW). Designed against **two** real shapes,
+    not one — the whole reason for the walls-first resequence. `PlacedStructure<S>` (`{id,buildableId,behavior,
+    col,row,sprite,state:S}`) with behavior-owned `CampfireState`/`WallState`; `PointerPick` `campfire`/`wall`
+    unified to one `structure` kind. Generic/aggregated capability route (`materialise`/`tick`/`lightSources`/
+    `stats`/`highlightBounds`/`all`/`at`/`byId`/`reset`/`destroy`, one SHUTDOWN listener fanning out);
+    behavior-specific ops (campfire `feedOne`/`damageFire`; wall `takeDamage`/`thornsOf`/`deconstruct`) reached
+    via a typed `behavior<M>(id)` getter so the manager stays behavior-agnostic (matches the architecture
+    note's aggregated-capability list — no per-behavior method explosion). Consumers rewired to the single
+    `structures` route: GameScene, ScenePicker (one generic pick loop, `tilesTall ?? 1` column),
+    TaskGlowRenderer (`outlineStructure`), SurvivalClock/VisionController (`lightSources`), stats.ts, EnemyManager
+    seam, testApi/testTypes/harness. **`__test` signatures unchanged.** `CampfireManager.ts`/`WallManager.ts`
+    deleted. Docs: `docs/decisions/architecture.md` (dated `[DONE]` note under the generalise-on-#2 decision),
+    `docs/STATUS.md`. **Verified (reviewed):** build clean, Tier-1 834 pass, eslint 0, prettier clean;
+    `refactor-tripwire` PASS with **golden UNCHANGED** (no DebugState change — a true pure refactor); campfire/
+    wall/wall-deconstruct/wall-enemy-attack/boar/build/inspect/glow specs pass; combat/monster/survival-daynight
+    pass **isolated** (25/25 `--workers=1`) — the parallel-run reds were load flakes, not regressions. `DecorManager`
+    edit is a doc-comment rename only. Pre-existing reds unchanged (incl. the rare `wave.spec` flame flake).
+  - (Original detail below, superseded by the outcome above.)
   - Add `src/scenes/world/StructureManager.ts` owning `PlacedStructure[]` and a behavior registry:
     `register(behaviorId, module)` called in `GameScene.buildWorld()`. `PlacedStructure` = generic
     runtime record `{id, buildableId, behavior, col, row, hp, maxHp, sprite?, ...behaviorState}`

@@ -1,21 +1,10 @@
 import type { Action } from '../../systems/tasks';
 import { worldToTile } from '../../systems/grid';
 import { hurtboxContains, DEFAULT_HURTBOX } from '../../systems/hurtbox';
-import {
-  treeStats,
-  wallStats,
-  placedWallStats,
-  enemyStats,
-  campfireStats,
-} from '../../systems/stats';
+import { treeStats, wallStats, enemyStats } from '../../systems/stats';
 import { BUILDABLES } from '../../data/buildables';
-import type {
-  PointerPick,
-  TreeNode,
-  BuildSite,
-  CampfireUnit,
-  PlacedWall,
-} from '../../entities/types';
+import type { PointerPick, TreeNode, BuildSite, PlacedStructure } from '../../entities/types';
+import type { InspectableStats } from '../../data/types';
 import type { MonsterCharacter } from '../../entities/MonsterCharacter';
 import type { GameScene } from '../GameScene';
 
@@ -35,11 +24,13 @@ export interface ScenePickerDeps {
   trees(): TreeNode[];
   /** Every placed site, built + unbuilt, in placement order (BuildManager.allSites()). */
   allSites(): readonly BuildSite[];
-  /** Every built campfire (CampfireManager.all()) — picked over its own (hidden) site rect by draw order. */
-  campfires(): CampfireUnit[];
-  /** Every live barricade wall (WallManager.all()) — picked over its own (hidden) site rect by draw
-   *  order, so a demolish-mode tap resolves the wall and inspecting it reads its live hp (plan 037). */
-  walls(): PlacedWall[];
+  /** Every live/simulated structure — campfires + barricade walls (StructureManager.all()) — each
+   *  picked over its own (hidden) site rect by draw order, so a demolish-mode tap resolves a wall and
+   *  inspecting a fire/wall reads its live state (plan 037). */
+  structures(): readonly PlacedStructure[];
+  /** Inspect-panel stats for a picked structure — routed to its owning behavior module
+   *  (StructureManager.stats), so ScenePicker stays behavior-agnostic. */
+  structureStats(struct: PlacedStructure): InspectableStats;
 }
 
 /**
@@ -75,9 +66,11 @@ export class ScenePicker {
   actionAt(x: number, y: number): Action {
     const pick = this.pickSpriteAt(x, y);
     if (pick?.kind === 'tree') return { kind: 'harvest', treeId: pick.tree.id };
-    if (pick?.kind === 'campfire') return { kind: 'refuel', campfireId: pick.campfire.id };
-    // A wall falls through to a plain move to the tapped tile (deconstructing is a DEMOLISH-mode-only
-    // intent — see GameScene's onTap + demolishMode; command-mode taps never unbuild a wall).
+    if (pick?.kind === 'structure' && pick.structure.behavior === 'campfire')
+      return { kind: 'refuel', campfireId: pick.structure.id };
+    // A wall structure falls through to a plain move to the tapped tile (deconstructing is a
+    // DEMOLISH-mode-only intent — see GameScene's onTap + demolishMode; command-mode taps never unbuild
+    // a wall).
     return { kind: 'move', col: worldToTile(x), row: worldToTile(y) };
   }
 
@@ -86,9 +79,11 @@ export class ScenePicker {
   /** The barricade wall whose sprite is drawn under a world point, or undefined for a non-wall / empty
    *  ground. GameScene routes this to a `deconstruct` worker order only while DEMOLISH mode is on; it
    *  reuses the same raycast as command/inspect taps so a wall is hit on its foot tile or up its art. */
-  wallAt(x: number, y: number): PlacedWall | undefined {
+  wallAt(x: number, y: number): PlacedStructure | undefined {
     const pick = this.pickSpriteAt(x, y);
-    return pick?.kind === 'wall' ? pick.wall : undefined;
+    return pick?.kind === 'structure' && pick.structure.behavior === 'wall'
+      ? pick.structure
+      : undefined;
   }
 
   // --- Inspect-mode intent ----------------------------------------------------
@@ -104,10 +99,11 @@ export class ScenePicker {
       return void this.scene.game.events.emit('inspect:show', treeStats(pick.tree));
     if (pick?.kind === 'site')
       return void this.scene.game.events.emit('inspect:show', wallStats(pick.site));
-    if (pick?.kind === 'campfire')
-      return void this.scene.game.events.emit('inspect:show', campfireStats(pick.campfire));
-    if (pick?.kind === 'wall')
-      return void this.scene.game.events.emit('inspect:show', placedWallStats(pick.wall));
+    if (pick?.kind === 'structure')
+      return void this.scene.game.events.emit(
+        'inspect:show',
+        this.deps.structureStats(pick.structure),
+      );
     this.scene.game.events.emit('inspect:hide');
   }
 
@@ -160,26 +156,20 @@ export class ScenePicker {
       const spriteHit = s.visual ? this.alphaHit(s.visual, x, y) : obj.getBounds().contains(x, y);
       if ((s.col === col && s.row === row) || spriteHit) consider(obj, { kind: 'site', site: s });
     }
-    // A built barricade wall's oriented sprite is created after (and over) its now-hidden site rect, so
-    // it wins the pick tie-break by draw order — a wall tile resolves to the wall (its live hp), not its
-    // site. Hit on the foot tile (reliable even where the stake art is transparent) OR an opaque pixel
-    // of the sprite (up its ~1-tile art), like a tree — NOT the campfire's full tilesTall column, since
-    // the wall art sits at the bottom of its frame (no rising flame to reach for).
-    for (const w of this.deps.walls()) {
-      if ((w.col === col && w.row === row) || this.alphaHit(w.sprite, x, y))
-        consider(w.sprite, { kind: 'wall', wall: w });
-    }
-    // A built campfire's fire sprite is created after (and over) its now-hidden site rect, so it wins
-    // the pick tie-break by draw order — inspecting a built fire yields the campfire, not its site.
-    // Hit-test its whole `tilesTall` tile column (foot tile + the tiles the bottom-anchored flame rises
-    // into), NOT just an opaque sprite pixel: the flame sheet swaps by fuel (plan 016) and its low-fuel
-    // ember frames have a tiny opaque region, so an alpha-only test would flicker-miss and fall through
-    // to a move onto the fire's blocking tile. The column keeps the fire reliably tappable at any fuel.
-    const fireTilesTall = BUILDABLES.campfire.tilesTall ?? 1;
-    for (const c of this.deps.campfires()) {
-      const inColumn = col === c.col && row <= c.row && row > c.row - fireTilesTall;
-      if (inColumn || this.alphaHit(c.sprite, x, y))
-        consider(c.sprite, { kind: 'campfire', campfire: c });
+    // A built structure's sprite is created after (and over) its now-hidden site rect, so it wins the
+    // pick tie-break by draw order — a fire/wall tile resolves to the structure (its live state), not
+    // its site. Hit-test its whole `tilesTall` tile column (foot tile + the tiles a bottom-anchored
+    // sprite rises into) OR an opaque pixel of the base sprite. The column matters for the CAMPFIRE
+    // (tilesTall 3): its flame sheet swaps by fuel (plan 016) and its low-fuel ember frames have a tiny
+    // opaque region, so an alpha-only test would flicker-miss and fall through to a move onto the fire's
+    // blocking tile. The WALL has no `tilesTall` in data (→ 1), so its column collapses to the foot tile
+    // (the stake art sits at the bottom of its frame, no rising flame to reach for) — identical to the
+    // old dedicated wall pick.
+    for (const s of this.deps.structures()) {
+      const tilesTall = BUILDABLES[s.buildableId].tilesTall ?? 1;
+      const inColumn = col === s.col && row <= s.row && row > s.row - tilesTall;
+      if (inColumn || this.alphaHit(s.sprite, x, y))
+        consider(s.sprite, { kind: 'structure', structure: s });
     }
     return best ? (best as { pick: PointerPick }).pick : null;
   }

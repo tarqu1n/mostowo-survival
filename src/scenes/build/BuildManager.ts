@@ -37,7 +37,7 @@ export interface BuildManagerDeps {
   /** Append a build order for a site to the task queue. */
   enqueueBuild(siteId: string): void;
   /** Hand a just-completed *live/simulated* buildable's site to its runtime manager to create the
-   *  visual (e.g. CampfireManager.materialise). Called only for buildables with a `behavior`; buildables
+   *  visual (e.g. StructureManager.materialise). Called only for buildables with a `behavior`; buildables
    *  without one take the static-tile path instead. */
   materialiseBuildable(site: BuildSite): void;
   /** Recompute the path to the active goal after the world changed (finishSite: a buildable completed). */
@@ -247,7 +247,7 @@ export class BuildManager {
       progress: 0,
       done: false,
       // Stamp the current rotate facing only for an orientable buildable (the wall); a fixed-orientation
-      // buildable leaves it undefined. WallManager reads it to render the oriented sprite.
+      // buildable leaves it undefined. WallBehavior reads it to render the oriented sprite.
       facing: BUILDABLES[buildableId].orientable ? this.placeFacing : undefined,
     };
     this.sites.push(site);
@@ -298,7 +298,7 @@ export class BuildManager {
   }
 
   /** Free a completed *live* buildable's tile when its runtime manager removes it (a destroyed wall —
-   *  WallManager calls this through its `freeTile` dep so BuildManager stays the sole occupancy/collision
+   *  WallBehavior calls this through its `freeTile` dep so BuildManager stays the sole occupancy/collision
    *  writer). Fully retires the finished site: drop its rect from the walls group + destroy it (which
    *  frees the static collision body with it), and clear the occupancy/site-slot keys — so the tile is
    *  passable AND re-placeable again, with no dangling destroyed-rect reference left for `reset()`. */

@@ -25,7 +25,7 @@ export function isLit(fuel: number): boolean {
  * Fuel fraction (`minFrac`..1) for a given fuel — a linear lerp from `minFrac` at empty to 1 at a full
  * tank, clamped to [0,1] on `fuel/max`. Drives BOTH the flame's display scale and its light radius, so
  * a well-fed fire is bigger + brighter and a dying one shrinks + dims (each with its own `minFrac`
- * floor from config). Pure — CampfireManager multiplies the fire's base scale / base radius by it.
+ * floor from config). Pure — CampfireBehavior multiplies the fire's base scale / base radius by it.
  */
 export function fuelFrac(fuel: number, max: number, minFrac: number): number {
   return minFrac + (1 - minFrac) * Math.max(0, Math.min(1, fuel / max));

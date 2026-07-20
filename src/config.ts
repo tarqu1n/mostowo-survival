@@ -400,7 +400,7 @@ export const BASE_ZONE_SIZE = { w: 21, h: 27 };
  * The fire is always burning once built, draining fuel continuously at `CAMPFIRE_FUEL_BURN_PER_SEC` —
  * a full tank (`CAMPFIRE_FUEL_MAX`) now lasts **~300s** (120 / 0.4). Sized so a full fire **just
  * outlasts a whole night** (NIGHT_MS 240s) on natural burn alone, leaving ~20% headroom — which the
- * night wave's fire attacks (`CampfireManager.damageFire`, plan 038) eat into, so keeping it lit
+ * night wave's fire attacks (`CampfireBehavior.damageFire`, plan 038) eat into, so keeping it lit
  * through a defended night takes a refuel or two but isn't constant babysitting. Over a full 900s
  * cycle that's ~3 tanks (~3 refuels) instead of the old 120s tank's ~7 — the "too punishing" tuning
  * the pre-038 comment flagged. **Exact feel-tuning (fuel vs wave DPS vs night length) is plan 038 Step

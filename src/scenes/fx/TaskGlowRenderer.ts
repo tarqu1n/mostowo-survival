@@ -4,7 +4,7 @@ import { tileToWorldCenter } from '../../systems/grid';
 import { SUB_ROW_EPSILON } from '../../systems/mapFormat';
 import { bakeGlowTexture } from '../../render/glowTexture';
 import type { Action } from '../../systems/tasks';
-import type { TreeNode, BuildSite, CampfireUnit, PlacedWall } from '../../entities/types';
+import type { TreeNode, BuildSite, PlacedStructure } from '../../entities/types';
 import type { ResourceNodeDef } from '../../data/types';
 import type { GameScene } from '../GameScene';
 
@@ -26,10 +26,11 @@ export interface TaskGlowRendererDeps {
   allSites(): readonly BuildSite[];
   /** Look up a build site by id. */
   siteById(id: string): BuildSite | undefined;
-  /** Look up a built campfire by id (undefined once gone) — for the queued-refuel outline. */
-  campfireById(id: string): CampfireUnit | undefined;
-  /** Look up a live barricade wall by id (undefined once gone) — for the queued-deconstruct outline. */
-  wallById(id: string): PlacedWall | undefined;
+  /** Look up a built structure by id (undefined once gone) — for the queued-refuel/deconstruct outline. */
+  structureById(id: string): PlacedStructure | undefined;
+  /** The world-AABB a queued-order outline should hug for a structure (StructureManager.highlightBounds,
+   *  dispatched to the owning behavior module — the campfire hugs base + flame, the wall its sprite). */
+  structureBounds(struct: PlacedStructure): Phaser.Geom.Rectangle;
   /** Base display scale for a node's sprite (see GameScene.nodeScale) — the glow halo's radius is
    *  converted to source texels through this, so it reads the same regardless of source resolution.
    *  Pass the instance's skin so a per-skin `scale` override sizes the halo correctly. */
@@ -77,11 +78,11 @@ export class TaskGlowRenderer {
         const site = this.deps.siteById(a.siteId);
         if (site && !site.done) site.rect.setStrokeStyle(2, COLORS.queued, 1);
       } else if (a.kind === 'refuel') {
-        const c = this.deps.campfireById(a.campfireId);
-        if (c) this.outlineCampfire(c);
+        const s = this.deps.structureById(a.campfireId);
+        if (s) this.outlineStructure(s);
       } else if (a.kind === 'deconstruct') {
-        const w = this.deps.wallById(a.wallId);
-        if (w) this.outlineWall(w);
+        const s = this.deps.structureById(a.wallId);
+        if (s) this.outlineStructure(s);
       } else {
         this.queueMarkers.push(
           this.scene.add
@@ -133,7 +134,7 @@ export class TaskGlowRenderer {
       // offset (this used to be a full 0.5) drops the halo below the integer tile-layer band: a node
       // near the top of the map sits at depth ~1.0x, so `-0.5` landed the halo at ~0.5x — under the
       // depth-1 ground layer — and shoreline/ground tiles drew over it (the halo read as "behind the
-      // tiles"). Mirrors CampfireManager stacking its flame `+ SUB_ROW_EPSILON` above its base.
+      // tiles"). Mirrors CampfireBehavior stacking its flame `+ SUB_ROW_EPSILON` above its base.
       .setDepth(tree.sprite.depth - SUB_ROW_EPSILON);
     this.glowSprites.set(tree.id, img);
     if (pulse) {
@@ -150,47 +151,18 @@ export class TaskGlowRenderer {
   }
 
   /**
-   * Outline a queued-for-refuel campfire: a yellow stroked rect hugging the fire sprite's actual
-   * rendered bounds (+ a small pad), so it tracks the fuel-scaled flame instead of dwarfing it — a
-   * fixed 2-tile column looked huge around the small flame. Deliberately a stroked rect, NOT a baked
-   * silhouette halo like {@link addTreeGlow}: the fire *animates* (its frame changes each tick) and
-   * *scales by fuel*, so a single-frame baked halo would freeze on one flame shape and drift out of
-   * sync — problems a static tree silhouette never has. Matches the queued-*site* stroke; pushed into
-   * `queueMarkers` so {@link reset} tears it down.
+   * Outline a structure queued for a worker order (refuel a campfire / deconstruct a wall, plan 037): a
+   * yellow stroked rect hugging the structure's rendered bounds (+ a small pad), so a marked target
+   * reads the same as a queued build. The bounds come from the owning behavior module
+   * (`deps.structureBounds` → StructureManager.highlightBounds): a campfire hugs the union of its
+   * ember base + fuel-scaled flame (so the box tracks the actual fire instead of a fixed tile column
+   * that dwarfed the small flame), a wall hugs its single sprite. Deliberately a stroked rect, NOT a
+   * baked silhouette halo like {@link addTreeGlow}: a fire *animates* + *scales by fuel* and a wall
+   * swaps HP-stage frames, so a single-frame baked halo would freeze on one shape and drift out of
+   * sync. Matches the queued-*site* stroke; pushed into `queueMarkers` so {@link reset} tears it down.
    */
-  outlineCampfire(c: CampfireUnit): void {
-    // Hug the union of the two layers' world AABBs (ember base + fuel-scaled flame) + a small pad, so
-    // the box tracks the actual fire instead of a fixed tile column (which dwarfed the small flame).
-    const b = c.sprite.getBounds();
-    const f = c.flame.getBounds();
-    const left = Math.min(b.left, f.left);
-    const right = Math.max(b.right, f.right);
-    const top = Math.min(b.top, f.top);
-    const bottom = Math.max(b.bottom, f.bottom);
-    const pad = 4;
-    const box = this.scene.add
-      .rectangle(
-        (left + right) / 2,
-        (top + bottom) / 2,
-        right - left + pad,
-        bottom - top + pad,
-        COLORS.queued,
-        0, // no fill — outline only
-      )
-      .setStrokeStyle(2, COLORS.queued, 1)
-      .setDepth(4);
-    this.queueMarkers.push(box);
-  }
-
-  /**
-   * Outline a wall queued for deconstruct (plan 037 2b): a yellow stroked rect hugging the barricade
-   * sprite's rendered bounds (+ a small pad) — the demolish analogue of {@link outlineCampfire}, so a
-   * marked-for-unbuild wall reads the same as a queued refuel/build target. A stroked rect (not a baked
-   * silhouette halo like {@link addTreeGlow}) keeps it simple and robust to the wall's HP-stage frame
-   * swaps; pushed into `queueMarkers` so {@link reset} tears it down.
-   */
-  outlineWall(w: PlacedWall): void {
-    const b = w.sprite.getBounds();
+  outlineStructure(struct: PlacedStructure): void {
+    const b = this.deps.structureBounds(struct);
     const pad = 4;
     const box = this.scene.add
       .rectangle(b.centerX, b.centerY, b.width + pad, b.height + pad, COLORS.queued, 0)

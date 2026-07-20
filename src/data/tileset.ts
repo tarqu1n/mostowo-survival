@@ -206,7 +206,7 @@ export interface TilesetManifest {
   /**
    * Placeable-station animations, keyed by station role — separate from `actors` since these aren't
    * characters. The campfire composites FOUR strips: a stone-ring `base` (always present, dimmed when
-   * out), a `flameLarge` + `flameSmall` pair (CampfireManager burns the large sheet above 50% fuel and
+   * out), a `flameLarge` + `flameSmall` pair (CampfireBehavior burns the large sheet above 50% fuel and
    * the small one below, so the flame steps down as it runs low), and a `smoke` plume drawn on top at
    * all times (plan 016 follow-up). Neither the base nor a flame reads right alone — the base is a flat
    * ember ring ("no flame") and a bare flame floats with no fuel under it — so we composite.
@@ -224,7 +224,7 @@ export interface TilesetManifest {
   /**
    * Placeable *structure* animations, keyed by structure role — a live/destructible buildable's art,
    * separate from `stations` (crafting stations) and `actors` (characters). The barricade wall
-   * composites nothing: WallManager makes ONE sprite per placed wall that plays a Build strip once,
+   * composites nothing: WallBehavior makes ONE sprite per placed wall that plays a Build strip once,
    * then settles on the Destroy strip's frame 0 (the intact idle) — the HP-stage hook steps the Destroy
    * strip toward rubble as HP drops. Full 4-way facing from three sheets each (down/up/side; left =
    * side flipped) for Build + Destroy, loaded cross-pack from `pack` (the boar precedent). Frame slicing
@@ -539,7 +539,7 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
     // base = Bonfire_01 (a ring of stones with glowing embers, 128×32 = 4 frames of 32×32) — the fire
     // costs stone to build, so the base reads as a stone fire-ring and is all that's left (dimmed) once
     // out. flameLarge = Fire_01 / flameSmall = Fire_02 (both 128×48 = 4 frames of 32 wide × 48 tall):
-    // CampfireManager burns the large sheet above 50% fuel and the small one below, so the flame visibly
+    // CampfireBehavior burns the large sheet above 50% fuel and the small one below, so the flame visibly
     // steps down as it runs low. smoke = Smoke-Sheet (same 32×48 grid) rides above the flame at all
     // times. frameWidth(32) ≠ frameSize(48) on the tall sheets, so both are declared (a bare
     // frameSize:48 would slice between frames).
@@ -571,7 +571,7 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
   },
   structures: {
     // Barricade wall (plan 037) — the open lashed-stake palisade `Traps/Barricades/*_2`, full 4-way
-    // (D=down/front, U=up/back, S=side; left reuses S flipped, see WallManager). Each orientation ships
+    // (D=down/front, U=up/back, S=side; left reuses S flipped, see WallBehavior). Each orientation ships
     // a Build (6f, played once on placement) + a Destroy (6f, frame 0 = intact idle → frame 5 = rubble)
     // sheet, 36w×64h frames throughout. Loaded cross-pack from craftpix-dungeon (via `pack`, not the
     // manifest base). Slicing verified in docs/wired-art.md.

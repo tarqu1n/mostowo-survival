@@ -120,7 +120,7 @@ export function registerActorAnims(scene: Phaser.Scene): void {
 
   // Campfire (station): four looping flickers — the stone-ring base, the large + small flame sheets,
   // and the smoke plume (plan 016 follow-up). Registered here alongside the actors so every anims.create
-  // lives in one guarded place; keys + frame counts come from the manifest. CampfireManager picks which
+  // lives in one guarded place; keys + frame counts come from the manifest. CampfireBehavior picks which
   // flame sheet + scale by fuel (anims are fuel-agnostic).
   const { base, flameLarge, flameSmall, smoke } = ACTIVE_TILESET.stations.campfire;
   for (const [key, strip] of [

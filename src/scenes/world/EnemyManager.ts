@@ -44,16 +44,16 @@ export interface EnemyManagerDeps {
    *  when none is lit. Shared across the tick (one hearth in the MVP); wave mobs (`seeksFire`) path to
    *  it + strike it. */
   litHearth(): { id: string; tile: Cell; pos: { x: number; y: number } } | null;
-  /** Drain `amount` fuel from the fire (→ CampfireManager.damageFire) — the fire-strike effect. */
+  /** Drain `amount` fuel from the fire (→ CampfireBehavior.damageFire) — the fire-strike effect. */
   attackFire(id: string, amount: number): void;
   /** Plan 037 chunk 2c — the live structure occupying `(col,row)` (today a wall), with the combat
    *  `defender` (armour + zeroed offence) and `thorns` a mob's strike needs; null when the tile holds
-   *  no structure. Assembled by GameScene closing over `wallManager`. */
+   *  no structure. Assembled by GameScene routing through the wall behavior module. */
   structureAt(
     col: number,
     row: number,
   ): { id: string; defender: CombatantStats; thorns: number } | null;
-  /** Deal `dmg` to the structure (→ WallManager.takeDamage); returns whether the blow destroyed it. */
+  /** Deal `dmg` to the structure (→ WallBehavior.takeDamage); returns whether the blow destroyed it. */
   attackStructure(id: string, dmg: number): boolean;
   /** Red flash + flinch on a sprite that took a survived hit (routes to CombatFxManager.flashHit) —
    *  reused for the thorns retaliation feedback, exactly as the player's melee/bow hit uses it. */

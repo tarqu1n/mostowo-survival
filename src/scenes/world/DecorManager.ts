@@ -9,7 +9,7 @@ import { resolveDecorDraw } from '../../render/decorSprites';
  * space with no actor layer to interleave with, so it can't be reused verbatim here. The live game
  * already has a small-integer depth convention instead — ground/tile layers `0..layers.length-1`
  * (`groundRenderer.drawMapLayers`), resource nodes + the campfire base at `~1`
- * (`ResourceNodeManager.addNode`, `CampfireManager`), actors `9..11` (`MonsterCharacter`/
+ * (`ResourceNodeManager.addNode`, `CampfireBehavior`), actors `9..11` (`MonsterCharacter`/
  * `PlayerCharacter`), and an above-actor `OVERHEAD_LAYER_DEPTH = 20` (`groundRenderer.ts`). Decor
  * (static rocks, a bonfire prop) belongs in the same ground-clutter band as resource nodes, so
  * `DEPTH_OBJECTS` is `1` here, not `1000` — a decor's own small `obj.depth` (e.g. `-1`/`0` in

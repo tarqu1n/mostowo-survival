@@ -71,6 +71,18 @@ single `structures` route. `CampfireManager` dissolves into the first behavior m
 → `PlacedStructure`; the `game.__test` wrapper signatures stay and re-point internally. Est. ~half a
 day, netted by the existing 216 unit + campfire e2e tests. Do NOT do it before #2 exists.
 
+**2026-07-20 — [DONE] (plan 037 step 3).** The trigger fired at buildable #2 = the barricade wall, so
+we folded BOTH campfire and wall into the generalisation in one pass. `src/scenes/world/StructureManager.ts`
+owns the homogeneous `PlacedStructure[]` behind a behavior registry (`register('campfire'|'wall', module)`
+in `buildWorld()`); `materialise` dispatches on `def.behavior`, and `tick`/`lightSources`/`reset`/`destroy`
+fan out (union) across modules. `CampfireManager`/`WallManager` dissolved into `CampfireBehavior`/`WallBehavior`
+(each a `StructureBehavior` with its own narrow deps); `CampfireUnit`/`PlacedWall` → `PlacedStructure<S>` +
+per-behavior `state` (`CampfireState`/`WallState`). Every aggregated consumer (ScenePicker pick, SurvivalClock/
+VisionController light, TaskGlowRenderer outline, `systems/stats`, EnemyManager fire/wall seam) routes through
+the single manager; behavior-specific ops reach the module via `structureManager.behavior<M>(id)`. The
+`game.__test` signatures are unchanged (re-pointed internally). Pure refactor — `refactor-tripwire` golden
+unchanged.
+
 ## 2026-07-13 — [DECIDED] GameScene decomposition part 2: 5 world-subsystem boundary rulings (plan 015)
 
 Continuing plan 013's manager extraction, plan 015 pulled the remaining state-owning world

@@ -21,55 +21,60 @@ import {
   campfireSmokeKey,
 } from '../../data/tileset';
 import { drainFuel, feedFuel, isLit, fuelFrac } from '../../systems/campfire';
-import type { CampfireUnit, BuildSite } from '../../entities/types';
+import { campfireStats } from '../../systems/stats';
+import type { InspectableStats } from '../../data/types';
+import type { CampfireStructure, BuildSite, PlacedStructure } from '../../entities/types';
 import type { GameScene } from '../GameScene';
+import type { LightSource, StructureBehavior } from './StructureManager';
 
 /** Stone-ring base render height in tiles (the flame's height comes from the buildable's `tilesTall`). */
 const EMBER_TILES = 2;
 
 /**
- * Narrow scene state {@link CampfireManager} needs but doesn't own — GameScene supplies these as
- * closures over its own private fields at construction (plan 013/015 coupling rules: managers get
+ * Narrow scene state {@link CampfireBehavior} needs but doesn't own — GameScene supplies these as
+ * closures over its own private fields at construction (plan 013/015 coupling rules: modules get
  * narrow interfaces, not raw field access). `spend` mirrors `systems/Inventory.ts`'s signature exactly
  * (rather than handing over the raw Inventory), matching how SurvivalClockDeps/BuildManagerDeps take
  * their cost closures — so the tap-to-feed spend reads as a one-line closure at the GameScene wiring.
  */
-export interface CampfireManagerDeps {
+export interface CampfireBehaviorDeps {
   /** Deduct `cost` (here always `{ wood: 1 }`) atomically; false (no-op) if unaffordable — feedAt's spend. */
   spend(cost: Record<string, number>): boolean;
 }
 
 /**
- * Campfires — the first live, per-frame-simulated buildable (plan 012). Owns the campfire collection
- * and each one's THREE stacked sprites — a stone-ring base + a flame over it + a smoke plume on top
- * (plan 016 follow-up) — so it is the sole writer of their anim/tint/scale and their sole destroyer. A
- * campfire is created by {@link materialise} when its build site completes (called
- * from `BuildManager.finishSite` via the scene-mediated `materialiseBuildable` dep — BuildManager
- * still owns the site rect + its occupancy/collision body, this manager owns only the visual + fuel).
+ * Campfires — the first live, per-frame-simulated buildable (plan 012), now the first
+ * {@link StructureBehavior} module in the StructureManager registry (plan 037). Owns the campfire
+ * collection and each one's THREE stacked sprites — a stone-ring base ({@link PlacedStructure.sprite})
+ * + a flame over it + a smoke plume on top (plan 016 follow-up) — so it is the sole writer of their
+ * anim/tint/scale and their sole destroyer. A campfire is created by {@link materialise} when its
+ * build site completes (routed from `BuildManager.finishSite` via the scene → `StructureManager.materialise`
+ * dispatch on `def.behavior` — BuildManager still owns the site rect + its occupancy/collision body,
+ * this module owns only the visual + fuel).
  *
  * Per-frame {@link tick} drains fuel, flips lit/unlit (dimming the base when spent), and drives the
  * flame from fuel (see {@link applyFlame}): the LARGE `Fire_01` sheet above 50% fuel (scaled a touch by
  * fuel), the SMALL `Fire_02` sheet below — a two-level swap, unlike the plan-012 single sheet, because
  * these two flame sheets ARE a clean ramp (the Bonfire_0x sheets weren't). The smoke drifts at all
- * times, fuel-agnostic. {@link feedOne} is
- * the single fuel/sprite write path — the GameScene `refuel` worker order feeds one wood per tick
- * through it (walk-adjacent-then-tend, like harvesting), and the DEV {@link feedAt} test seam delegates
- * to it. {@link lightSources} is the single light source the scene hands to BOTH SurvivalClock
- * (night-overlay mask holes) and VisionController (fog reveal) — no manager↔manager edge; the scene
- * mediates — and its radius lerps with fuel the same way the flame scale does.
+ * times, fuel-agnostic. {@link feedOne} is the single fuel/sprite write path — the GameScene `refuel`
+ * worker order feeds one wood per tick through it (walk-adjacent-then-tend, like harvesting), and the
+ * DEV {@link feedAt} test seam delegates to it. {@link lightSources} is the single light source the
+ * StructureManager hands to BOTH SurvivalClock (night-overlay mask holes) and VisionController (fog
+ * reveal) — no module↔consumer edge; the scene mediates — and its radius lerps with fuel the same way
+ * the flame scale does.
  *
- * Constructed fresh in `buildWorld()` each (re)start, alongside the other world managers.
+ * Constructed fresh in `buildWorld()` each (re)start and registered under `'campfire'`.
  *
- * **SHUTDOWN vs plain GameObjects — the trap for this manager.** The fire sprites are plain animated
+ * **SHUTDOWN vs plain GameObjects — the trap for this module.** The fire sprites are plain animated
  * Sprites (no Arcade body), but the rule from EnemyManager/SurvivalClock still applies: Phaser's own
- * scene teardown destroys every GameObject BEFORE this manager's SHUTDOWN listener runs (a fresh
- * CampfireManager is built by the next `buildWorld()`). So {@link destroy} may **only drop references**
- * — never call `sprite.destroy()` on the SHUTDOWN path (it pokes an already-destroyed sprite). This
- * differs from {@link reset}, which runs at RUNTIME (physics/scene alive) where `sprite.destroy()` IS
- * correct — that's the DEV-only scenario reset.
+ * scene teardown destroys every GameObject BEFORE StructureManager's SHUTDOWN listener fans {@link destroy}
+ * out (a fresh module is built by the next `buildWorld()`). So {@link destroy} may **only drop
+ * references** — never call `sprite.destroy()` on the SHUTDOWN path (it pokes an already-destroyed
+ * sprite). This differs from {@link reset}, which runs at RUNTIME (physics/scene alive) where
+ * `sprite.destroy()` IS correct — that's the DEV-only scenario reset.
  */
-export class CampfireManager {
-  private campfires: CampfireUnit[] = [];
+export class CampfireBehavior implements StructureBehavior {
+  private campfires: CampfireStructure[] = [];
   private nextId = 0;
   /** Last rounded fuel value broadcast on `fire:changed` (plan 038 Step 6) — throttles the per-frame
    *  drain so the HUD bar only re-renders on a visible change. `-1` = nothing emitted yet. */
@@ -77,15 +82,13 @@ export class CampfireManager {
 
   constructor(
     private readonly scene: GameScene,
-    private readonly deps: CampfireManagerDeps,
-  ) {
-    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.destroy());
-  }
+    private readonly deps: CampfireBehaviorDeps,
+  ) {}
 
   // --- Lifecycle -----------------------------------------------------------------
 
   /** Turn a completed campfire build site into a live, burning campfire: three bottom-anchored layers at
-   *  the fire's tile — a stone-ring `base` (fixed height), a `flame` lifted `CAMPFIRE_FLAME_RISE_PX`
+   *  the fire's tile — a stone-ring `sprite` base (fixed height), a `flame` lifted `CAMPFIRE_FLAME_RISE_PX`
    *  above it (large/small sheet + scale set by {@link applyFlame}), and a `smoke` plume above that
    *  (always drifting). Starts full + lit. */
   materialise(site: BuildSite): void {
@@ -122,17 +125,21 @@ export class CampfireManager {
       .setOrigin(0.5, originY);
     smoke.setScale((TILE_SIZE * tilesTall) / smoke.frame.height).play(campfireSmokeKey());
 
-    const c: CampfireUnit = {
+    const c: CampfireStructure = {
       id: `campfire-${this.nextId++}`,
+      buildableId: site.buildableId,
+      behavior: 'campfire',
       col: site.col,
       row: site.row,
       sprite: base,
-      flame,
-      smoke,
-      fuel: CAMPFIRE_FUEL_MAX,
-      lit: true,
-      flameBaseScale,
-      flameLevel: 'large',
+      state: {
+        flame,
+        smoke,
+        fuel: CAMPFIRE_FUEL_MAX,
+        lit: true,
+        flameBaseScale,
+        flameLevel: 'large',
+      },
     };
     this.applyFlame(c); // full tank → large sheet at native size
     this.campfires.push(c);
@@ -143,10 +150,10 @@ export class CampfireManager {
    *  — a single hearth in the MVP), or `null` when none exists (the HUD hides the bar). */
   private emitFire(): void {
     const c = this.campfires[0];
-    this.lastFireFuelEmit = c ? Math.round(c.fuel) : -1;
+    this.lastFireFuelEmit = c ? Math.round(c.state.fuel) : -1;
     this.scene.game.events.emit(
       'fire:changed',
-      c ? { fuel: c.fuel, maxFuel: CAMPFIRE_FUEL_MAX, lit: c.lit } : null,
+      c ? { fuel: c.state.fuel, maxFuel: CAMPFIRE_FUEL_MAX, lit: c.state.lit } : null,
     );
   }
 
@@ -158,15 +165,15 @@ export class CampfireManager {
    *  no-action early-return) so fuel drains whether or not a worker task is active. */
   tick(delta: number): void {
     for (const c of this.campfires) {
-      c.fuel = drainFuel(c.fuel, delta, CAMPFIRE_FUEL_BURN_PER_SEC);
-      if (c.lit && !isLit(c.fuel)) this.douse(c);
-      else if (!c.lit && isLit(c.fuel)) this.light(c);
-      else if (c.lit) this.applyFlame(c); // still lit — pick sheet + scale for the new fuel
+      c.state.fuel = drainFuel(c.state.fuel, delta, CAMPFIRE_FUEL_BURN_PER_SEC);
+      if (c.state.lit && !isLit(c.state.fuel)) this.douse(c);
+      else if (!c.state.lit && isLit(c.state.fuel)) this.light(c);
+      else if (c.state.lit) this.applyFlame(c); // still lit — pick sheet + scale for the new fuel
     }
     // Feed the HUD fire bar, throttled to the primary hearth's rounded fuel so it only re-renders on a
     // visible change (mirrors the hunger tick's rounded-emit — plan 038 Step 6).
     const primary = this.campfires[0];
-    if (primary && Math.round(primary.fuel) !== this.lastFireFuelEmit) this.emitFire();
+    if (primary && Math.round(primary.state.fuel) !== this.lastFireFuelEmit) this.emitFire();
   }
 
   /** Which flame sheet a given fuel level burns: the LARGE sheet at/above `CAMPFIRE_FLAME_LARGE_MIN_FRAC`
@@ -185,26 +192,26 @@ export class CampfireManager {
    *  small sheet stays native (its art already reads as a reduced flame, so we don't shrink it further).
    *  The stone base is fixed — only the flame changes. Sole flame texture/scale writer (drain in tick +
    *  the jump-up on feed both route here). */
-  private applyFlame(c: CampfireUnit): void {
-    const level = this.flameLevelFor(c.fuel);
-    if (level !== c.flameLevel) {
-      c.flameLevel = level;
-      c.flame.play({
+  private applyFlame(c: CampfireStructure): void {
+    const level = this.flameLevelFor(c.state.fuel);
+    if (level !== c.state.flameLevel) {
+      c.state.flameLevel = level;
+      c.state.flame.play({
         key: this.flameKeyFor(level),
-        startFrame: c.flame.anims.currentFrame?.index ?? 0,
+        startFrame: c.state.flame.anims.currentFrame?.index ?? 0,
       });
     }
     const topBand = Phaser.Math.Clamp(
-      (c.fuel / CAMPFIRE_FUEL_MAX - CAMPFIRE_FLAME_LARGE_MIN_FRAC) /
+      (c.state.fuel / CAMPFIRE_FUEL_MAX - CAMPFIRE_FLAME_LARGE_MIN_FRAC) /
         (1 - CAMPFIRE_FLAME_LARGE_MIN_FRAC),
       0,
       1,
     );
     const scale =
       level === 'large'
-        ? c.flameBaseScale * Phaser.Math.Linear(CAMPFIRE_FLAME_LARGE_SCALE_MIN, 1, topBand)
-        : c.flameBaseScale;
-    c.flame.setScale(scale);
+        ? c.state.flameBaseScale * Phaser.Math.Linear(CAMPFIRE_FLAME_LARGE_SCALE_MIN, 1, topBand)
+        : c.state.flameBaseScale;
+    c.state.flame.setScale(scale);
   }
 
   // --- Tap-to-feed ---------------------------------------------------------------
@@ -220,10 +227,10 @@ export class CampfireManager {
    *  it was out, and grow the flame to match the new fuel (the visible "fed it" pop). This is the single
    *  fuel/sprite write path: the refuel worker order calls it once per feed interval and the test seam
    *  routes through it too, so there is no parallel "instant feed" logic to drift from the real one. */
-  feedOne(c: CampfireUnit): boolean {
+  feedOne(c: CampfireStructure): boolean {
     if (!this.deps.spend({ wood: 1 })) return false; // no wood — no-op
-    c.fuel = feedFuel(c.fuel, CAMPFIRE_FUEL_PER_WOOD, CAMPFIRE_FUEL_MAX);
-    if (!c.lit && isLit(c.fuel)) this.light(c);
+    c.state.fuel = feedFuel(c.state.fuel, CAMPFIRE_FUEL_PER_WOOD, CAMPFIRE_FUEL_MAX);
+    if (!c.state.lit && isLit(c.state.fuel)) this.light(c);
     else this.applyFlame(c); // already lit → jump the flame up to the new fuel (may swap small→large)
     this.emitFire(); // refuel → bump the HUD fire bar (plan 038 Step 6)
     return true;
@@ -232,13 +239,13 @@ export class CampfireManager {
   /** Brief red "can't feed" blink for a refuel that can't proceed (bag empty, or the fire's already
    *  topped up), so an aborted refuel reads as a refusal rather than a dead tap; restores the real tint
    *  after (none if lit, ash-grey if out). */
-  flashNoFuel(c: CampfireUnit): void {
+  flashNoFuel(c: CampfireStructure): void {
     c.sprite.setTint(COLORS.ghostInvalid);
-    c.flame.setTint(COLORS.ghostInvalid);
+    c.state.flame.setTint(COLORS.ghostInvalid);
     this.scene.time.delayedCall(160, () => {
       if (!c.sprite.active) return; // torn down by a scenario reset before the blink cleared
-      c.flame.clearTint();
-      if (c.lit) c.sprite.clearTint();
+      c.state.flame.clearTint();
+      if (c.state.lit) c.sprite.clearTint();
       else c.sprite.setTint(0x555555);
     });
   }
@@ -255,32 +262,32 @@ export class CampfireManager {
   damageFire(id: string, amount: number): boolean {
     const c = this.campfireById(id);
     if (!c) return false;
-    c.fuel = Math.max(0, c.fuel - amount);
-    if (c.lit && !isLit(c.fuel))
+    c.state.fuel = Math.max(0, c.state.fuel - amount);
+    if (c.state.lit && !isLit(c.state.fuel))
       this.douse(c); // emptied → douse (same path as burn-out in tick)
-    else if (c.lit) this.applyFlame(c); // still lit → shrink the flame to the new fuel now, not next tick
+    else if (c.state.lit) this.applyFlame(c); // still lit → shrink the flame to the new fuel now, not next tick
     this.emitFire(); // mob attack drained the fire → update the HUD fire bar (plan 038 Step 6)
     return true;
   }
 
-  // --- Light source (read by SurvivalClock + VisionController via the scene) ------
+  // --- Light source (read by SurvivalClock + VisionController via StructureManager) -
 
-  /** World-space light discs this manager contributes — the behavior-neutral "light source" seam both
+  /** World-space light discs this behavior contributes — the behavior-neutral "light source" seam both
    *  the night-overlay mask (SurvivalClock) and the fog reveal (VisionController) fill circles from
-   *  (named for the concept it fulfils, not "campfires", so a future lamp/torch emitter aggregates into
-   *  the same scene closure without either consumer changing — see docs/DECISIONS.md). One disc per LIT
-   *  campfire; radius = the buildable's `light` (tiles) × TILE_SIZE, centred on the fire's base tile. */
-  lightSources(): readonly { x: number; y: number; radius: number }[] {
+   *  (a future lamp/torch emitter aggregates into the same StructureManager union without either
+   *  consumer changing — see docs/DECISIONS.md). One disc per LIT campfire; radius = the buildable's
+   *  `light` (tiles) × TILE_SIZE, centred on the fire's base tile. */
+  lightSources(): readonly LightSource[] {
     const base = (BUILDABLES.campfire.light ?? 0) * TILE_SIZE;
     return this.campfires
-      .filter((c) => c.lit)
+      .filter((c) => c.state.lit)
       .map((c) => ({
         x: tileToWorldCenter(c.col),
         y: tileToWorldCenter(c.row),
         // Radius lerps MIN_FRAC..1 with fuel — a dying fire's lit hole shrinks (plan 016). Read per
         // frame by SurvivalClock + VisionController, so it animates for free; fog reveal is one-way so a
         // shrinking radius never un-reveals ground already seen this frame.
-        radius: base * fuelFrac(c.fuel, CAMPFIRE_FUEL_MAX, CAMPFIRE_LIGHT_MIN_FRAC),
+        radius: base * fuelFrac(c.state.fuel, CAMPFIRE_FUEL_MAX, CAMPFIRE_LIGHT_MIN_FRAC),
       }));
   }
 
@@ -294,38 +301,57 @@ export class CampfireManager {
   // --- Queries -------------------------------------------------------------------
 
   /** Every campfire (raw backing array, not a copy). */
-  all(): CampfireUnit[] {
+  all(): CampfireStructure[] {
     return this.campfires;
   }
 
-  campfireAt(col: number, row: number): CampfireUnit | undefined {
+  campfireAt(col: number, row: number): CampfireStructure | undefined {
     return this.campfires.find((c) => c.col === col && c.row === row);
   }
 
   /** Look up a campfire by id (undefined once gone) — the refuel worker order re-resolves through this
    *  each frame so the executor tolerates a fire that's destroyed mid-order (future destructible fires). */
-  campfireById(id: string): CampfireUnit | undefined {
+  campfireById(id: string): CampfireStructure | undefined {
     return this.campfires.find((c) => c.id === id);
+  }
+
+  /** Inspect-panel stats for a picked campfire (dispatched here from StructureManager.stats). */
+  stats(struct: PlacedStructure): InspectableStats {
+    return campfireStats(struct as CampfireStructure);
+  }
+
+  /** The world-AABB a queued-refuel outline hugs: the union of the two layers' world AABBs (ember base
+   *  + fuel-scaled flame), so the box tracks the actual fire instead of a fixed tile column (which
+   *  dwarfed the small flame). Dispatched here from StructureManager.highlightBounds. */
+  highlightBounds(struct: PlacedStructure): Phaser.Geom.Rectangle {
+    const c = struct as CampfireStructure;
+    const b = c.sprite.getBounds();
+    const f = c.state.flame.getBounds();
+    const left = Math.min(b.left, f.left);
+    const right = Math.max(b.right, f.right);
+    const top = Math.min(b.top, f.top);
+    const bottom = Math.max(b.bottom, f.bottom);
+    return new Phaser.Geom.Rectangle(left, top, right - left, bottom - top);
   }
 
   // --- Reset / teardown ----------------------------------------------------------
 
   /** Douse: hide + stop the flame (the stone ring remains), and dim the base ash-grey (fuel is 0 here).
    *  Smoke keeps drifting — a doused fire still smoulders (smoke is always-on). */
-  private douse(c: CampfireUnit): void {
-    c.lit = false;
-    c.flame.stop();
-    c.flame.setVisible(false);
+  private douse(c: CampfireStructure): void {
+    c.state.lit = false;
+    c.state.flame.stop();
+    c.state.flame.setVisible(false);
     c.sprite.setTint(0x555555);
   }
 
   /** Light/relight: un-dim the stones, show + resume the flame on the sheet for the current fuel, and
    *  size it. */
-  private light(c: CampfireUnit): void {
-    c.lit = true;
+  private light(c: CampfireStructure): void {
+    c.state.lit = true;
     c.sprite.clearTint();
-    c.flameLevel = this.flameLevelFor(c.fuel);
-    c.flame.setVisible(true).play(this.flameKeyFor(c.flameLevel), true);
+    c.state.flameLevel = this.flameLevelFor(c.state.fuel);
+    c.state.flame.setVisible(true).play(this.flameKeyFor(c.state.flameLevel), true);
     this.applyFlame(c);
   }
 
@@ -337,8 +363,8 @@ export class CampfireManager {
   reset(): void {
     for (const c of this.campfires) {
       c.sprite.destroy();
-      c.flame.destroy();
-      c.smoke.destroy();
+      c.state.flame.destroy();
+      c.state.smoke.destroy();
     }
     this.campfires = [];
     this.nextId = 0;
@@ -346,13 +372,13 @@ export class CampfireManager {
   }
 
   /**
-   * SHUTDOWN: this run's campfire sprites are going away with the rest of this manager instance (a
-   * fresh CampfireManager is built by the next `buildWorld()`) — Phaser's own scene teardown already
-   * destroyed every sprite by the time this fires. So this only drops the stale references; it must
-   * NEVER call `sprite.destroy()` here (see class doc). Deliberately not `reset()` (that destroys
-   * sprites, only safe while the scene is alive).
+   * SHUTDOWN: this run's campfire sprites are going away with the rest of this module instance (a
+   * fresh module is built by the next `buildWorld()`) — Phaser's own scene teardown already destroyed
+   * every sprite by the time StructureManager fans this out. So this only drops the stale references;
+   * it must NEVER call `sprite.destroy()` here (see class doc). Deliberately not `reset()` (that
+   * destroys sprites, only safe while the scene is alive).
    */
-  private destroy(): void {
+  destroy(): void {
     this.campfires = [];
   }
 }

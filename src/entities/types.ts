@@ -52,65 +52,79 @@ export interface BuildSite {
   done: boolean;
   /** Placement facing for an `orientable` buildable (the wall) — stamped by `createBlueprint` from the
    *  build manager's rotate state (plan 037); undefined for a fixed-orientation buildable. Drives the
-   *  oriented sprite WallManager materialises (left = the side sheet flipped). */
+   *  oriented sprite WallBehavior materialises (left = the side sheet flipped). */
   facing?: FacingSpec;
 }
 
 /**
- * A built campfire in the world: its stacked fire sprites plus fuel/lit state. Owned by
- * CampfireManager, the sole writer of the sprites' anim/tint (and their sole destroyer). `fuel` drains
- * every frame; `lit` mirrors `fuel > 0` and drives the light it casts + its dim-out when spent. The
- * fire is THREE layered sprites: `sprite` is the stone-ring base (always present), `flame` is the
- * flame over it (large/small sheet + scale by fuel, hidden when out), and `smoke` is the plume above
- * (always drifting). CampfireManager picks the flame sheet + scale from fuel each tick (`flameBaseScale`
- * is its full-fuel fit).
+ * A built, live/simulated structure in the world — the generic runtime record every buildable with a
+ * `behavior` collapses into (plan 037: campfire + wall). Owned by a StructureManager behavior module
+ * (the sole writer of `sprite`'s anim/tint + the sole destroyer), keyed by its `behavior` for routing.
+ * `sprite` is the primary/base layer; each behavior's extra runtime state (fuel/flame for the campfire,
+ * hp/facing for the wall) lives in the strongly-typed `state`, so a homogeneous `PlacedStructure[]` can
+ * be iterated generically (pick/tick/reset) without losing per-behavior type safety at the module.
  */
-export interface CampfireUnit {
+export interface PlacedStructure<S = unknown> {
   id: string;
+  /** The `BUILDABLES` entry this was built from — drives per-struct data reads (light/tilesTall/…). */
+  buildableId: string;
+  /** The behavior module that owns this struct — the StructureManager dispatch key (`'campfire'`/`'wall'`). */
+  behavior: string;
   col: number;
   row: number;
-  /** Stone-ring ember base layer — always visible (dimmed when out). */
+  /** Primary/base sprite — the owning behavior module is its sole writer + destroyer. */
   sprite: Phaser.GameObjects.Sprite;
+  /** Behavior-owned runtime state (see {@link CampfireState}/{@link WallState}). */
+  state: S;
+}
+
+/**
+ * A campfire structure's runtime state (plan 012/016). The fire is THREE layered sprites: the
+ * {@link PlacedStructure.sprite} base is the stone ring (always present), `flame` is the flame over it
+ * (large/small sheet + scale by fuel, hidden when out), and `smoke` is the plume above (always
+ * drifting). `fuel` drains every frame; `lit` mirrors `fuel > 0` and drives the light it casts + its
+ * dim-out when spent. The campfire behavior module picks the flame sheet + scale from fuel each tick
+ * (`flameBaseScale` is its full-fuel fit).
+ */
+export interface CampfireState {
   /** Flame layer, drawn over the base — swaps large/small sheet + scales by fuel, hidden when out. */
   flame: Phaser.GameObjects.Sprite;
   /** Smoke plume, drawn above the flame — always visible/animating. */
   smoke: Phaser.GameObjects.Sprite;
   fuel: number;
   lit: boolean;
-  /** Flame's fitted full-fuel display scale — CampfireManager render state; the large sheet ×[MIN..1] by fuel. */
+  /** Flame's fitted full-fuel display scale — render state; the large sheet ×[MIN..1] by fuel. */
   flameBaseScale: number;
   /** Which flame sheet is currently rendered (large >50% fuel, small ≤50%) — swap state, so the anim isn't replayed every tick. */
   flameLevel: 'large' | 'small';
 }
+export type CampfireStructure = PlacedStructure<CampfireState>;
 
 /**
- * A built barricade wall in the world: its single oriented sprite + HP. Owned by WallManager, the sole
- * writer of the sprite's anim/frame (and its sole destroyer) — mirrors {@link CampfireUnit}. `hp` drops
- * when a mob attacks it (plan 037 chunk 2c wires the enemy); the HP-stage render steps the Destroy
- * sheet toward rubble, and at `hp <= 0` the wall plays the Destroy anim and is removed (its tile freed
- * through BuildManager). `facing` is the player-rotate placement facing (left = the side sheet flipped).
+ * A barricade wall structure's runtime state (plan 037). Its single oriented {@link PlacedStructure.sprite}
+ * is the wall behavior module's concern; `hp` drops when a mob attacks it (chunk 2c), the HP-stage render
+ * steps the Destroy sheet toward rubble, and at `hp <= 0` the wall plays the Destroy anim and is removed
+ * (its tile freed through BuildManager). `facing` is the player-rotate placement facing (left = the side
+ * sheet flipped).
  */
-export interface PlacedWall {
-  id: string;
-  col: number;
-  row: number;
+export interface WallState {
   facing: FacingSpec;
-  sprite: Phaser.GameObjects.Sprite;
   hp: number;
   maxHp: number;
 }
+export type WallStructure = PlacedStructure<WallState>;
 
 /**
  * What a pointer "raycast" landed on: the specific world entity whose *rendered sprite* is drawn
  * under the point (see {@link ScenePicker.pickSpriteAt}). `null` (the absence of a pick) means empty
- * ground — no interactive sprite there — and the caller falls back to a plain move-to-tile.
+ * ground — no interactive sprite there — and the caller falls back to a plain move-to-tile. A built
+ * campfire/wall both resolve to the one `structure` kind (behavior-branched by the consumer).
  */
 export type PointerPick =
   | { kind: 'tree'; tree: TreeNode }
   | { kind: 'enemy'; enemy: MonsterCharacter }
   | { kind: 'site'; site: BuildSite }
-  | { kind: 'campfire'; campfire: CampfireUnit }
-  | { kind: 'wall'; wall: PlacedWall };
+  | { kind: 'structure'; structure: PlacedStructure };
 
 /** Cardinal facing shorthand for {@link ScenarioSpec}, mapped to `lastFacing` deltas below. */
 export type FacingSpec = 'up' | 'down' | 'left' | 'right';
