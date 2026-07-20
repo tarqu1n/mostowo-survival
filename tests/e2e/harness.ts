@@ -129,6 +129,14 @@ export function enqueue(page: Page, action: Action): Promise<void> {
   return page.evaluate((a) => (window as any).game.__test.enqueue(a), action);
 }
 
+/** Relocate the enemy at `index` (sprite + logical tile) without a world reset. */
+export function moveEnemy(page: Page, index: number, col: number, row: number): Promise<boolean> {
+  return page.evaluate(
+    ({ index, col, row }) => (window as any).game.__test.moveEnemy(index, col, row),
+    { index, col, row },
+  );
+}
+
 /** Inspect the entity at a tile (same panel path as an Inspect-mode tap). */
 export function inspect(page: Page, col: number, row: number): Promise<void> {
   return page.evaluate(([c, r]) => (window as any).game.__test.inspect(c, r), [col, row] as const);

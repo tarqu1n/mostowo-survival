@@ -82,4 +82,7 @@ export interface GameTestApi {
   feedCampfire(index: number): boolean;
   /** The authored zone id at global tile `(col,row)`, `0` = no zone (plan 014 zones read path). */
   zoneAt(col: number, row: number): number;
+  /** DEV/test-only: relocate the enemy at `index` (sprite + body + logical tile) without a world
+   *  reset — lets a spec cross a distance threshold mid-test. Returns false if no such enemy. */
+  moveEnemy(index: number, col: number, row: number): boolean;
 }

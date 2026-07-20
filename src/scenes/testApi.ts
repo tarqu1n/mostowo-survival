@@ -374,6 +374,22 @@ export class TestApi {
     return this.deps.campfireManager.feedAt(c.col, c.row);
   }
 
+  /** DEV-only: relocate the enemy at `index` to a tile — sprite, physics body AND logical col/row —
+   *  so a spec can cross a distance threshold (e.g. the combat-active hysteresis band) mid-test
+   *  WITHOUT a world reset, which would clear the state hysteresis depends on. Returns false if no
+   *  such enemy. */
+  moveEnemy(index: number, col: number, row: number): boolean {
+    const z = this.deps.enemies()[index];
+    if (!z) return false;
+    const x = tileToWorldCenter(col);
+    const y = tileToWorldCenter(row);
+    z.sprite.setPosition(x, y);
+    z.sprite.body.reset(x, y);
+    z.col = col;
+    z.row = row;
+    return true;
+  }
+
   /** State snapshot for the Tier-2 Playwright suite + the smoke test. */
   debugState(): DebugState {
     const pc = this.deps.playerChar;

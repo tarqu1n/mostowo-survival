@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { startGame, applyScenario, emit, step, state, captured, order } from './harness';
+import { startGame, applyScenario, emit, step, state, captured, order, moveEnemy } from './harness';
 import { oneEnemy } from './scenarios';
 
 // Tier-2: the enemy AI + contact damage + Attack paths through the real scene. Damage/hit-chance math
@@ -341,4 +341,27 @@ test('the movepad drives the player directly, bypassing the pathfinder', async (
   const s = await state(page);
   expect(s.pcol).toBeGreaterThan(10); // moved east
   expect(s.currentKind).toBeNull(); // no task/path was involved
+});
+
+test('the auto-surface predicate has hysteresis — an enemy at the boundary does not flicker the controls (plan 035b playtest fix)', async ({
+  page,
+}) => {
+  await startGame(page);
+  // Enemy exactly at COMBAT_ACTIVE_RADIUS_TILES (7) east of the player → the controls engage.
+  await applyScenario(page, { player: [10, 10], enemies: [[17, 10]] });
+  await step(page, 50);
+  expect((await state(page)).combatActive).toBe(true);
+
+  // Relocate the enemy to 8 tiles away: past the activation radius (7) but inside the release band
+  // (7 + COMBAT_ACTIVE_HYSTERESIS_TILES = 10). WITHOUT hysteresis this would drop combatActive every
+  // frame it crossed the line; WITH it, the controls hold. (One frame can't clobber the injected
+  // tile — col/row only snap on reaching a waypoint, and updateCombatActive reads before the AI moves.)
+  expect(await moveEnemy(page, 0, 18, 10)).toBe(true);
+  await step(page, 16);
+  expect((await state(page)).combatActive).toBe(true);
+
+  // 11 tiles away: finally beyond the release radius (10) → the controls retract.
+  await moveEnemy(page, 0, 21, 10);
+  await step(page, 16);
+  expect((await state(page)).combatActive).toBe(false);
 });
