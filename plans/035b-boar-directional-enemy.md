@@ -100,7 +100,18 @@ an actor discriminator on `EnemyDef` + an id-keyed directional-actor map — so 
     player with correct 4-way facing, takes melee/bow damage and dies (reusing 035a's HP bar + bow); skeleton
     unchanged.
 
-- [ ] **Step 3: Boar telegraphed attack (real Attack anim)** `[inline]`
+- [x] **Step 3: Boar telegraphed attack (real Attack anim)** `[inline]`
+  - Outcome: `src/config.ts` — added `BOAR_ATTACK_WINDUP_MS` (250ms, sized to the 5-frame Attack anim at
+    20fps; punchier than the skeleton's 350). `MonsterCharacter.ts` — the contact-bite block now picks a
+    per-instance `windupMs` (`dir4Actor ? BOAR_ATTACK_WINDUP_MS : ENEMY_ATTACK_WINDUP_MS`), reusing 035a's
+    caller-side wind-up mechanism unchanged; `updateAnimDir4` plays the real `attack` sheet (one-shot, faced
+    from `dir4Facing`) whenever `windupUntil > 0` — the animation IS the tell, on top of the shared tint.
+    Strike lands on wind-up completion (damage + lunge), then back to idle/cooldown. Hurt-flinch left out
+    (plan-optional, not in done-when). NO DebugState/tripwire change needed — the wind-up+strike is asserted
+    via the existing `enemyWindups`/`enemyAttacks`/`playerHp` counters. Test: new Tier-2 spec in
+    `boar.spec.ts` (mid-wind-up with player unhurt, then the strike bites) — the unarmed dir4 path.
+    Verified: typecheck 0 new errors; vitest 806/806; boar e2e 5/5; skeleton wind-up regression (combat.spec)
+    - refactor-tripwire green; eslint clean; screenshot caught the boar mid-wind-up in its Attack pose + tint.
   - Use the boar's real **Attack** sheet as the wind-up tell via 035a's caller-side attack mechanism in
     `MonsterCharacter`: play the boar `attack` anim as the wind-up (propose a boar-specific
     `BOAR_ATTACK_WINDUP_MS`, likely a punchier charge than the skeleton), damage on the strike frame, then a

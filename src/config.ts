@@ -217,6 +217,15 @@ export const ENEMY_ATTACK_WINDUP_MS = 350;
 export const ENEMY_WINDUP_TINT = 0xffcc33;
 
 /**
+ * The boar's wind-up (plan 035b Step 3). A `dir4` mob with a real Attack sheet plays that animation AS
+ * the tell (richer than the skeleton's coded tint ramp), so its wind-up is sized to the anim: the boar
+ * Attack strip is 5 frames at `ACTION_ANIM_FRAMERATE` (20fps) ≈ 250ms, so the strike lands as the lunge
+ * completes. Punchier (quicker) than the skeleton's 350ms — the boar is a fast, committed charger.
+ * Playtest-tune. Carved from the tail of the bite cadence (`CONTACT_DAMAGE_COOLDOWN_MS`) like 035a.
+ */
+export const BOAR_ATTACK_WINDUP_MS = 250;
+
+/**
  * Auto-surfacing combat controls (plan 035a Step 3). The fighting HUD (left-thumb movepad + the
  * right-thumb Melee/Bow cluster) reveals itself — and the movepad becomes authoritative — whenever
  * combat is *active*: a live enemy within this Chebyshev tile radius of the player, OR the night

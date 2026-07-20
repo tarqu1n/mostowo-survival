@@ -3,6 +3,7 @@ import {
   UNARMED_BASE_DAMAGE,
   CONTACT_DAMAGE_COOLDOWN_MS,
   ENEMY_ATTACK_WINDUP_MS,
+  BOAR_ATTACK_WINDUP_MS,
   MONSTER_CHASE_DROP_RADIUS_PX,
   MONSTER_VEER_BAND_PX,
   MONSTER_VEER_MAX_TILES,
@@ -241,6 +242,10 @@ export class MonsterCharacter extends Character {
         // as a club); an unarmed monster falls back to the shared unarmed damage + contact cooldown.
         const baseDmg = this.weapon ? this.weapon.def.damage : UNARMED_BASE_DAMAGE;
         const cooldown = this.weapon ? this.weapon.def.attackMs : CONTACT_DAMAGE_COOLDOWN_MS;
+        // A dir4 mob (the boar) telegraphs with its real Attack sheet on a punchier wind-up; the flip3
+        // skeleton uses the shared coded-tint wind-up. updateAnimDir4 plays the Attack anim while
+        // `windupUntil > 0` (this same window), so the tell is the animation, not just the tint.
+        const windupMs = this.dir4Actor ? BOAR_ATTACK_WINDUP_MS : ENEMY_ATTACK_WINDUP_MS;
         if (this.windupUntil > 0) {
           // Mid wind-up: hold the tell until it completes, then STRIKE. The wind-up is carved out of
           // the tail of the cadence, so the strike still lands on schedule — just now with a warning.
@@ -253,10 +258,10 @@ export class MonsterCharacter extends Character {
             if (dmg > 0) env.onPlayerHurt(); // flash + camera kick + damage vignette when the bite lands
             env.damagePlayer(dmg);
           }
-        } else if (env.nowMs - this.lastContactAt >= cooldown - ENEMY_ATTACK_WINDUP_MS) {
+        } else if (env.nowMs - this.lastContactAt >= cooldown - windupMs) {
           // Cadence gate open → begin the wind-up telegraph (the player's cue to disengage).
-          this.windupUntil = env.nowMs + ENEMY_ATTACK_WINDUP_MS;
-          env.beginWindUp(this, ENEMY_ATTACK_WINDUP_MS);
+          this.windupUntil = env.nowMs + windupMs;
+          env.beginWindUp(this, windupMs);
         }
         this.updateAnim();
         return;
@@ -337,17 +342,19 @@ export class MonsterCharacter extends Character {
   private updateAnimDir4(): void {
     const v = this.sprite.body.velocity;
     const moving = v.lengthSq() > 1;
-    if (!moving) {
-      if (this.ai.mode === 'chase') {
-        // Stalled in melee while chasing: hold a still facing pose (Step 3 plays the real Attack anim).
-        this.sprite.anims.stop();
-        this.sprite.setTexture(dirEnemyAnimKey(this.def.id, 'idle', this.dir4Facing), 0);
-      } else {
-        this.sprite.anims.play(dirEnemyAnimKey(this.def.id, 'idle', this.dir4Facing), true);
-      }
+    if (moving) this.dir4Facing = facing4FromVelocity(v.x, v.y);
+    // Winding up a bite (plan 035b Step 3): play the real Attack sheet as the telegraph — a one-shot
+    // anim (`true` keeps it running rather than restarting each tick), facing the way it last charged so
+    // the lunge reads. This is the whole tell; the strike lands on wind-up completion (see update()).
+    if (this.windupUntil > 0) {
+      this.sprite.anims.play(dirEnemyAnimKey(this.def.id, 'attack', this.dir4Facing), true);
       return;
     }
-    this.dir4Facing = facing4FromVelocity(v.x, v.y);
+    if (!moving) {
+      // Stopped: gentle Idle bob (calm) or between-bite hold while chasing — either reads as "standing".
+      this.sprite.anims.play(dirEnemyAnimKey(this.def.id, 'idle', this.dir4Facing), true);
+      return;
+    }
     const state: DirEnemyState = this.ai.mode === 'chase' ? 'run' : 'walk';
     this.sprite.anims.play(dirEnemyAnimKey(this.def.id, state, this.dir4Facing), true);
   }

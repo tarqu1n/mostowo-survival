@@ -67,6 +67,33 @@ test('a boar takes melee hits and dies onto its Death strip (the dir4 die path)'
   expect(s.corpses).toBe(1); // lingers as a corpse on its Death collapse, like the skeleton
 });
 
+test('a boar telegraphs a wind-up (its Attack anim) before its bite lands (plan 035b)', async ({
+  page,
+}) => {
+  await startGame(page);
+  // Boar already adjacent + chasing. Unarmed (natural bite), so it uses the contact cadence with a
+  // punchier BOAR_ATTACK_WINDUP_MS tell. dodge 0 → the bite always connects once it strikes.
+  await applyScenario(page, {
+    player: [10, 10],
+    enemies: [{ at: [11, 10], id: 'boar', mode: 'chase' }],
+  });
+  const before = (await state(page)).playerHp;
+
+  // Drive in slices finer than the wind-up and prove the ordering: at some slice the boar is mid-wind-up
+  // with the player still unhurt (a readable window to disengage), and only later does HP drop. Same
+  // shape as the skeleton wind-up test, but exercising the unarmed dir4 path (Attack anim as the tell).
+  let sawWindupBeforeDamage = false;
+  let damageLanded = false;
+  for (let i = 0; i < 40 && !damageLanded; i++) {
+    await step(page, 50);
+    const s = await state(page);
+    if (s.enemyWindups > 0 && s.playerHp === before) sawWindupBeforeDamage = true;
+    if (s.playerHp < before) damageLanded = true;
+  }
+  expect(sawWindupBeforeDamage).toBe(true); // wound up with no damage yet — the disengage window
+  expect(damageLanded).toBe(true); // the strike eventually bit
+});
+
 test('a boar takes bow damage from range (reuses the 035a bow)', async ({ page }) => {
   await startGame(page);
   // Boar 5 tiles north — inside bow range (6), never adjacent. Player faces up, no movepad drive.
