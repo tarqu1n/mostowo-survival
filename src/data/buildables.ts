@@ -62,10 +62,11 @@ export const BUILDABLES: Record<string, BuildableDef> = {
     blocksPath: false,
     behavior: 'trap',
     animKey: 'spikeTrap', // truthy → routes through the animated-buildable branch (like the campfire)
-    // Rendered ~2 tiles tall (32px art at native scale 1) + bottom-anchored, so the spikes rise UP out
-    // of the foot tile and read against the dark ground (the half-size 1-tile decal was too small to
-    // see — owner feedback). The pick column spans those 2 rows. It still occupies ONE logical tile.
+    // Rendered ~2 tiles tall (32px art at native scale 1) so it reads against the dark ground (the
+    // half-size 1-tile decal was too small — owner feedback), but CENTRED on its tile (originY 0.5) so
+    // the spikes sit ON the square you build it on, not floating above it (bottom-anchoring pushed the
+    // art up off the tile). The pick column spans those 2 rows; it still occupies ONE logical tile.
     tilesTall: 2,
-    originY: 0.9,
+    originY: 0.5,
   },
 };

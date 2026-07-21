@@ -248,6 +248,11 @@ like the campfire.
 > plus a **×1.35 scale-punch on the strike**. Verified in-engine — the armed trap now reads as a clear
 > spike cluster on the ground and the strike (mob hit-flash + spikes punching up over it) is unmistakable.
 > `buildables.ts` + `TrapBehavior.ts` + `docs/wired-art.md`.
+>
+> **Centering fix.** The bottom-anchor (`originY:0.9`) drew the now-2-tile sprite ~1.5 tiles ABOVE the
+> tile, so the spikes no longer sat on the built square (owner feedback). Re-centred on the tile
+> (`originY:0.5`), keeping the bigger size — verified with a tile-centre marker (spikes now straddle the
+> square's centre). `buildables.ts` + `TrapBehavior.ts`.
 
 ## Out of scope
 

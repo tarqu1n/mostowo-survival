@@ -243,9 +243,11 @@ wall/gate/trap render steps read paths + frames from.
     sit at ground depth, mobs at 9) and is invisible, which is what the first cut shipped.
   - **Sheet + size (owner call, 2026-07-21):** stay on `Traps/Spikes/2` (wood-tone) — the brighter
     white/metal variants (`Spikes/3`/`4`) were offered but declined. Visibility comes from **size** instead:
-    the trap renders **~2 tiles tall, bottom-anchored** (`tilesTall:2`, `originY:0.9`, 32px art at native
-    scale 1 — up from the too-small 1-tile/half-scale first cut) with a **scale-punch (×1.35) on the
-    strike**. The damage **hit-flash** on the struck mob is the dominant "it fired" cue.
+    the trap renders **~2 tiles tall** (`tilesTall:2`, 32px art at native scale 1 — up from the too-small
+    1-tile/half-scale first cut) but **centred on its tile** (`originY:0.5`) so the spikes sit ON the built
+    square rather than floating above it (an initial `originY:0.9` bottom-anchor pushed the art ~1.5 tiles
+    up off the tile — owner feedback), with a **scale-punch (×1.35) on the strike**. The damage
+    **hit-flash** on the struck mob is the dominant "it fired" cue.
 - **Deferred siblings (catalogued so a later session doesn't re-discover them):** same `Traps/` folder
   — `Lightning`, `Barrel` (+`Boom`), and `Barricades/Archer` (turret + its `Arrow` projectile). Not
   wired by plan 037; only the spike trap ships now.

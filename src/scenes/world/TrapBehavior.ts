@@ -15,10 +15,10 @@ import type { TrapStructure, BuildSite, PlacedStructure } from '../../entities/t
 import type { GameScene } from '../GameScene';
 import type { StructureBehavior } from './StructureManager';
 
-/** Default bottom-anchor + height (tiles) the spike sprite scales to when the buildable omits them —
- *  the buildable sets these (tilesTall 2, originY 0.9) so the 32px spike frame renders ~2 tiles tall,
- *  bottom-anchored, rising out of the foot tile (the 1-tile half-scale decal was too small to see). */
-const TRAP_ORIGIN_Y = 0.9;
+/** Default origin + height (tiles) the spike sprite scales to when the buildable omits them — the
+ *  buildable sets these (tilesTall 2, originY 0.5) so the 32px spike frame renders ~2 tiles tall (reads
+ *  against the dark ground) but CENTRED on its tile (spikes sit ON the built square, not floating above). */
+const TRAP_ORIGIN_Y = 0.5;
 const TRAP_TILES_TALL = 2;
 
 /** Depth the spike sprite jumps to for the strike beat so the spikes punch up **over** the mob standing
