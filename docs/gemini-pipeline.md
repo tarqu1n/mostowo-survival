@@ -41,3 +41,28 @@ automates:
 > cloud/other devices just consume them. `--dry-run` composes prompts with no key and no spend.
 > This pipeline currently targets **item icons**; non-item art (tiles/mobs/stations) has its own
 > paths (the RD/PixelLab trials above, `scripts/pixel-crawler/` extraction).
+
+## Character animation via image-to-image (Rogue attack — 2026-07-21)
+
+The Rogue NPC (plan 042) ships no attack strip. We generated one with the same Gemini
+endpoint but **image-to-image**: feed the model the Rogue's own idle sprite as an inline
+image so it re-poses the *same* character instead of inventing one — this is what makes the
+output actually match. A tuned single-row prompt ("one horizontal row of N equal frames,
+one shared feet baseline, flat/chunky low-detail") yields a clean, ordered overhead-slash
+strip (other approaches — recolour-graft onto Body_A, literal part-graft, self-inferred
+whole-body transform — were tried first and read worse; Gemini won on character fidelity).
+
+Two scripts under `scripts/pixel-crawler/`:
+
+- **`gen_rogue_gemini.py`** — sends the idle sprite + prompt variants, saves raw ~1024px
+  strips to the gitignored `scripts/.gen-icons/raw/` scratch. Needs `GEMINI_API_KEY`
+  (fetch from guppi's `~/house-helper/.env`; `--dry-run` needs no key). Pick the best raw.
+- **`process_gemini.py`** — turns a chosen raw strip into a committed pack-matching sheet:
+  key out magenta → split the row into per-figure columns → **alpha-bleed defringe** (kills
+  the anti-aliased magenta halo before downscaling) → one shared downscale to ~pack height →
+  hard alpha → gentle colour-grade + shared palette quantise (the style-match that makes the
+  HD gen read as pack art) → baseline-align. Runs anywhere (no key).
+
+Only the processed sheet is committed (`_derived/rogue/Slice_Side-Sheet.png`, 5f @ 56px); the
+raws stay gitignored scratch. Re-run `gen_rogue_gemini.py` (with the key) then
+`process_gemini.py` to regenerate. **Not yet wired into the game** — asset only.
