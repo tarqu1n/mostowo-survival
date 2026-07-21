@@ -324,7 +324,17 @@ delegate lanes — just driven inline, not blind-delegated.
   - Docs: none inline.
   - Done when: `refactor-tripwire.spec.ts` + combat/death/boar e2e green, full gate green.
 
-- [ ] **Step 12: Split `UIScene.ts` into per-widget builders** `[delegate]` (parallel: C)
+- [x] **Step 12: Split `UIScene.ts` into per-widget builders** `[delegate]` (parallel: C)
+  - Outcome: `UIScene.ts` 1389 → **352 lines**, still the composition root (keeps export, `hudHitTest`/
+    `isMovepadHeld`, all bus on/off + inventory `'change'` sub + SHUTDOWN teardown, cross-widget state).
+    11 `src/scenes/hud/` modules: `types.ts`, `HudBars`, `WellbeingPanel`, `InventoryWidget`, `BuildControls`,
+    `CombatControls`, `InspectPanel`, `ModeControls`, `TopCenterControls`, `DevMenu`, `NpcAssignMenu` — each
+    owns its GameObjects + `onXChanged` handlers; widgets push interactive els back via an `addHudElement`
+    closure so the single `hudElements` hit-region list stays authoritative on UIScene. Widgets typed against
+    `Phaser.Scene` (no circular import). **ALL 37 game.events + 7 registry keys byte-identical (diff-verified);
+    every `on` matched by identical `off`.** tsc 0 errors; 911 unit tests pass; eslint clean (39 pre-existing
+    unbound-method warns). Watch in smoke/e2e: movepad reset-on-hide reordered inside `setControlsVisible`
+    (movepad-internal only), layout consts now replicated per-widget (pixel-identical). smoke + HUD e2e = net.
   - Break the ~490-line `create()` (`:180-672`) and the ~50 fields into `src/scenes/hud/` modules
     per widget — build-palette (+rotate), wellbeing panel (+eat rows), HUD bars (HP/food/fire),
     combat controls (movepad + action cluster), inspect panel, dev menu, mode indicators — each owning
