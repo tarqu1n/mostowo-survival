@@ -229,10 +229,10 @@
     },
     {
       "id": "berryBush",
-      "name": "Berry Bush",
+      "name": "Berry Bush (Small)",
       "maxHp": 1,
       "yieldItemId": "berries",
-      "yieldPerHit": 2,
+      "yieldPerHit": 3,
       "regrowMs": 300000,
       "blocksPath": false,
       "harvestAnim": "gather",
@@ -243,7 +243,65 @@
       "skins": [
         {
           "id": "default",
-          "asset": "pixel-crawler/_derived/bush.png"
+          "asset": "craftpix-nature/Bushes/Bush_orange_bare3.png",
+          "region": {
+            "x": 1,
+            "y": 0,
+            "w": 15,
+            "h": 14
+          }
+        }
+      ]
+    },
+    {
+      "id": "berryBushMed",
+      "name": "Berry Bush (Medium)",
+      "maxHp": 1,
+      "yieldItemId": "berries",
+      "yieldPerHit": 5,
+      "regrowMs": 300000,
+      "blocksPath": false,
+      "harvestAnim": "gather",
+      "color": 4156724,
+      "stumpColor": 4872762,
+      "originX": 0.5,
+      "originY": 0.72,
+      "skins": [
+        {
+          "id": "default",
+          "asset": "craftpix-nature/Bushes/Bush_orange_bare2.png",
+          "region": {
+            "x": 3,
+            "y": 2,
+            "w": 26,
+            "h": 26
+          }
+        }
+      ]
+    },
+    {
+      "id": "berryBushBig",
+      "name": "Berry Bush (Big)",
+      "maxHp": 1,
+      "yieldItemId": "berries",
+      "yieldPerHit": 7,
+      "regrowMs": 300000,
+      "blocksPath": false,
+      "harvestAnim": "gather",
+      "color": 4156724,
+      "stumpColor": 4872762,
+      "originX": 0.5,
+      "originY": 0.72,
+      "skins": [
+        {
+          "id": "default",
+          "asset": "craftpix-nature/Bushes/Bush_orange_bare1.png",
+          "region": {
+            "x": 14,
+            "y": 14,
+            "w": 35,
+            "h": 34
+          }
         }
       ]
     }

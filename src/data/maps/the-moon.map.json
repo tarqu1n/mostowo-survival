@@ -3275,7 +3275,7 @@
     {
       "id": "node_0039",
       "kind": "node",
-      "ref": "berryBush",
+      "ref": "berryBushMed",
       "col": 113,
       "row": 141,
       "skin": "default"
@@ -3291,7 +3291,7 @@
     {
       "id": "node_0041",
       "kind": "node",
-      "ref": "berryBush",
+      "ref": "berryBushBig",
       "col": 114,
       "row": 142,
       "skin": "default"

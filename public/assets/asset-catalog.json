@@ -26066,6 +26066,66 @@
       "origin": "pack"
     },
     {
+      "id": "craftpix-nature/Bushes/Bush_orange_bare1.png",
+      "pack": "craftpix-nature",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Bushes/Bush_orange_bare1.png"
+      },
+      "w": 64,
+      "h": 64,
+      "category": "Bushes",
+      "tags": [
+        "bare1",
+        "bush",
+        "bushes",
+        "orange"
+      ],
+      "origin": "pack"
+    },
+    {
+      "id": "craftpix-nature/Bushes/Bush_orange_bare2.png",
+      "pack": "craftpix-nature",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Bushes/Bush_orange_bare2.png"
+      },
+      "w": 32,
+      "h": 32,
+      "category": "Bushes",
+      "tags": [
+        "bare2",
+        "bush",
+        "bushes",
+        "orange"
+      ],
+      "origin": "pack"
+    },
+    {
+      "id": "craftpix-nature/Bushes/Bush_orange_bare3.png",
+      "pack": "craftpix-nature",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Bushes/Bush_orange_bare3.png"
+      },
+      "w": 16,
+      "h": 16,
+      "category": "Bushes",
+      "tags": [
+        "bare3",
+        "bush",
+        "bushes",
+        "orange"
+      ],
+      "origin": "pack"
+    },
+    {
       "id": "craftpix-nature/Bushes/Bush_orange_flowers1.png",
       "pack": "craftpix-nature",
       "type": "object",
