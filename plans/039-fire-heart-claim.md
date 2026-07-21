@@ -1,6 +1,6 @@
 # Fire-Heart Claim & the Lit Sightline — the Fire's Light Is Both Base and Vision
 
-> Status: in review
+> Status: deployed
 
 ## Summary
 
