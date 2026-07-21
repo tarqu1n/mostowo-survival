@@ -233,10 +233,14 @@ wall/gate/trap render steps read paths + frames from.
   - **FINALISED (plan 040, 2026-07-20):** frame roles pinned (opaque-pixel measure confirms the
     symmetric profile: f0=36 f1=94 f2=169 f3=156 f4=94 f5=36). **Armed = frame 1** (spikes low/primed —
     deliberately *not* frame 0, which is flush/near-invisible, so a placed trap reads on the map).
-    **Trigger = play armed→frame 2** (the extend/strike), apply `SPIKE_TRAP_DAMAGE` at the peak
-    (frame 2). **Spent = frame 2 held** (fully extended/stuck up — clear "fired" read vs the low
-    armed frame). **Re-arm = frame 2 → frame 1** (retract to primed). Frames 3–5 are unused (the
-    strike only needs the extend half). Only frames 1 & 2 are load-bearing state frames.
+    **Spent = frame 2 held** (fully extended/stuck up — clear "fired" read vs the low armed frame).
+  - **Animation revised (plan 040 polish, 2026-07-21) — use the strip + fix the occlusion.** The strike
+    now plays the **rise 0→2** (a flush→low→peak *coil-then-slam*, `spikeTrapExtendKey`) and holds the
+    peak; re-arm plays the strip's **descent 2→4** (`spikeTrapRetractKey`, spikes wind back down) then
+    settles on the armed frame. So frames **0–4 are all used** (only f5, a duplicate flush, is not).
+    Critically, the sprite jumps to a **high depth (over mobs) for the strike beat** and drops back to
+    ground depth once settled — otherwise the strike renders *behind* the mob standing on the tile (traps
+    sit at ground depth, mobs at 9) and is invisible, which is what the first cut shipped.
 - **Deferred siblings (catalogued so a later session doesn't re-discover them):** same `Traps/` folder
   — `Lightning`, `Barrel` (+`Boom`), and `Barricades/Archer` (turret + its `Arrow` projectile). Not
   wired by plan 037; only the spike trap ships now.

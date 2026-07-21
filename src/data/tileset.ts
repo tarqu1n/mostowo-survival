@@ -697,15 +697,23 @@ export const barricadeDestroyKey = (facing: Facing): string => `barricade-destro
  *  `structures.spikeTrap`. */
 export const spikeTrapKey = (): string => 'spike-trap';
 
-/** Anim key for the spike trap's extend/strike (armed frame → peak) — played once on trigger, after
- *  which the sprite holds the spent (extended) frame. See `structures.spikeTrap` + docs/wired-art.md. */
+/** Anim key for the spike trap's extend/**strike** — the coil-then-slam (flush → low → peak, frames
+ *  0→2), played once on trigger; the sprite then holds the spent (extended peak) frame. Raised over the
+ *  triggering mob for the strike beat so the spikes punch up in front of it. See `structures.spikeTrap`. */
 export const spikeTrapExtendKey = (): string => 'spike-trap-extend';
 
+/** Anim key for the spike trap's **retract** — the wind-down (peak → high → low, frames 2→4) played
+ *  once when a worker re-arms a spent trap, settling back on the armed frame. The strip's descent half,
+ *  which the strike doesn't use (spent stays extended). See `structures.spikeTrap`. */
+export const spikeTrapRetractKey = (): string => 'spike-trap-retract';
+
 /** Spike-trap frame roles (plan 040, pinned in docs/wired-art.md). ARMED = a low/primed frame
- *  (deliberately NOT the flush frame 0, so a placed trap reads on the map); the strike animates
- *  ARMED → PEAK; spent holds PEAK (fully extended). */
+ *  (deliberately NOT the flush frame 0, so a placed trap reads on the map); the strike animates the
+ *  rise 0→PEAK; spent holds PEAK (fully extended); re-arm plays the descent PEAK→4 back to a low pose. */
 export const SPIKE_TRAP_ARMED_FRAME = 1;
 export const SPIKE_TRAP_PEAK_FRAME = 2;
+/** Frame the re-arm descent settles near (a low/primed pose, opaque-px-equal to the armed frame). */
+export const SPIKE_TRAP_SETTLE_FRAME = 4;
 
 /** Texture key for an item's icon image (loaded from `public/assets/icons/<icon>`). */
 export const iconKey = (id: string): string => `icon:${id}`;

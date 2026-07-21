@@ -3,7 +3,12 @@ import { TILE_SIZE, SPIKE_TRAP_DAMAGE } from '../../config';
 import { tileToWorldCenter } from '../../systems/grid';
 import { rowDepthOffset } from '../../systems/mapFormat';
 import { BUILDABLES } from '../../data/buildables';
-import { spikeTrapKey, spikeTrapExtendKey, SPIKE_TRAP_ARMED_FRAME } from '../../data/tileset';
+import {
+  spikeTrapKey,
+  spikeTrapExtendKey,
+  spikeTrapRetractKey,
+  SPIKE_TRAP_ARMED_FRAME,
+} from '../../data/tileset';
 import { trapStats } from '../../systems/stats';
 import type { InspectableStats } from '../../data/types';
 import type { TrapStructure, BuildSite, PlacedStructure } from '../../entities/types';
@@ -14,6 +19,15 @@ import type { StructureBehavior } from './StructureManager';
  *  a single-tile floor decal (the 32px spike frame fits one 16px tile at scale 0.5). */
 const TRAP_ORIGIN_Y = 0.5;
 const TRAP_TILES_TALL = 1;
+
+/** Depth the spike sprite jumps to for the strike beat so the spikes punch up **over** the mob standing
+ *  on the tile (mobs draw at depth 9, the player at 10, held weapons ~11–12) — otherwise the strike
+ *  plays at the trap's ground depth, hidden behind the body. Restored to the ground depth once settled. */
+const TRAP_STRIKE_DEPTH = 15;
+
+/** A trap's resting (ground) depth — the one-row y-sort band trees/walls/campfire share (plan 029/5b),
+ *  well below mobs so a standing enemy draws over the resting trap. */
+const groundDepth = (row: number): number => 1 + rowDepthOffset(row);
 
 /**
  * Narrow scene state {@link TrapBehavior} needs but doesn't own — GameScene supplies these as closures
@@ -81,7 +95,7 @@ export class TrapBehavior implements StructureBehavior {
     // spikes. Start on the armed frame (not the extend anim) — a placed trap is primed, not striking.
     const sprite = this.scene.add
       .sprite(x, y, spikeTrapKey(), SPIKE_TRAP_ARMED_FRAME)
-      .setDepth(1 + rowDepthOffset(site.row))
+      .setDepth(groundDepth(site.row))
       .setOrigin(0.5, originY);
     sprite.setScale((TILE_SIZE * tilesTall) / sprite.frame.height);
 
@@ -111,22 +125,33 @@ export class TrapBehavior implements StructureBehavior {
     }
   }
 
-  /** Spring a trap: flip it spent + play the extend/strike (armed → peak), which holds the extended
-   *  spent frame on completion. Sole spent-transition path (tick's trigger routes here). */
+  /** Spring a trap: flip it spent + play the coil-then-slam strike (flush→low→peak), holding the
+   *  extended spent frame. The sprite jumps to {@link TRAP_STRIKE_DEPTH} for the strike so the spikes
+   *  punch up OVER the mob on the tile (they'd otherwise play hidden behind it at ground depth), then
+   *  drops back to the ground depth once the strike settles. Sole spent-transition path (tick routes
+   *  here). Guard the completion callback with `sprite.active` — a scenario reset may destroy it mid-anim. */
   private trip(t: TrapStructure): void {
     t.state.armed = false;
-    t.sprite.play(spikeTrapExtendKey());
+    t.sprite.setDepth(TRAP_STRIKE_DEPTH).play(spikeTrapExtendKey());
+    t.sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      if (t.sprite.active) t.sprite.setDepth(groundDepth(t.row));
+    });
   }
 
-  /** Re-arm a spent trap: snap the sprite back to the armed frame + flip `armed` true. No-op (returns
-   *  false) if `id` is unknown (a trap gone mid-order — tolerated, like wallById's consumers) or the
-   *  trap is already armed. Driven by the GameScene `rearm` worker order (dawn auto-enqueue + tap). */
+  /** Re-arm a spent trap: flip `armed` true and play the wind-down (peak→low, the strip's descent
+   *  half), settling on the canonical armed frame when it completes. No-op (returns false) if `id` is
+   *  unknown (a trap gone mid-order — tolerated, like wallById's consumers) or the trap is already
+   *  armed. Driven by the GameScene `rearm` worker order (dawn auto-enqueue + tap). */
   rearm(id: string): boolean {
     const t = this.trapById(id);
     if (!t || t.state.armed) return false;
-    t.sprite.stop();
-    t.sprite.setTexture(spikeTrapKey(), SPIKE_TRAP_ARMED_FRAME);
     t.state.armed = true;
+    t.sprite.play(spikeTrapRetractKey());
+    t.sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      if (!t.sprite.active) return; // torn down by a scenario reset before the wind-down finished
+      t.sprite.stop();
+      t.sprite.setTexture(spikeTrapKey(), SPIKE_TRAP_ARMED_FRAME);
+    });
     return true;
   }
 

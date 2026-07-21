@@ -15,8 +15,9 @@ import {
   barricadeDestroyKey,
   spikeTrapKey,
   spikeTrapExtendKey,
-  SPIKE_TRAP_ARMED_FRAME,
+  spikeTrapRetractKey,
   SPIKE_TRAP_PEAK_FRAME,
+  SPIKE_TRAP_SETTLE_FRAME,
   type Facing,
   type Facing4,
   type DirEnemyState,
@@ -162,18 +163,30 @@ export function registerActorAnims(scene: Phaser.Scene): void {
     }
   }
 
-  // Spike trap (structure, plan 040): the extend/strike anim (armed frame → peak), played ONCE on
-  // trigger; the sprite otherwise sits on a static armed/spent frame TrapBehavior sets directly, so
-  // only this sub-range (not the full 6-frame retract→extend→retract) is registered. Guarded like the
-  // blocks above; one-shot (repeat 0) so the last (peak) frame holds as the spent look.
+  // Spike trap (structure, plan 040): two one-shot slices of the 6-frame strip, both timed to the
+  // config strike beat. EXTEND = the coil-then-slam strike (flush→low→peak, frames 0→2), played on
+  // trigger and held on the peak (spent) frame. RETRACT = the wind-down (peak→high→low, frames 2→4)
+  // played when a worker re-arms a spent trap, settling near the low/primed frame. repeat 0 so each
+  // holds its last frame. Guarded like the blocks above.
   if (!scene.anims.exists(spikeTrapExtendKey())) {
     scene.anims.create({
       key: spikeTrapExtendKey(),
       frames: scene.anims.generateFrameNumbers(spikeTrapKey(), {
-        start: SPIKE_TRAP_ARMED_FRAME,
+        start: 0,
         end: SPIKE_TRAP_PEAK_FRAME,
       }),
       duration: SPIKE_TRAP_TRIGGER_MS, // the strike beat (config), not the shared action framerate
+      repeat: 0,
+    });
+  }
+  if (!scene.anims.exists(spikeTrapRetractKey())) {
+    scene.anims.create({
+      key: spikeTrapRetractKey(),
+      frames: scene.anims.generateFrameNumbers(spikeTrapKey(), {
+        start: SPIKE_TRAP_PEAK_FRAME,
+        end: SPIKE_TRAP_SETTLE_FRAME,
+      }),
+      duration: SPIKE_TRAP_TRIGGER_MS,
       repeat: 0,
     });
   }

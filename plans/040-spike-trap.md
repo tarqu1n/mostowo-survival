@@ -231,6 +231,18 @@ like the campfire.
   - Done when: all three tiers green (Vitest units, Playwright scenarios incl. the live-wave scenario, boot
     canary) and the tripwire passes against the intentionally-updated golden.
 
+> **Post-deploy iteration (2026-07-21) — trigger animation visibility.** First cut used only a 2-frame
+> slice (armed f1 → peak f2) drawn at the trap's ground depth, so the strike played *behind* the mob
+> standing on it and was effectively invisible (owner feedback: "couldn't see it"). Fixed without
+> changing any trap mechanics/state: the strike now plays the strip's **rise 0→2** (coil-then-slam) and
+> the sprite jumps to a high depth (over mobs) for the strike beat, dropping back to ground depth once
+> settled; re-arm plays the strip's **descent 2→4** (spikes visibly wind back down) then settles on the
+> armed frame. So frames 0–4 are all used (f5 is a duplicate flush). The existing damage hit-flash on the
+> struck mob is the dominant "it fired" cue; the raised spikes read secondarily. Verified in-engine via a
+> 4-state capture (armed/strike/spent/re-armed). All gates stayed green (e2e assert state, not visuals).
+> `TrapBehavior.ts` + `actorAnims.ts` + `tileset.ts` + `docs/wired-art.md`. *(Optional further polish if
+> wanted: a scale-punch on the spikes during the strike — held off pending owner call.)*
+
 ## Out of scope
 
 - **The StructureManager / behavior-registry generalisation, destructible walls, and the gate** — plan
