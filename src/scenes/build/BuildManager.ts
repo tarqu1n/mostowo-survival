@@ -30,6 +30,14 @@ export interface BuildManagerDeps {
   hasBlockingTree(col: number, row: number): boolean;
   /** Grid bounds for tilePlaceable's in-bounds check. */
   dims(): Dims;
+  /** True if a lit hearth exists — the base-CLAIM is active (plan 039). While false, the bootstrap
+   *  `BASE_ZONE` rect governs `baseOnly` placement so the first campfire can be built; while true,
+   *  {@link inClaim} governs. Scene closure over CampfireBehavior.hasLitHearth. */
+  hasLitClaim(): boolean;
+  /** True if tile (col,row)'s centre lies inside a lit hearth's **bright core** — the fire-heart base
+   *  claim (plan 039). Scene closure converting the tile centre to world-px and calling
+   *  CampfireBehavior.inClaim; fires only, never the player's render light (decision #7). */
+  inClaim(col: number, row: number): boolean;
   /** Can the player afford `cost` right now? (updateGhost's valid/invalid tint + the placement gate). */
   canAfford(cost: Record<string, number>): boolean;
   /** Spend `cost`; false (no-op) if unaffordable. */
@@ -139,14 +147,21 @@ export class BuildManager {
 
   // --- Placement --------------------------------------------------------------
 
-  /** True if the *selected* buildable can be blueprinted here: in bounds, inside the base zone (if the
-   *  buildable is `baseOnly`), empty, off live blocking nodes, and reachable. */
+  /** True if the *selected* buildable can be blueprinted here: in bounds, inside the base claim (if
+   *  the buildable is `baseOnly`), empty, off live blocking nodes, and reachable. */
   tilePlaceable(col: number, row: number): boolean {
     const dims = this.deps.dims();
     if (col < 0 || row < 0 || col >= dims.cols || row >= dims.rows) return false;
-    // Base-zone restriction for `baseOnly` buildables (e.g. the campfire); walls place anywhere.
-    if (BUILDABLES[this.selectedBuildableId].baseOnly && !isInBase(this.baseZoneRect, col, row))
-      return false;
+    // Base-claim restriction for `baseOnly` buildables (e.g. the campfire); walls place anywhere.
+    // The claim IS the fire-heart's lit bright core (plan 039): once a hearth is lit, placement is
+    // confined to `inClaim`. Bootstrap — while NO hearth is lit (before the first fire exists), fall
+    // back to the fixed `BASE_ZONE` rect so that first `baseOnly` campfire can still be placed.
+    if (BUILDABLES[this.selectedBuildableId].baseOnly) {
+      const claimed = this.deps.hasLitClaim()
+        ? this.deps.inClaim(col, row)
+        : isInBase(this.baseZoneRect, col, row);
+      if (!claimed) return false;
+    }
     if (this.isOccupied(col, row) || this.hasSiteTile(col, row)) return false;
     // Only blocking nodes (trees/rocks) veto placement — a non-blocking bush can be built over.
     if (this.deps.hasBlockingTree(col, row)) return false;

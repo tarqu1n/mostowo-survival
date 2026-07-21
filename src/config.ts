@@ -424,6 +424,16 @@ export const CAMPFIRE_FEED_INTERVAL_MS = 1000;
 export const CAMPFIRE_LIGHT_MIN_FRAC = 0.4;
 
 /**
+ * Base-claim bright core (plan 039). The fire-heart's light now *is* the base zone: a `baseOnly`
+ * buildable places only inside a lit hearth's **bright core** — `lightSources()` radius ×
+ * `CLAIM_LIGHT_FRAC` — NOT the full geometric radius, whose soft gradient rim (plan 039 Step 2) has
+ * faded to near-invisible; claiming there would let you build in a fringe you can't see. Kept inside
+ * the clearly-lit core so the placeable area reads as "the firelit ground". Fires only (never the
+ * player's personal light) — see plan 039 decisions #1/#7.
+ */
+export const CLAIM_LIGHT_FRAC = 0.7;
+
+/**
  * Flame/smoke rendering (plan 016 follow-up). The flame is a TWO-sheet swap keyed on fuel fraction: at
  * or above `CAMPFIRE_FLAME_LARGE_MIN_FRAC` the larger `Fire_01` sheet burns, scaled a touch by fuel
  * (`CAMPFIRE_FLAME_LARGE_SCALE_MIN`..1 across the top band) so a well-fed fire is visibly bigger; below

@@ -236,8 +236,14 @@ four pillars into single objects and reuse built machinery.
   enemy fog-gating**: enemies hidden in darkness, revealed in light — partner to the treeline night wave.
 - **Knock-on:** fuel now governs the whole claim, so the campfire fuel numbers (already flagged mis-tuned
   for the 15-min cycle) become critical to retune — no longer optional.
-- **Staging:** (1) base zone = central hearth radius replacing the rect; (2) multiple fires union claims;
-  (3) walls shape/extend the boundary while fire-connected.
+- **Staging:** (1) base zone = central hearth radius replacing the rect **[DONE — plan 039 Step 1]**;
+  (2) multiple fires union claims; (3) walls shape/extend the boundary while fire-connected.
+  - **(1) landed 2026-07-21:** `baseOnly` placement now gates on a lit hearth's **bright core**
+    (`lightSources()` radius × `CLAIM_LIGHT_FRAC`, config — the clearly-lit core, not the soft-gradient
+    rim), via `CampfireBehavior.inClaim`/`hasLitHearth` threaded into `BuildManager.tilePlaceable`.
+    `BASE_ZONE` is retained as the **no-hearth bootstrap** so the first campfire can still be placed. The
+    claim breathes with fuel. Post-037, the light seam lives on `CampfireBehavior` (unioned by
+    `StructureManager`), not the old `CampfireManager`.
 
 ## 2026-07-19 — [DECIDED] Core-loop framing: three-horizon progression, hard-countdown-no-fallback dusk, progress-keyed escalation, pacing targets
 

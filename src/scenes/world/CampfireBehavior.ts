@@ -5,6 +5,7 @@ import {
   CAMPFIRE_FUEL_BURN_PER_SEC,
   CAMPFIRE_FUEL_PER_WOOD,
   CAMPFIRE_LIGHT_MIN_FRAC,
+  CLAIM_LIGHT_FRAC,
   CAMPFIRE_FLAME_LARGE_MIN_FRAC,
   CAMPFIRE_FLAME_LARGE_SCALE_MIN,
   CAMPFIRE_FLAME_RISE_PX,
@@ -295,6 +296,23 @@ export class CampfireBehavior implements StructureBehavior {
   inLight(x: number, y: number): boolean {
     return this.lightSources().some(
       (l) => Phaser.Math.Distance.Between(x, y, l.x, l.y) <= l.radius,
+    );
+  }
+
+  /** True if any campfire is currently lit — the base-CLAIM gate (plan 039): while false, the
+   *  bootstrap `BASE_ZONE` rect governs `baseOnly` placement; once a hearth is lit, {@link inClaim}
+   *  takes over so the first (`baseOnly`) campfire can still be placed before any fire exists. */
+  hasLitHearth(): boolean {
+    return this.campfires.some((c) => c.state.lit);
+  }
+
+  /** True if world point (x,y) is within a lit campfire's **bright core** — the base-claim predicate
+   *  (plan 039 decisions #1/#7). Unlike {@link inLight} (full geometric radius, the reveal), the claim
+   *  tests only `radius × CLAIM_LIGHT_FRAC` so placement is confined to the clearly-lit core, never the
+   *  soft gradient rim that's faded to near-invisible. Breathes with fuel like the light does. */
+  inClaim(x: number, y: number): boolean {
+    return this.lightSources().some(
+      (l) => Phaser.Math.Distance.Between(x, y, l.x, l.y) <= l.radius * CLAIM_LIGHT_FRAC,
     );
   }
 

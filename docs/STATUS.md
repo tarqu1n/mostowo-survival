@@ -176,6 +176,13 @@ it one wood at a time, self-terminating when topped up or out of wood. A tap on 
 resolves to `refuel` (column-hit-tested over its whole tile stack). Tuned numbers:
 [GAME-MECHANICS.md](GAME-MECHANICS.md).
 
+**Fire-heart base claim (plan 039 Step 1):** `baseOnly` placement now gates on a lit hearth's **bright
+core** (`lightSources()` radius × `CLAIM_LIGHT_FRAC`, tighter than the full light radius so it stays in
+clearly-lit ground) rather than the fixed `BASE_ZONE` rect — `CampfireBehavior.inClaim`/`hasLitHearth`
+threaded into `BuildManager.tilePlaceable`. The claim breathes with fuel (a dimming fire shrinks the
+placeable area). `BASE_ZONE` is retained as the **no-hearth bootstrap** so the first campfire can still
+be placed before any fire exists. Staging (1) of the campfire-heart claim; (2)/(3) still pending.
+
 **Attackable fire (plan 038 Step 1):** `CampfireBehavior.damageFire(id, amount)` drains the fire's
 **fuel** — the mob→fire coupling the night wave's objective AI calls (plan 038 Step 4). It reuses the
 existing fuel meter (no separate integrity meter) and douses on the same zero-crossing as a burn-out, so

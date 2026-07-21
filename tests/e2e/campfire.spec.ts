@@ -12,11 +12,14 @@ import {
   held,
 } from './harness';
 
-// Tier-2: the campfire buildable end-to-end — fixture placement, the real tilePlaceable/isInBase
-// gate, the night-overlay reveal (nightAlpha/inLight — NOT enemy visibility, see plan 012 Out of
-// scope), and the per-frame fuel drain + tap-to-feed relight. Player/campfire tiles below are inside
-// BASE_ZONE (config.ts: minCol 12/maxCol 32/minRow 26/maxRow 52) on open, reachable ground, so
-// `reachableAdjacent` (the hidden determinism trap in tilePlaceable) holds for every scenario here.
+// Tier-2: the campfire buildable end-to-end — fixture placement, the real tilePlaceable gate (plan
+// 039: the base-claim is a lit hearth's bright core, with the fixed BASE_ZONE rect as the no-hearth
+// bootstrap), the night-overlay reveal (nightAlpha/inLight — NOT enemy visibility, see plan 012 Out
+// of scope), and the per-frame fuel drain + tap-to-feed relight. Most tiles below sit at [22,x] on
+// open, reachable ground — campfire FIXTURES are force-placed by applyScenario (bypassing the gate)
+// and inLight/fuel/refuel are relative to the fire wherever it is, so those scenarios don't care
+// where BASE_ZONE is. The gate tests (tryPlace / the claim test) use real BASE_ZONE / claim coords
+// around SPAWN_TILE {118,140} (rect: cols 108-128, rows 127-153) — see each test.
 
 test('a campfire fixture placed inside the base zone appears in state().campfires', async ({
   page,
@@ -33,16 +36,19 @@ test('a campfire fixture placed inside the base zone appears in state().campfire
   expect(s.campfires[0]).toMatchObject({ col: 22, row: 38 });
 });
 
-test('tryPlace is blocked outside the base zone and allowed inside it', async ({ page }) => {
+// Bootstrap path (plan 039): with NO lit hearth, `baseOnly` placement falls back to the fixed
+// BASE_ZONE rect so the FIRST campfire can be built before any fire exists. Coords are around
+// SPAWN_TILE {118,140} — rect cols 108-128, rows 127-153 — on open, reachable ground.
+test('with no hearth, tryPlace falls back to the BASE_ZONE rect (bootstrap)', async ({ page }) => {
   await startGame(page);
-  await applyScenario(page, { player: [22, 40], inventory: { wood: 40, stone: 40 } });
+  await applyScenario(page, { player: [118, 141], inventory: { wood: 40, stone: 40 } });
 
   const before = await state(page);
   const woodBefore = await held(page, 'wood');
   const stoneBefore = await held(page, 'stone');
 
-  // Outside BASE_ZONE (row 5 < minRow 26) — rejected by the isInBase gate.
-  const placedOutside = await tryPlace(page, 'campfire', 22, 5);
+  // Outside BASE_ZONE (row 100 < minRow 127) — rejected by the bootstrap rect (no hearth yet).
+  const placedOutside = await tryPlace(page, 'campfire', 118, 100);
   expect(placedOutside).toBe(false);
 
   const afterOutside = await state(page);
@@ -50,9 +56,46 @@ test('tryPlace is blocked outside the base zone and allowed inside it', async ({
   expect(await held(page, 'wood')).toBe(woodBefore);
   expect(await held(page, 'stone')).toBe(stoneBefore);
 
-  // Inside BASE_ZONE, reachable from the player — accepted.
-  const placedInside = await tryPlace(page, 'campfire', 22, 42);
+  // Inside BASE_ZONE, reachable from the player — accepted (the bootstrap first-fire placement).
+  const placedInside = await tryPlace(page, 'campfire', 118, 138);
   expect(placedInside).toBe(true);
+});
+
+// Claim path (plan 039): once a hearth is LIT, the base-claim IS its bright core (radius ×
+// CLAIM_LIGHT_FRAC, tighter than the full light radius) — NOT the BASE_ZONE rect. A `baseOnly`
+// buildable places inside the core and is rejected just outside it (even where the fire still casts
+// light), and the placeable area BREATHES with fuel — draining the fire shrinks the core so a tile
+// that was claimable flips to rejected. Seeded at full fuel: light = 8 tiles, core = 8 × 0.7 ≈ 5.6.
+test('with a lit hearth, tryPlace claims the bright core and shrinks with fuel', async ({
+  page,
+}) => {
+  await startGame(page);
+  // Full-fuel hearth: a tile 3 tiles out is inside the ~5.6-tile core; a tile 7 tiles out is lit but
+  // OUTSIDE the core → rejected. Hearth at [118,138], player below it, on reachable spawn ground.
+  await applyScenario(page, {
+    player: [118, 141],
+    campfires: [[118, 138]], // force-placed lit at full fuel (120) → claim is active
+    inventory: { wood: 60, stone: 60 },
+  });
+  expect((await state(page)).campfires[0].lit).toBe(true);
+
+  // 7 tiles above the hearth: within the light radius (≤8) but outside the bright core (>5.6).
+  expect(await inLight(page, 118, 131)).toBe(true); // the fire DOES light it…
+  expect(await tryPlace(page, 'campfire', 118, 131)).toBe(false); // …but it's outside the claim core
+
+  // 3 tiles from the hearth: inside the bright core → placeable.
+  expect(await tryPlace(page, 'campfire', 121, 138)).toBe(true);
+
+  // Fuel shrinks the core: re-seed the same layout near-empty (still lit) and the tile 3 out that was
+  // just claimable now falls outside the shrunken core → rejected.
+  await applyScenario(page, {
+    player: [118, 141],
+    campfires: [[118, 138]],
+    campfireFuel: 4, // lit but dim → light radius (and its core) contract toward the MIN_FRAC floor
+    inventory: { wood: 60, stone: 60 },
+  });
+  expect((await state(page)).campfires[0].lit).toBe(true);
+  expect(await tryPlace(page, 'campfire', 121, 138)).toBe(false); // core shrank past 3 tiles
 });
 
 test('night reveals a hole around a lit campfire (nightAlpha + inLight), no enemy-visibility check', async ({

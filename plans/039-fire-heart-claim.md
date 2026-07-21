@@ -103,7 +103,26 @@ the claim. The full-dark / light-only sightline is the natural companion to "fir
 
 ## Steps
 
-- [ ] **Step 1: Swap the `baseOnly` placement gate to the lit-radius test (with bootstrap)** `[inline]`
+- [x] **Step 1: Swap the `baseOnly` placement gate to the lit-radius test (with bootstrap)** `[inline]`
+  - Outcome: `baseOnly` placement now gates on a lit hearth's **bright core**, with the `BASE_ZONE`
+    rect kept as the no-hearth bootstrap. Files: **`config.ts`** — new `CLAIM_LIGHT_FRAC = 0.7`;
+    **`CampfireBehavior.ts`** — new `hasLitHearth()` + `inClaim(x,y)` (mirrors `inLight` but tests
+    `radius × CLAIM_LIGHT_FRAC`, the clearly-lit core not the gradient rim); **`BuildManager.ts`** —
+    two new deps (`hasLitClaim()`, `inClaim(col,row)`) and the `tilePlaceable` `baseOnly` branch now
+    picks `inClaim` when a hearth is lit else `isInBase(baseZoneRect)`; **`GameScene.ts`** — wired both
+    deps as closures over `this.campfire` (resolved at call time, so live despite BuildManager being
+    constructed before StructureManager; tile centre → world-px via `tileToWorldCenter`, the same space
+    `lightSources()` casts in — no origin offset). **Post-037 note:** the plan's `CampfireManager`
+    pointers are now `CampfireBehavior` (light seam) unioned by `StructureManager`; `litHearth()` already
+    exists on GameScene from plan 038. Docs: `docs/decisions/gameplay.md` (staging (1) marked DONE),
+    `docs/STATUS.md` (new "Fire-heart base claim" note). Tests: **`tests/e2e/campfire.spec.ts`** — fixed
+    the pre-existing stale-coords `tryPlace` test (repurposed as the bootstrap-path test, correct
+    `SPAWN_TILE` coords) and added a claim-path test (bright-core accept/reject + fuel-shrink flip);
+    header comment corrected. **Verified:** typecheck + lint clean (no errors; only pre-existing
+    unbound-method warnings at 635-644); 836/836 unit; campfire e2e **9/9** (incl. the 2 new/fixed);
+    prod `npm run build` clean. Deviation: also fixed the pre-existing `tryPlace` failure (plan 038
+    flagged it as plan-039 base-claim territory) since it directly tests the gate I reworked. `inClaim`
+    read-side `DebugState`/pure-predicate helpers are deferred to Step 4 per the plan.
   - In `BuildManager.tilePlaceable` (`:143-144`), replace `isInBase(baseZoneRect, col, row)` for `baseOnly`
     buildables with an "inside any lit hearth's **bright core**" test, via a threaded dep (e.g.
     `deps.inClaim(col,row)` → scene calls a fire bright-core check at the tile centre). Add

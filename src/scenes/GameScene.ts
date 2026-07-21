@@ -436,6 +436,12 @@ export class GameScene extends Phaser.Scene {
       isBlocked: (col, row) => this.isBlocked(col, row),
       hasBlockingTree: (col, row) => this.resourceNodeManager.hasBlockingNode(col, row),
       dims: () => this.gridDims,
+      // Base-claim (plan 039): the fire-heart's lit bright core replaces the fixed rect. Closures over
+      // CampfireBehavior — resolved at call time (tilePlaceable), so `this.campfire` is live even though
+      // structureManager is constructed just below this BuildManager. Tile centre → world-px matches the
+      // space lightSources() casts in (tileToWorldCenter, no origin offset).
+      hasLitClaim: () => this.campfire.hasLitHearth(),
+      inClaim: (col, row) => this.campfire.inClaim(tileToWorldCenter(col), tileToWorldCenter(row)),
       canAfford: (cost) => this.inv.canAfford(cost),
       spend: (cost) => this.inv.spend(cost),
       enqueueBuild: (siteId) => this.enqueue({ kind: 'build', siteId }),
