@@ -16,14 +16,19 @@ import type { GameScene } from '../GameScene';
 import type { StructureBehavior } from './StructureManager';
 
 /** Default bottom-anchor + height (tiles) the spike sprite scales to when the buildable omits them —
- *  a single-tile floor decal (the 32px spike frame fits one 16px tile at scale 0.5). */
-const TRAP_ORIGIN_Y = 0.5;
-const TRAP_TILES_TALL = 1;
+ *  the buildable sets these (tilesTall 2, originY 0.9) so the 32px spike frame renders ~2 tiles tall,
+ *  bottom-anchored, rising out of the foot tile (the 1-tile half-scale decal was too small to see). */
+const TRAP_ORIGIN_Y = 0.9;
+const TRAP_TILES_TALL = 2;
 
 /** Depth the spike sprite jumps to for the strike beat so the spikes punch up **over** the mob standing
  *  on the tile (mobs draw at depth 9, the player at 10, held weapons ~11–12) — otherwise the strike
  *  plays at the trap's ground depth, hidden behind the body. Restored to the ground depth once settled. */
 const TRAP_STRIKE_DEPTH = 15;
+
+/** Scale multiplier applied to the spikes for the strike beat — a quick punch so the slam-up reads,
+ *  restored to the resting scale once settled. */
+const TRAP_STRIKE_SCALE = 1.35;
 
 /** A trap's resting (ground) depth — the one-row y-sort band trees/walls/campfire share (plan 029/5b),
  *  well below mobs so a standing enemy draws over the resting trap. */
@@ -132,9 +137,11 @@ export class TrapBehavior implements StructureBehavior {
    *  here). Guard the completion callback with `sprite.active` — a scenario reset may destroy it mid-anim. */
   private trip(t: TrapStructure): void {
     t.state.armed = false;
-    t.sprite.setDepth(TRAP_STRIKE_DEPTH).play(spikeTrapExtendKey());
+    const restScale = t.sprite.scaleX; // the resting fit set in materialise — restore it after the punch
+    t.sprite.setDepth(TRAP_STRIKE_DEPTH).setScale(restScale * TRAP_STRIKE_SCALE);
+    t.sprite.play(spikeTrapExtendKey());
     t.sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
-      if (t.sprite.active) t.sprite.setDepth(groundDepth(t.row));
+      if (t.sprite.active) t.sprite.setDepth(groundDepth(t.row)).setScale(restScale);
     });
   }
 

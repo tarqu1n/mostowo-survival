@@ -240,8 +240,14 @@ like the campfire.
 > armed frame. So frames 0–4 are all used (f5 is a duplicate flush). The existing damage hit-flash on the
 > struck mob is the dominant "it fired" cue; the raised spikes read secondarily. Verified in-engine via a
 > 4-state capture (armed/strike/spent/re-armed). All gates stayed green (e2e assert state, not visuals).
-> `TrapBehavior.ts` + `actorAnims.ts` + `tileset.ts` + `docs/wired-art.md`. *(Optional further polish if
-> wanted: a scale-punch on the spikes during the strike — held off pending owner call.)*
+> `TrapBehavior.ts` + `actorAnims.ts` + `tileset.ts` + `docs/wired-art.md`.
+>
+> **Follow-up (still not visible enough).** Owner declined switching to the brighter white/metal sheets
+> (`Spikes/3`/`4`) — kept `Spikes/2` (wood-tone) and went bigger instead: the trap now renders **~2 tiles
+> tall, bottom-anchored** (`tilesTall:2`/`originY:0.9`, native scale 1 vs the too-small 1-tile half-scale)
+> plus a **×1.35 scale-punch on the strike**. Verified in-engine — the armed trap now reads as a clear
+> spike cluster on the ground and the strike (mob hit-flash + spikes punching up over it) is unmistakable.
+> `buildables.ts` + `TrapBehavior.ts` + `docs/wired-art.md`.
 
 ## Out of scope
 

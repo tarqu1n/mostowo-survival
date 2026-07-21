@@ -259,8 +259,8 @@ new **`trap` behavior module** (`src/scenes/world/TrapBehavior.ts`) in the Struc
 beside `campfire`/`wall` — no bespoke manager, no `materialiseBuildable` edit (`finishSite` already
 dispatches on `behavior`; the whole wiring is one `register('trap', …)` line in `buildWorld()`). It is
 `blocksPath:false` (mobs walk **onto** it — that's how it fires; it never joins the occupancy set) and
-**not** `baseOnly` (it lines the kill-funnel). Each placed trap owns one centred floor sprite from the
-CraftPix `Traps/Spikes/2` sheet (cross-pack load, like the barricade), settled on the **armed** frame
+**not** `baseOnly` (it lines the kill-funnel). Each placed trap owns one ~2-tile-tall, bottom-anchored sprite from
+the CraftPix `Traps/Spikes/2` sheet (cross-pack load, like the barricade), settled on the **armed** frame
 (frame 1 — low/primed, deliberately not the flush frame 0, so a placed trap reads); frame roles pinned
 in [wired-art.md](wired-art.md).
 
