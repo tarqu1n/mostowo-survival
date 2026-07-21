@@ -98,6 +98,25 @@ test('with a lit hearth, tryPlace claims the bright core and shrinks with fuel',
   expect(await tryPlace(page, 'campfire', 121, 138)).toBe(false); // core shrank past 3 tiles
 });
 
+// Plan 039 Step 3 (decision #7): the player emits a tiny RENDER light so full-dark night isn't
+// blinding — but that light is NOT the base CLAIM (which is fires-only). A tile right by the player,
+// far from any lit hearth, must still be REJECTED for a `baseOnly` build: standing somewhere never
+// claims it. Guards against the player light ever leaking into the claim path.
+test("the player's personal light does not grant baseOnly placement (render ≠ claim)", async ({
+  page,
+}) => {
+  await startGame(page);
+  await applyScenario(page, {
+    player: [118, 141],
+    campfires: [[118, 118]], // a LIT hearth far away (~23 tiles) → claim path active, but not here
+    inventory: { wood: 60, stone: 60 },
+  });
+  expect((await state(page)).campfires[0].lit).toBe(true);
+  // A tile next to the player but ~25 tiles from the only hearth: outside its claim core → rejected,
+  // even though the player's own render light sits right on it.
+  expect(await tryPlace(page, 'campfire', 118, 143)).toBe(false);
+});
+
 test('night reveals a hole around a lit campfire (nightAlpha + inLight), no enemy-visibility check', async ({
   page,
 }) => {

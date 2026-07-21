@@ -23,6 +23,7 @@ import {
   COMBAT_ACTIVE_HYSTERESIS_TILES,
   INVENTORY_SLOTS,
   DEFAULT_MAX_STACK,
+  PLAYER_LIGHT_RADIUS,
 } from '../config';
 import { ITEMS } from '../data/items';
 import { NODES } from '../data/nodes';
@@ -594,7 +595,12 @@ export class GameScene extends Phaser.Scene {
       damagePlayer: (amount) => this.damagePlayer(amount),
       canAfford: (cost) => this.inv.canAfford(cost),
       spend: (cost) => this.inv.spend(cost),
-      lightSources: () => this.structureManager.lightSources(),
+      // RENDER light sources for the night light-layer (plan 039): the lit hearths (unioned by
+      // StructureManager) PLUS the player's tiny personal light, so full-dark night leaves a small
+      // readable disc around the player. This is the RENDER seam only — the base CLAIM keys off
+      // CampfireBehavior.inClaim (fires-only), so the player light never grants placement (decision #7).
+      // VisionController keeps its own fires-only closure + separate vision radius (unchanged).
+      lightSources: () => [...this.structureManager.lightSources(), this.playerLight()],
       worldPx, // night overlay spans the loaded map (plan 018 A9) instead of fixed MAP_WIDTH/HEIGHT
     });
 
@@ -1306,6 +1312,13 @@ export class GameScene extends Phaser.Scene {
   /** The lit hearth the night wave converges on + strikes (plan 038): the first lit campfire (id + its
    *  tile + world-centre pos), or null when none is lit. Single hearth in the MVP; shared by the
    *  WaveDirector's spawn-anchor and the enemy AI's fire objective. */
+  /** The player's tiny personal RENDER light (plan 039 Step 3) — a small disc at the player's current
+   *  world position, fed into SurvivalClock's night light-layer erase list so the player is never fully
+   *  blind at full-dark night. RENDER only: it is NOT in the base-claim path (fires-only, decision #7). */
+  private playerLight(): { x: number; y: number; radius: number } {
+    return { x: this.player.x, y: this.player.y, radius: PLAYER_LIGHT_RADIUS };
+  }
+
   private litHearth(): { id: string; tile: Cell; pos: { x: number; y: number } } | null {
     const c = this.campfire.all().find((f) => f.state.lit);
     if (!c) return null;

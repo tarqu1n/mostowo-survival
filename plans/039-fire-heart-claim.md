@@ -192,7 +192,20 @@ the claim. The full-dark / light-only sightline is the natural companion to "fir
     disc shrinks and stays soft; an enemy outside the light (and its tells) is **not visible**; mid-day is
     fully lit; dusk/dawn cross-fade smoothly; boot canary green (RT is the restart-teardown trap).
 
-- [ ] **Step 3: Tiny player personal light** `[inline]`
+- [x] **Step 3: Tiny player personal light** `[inline]`
+  - Outcome: the player now emits a tiny personal RENDER light so full-dark night isn't blinding.
+    Files: **`config.ts`** — new `PLAYER_LIGHT_RADIUS = TILE_SIZE * 1.25` (~1.25 tiles, small so
+    fires/torches matter); **`GameScene.ts`** — new `playerLight()` helper returning `{x,y,radius}` at
+    the player sprite's live world pos, and the **SurvivalClock** `lightSources` closure now returns
+    `[...structureManager.lightSources(), playerLight()]` (the RENDER seam only). Crucially NOT wired
+    into the claim path (`CampfireBehavior.inClaim` stays fires-only, decision #7) and NOT into
+    VisionController's closure (it keeps fires-only + its own `VISION_RADIUS` fog, unchanged). Test:
+    **`tests/e2e/campfire.spec.ts`** — new guard "the player's personal light does not grant baseOnly
+    placement (render ≠ claim)": a tile on the player, ~25 tiles from the only (far) lit hearth, is
+    still rejected for a `baseOnly` build. **Verified:** typecheck + lint clean (0 errors); 836/836
+    unit; campfire e2e **10/10** (incl. the new guard); prod build clean. **Deferred to playtest:** the
+    visual reveal (that the disc reads well / moves with the player / is tuned to the right size) is not
+    headlessly checkable; flagged for the iterate-phase playtest alongside Step 2's brush tuning.
   - `config.ts`: add `PLAYER_LIGHT_RADIUS` (~1–1.5 tiles). Aggregate a player-centred light disc into the
     scene's **render** light-source closure (feeding Step 2's erase list) — **not** the claim path
     (decision #7). It tracks the player each frame.

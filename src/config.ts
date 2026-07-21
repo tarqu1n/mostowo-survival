@@ -134,6 +134,17 @@ export const ZOOM_STORAGE_KEY = 'mostowo:zoom';
 /** Radius (world px) of the character's line of sight — everything beyond it is fogged. */
 export const VISION_RADIUS = TILE_SIZE * 5;
 
+/**
+ * Radius (world px) of the tiny personal light the player always emits (plan 039 Step 3). Fed into the
+ * night light-layer's RENDER light sources (SurvivalClock's erase list) so full-dark night still leaves
+ * a small readable disc around the player — never fully blind. Deliberately SMALL (~1.25 tiles) so
+ * fires/torches clearly matter and enemy tells stay unreadable beyond its reach (decision #4). Distinct
+ * from `VISION_RADIUS` (the day fog-of-war reach, 5 tiles) and from the base CLAIM (fires only, decision
+ * #7): the player's light reveals but never grants `baseOnly` placement. A future off-hand torch just
+ * raises this radius.
+ */
+export const PLAYER_LIGHT_RADIUS = TILE_SIZE * 1.25;
+
 /** Starting player combat stats (see plan 003 Context & decisions' cast table). */
 export const PLAYER_MAX_HP = 10;
 export const PLAYER_START_SPEED = 90;
