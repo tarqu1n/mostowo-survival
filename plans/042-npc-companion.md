@@ -281,13 +281,13 @@ under the owner's full-scope call.
 > rules, and the scope has ballooned well past the roadmap's final-MVP-closing step. **Both resolved
 > by owner decision (this session) and folded into the steps above.**
 
-| # | Finding | Severity | Resolution |
-| - | ------- | -------- | ---------- |
-| 1 | Mobs damage only player/fire/structure; the NPC could never be downed in real play, so downed/revive + its acceptance test only fire by force-seeding `hp=0`. | **High** | **Owner: mobs can aggro the NPC.** Step 6 generalises mob targeting to nearest-of-{player, NPC}; Step 7/10 downed is reachable without seeding. |
-| 2 | Scope exceeds ROADMAP Step 5 (2 day roles + repair economy, 3 postures, stockpile+HUD, downed/revive, click-menu; 11 steps to close the MVP). | **High** | **Owner: keep full scope.** Steps re-sequenced so the roadmap spine lands + is testable first; extras are additive tail steps. |
-| 3 | New `baseSupply` duplicates `Inventory`; dual-wood economy. | Medium | **Owner: keep separate `baseSupply`** (Step 3) for a clean base-vs-carried split. |
-| 4 | "Rename the player-baked FSM" underrates how baked player-targeting is. | Medium | Step 7 uses a **dedicated companion stepper**; Step 6 does the (separate, minimal) mob-side generalisation. |
-| 5 | Worker-driver-vs-slimmed-executor left unresolved; refactoring the ~350-line player loop risks regression. | Medium | Step 4 commits: NPC gets its **own slimmed executor**; the shipped player loop is **not** refactored. |
-| 6 | Acceptance backloaded — Steps 4–7 asserted via `debugState` fields not added until the end. | Medium | Scenario + `DebugState` scaffolding moved **early to Step 2**; every behaviour step now has a real e2e check. |
-| 7 | Art stand-in looked like the enemy wave — hurts night readability. | Low | **Rogue sprite** (Step 1) — distinct, on-style, already in the active pack. |
-| 8 | Follow / Refuel-lights postures exceed the roadmap's "hold near campfire/wall." | Low | Kept under the owner's full-scope call (#2). |
+|#|Finding|Severity|Resolution|
+|-|-------|--------|----------|
+|1|Mobs damage only player/fire/structure; the NPC could never be downed in real play, so downed/revive + its acceptance test only fire by force-seeding `hp=0`.|**High**|**Owner: mobs can aggro the NPC.** Step 6 generalises mob targeting to nearest-of-{player, NPC}; Step 7/10 downed is reachable without seeding.|
+|2|Scope exceeds ROADMAP Step 5 (2 day roles + repair economy, 3 postures, stockpile+HUD, downed/revive, click-menu; 11 steps to close the MVP).|**High**|**Owner: keep full scope.** Steps re-sequenced so the roadmap spine lands + is testable first; extras are additive tail steps.|
+|3|New `baseSupply` duplicates `Inventory`; dual-wood economy.|Medium|**Owner: keep separate `baseSupply`** (Step 3) for a clean base-vs-carried split.|
+|4|"Rename the player-baked FSM" underrates how baked player-targeting is.|Medium|Step 7 uses a **dedicated companion stepper**; Step 6 does the (separate, minimal) mob-side generalisation.|
+|5|Worker-driver-vs-slimmed-executor left unresolved; refactoring the ~350-line player loop risks regression.|Medium|Step 4 commits: NPC gets its **own slimmed executor**; the shipped player loop is **not** refactored.|
+|6|Acceptance backloaded — Steps 4–7 asserted via `debugState` fields not added until the end.|Medium|Scenario + `DebugState` scaffolding moved **early to Step 2**; every behaviour step now has a real e2e check.|
+|7|Art stand-in looked like the enemy wave — hurts night readability.|Low|**Rogue sprite** (Step 1) — distinct, on-style, already in the active pack.|
+|8|Follow / Refuel-lights postures exceed the roadmap's "hold near campfire/wall."|Low|Kept under the owner's full-scope call (#2).|
