@@ -564,7 +564,7 @@ export class UIScene extends Phaser.Scene {
     // children (like the Wellbeing eat-rows), so they show/hide and hit-test with the panel — only
     // the panel itself is pushed to hudElements. Hidden until DEV is tapped.
     const dpw = 124;
-    const dph = 128; // fits three dev buttons (SPAWN ENEMY / GO NIGHT / FORCE WAVE) + the label
+    const dph = 158; // fits four dev buttons (SPAWN ENEMY / SPAWN NPC / GO NIGHT / FORCE WAVE) + the label
     this.devPanel = new Panel(this, BASE_WIDTH - dpw / 2 - 8, BASE_HEIGHT - dbh - 16 - dph / 2, {
       width: dpw,
       height: dph,
@@ -575,13 +575,23 @@ export class UIScene extends Phaser.Scene {
     });
     this.devPanel.addText(14, { fontSize: '10px', color: UI_THEME.olive.text }).setText('DEV MENU');
 
-    const spawnEnemyButton = new Button(this, 0, -4, {
+    const spawnEnemyButton = new Button(this, 0, -34, {
       width: 108,
       height: 24,
       label: 'SPAWN ENEMY',
       variant: 'olive',
       fontSize: 11,
       onDown: () => this.game.events.emit('debug:spawnEnemy'),
+    });
+    // Spawn the dev-/scenario-only companion Rogue by the player (plan 042) — the on-screen twin of the
+    // console `window.game.events.emit('debug:spawnNpc')`, so the NPC is testable on a phone too.
+    const spawnNpcButton = new Button(this, 0, -4, {
+      width: 108,
+      height: 24,
+      label: 'SPAWN NPC',
+      variant: 'olive',
+      fontSize: 11,
+      onDown: () => this.game.events.emit('debug:spawnNpc'),
     });
     const initialTimeLabel = initialPhase === 'day' ? 'GO NIGHT' : 'GO DAY';
     this.devTimeButton = new Button(this, 0, 26, {
@@ -601,7 +611,7 @@ export class UIScene extends Phaser.Scene {
       fontSize: 11,
       onDown: () => this.game.events.emit('debug:forceWave'),
     });
-    this.devPanel.add([spawnEnemyButton, this.devTimeButton, forceWaveButton]);
+    this.devPanel.add([spawnEnemyButton, spawnNpcButton, this.devTimeButton, forceWaveButton]);
     this.hudElements.push(this.devPanel);
 
     // Hotbar — always-visible row of the first HOTBAR_SLOTS slots, bottom-centre. Hidden in combat
