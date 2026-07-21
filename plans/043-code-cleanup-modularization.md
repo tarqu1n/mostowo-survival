@@ -296,7 +296,19 @@ delegate lanes — just driven inline, not blind-delegated.
   - Docs: none inline.
   - Done when: smoke green (zero console errors), HUD e2e green, full gate green.
 
-- [ ] **Step 13: Split `mapFormat.ts` into schema/parse/serialize/resize** `[delegate]` (parallel: C)
+- [x] **Step 13: Split `mapFormat.ts` into schema/parse/serialize/resize** `[delegate]` (parallel: C)
+  - Outcome: `src/systems/mapFormat.ts` → dir `src/systems/mapFormat/` with `schema.ts` (types +
+    `ROW_DEPTH_DIVISOR`/`SUB_ROW_EPSILON`/`rowDepthOffset` + the pure cell helpers
+    `cellIndex`/`getCell`/`setCell`/`isInside`, which sit between the schema/parse ranges and are
+    consumed by both), `parse.ts` (`parseMap` + all `expect*`/`parse*` + `objectFootprintCells` +
+    `validateVoidConsistency`), `serialize.ts` (`serializeMap`/`createEmptyMap` + private
+    `collapseCellsArrays`), `resize.ts` (`planResize`/`applyResize`/`translateObject`/`migrateMap`/
+    `collectTextureSources` + `MAX_MAP_DIM`/`MAP_ID_PATTERN`), and `index.ts` barrel. Public export
+    surface byte-for-byte identical (three former privates `fail`/`expectRecord`/`objectFootprintCells`
+    became cross-file exports on parse.ts but are NOT re-exported by the barrel). All 82 consumers import
+    by path — **none edited**. `parseMapObject` dispatch-table: **logged, not done** (if-chain has
+    fall-through error semantics a table couldn't preserve as a pure move). tsc + eslint clean; 138
+    relevant specs green (mapFormat.test.ts 67, resize 28); build + smoke green. e2e deferred to Wave-1 integration.
   - Create `src/systems/mapFormat/` with `schema.ts` (types + `rowDepthOffset`, `:32-266`),
     `parse.ts` (`expect*`/`parse*`/`parseMap`/`validateVoidConsistency`, `:301-731`), `serialize.ts`
     (`collapseCellsArrays`/`serializeMap`/`createEmptyMap`, `:778-807`), `resize.ts`
