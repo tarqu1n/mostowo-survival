@@ -218,7 +218,20 @@ Steps 8–13 are `[delegate]` (mechanical, API-preserving). **Step 7 is `[inline
 see #2) but still edits a disjoint file, so it runs concurrently in its own worktree alongside the
 delegate lanes — just driven inline, not blind-delegated.
 
-- [ ] **Step 7: Split `editorStore.ts` into Zustand slices** `[inline]` (parallel: C — inline-driven, own worktree)
+- [x] **Step 7: Split `editorStore.ts` into Zustand slices** `[delegate]` (parallel: C) — *delegated per user (was [inline])*
+  - Outcome: `editorStore.ts` 3662 → **93 lines** (barrel: one `create<EditorState>()(subscribeWithSelector(...))`
+    composing 15 slices + re-exporting the full surface). 15 `store/slices/*` by domain (document/tools/underlay/
+    world/nodeDefs/resizeRename/paint/walkability/zones/shape/terrain/layers/favourites/tilePalettes/objects) +
+    `store/shared.ts` (history stack + reconcile helpers + `paletteSlotRotationKey`) + `store/types.ts`
+    (`EditorState` + exported types + `EditorSlice` factory alias). Pure helpers moved: `buildShapeCommand`→
+    `shapeOps`, `buildTerrainCommand`→`terrainOps`, `batchCommand`→`objectOps` (`defaultAuthoredNodeDef` +
+    `blobToDataUrl`/`imageSizeFromDataUrl` co-located in their owning slice — no matching Ops file).
+    **Full 15-symbol export surface preserved** (`useEditorStore`, `paletteSlotRotationKey`,
+    `PLACEHOLDER_SKIN_ASSET`, `DECOR_ANIM_DEFAULT_FPS` + 11 types); NO consumer edited. **Null byte** (offset
+    61841 in `paletteSlotRotationKey`) → `|`; safe (transient in-memory Record key, never persisted). Judgment:
+    `EditorState` kept as ONE interface, slices typed `EditorSlice<Pick<EditorState,…>>` so the `create()`
+    compile-verifies the Picks partition it. Cross-slice `get()/set()` calls all route through the combined
+    store (verified by the specs). tsc 0 errors; eslint clean; **450** store+ops tests pass.
   - **Not a pure mechanical move (critique #2):** the ~120 actions cross-call each other via
     `get()`/`set()` across domains, so slicing needs judgment to keep those cross-slice calls working
     (Zustand slice pattern: each slice is `(set, get) => ({...})`, composed in one `create()` —

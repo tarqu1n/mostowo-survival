@@ -11,6 +11,7 @@
  */
 
 import { isInside, type MapFile, type MapObject } from '../systems/mapFormat';
+import { type Command } from './store/history';
 
 export interface Cell {
   col: number;
@@ -69,4 +70,19 @@ export function nextObjectId(
     if (m) max = Math.max(max, Number(m[1]));
   }
   return `${prefix}_${String(max + 1).padStart(4, '0')}`;
+}
+
+/** Bundles several `{do,undo}` op pairs into ONE `Command` — `do` runs them in order, `undo` reverses
+ *  them in REVERSE order (so a later op's undo, which may assume an earlier op's effect, unwinds
+ *  first). Used by the multi-object batch actions (rotate/flip/depth-bump) so selecting N objects and
+ *  pressing e.g. "rotate +90" is one undo step, not N. */
+export function batchCommand(ops: Array<{ do: () => void; undo: () => void }>): Command {
+  return {
+    do: () => {
+      for (const op of ops) op.do();
+    },
+    undo: () => {
+      for (let i = ops.length - 1; i >= 0; i--) ops[i].undo();
+    },
+  };
 }

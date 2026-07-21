@@ -13,6 +13,8 @@
 
 import { cellIndex, type MapFile } from '../systems/mapFormat';
 import { objectFootprintCells } from './objectOps';
+import { cellsToChanges } from './paintOps';
+import { type Command } from './store/history';
 
 /** One tile-layer cell that must be zeroed because its cell is being voided. */
 export interface CascadeTileChange {
@@ -69,4 +71,58 @@ export function computeVoidCascade(map: MapFile, voidedIndices: ReadonlySet<numb
   });
 
   return { tileChanges, zoneChanges, removedObjectIndices };
+}
+
+/**
+ * Builds the ONE undoable command for a shape-paint operation touching `points` (already filtered to
+ * `inBounds`). `inside=true` is a plain cell-set (no cascade). `inside=false` computes
+ * `computeVoidCascade` for exactly the cells that are NEWLY voided (i.e. currently `1`, per the
+ * pre-edit `shapeCellsBase`) and bundles the tile-layer/zone zeroing + object removal into the same
+ * command. Materializes `map.shape` (absent ⇒ all-inside) on first write; `hadShapeBefore` lets undo
+ * restore the exact prior absent/present state. Returns `null` if nothing would change.
+ */
+export function buildShapeCommand(
+  map: MapFile,
+  points: ReadonlyArray<{ col: number; row: number }>,
+  inside: boolean,
+): Command | null {
+  const width = map.meta.width;
+  const height = map.meta.height;
+  const hadShapeBefore = !!map.shape;
+  const shapeCellsBase = map.shape
+    ? map.shape.cells
+    : (new Array(width * height).fill(1) as number[]);
+  const value = inside ? 1 : 0;
+  const changes = cellsToChanges(shapeCellsBase, width, points, value);
+  if (changes.length === 0) return null;
+
+  const cascade = inside ? null : computeVoidCascade(map, new Set(changes.map((c) => c.index)));
+  const removedObjects = cascade
+    ? cascade.removedObjectIndices.map((index) => ({ index, obj: map.objects[index] }))
+    : [];
+
+  return {
+    do: () => {
+      if (!map.shape) map.shape = { cells: shapeCellsBase.slice() };
+      for (const c of changes) map.shape.cells[c.index] = value;
+      if (cascade) {
+        for (const tc of cascade.tileChanges) map.layers[tc.layerIndex].cells[tc.index] = 0;
+        for (const zc of cascade.zoneChanges) map.zones.cells[zc.index] = 0;
+        for (let i = removedObjects.length - 1; i >= 0; i--) {
+          map.objects.splice(removedObjects[i].index, 1);
+        }
+      }
+    },
+    undo: () => {
+      if (cascade) {
+        for (const { index, obj } of removedObjects) map.objects.splice(index, 0, obj);
+        for (const zc of cascade.zoneChanges) map.zones.cells[zc.index] = zc.prev;
+        for (const tc of cascade.tileChanges) map.layers[tc.layerIndex].cells[tc.index] = tc.prev;
+      }
+      if (map.shape) {
+        for (const c of changes) map.shape.cells[c.index] = c.prev;
+      }
+      if (!hadShapeBefore) map.shape = undefined;
+    },
+  };
 }

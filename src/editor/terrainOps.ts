@@ -22,6 +22,10 @@
  */
 
 import { paintMask, type Dims, type Mask, type TerrainMapping } from '../systems/autotile';
+import type { MapFile, TerrainSection, TileLayer } from '../systems/mapFormat';
+import type { TerrainDef } from './terrainCatalog';
+import { cellsToChanges, findOrAppendPaletteIndex } from './paintOps';
+import { type Command } from './store/history';
 
 /** One layer cell whose palette index changed as a result of a terrain (re)bake. */
 export interface TerrainBakeChange {
@@ -72,4 +76,92 @@ export function computeTerrainBake(
     if (prev !== 0) changes.push({ index, prev, next: 0 });
   }
   return changes;
+}
+
+/**
+ * Builds the ONE undoable command for a terrain-paint operation touching `points` on `layer` (already
+ * filtered to `isInside`). Toggles `terrainId`'s `TerrainSection` mask for `layer.id` at `points` to
+ * `on`, materializing the section lazily on first paint (mirrors `buildShapeCommand` materializing
+ * `map.shape`), then rebakes via `computeTerrainBake`: every currently-painted mask cell's resolved
+ * frame (via `terrainDef.mapping` + append-only palette) diffed against `layer.cells`, PLUS an
+ * explicit clear-to-0 for any cell this edit just erased (mask 1->0). Returns `null` if nothing would
+ * change (every point already at `on`'s value). `existingSection` is a mutable closure variable (not a
+ * captured array index) so repeated undo/redo cycles correctly recreate/re-remove a section that
+ * didn't exist before this command, exactly like `buildShapeCommand` materializes/un-materializes
+ * `map.shape`.
+ */
+export function buildTerrainCommand(
+  map: MapFile,
+  layer: TileLayer,
+  terrainId: string,
+  terrainDef: TerrainDef,
+  points: ReadonlyArray<{ col: number; row: number }>,
+  on: boolean,
+): Command | null {
+  const width = map.meta.width;
+  const height = map.meta.height;
+  const layerId = layer.id;
+  let existingSection: TerrainSection | undefined = map.terrain.find(
+    (t) => t.layerId === layerId && t.terrainId === terrainId,
+  );
+  const hadSectionBefore = !!existingSection;
+  const baseCells = existingSection
+    ? existingSection.cells
+    : (new Array(width * height).fill(0) as number[]);
+  const value = on ? 1 : 0;
+  const maskChanges = cellsToChanges(baseCells, width, points, value);
+  if (maskChanges.length === 0) return null;
+
+  const nextMask = baseCells.slice();
+  for (const c of maskChanges) nextMask[c.index] = value;
+  // Cells this edit just erased (1->0) — paintMask no longer reports them, so they need an explicit
+  // clear (see computeTerrainBake's doc).
+  const clearedIndices = new Set(
+    maskChanges.filter((c) => value === 0 && c.prev === 1).map((c) => c.index),
+  );
+
+  const dims: Dims = { cols: width, rows: height };
+  const resolveIndex = (frame: number): number =>
+    findOrAppendPaletteIndex(
+      map,
+      terrainDef.pack,
+      {
+        kind: 'sheetFrame',
+        sheet: terrainDef.sheet,
+        frame,
+      },
+      0, // terrain autotile always bakes at angle 0 (brush-only rotation this plan)
+    );
+  const bakeChanges = computeTerrainBake(
+    nextMask,
+    dims,
+    terrainDef.mapping,
+    clearedIndices,
+    layer.cells,
+    resolveIndex,
+  );
+
+  return {
+    do: () => {
+      let section = existingSection;
+      if (!section) {
+        section = { layerId, terrainId, cells: baseCells.slice() };
+        map.terrain.push(section);
+        existingSection = section;
+      }
+      for (const c of maskChanges) section.cells[c.index] = value;
+      for (const c of bakeChanges) layer.cells[c.index] = c.next;
+    },
+    undo: () => {
+      for (const c of bakeChanges) layer.cells[c.index] = c.prev;
+      if (existingSection) {
+        for (const c of maskChanges) existingSection.cells[c.index] = c.prev;
+      }
+      if (!hadSectionBefore && existingSection) {
+        const i = map.terrain.indexOf(existingSection);
+        if (i >= 0) map.terrain.splice(i, 1);
+        existingSection = undefined; // a redo's `do` recreates it fresh, matching the first-run path
+      }
+    },
+  };
 }
