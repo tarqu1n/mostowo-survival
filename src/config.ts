@@ -174,6 +174,42 @@ export const UNARMED_MELEE_SHAPE: AttackShape = { reach: 1, arc: 'single' };
 export const ATTACK_MOVE_SLOW = 0.2;
 
 /**
+ * NPC companion (the Rogue, plan 042) — a named constants block mirroring the player block above,
+ * NOT a data catalogue (the companion is one hand-built actor, like the player). `NpcCharacter`
+ * assembles its `CombatantStats` from these; the day/night role + posture behaviour that reads the
+ * timings lands in later steps.
+ *
+ * ALL NUMBERS ARE PLACEHOLDER TUNING (un-playtested), flagged per plan 040's convention — expect to
+ * retune once the companion's gather/repair/guard loop is actually playable:
+ *  - HP a notch below the player (a helper you must protect, not a second tank);
+ *  - SPEED a touch under the player so it trails rather than races ahead;
+ *  - VISION shorter than the player's day fog reach (it reacts to what's near, not the whole screen);
+ *  - CARRY_CAP deliberately LOW (it ferries a little, it isn't a warehouse);
+ *  - WINDUP/REPAIR in the low hundreds of ms; REVIVE_HP the HP it stands back up with at dawn.
+ */
+export const NPC_MAX_HP = 8;
+export const NPC_SPEED = 80;
+export const NPC_VISION = TILE_SIZE * 4;
+export const NPC_STRENGTH = 1;
+export const NPC_CARRY_CAP = 5;
+export const NPC_ATTACK_WINDUP_MS = 300;
+export const NPC_REPAIR_MS = 400;
+export const NPC_REVIVE_HP = 3;
+/**
+ * NPC body extent for combat targeting (see `Hurtbox`) — same ~1-wide, 2-tall silhouette as the
+ * player (the Rogue is a humanoid of the same rough size). Occupancy stays the single feet tile.
+ */
+export const NPC_HURTBOX: Hurtbox = { width: 1, height: 2 };
+/**
+ * The melee weapon id the companion carries (plan 042) — keys BOTH its gameplay stats
+ * (`MELEE_WEAPONS[NPC_MELEE_WEAPON_ID]` in data/weapons.ts) AND its held-blade art
+ * (`ACTIVE_TILESET.actors.npc.weapons[...]`), exactly as a skeleton's weapon id joins the two
+ * catalogues. `cleaver` = a short reach:1 swing that suits a close-in rogue. Placeholder — the
+ * directed swing that consumes it is plan 042 Step 7.
+ */
+export const NPC_MELEE_WEAPON_ID = 'cleaver';
+
+/**
  * Bow-fire commitment (plan 035a Steps 2/5). Loosing an arrow locks the player into a brief
  * draw/release for `BOW_DRAW_MS`, during which move speed drops only to `BOW_MOVE_SLOW` of normal —
  * far lighter than the melee `ATTACK_MOVE_SLOW`, so you can keep kiting while you shoot. The

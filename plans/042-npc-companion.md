@@ -94,7 +94,8 @@ under the owner's full-scope call.
 
 ## Steps
 
-- [ ] **Step 1: `NpcCharacter` entity + Rogue sprite + config** `[inline]`
+- [x] **Step 1: `NpcCharacter` entity + Rogue sprite + config** `[inline]`
+  - Outcome: Wired Rogue sprite (`NpcState`+`npc` manifest entry in `src/data/tileset.ts`, `npcAnimKey` helper, keys `npc-rogue-{idle,walk,death}`; `loadStrip` in `PreloadScene.ts`; anims in `world/actorAnims.ts`). New `src/entities/NpcCharacter.ts` (3rd `Character` subclass; `moveSpeed`/`die`; carries `MELEE_WEAPONS.cleaver` on the skeleton weapon-pin rig; role/posture/`downed` scaffold defaults). `NPC_*` block in `config.ts` (all placeholder-flagged: HP8/SPD80/VIS×4/CARRY5/windup300/repair400/revive3/hurtbox1×2/weapon `cleaver`). Temp dev seam in `GameScene.ts` (`spawnCompanion`/`spawnNpcNearPlayer`/`tickDevNpc`, `debug:spawnNpc` bus event) — superseded by `CompanionManager` in Step 2. `npcAnimKey` is facing-less (single-orientation, `flipX`) with an ignored `_facing?` for call-site symmetry. `assets:catalog` not needed (actor loader reads strip paths directly). Build/typecheck/lint clean; `npm test` 838 pass.
   - Wire the **Rogue** sprite: add an NPC actor entry to `ACTIVE_TILESET.actors` in `src/data/tileset.ts`
     mirroring the skeleton/`enemy` flip3 struct (states `idle` 4f @32px, `walk`←Run 6f @64px, `death`
     12f @32px; single-orientation, `side` mirrored via `flipX`); add a `npcAnimKey(state,facing)`

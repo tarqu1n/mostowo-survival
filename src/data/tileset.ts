@@ -32,6 +32,14 @@ export type DirEnemyState = 'idle' | 'walk' | 'run' | 'attack' | 'hurt' | 'death
  */
 export type PlayerState = 'idle' | 'walk' | 'chop' | 'mine' | 'gather' | 'attack' | 'death';
 
+/**
+ * NPC (companion) animation states — the Rogue ships only these three (plan 042): `idle` (4f @32px)
+ * and `walk` (its "Run" sheet, 6f @64px) loop; `death` (12f @32px) is a one-shot collapse that
+ * doubles as the downed/revive visual. Single-orientation like the skeleton — `side` is faked by
+ * `flipX`, so there's no per-facing strip and no attack strip (the swing reads via the weapon rig).
+ */
+export type NpcState = 'idle' | 'walk' | 'death';
+
 /** A terrain tile: a standalone PNG (load.image) OR frame N of a sheet sliced at TILE_SIZE. */
 export type TileSource =
   { kind: 'image'; path: string } | { kind: 'sheetFrame'; sheet: string; frame: number };
@@ -193,6 +201,22 @@ export interface TilesetManifest {
       weapons: Record<string, WeaponArt>;
       /** Shared hand mitt pinned to the `mainHand` (grips the weapon) and `offHand` anchors — see
        *  {@link HandArt}. The skeleton always has both hands, armed or not. */
+      hand: HandArt;
+    };
+    /**
+     * NPC companion (the Rogue, plan 042) — a single-orientation actor shaped EXACTLY like the
+     * skeleton `enemy` above: an `idle` bob + a `walk` (its "Run" sheet) + a one-shot `death`
+     * collapse, faced by `flipX` (no per-facing strip), plus the same weapon-art catalogue + `hand`
+     * mitt rig so its melee reads without a dedicated attack strip. `idle`/`walk` carry per-frame
+     * `mainHand`/`offHand` anchors; the held weapon + both fists pin to them each tick, exactly as on
+     * the skeleton. Stats live in config.ts (`NPC_*`) + data/weapons.ts (`MELEE_WEAPONS`), not here.
+     */
+    npc: {
+      render: ActorRender;
+      idle: StripAnim;
+      walk: StripAnim;
+      death: StripAnim;
+      weapons: Record<string, WeaponArt>;
       hand: HandArt;
     };
     /**
@@ -528,6 +552,99 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
         offZ: 1,
       },
     },
+    // NPC companion — the Pixel Crawler Rogue (plan 042). Shaped like the skeleton `enemy` above:
+    // single-orientation (side faked by flipX), Idle (4f @32px) + Run→`walk` (6f @64px) + a one-shot
+    // Death collapse (12f @32px). NB the pack folder is literally `Npc's` (apostrophe included) — the
+    // loader `encodeURI`s the path and leaves `'` intact, so it matches the on-disk name. All strips
+    // are 32px SQUARE except the 64px Run, so idle/death carry their own 32px render footprint (like
+    // the skeleton Idle) and the default `render` grounds the 64px Run. Content is bottom-aligned like
+    // the skeleton (feet at the frame bottom), so the same origins ground it.
+    npc: {
+      // Native 1:1 (crisp at integer zoom), like the player/skeleton. Default = the 64px Run
+      // footprint; feet reach the frame bottom, so originY 0.96 grounds them (matches the skeleton).
+      render: { scale: 1, originX: 0.5, originY: 0.96 },
+      // Idle bob: 128×32 = 4 frames of 32px, its own tighter-padding footprint (scale 1, originY 0.92
+      // == the skeleton Idle). anchors are frame-px; weaponTransform rescales them per strip.
+      // PLACEHOLDER anchors (hand not pixel-measured — the swing/rig tuning is plan 042 Step 7); one
+      // per frame (asserted for the skeleton in data.test) so the weapon + both fists pin cleanly.
+      idle: {
+        path: "Entities/Npc's/Rogue/Idle/Idle-Sheet.png",
+        frameSize: 32,
+        frames: 4,
+        render: { scale: 1, originX: 0.5, originY: 0.92 },
+        anchors: {
+          mainHand: [
+            { x: 22, y: 18 },
+            { x: 22, y: 19 },
+            { x: 22, y: 18 },
+            { x: 22, y: 17 },
+          ],
+          offHand: [
+            { x: 9, y: 20 },
+            { x: 9, y: 21 },
+            { x: 9, y: 20 },
+            { x: 9, y: 19 },
+          ],
+        },
+      },
+      // Run strip (frame 0 doubles as the frozen idle pose). Per-frame grip + free-hand anchors so the
+      // held weapon + fists track the run cycle. PLACEHOLDER (see idle note) — tuned in Step 7.
+      walk: {
+        path: "Entities/Npc's/Rogue/Run/Run-Sheet.png",
+        frameSize: 64,
+        frames: 6,
+        anchors: {
+          mainHand: [
+            { x: 38, y: 50 },
+            { x: 39, y: 49 },
+            { x: 38, y: 48 },
+            { x: 38, y: 50 },
+            { x: 39, y: 49 },
+            { x: 38, y: 48 },
+          ],
+          offHand: [
+            { x: 26, y: 52 },
+            { x: 27, y: 51 },
+            { x: 26, y: 50 },
+            { x: 26, y: 52 },
+            { x: 27, y: 51 },
+            { x: 26, y: 50 },
+          ],
+        },
+      },
+      // Death collapse: 384×32 = 12 frames of 32px (its own 32px footprint like idle), played once and
+      // held on the last (downed) frame — the downed/revive visual (used from Step 8). No anchors (the
+      // weapon + fists are destroyed on death, like the skeleton).
+      death: {
+        path: "Entities/Npc's/Rogue/Death/Death-Sheet.png",
+        frameSize: 32,
+        frames: 12,
+        render: { scale: 1, originX: 0.5, originY: 0.92 },
+      },
+      // The rogue's short blade — ART ONLY (gameplay stats in data/weapons.ts MELEE_WEAPONS, shared
+      // id). Reuses the skeleton's extracted knife blade as a stand-in for a `cleaver` (the short-swing
+      // player melee weapon the companion carries) until dedicated rogue-weapon art is cut — the same
+      // "coded stand-in" pattern the bow reuses the Pierce strip with. pivot = grip end; z 1 draws it
+      // in front of the depth-9 companion.
+      weapons: {
+        cleaver: {
+          source: { kind: 'image', path: '_derived/weapons/knife.png' },
+          pivot: [0.5, 0.9],
+          z: 1,
+        },
+      },
+      // Same two-hand mitt rig as the skeleton (its own hands are unreadable nubs): the open grip
+      // (main) wraps the raised weapon, the free fist (off) hangs beside the body — reusing the very
+      // same `_derived` hand art (already resident from the enemy load).
+      hand: {
+        source: { kind: 'image', path: '_derived/hand.png' },
+        mainSource: { kind: 'image', path: '_derived/hand_open.png' },
+        mainRot: 14,
+        pivot: [0.5, 0.5],
+        mainZ: 2,
+        offZ: 1,
+      },
+    },
     // 4-way directional enemies (plan 035b). The boar lives in the craftpix-creatures pack (not
     // pixel-crawler) — `pack` routes its loads there. All strips are 32px square; `render` grounds the
     // ~28px-tall content on the 16px tile (originY tuned so the hooves sit on the feet tile). Frame
@@ -653,6 +770,15 @@ export const enemyIdleKey = 'enemy-idle';
 
 /** Texture/anim key for the enemy Death strip (one-shot collapse on kill). */
 export const enemyDeathKey = 'enemy-death';
+
+/**
+ * Texture/anim key for an NPC-companion (Rogue) state strip, e.g. `npc-rogue-walk` (plan 042). The
+ * Rogue is single-orientation like the skeleton — `side` is faked by `flipX` — so the key carries NO
+ * facing (the three keys are `npc-rogue-{idle,walk,death}`); a `facing` arg is accepted only for call-
+ * site symmetry with {@link playerAnimKey} and is deliberately unused (the flip3 skeleton's keys are
+ * facing-less constants for the same reason). Texture key == anim key, loaded in PreloadScene.
+ */
+export const npcAnimKey = (state: NpcState, _facing?: Facing): string => `npc-rogue-${state}`;
 
 /**
  * Texture/anim key for a **directional** enemy's state+facing strip, id-scoped so each dir4 creature

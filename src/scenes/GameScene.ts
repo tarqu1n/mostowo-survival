@@ -44,6 +44,7 @@ import type { UIScene } from './UIScene';
 import type { GameTestApi } from '../entities/testTypes';
 import type { CharacterSprite } from '../entities/Character';
 import { PlayerCharacter } from '../entities/PlayerCharacter';
+import { NpcCharacter } from '../entities/NpcCharacter';
 import type { MonsterCharacter } from '../entities/MonsterCharacter';
 import { CombatFxManager } from './fx/CombatFxManager';
 import { NodeFxManager } from './fx/NodeFxManager';
@@ -78,6 +79,11 @@ export class GameScene extends Phaser.Scene {
   // The player-controlled worker (plan 013 Step 4): owns its sprite, stats/hp, facing, path state,
   // anim + death collapse. Recreated every create() (a death-restart), so all its state starts fresh.
   private playerChar!: PlayerCharacter;
+
+  /** TEMPORARY (plan 042 Step 1): the dev-spawned companion NPC, driven by {@link tickDevNpc}. A
+   *  throwaway seam so the Rogue sprite + `advancePath` can be eyeballed before `CompanionManager`
+   *  (Step 2) owns spawning + the per-frame drive; this field + its seams are removed then. */
+  private devNpc?: NpcCharacter;
 
   /** The player's sprite — camera/fog/pointer code addresses the display object this way. */
   private get player(): CharacterSprite {
@@ -644,6 +650,7 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on('tasks:cancel', this.cancelAll, this);
     this.game.events.on('debug:randomise', this.randomiseWorld, this); // dev menu: scatter nodes + enemies
     this.game.events.on('debug:spawnEnemy', this.spawnEnemyNearPlayer, this); // dev menu: drop one enemy by the player to fight
+    this.game.events.on('debug:spawnNpc', this.spawnNpcNearPlayer, this); // TEMPORARY (plan 042 Step 1): drop the companion Rogue to eyeball
     this.game.events.on('debug:toggleTime', this.survivalClock.toggleDayNight, this.survivalClock); // dev menu: flip day/night
     this.game.events.on('debug:forceWave', this.onForceWave, this); // dev menu: jump to night + start a wave now
     this.game.events.on('time:changed', this.waveDirector.onTimeChanged, this.waveDirector); // start/stop the night wave on dusk/dawn
@@ -667,6 +674,7 @@ export class GameScene extends Phaser.Scene {
       this.game.events.off('tasks:cancel', this.cancelAll, this);
       this.game.events.off('debug:randomise', this.randomiseWorld, this);
       this.game.events.off('debug:spawnEnemy', this.spawnEnemyNearPlayer, this);
+      this.game.events.off('debug:spawnNpc', this.spawnNpcNearPlayer, this);
       this.game.events.off(
         'debug:toggleTime',
         this.survivalClock.toggleDayNight,
@@ -827,6 +835,11 @@ export class GameScene extends Phaser.Scene {
     // Live structures tick every frame too (above the early-return), so a campfire burns down whether
     // or not a worker task is active — mirrors the survival tick. See src/scenes/world/StructureManager.ts.
     this.structureManager.tick(delta);
+
+    // TEMPORARY (plan 042 Step 1): drive the dev-spawned companion each frame. Above the no-action
+    // early-return so it ticks whether or not a worker task is active. Removed when CompanionManager
+    // (Step 2) takes over spawning + the per-frame drive.
+    this.tickDevNpc();
 
     // Night wave scheduler (plan 038 Step 3) — meter out spawns during the night. Above the no-action
     // early-return (so it runs whether or not a task is active) but below the `playerChar.dying` freeze
@@ -1658,6 +1671,19 @@ export class GameScene extends Phaser.Scene {
    * player is boxed in with no clear tile in range. Wired to the dev-menu Spawn Enemy button.
    */
   private spawnEnemyNearPlayer(): void {
+    // The boar is the default dev spawn (plan 035b Step 4) — fighting it exercises the full loop:
+    // 4-way facing, the Attack-anim telegraph, melee, bow, and the HP bar. The skeleton stays
+    // reachable via scenarios (the combat/monster e2e specs) as a regression anchor.
+    const t = this.firstSpawnableTileNearPlayer();
+    if (t) this.enemyManager.addEnemy('boar', t.col, t.row);
+  }
+
+  /**
+   * First empty, walkable, unoccupied tile near the player — scanned outward in Chebyshev rings from
+   * distance 2 (so it never lands on or directly touching the player) up to a small cap. Returns null
+   * if the player is boxed in with no clear tile in range. Shared by the dev spawn seams below.
+   */
+  private firstSpawnableTileNearPlayer(): Cell | null {
     const pt = this.playerChar.tile();
     const canSpawn = (col: number, row: number): boolean =>
       col >= 0 &&
@@ -1673,15 +1699,54 @@ export class GameScene extends Phaser.Scene {
       for (let col = pt.col - dist; col <= pt.col + dist; col++) {
         for (let row = pt.row - dist; row <= pt.row + dist; row++) {
           if (Math.max(Math.abs(col - pt.col), Math.abs(row - pt.row)) !== dist) continue; // ring edge only
-          if (canSpawn(col, row)) {
-            // The boar is the default dev spawn (plan 035b Step 4) — fighting it exercises the full
-            // loop: 4-way facing, the Attack-anim telegraph, melee, bow, and the HP bar. The skeleton
-            // stays reachable via scenarios (the combat/monster e2e specs) as a regression anchor.
-            this.enemyManager.addEnemy('boar', col, row);
-            return;
-          }
+          if (canSpawn(col, row)) return { col, row };
         }
       }
     }
+    return null;
+  }
+
+  /**
+   * TEMPORARY dev seam (plan 042 Step 1) — spawn the companion Rogue near the player and hand it a path
+   * walking back toward the player, so the sprite (idle/walk/death anims) and `advancePath` can be
+   * eyeballed before `CompanionManager` (Step 2) owns spawning. Reachable from the console via
+   * `window.game.events.emit('debug:spawnNpc')` (wired in wireBus, mirroring `debug:spawnEnemy`).
+   * Spawns at most one companion; both this and {@link spawnCompanion} are removed when Step 2 lands.
+   */
+  private spawnNpcNearPlayer(): void {
+    if (this.devNpc) return; // one dev companion at a time — no-op if already spawned
+    const t = this.firstSpawnableTileNearPlayer();
+    if (!t) return;
+    const path = findPath(t, this.playerChar.tile(), this.isBlocked, this.gridDims);
+    this.spawnCompanion(t.col, t.row, path ?? undefined);
+  }
+
+  /**
+   * TEMPORARY dev seam (plan 042 Step 1) — instantiate the companion at a tile (grid col/row, converted
+   * to the world centre like the enemy spawn) and optionally seed a hand-set path for it to walk.
+   * Stores it in {@link devNpc} for {@link tickDevNpc}. Superseded by `CompanionManager` in Step 2.
+   */
+  spawnCompanion(col: number, row: number, path?: Cell[]): NpcCharacter {
+    const npc = new NpcCharacter(this, {
+      x: tileToWorldCenter(col),
+      y: tileToWorldCenter(row),
+    });
+    if (path) {
+      npc.path = path;
+      npc.pathIndex = 0;
+    }
+    this.devNpc = npc;
+    return npc;
+  }
+
+  /**
+   * TEMPORARY (plan 042 Step 1): per-frame drive for the dev-spawned companion — advance its path and
+   * refresh its animation. Called from update() above the no-action early-return. Removed when
+   * `CompanionManager` (Step 2) takes over the per-frame drive.
+   */
+  private tickDevNpc(): void {
+    if (!this.devNpc) return;
+    this.devNpc.advancePath();
+    this.devNpc.updateAnim();
   }
 }

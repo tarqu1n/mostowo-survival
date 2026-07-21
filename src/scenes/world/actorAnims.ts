@@ -6,6 +6,7 @@ import {
   enemyWalkKey,
   enemyIdleKey,
   enemyDeathKey,
+  npcAnimKey,
   dirEnemyAnimKey,
   campfireBaseKey,
   campfireFlameLargeKey,
@@ -34,7 +35,7 @@ import {
 export function registerActorAnims(scene: Phaser.Scene): void {
   // Player: 3-way directional idle + walk (down/side/up). Each strip is its own texture (key ==
   // anim key, loaded in PreloadScene); side art faces right, GameScene mirrors it with flipX.
-  const { player: playerActor, enemy: enemyActor } = ACTIVE_TILESET.actors;
+  const { player: playerActor, enemy: enemyActor, npc: npcActor } = ACTIVE_TILESET.actors;
   // idle/walk loop (velocity-driven locomotion); chop/mine/gather loop while harvesting in place;
   // attack is a one-shot swing. Chop/mine/attack run faster (ACTION_ANIM_FRAMERATE) so a hit lands per
   // swing; gather is a calmer forage loop at the locomotion rate.
@@ -93,6 +94,27 @@ export function registerActorAnims(scene: Phaser.Scene): void {
       repeat: 0,
     });
   }
+  // NPC companion (the Rogue, plan 042): idle + walk loop (locomotion), death plays once and holds its
+  // last (downed) frame — mirrors the skeleton block. Single-orientation (flipX-faced), so one anim per
+  // state (no facing). Keys + frame counts from the manifest; guarded like the blocks above.
+  for (const [state, frameRate, repeat] of [
+    ['idle', 6, -1], // slow, gentle breathing bob (matches the skeleton idle)
+    ['walk', 10, -1],
+    ['death', DEATH_ANIM_FRAMERATE, 0],
+  ] as const) {
+    const key = npcAnimKey(state);
+    if (scene.anims.exists(key)) continue;
+    scene.anims.create({
+      key,
+      frames: scene.anims.generateFrameNumbers(key, {
+        start: 0,
+        end: npcActor[state].frames - 1,
+      }),
+      frameRate,
+      repeat,
+    });
+  }
+
   // Directional enemies (dir4, e.g. the boar): one anim per state per facing, id-scoped keys (distinct
   // from the skeleton's global enemy-* keys). idle/walk/run loop (locomotion); attack/hurt/death play
   // once. Frame counts come from each strip in the manifest. Empty until a dir4 creature is registered.

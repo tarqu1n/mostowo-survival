@@ -8,6 +8,7 @@ import {
   enemyWalkKey,
   enemyIdleKey,
   enemyDeathKey,
+  npcAnimKey,
   dirEnemyAnimKey,
   campfireBaseKey,
   campfireFlameLargeKey,
@@ -109,7 +110,7 @@ export class PreloadScene extends Phaser.Scene {
         frameHeight: strip.frameSize,
       });
     };
-    const { player, enemy } = manifest.actors;
+    const { player, enemy, npc } = manifest.actors;
     const playerStates: PlayerState[] = [
       'idle',
       'walk',
@@ -126,6 +127,12 @@ export class PreloadScene extends Phaser.Scene {
     loadStrip(enemyWalkKey, enemy.walk);
     loadStrip(enemyIdleKey, enemy.idle); // 32px Idle bob — its own footprint (Phase B)
     loadStrip(enemyDeathKey, enemy.death);
+    // NPC companion (the Rogue, plan 042) — three flip3 strips keyed by `npcAnimKey` (== the anim key),
+    // loaded in-place from the pixel-crawler pack like the player/skeleton. Loaded unconditionally so a
+    // dev spawn / CompanionManager (Step 2) always has a resident texture. The Run sheet backs `walk`.
+    loadStrip(npcAnimKey('walk'), npc.walk);
+    loadStrip(npcAnimKey('idle'), npc.idle);
+    loadStrip(npcAnimKey('death'), npc.death);
 
     // Directional enemies (dir4, e.g. the boar): each state×facing strip is its own spritesheet, keyed
     // by `dirEnemyAnimKey` (== the anim key). These load from the creature's OWN pack (the boar is in
@@ -180,12 +187,22 @@ export class PreloadScene extends Phaser.Scene {
       frameHeight: spikeTrap.sheet.frameSize,
     });
 
-    // Monster weapon art + the two hand images (off-hand fist + main-hand open grip): one static image
-    // each (no anim), keyed like the derived tiles. GameScene resolves them via resolveTile(source).
-    const handSources = [enemy.hand.source, enemy.hand.mainSource].filter(
-      (s): s is TileSource => s !== undefined,
-    );
-    for (const src of [...Object.values(enemy.weapons).map((w) => w.source), ...handSources]) {
+    // Monster + NPC weapon art and the two hand images (off-hand fist + main-hand open grip): one
+    // static image each (no anim), keyed like the derived tiles. GameScene resolves them via
+    // resolveTile(source). The NPC (plan 042) reuses the same `_derived` blade/hand paths as the
+    // skeleton, so `loadedImages` dedups them to a no-op — listing them keeps the companion's rig
+    // self-sufficient (not implicitly reliant on the enemy load) without a double fetch.
+    const handSources = [
+      enemy.hand.source,
+      enemy.hand.mainSource,
+      npc.hand.source,
+      npc.hand.mainSource,
+    ].filter((s): s is TileSource => s !== undefined);
+    for (const src of [
+      ...Object.values(enemy.weapons).map((w) => w.source),
+      ...Object.values(npc.weapons).map((w) => w.source),
+      ...handSources,
+    ]) {
       if (src.kind === 'image' && !loadedImages.has(src.path)) {
         loadedImages.add(src.path);
         this.load.image(tileImageKey(src.path), url(src.path));
