@@ -439,7 +439,21 @@ delegate lanes — just driven inline, not blind-delegated.
   - Docs: mark applied items in `docs/cleanup/perf.md`.
   - Done when: tripwire green, no visual regression in smoke, full gate green.
 
-- [ ] **Step 16: Apply clear-fix standardizations; land the backlog** `[inline]`
+- [x] **Step 16: Apply clear-fix standardizations; land the backlog** `[inline]`
+  - Outcome: applied the two outstanding `[fix]` rows (every other smells/standards `[fix]` already
+    landed in Steps 14 / 5·9·10 / 7). **(1) Cost consolidation (user-resolved `[log]`→`[fix]`):** inlined
+    `spike_trap.cost = { wood: 5 }` onto the BUILDABLES entry beside `wall`/`campfire`, removed
+    `SPIKE_TRAP_COST` + its import from `config.ts`/`buildables.ts`, updated the config doc-comment;
+    `SPIKE_TRAP_DAMAGE`/`SPIKE_TRAP_TRIGGER_MS` stay in config (sole consumer was `buildables.ts`).
+    **(2) Event-namespace doc (`[fix]`):** grep-verified the live namespace set and completed
+    `docs/STANDARDS.md`'s enumeration — added `demolish`/`fire`/`npc`/`supply`; **kept `hunger`** (the
+    finding's "code uses needs:*" was partial — `hunger:changed` IS live alongside `needs:eat`). Both
+    marked ✅ in `standards.md`. **`assetSwatch.tsx` NOT split:** the smells lens tags it `[log]`
+    ("cohesive today; splitting is a style call"), so under the "don't touch `[log]`" rule it's left as-is
+    (the plan-body mention of it as a `[fix]` example predates the lens tag — reconciled to `[log]`). All
+    other `[log]` items (parked portals, two-finger gesture, readonly-records posture, editor UI naming,
+    game-bus-vs-Zustand, TS `any`) untouched. Gates: `check` green (925 tests), `build` green,
+    **refactor-tripwire green**, build/campfire/wall/spike-trap e2e green (workers=1), smoke green.
   - **DECISION (user, this session): consolidate costs INTO data** — inline `spike_trap`'s `{wood:5}` into
     `src/data/buildables.ts` (matching `wall`/`campfire`), remove `SPIKE_TRAP_COST` from `config.ts` and update
     its consumers, leaving the non-cost trap tunables (`SPIKE_TRAP_DAMAGE`/`SPIKE_TRAP_TRIGGER_MS`) in config.

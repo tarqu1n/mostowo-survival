@@ -70,8 +70,8 @@ rules that STRIP them — trailing spaces, repeat blanks, tight table pipes — 
   scene-facade modules (`testApi.ts`) sit directly under `src/scenes/`, not a submodule of one.
 - **Cross-scene events** (`game.events`): `'namespace:action'` string, lowerCamelCase action, e.g.
   `build:toggle`, `combat:attack`, `mode:combatToggle`, `debug:randomise`, `zoom:delta`,
-  `tasks:cancel`. Namespaces group by subsystem (`build`, `camera`, `combat`, `debug`, `hunger`,
-  `inspect`, `mode`, `needs`, `player`, `tasks`, `time`, `zoom`).
+  `tasks:cancel`. Namespaces group by subsystem (`build`, `camera`, `combat`, `debug`, `demolish`,
+  `fire`, `hunger`, `inspect`, `mode`, `needs`, `npc`, `player`, `supply`, `tasks`, `time`, `zoom`).
 - **Registry keys** (`this.registry`): flat lowerCamelCase strings, no namespace prefix (`hunger`,
   `playerStats`, `inventory`, `following`, `dayPhase`, `dayCount`) — registry holds live state, events
   announce changes to it.

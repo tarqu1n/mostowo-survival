@@ -2,7 +2,6 @@
  * Buildable catalogue. Keyed by buildable id; add new placeable structures here.
  */
 
-import { SPIKE_TRAP_COST } from '../config';
 import type { BuildableDef } from './types';
 
 export const BUILDABLES: Record<string, BuildableDef> = {
@@ -50,11 +49,13 @@ export const BUILDABLES: Record<string, BuildableDef> = {
   // how it fires), so it never joins BuildManager's occupied/walls set. NOT `baseOnly` — it lines the
   // kill-funnel outside the base (decision #5). The third live/simulated buildable — routed to
   // TrapBehavior on completion via the StructureManager registry (finishSite dispatch on `behavior`).
-  // maxHp is an inert display stat (traps aren't mob-damageable this slice); cost is a placeholder.
+  // maxHp is an inert display stat (traps aren't mob-damageable this slice); cost {wood:5} is a
+  // placeholder — scarce range (a funnel-liner, not spammable). Inlined here beside wall/campfire so
+  // all buildable costs live in this data table, not split into config (plan 043 Step 16).
   spike_trap: {
     id: 'spike_trap',
     name: 'Spike Trap',
-    cost: SPIKE_TRAP_COST,
+    cost: { wood: 5 },
     color: 0x9a6b3f,
     maxHp: 10,
     armour: 0,

@@ -536,13 +536,13 @@ export const CAMPFIRE_SMOKE_RISE_PX = 22;
  * path, then goes spent until re-armed (a dawn worker order + a tap).
  *  - `SPIKE_TRAP_DAMAGE` 2: meaningfully hurts a skeleton (`kidZombie` maxHp 3 → 1, survives) but
  *    doesn't one-shot a boar (maxHp 5 → 3) — decision #2. The #1 knob once felt vs the live wave.
- *  - `SPIKE_TRAP_COST` {wood:5}: scarce range (a funnel-liner, not spammable) — placeholder.
  *  - `SPIKE_TRAP_TRIGGER_MS` 120: the extend/strike anim beat (armed frame → peak) on trigger.
- * Re-arm consumes worker-time only for MVP (no resource — decision #6); a material cost is a later
- * tuning decision.
+ * The build COST is content, not a tunable, so it lives inline on the `spike_trap` BUILDABLES entry
+ * beside `wall`/`campfire` (plan 043 Step 16 — data-driven cost consolidation), not here. Re-arm
+ * consumes worker-time only for MVP (no resource — decision #6); a material cost is a later tuning
+ * decision.
  */
 export const SPIKE_TRAP_DAMAGE = 2;
-export const SPIKE_TRAP_COST: Record<string, number> = { wood: 5 };
 export const SPIKE_TRAP_TRIGGER_MS = 120;
 
 /**
