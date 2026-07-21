@@ -238,7 +238,19 @@ delegate lanes — just driven inline, not blind-delegated.
   - Docs: none inline (Step 18 updates CONVENTIONS with the slice pattern).
   - Done when: `store/__tests__/*` all green, editor builds, gate green at merge, no consumer edits.
 
-- [ ] **Step 8: Split `EditorScene.ts` into controllers** `[delegate]` (parallel: C)
+- [x] **Step 8: Split `EditorScene.ts` into controllers** `[delegate]` (parallel: C)
+  - Outcome: `EditorScene.ts` 2367 → **370 lines**, export `class EditorScene` unchanged (consumer
+    `PhaserViewport.tsx` untouched). New `src/editor/scene/`: `constants.ts`, `textureBaker.ts` (free fns:
+    queue/bake layers+palettes+ghost+thumbnail), `objectRenderer.ts` (free fns: place/pick/clear decor+nodes),
+    `overlaysRenderer.ts` (overlay/void/grid/walkability/zones/shape/hover draws + ghost/underlay
+    orchestration), `EditorCameraController.ts` (class `(scene)`, wheel listener in ctor→`destroy()`),
+    `EditorInputController.ts` (class `(scene)`, the 958-line pointer/gesture/keyboard/tool-dispatch chunk;
+    listeners removed in `destroy()`). Parked `TWO_FINGER_GESTURE_ENABLED` kept as-is. **Behavior nuances
+    (verify via editor e2e — no unit tests):** (1) controller fields named `inputController`/`cameraController`
+    (can't be `input` — collides with Phaser's `Scene.input`); internal only. (2) `teardown()` now removes
+    POINTER_*/wheel listeners via `destroy()` (original relied on Phaser auto-clean) — equivalent-or-safer,
+    idempotent, matches repo `PointerInputController` idiom. tsc 0 errors; eslint clean (10 pre-existing
+    `unbound-method` warns). Whole-tree gate at wave integration.
   - Extract into `src/editor/scene/`: `EditorInputController` (pointer/gesture + tool dispatch,
     `:1706-2366` — the biggest chunk), `EditorCameraController` (`:1562-1705`), `textureBaker`
     (`:463-700`,`:1392-1463`,`:1488`), `overlaysRenderer` (`:926-1260`), `objectRenderer`
