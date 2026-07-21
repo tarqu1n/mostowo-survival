@@ -250,7 +250,16 @@ delegate lanes — just driven inline, not blind-delegated.
   - Docs: none inline.
   - Done when: editor builds + boots, gestures/paint/camera still work via existing e2e, full gate green.
 
-- [ ] **Step 9: Split `LibraryPanel.tsx` + adopt shared pan/zoom** `[delegate]` (parallel: C)
+- [x] **Step 9: Split `LibraryPanel.tsx` + adopt shared pan/zoom** `[delegate]` (parallel: C)
+  - Outcome: `LibraryPanel.tsx` 1766 → **835 lines**; exports unchanged (`LibraryPanel` + `PalettePickControls`;
+    sole consumer `EditorApp.tsx` untouched). New `panels/library/`: `shared.ts` (PREVIEW_PX consts + libClass
+    helpers + `isObjectRegion`), `cards.tsx` (`TileFrameGrid`/`NodeCard`/`TerrainCard`/`AssetCard`/`FavouriteItem`
+    - internal `TileFrameButton`/`FavHeart`), `AtlasSheetPicker.tsx` (rewired to `usePanZoom`/`zoom.ts` — local
+    `ATLAS_ZOOM_*`/pan-zoom state/handlers all removed), `AnimatedStripPicker.tsx` (+ `isAnimatableStrip`),
+    `AssetReclassify.tsx`. **Flag for live check:** `usePanZoom(scale)` takes effective scale but returns `zoom`
+    (lexical cycle) — resolved via React derived-state-during-render (mirror effective scale into `useState`,
+    adjust in-render before paint). Behaviorally identical but the one spot to sanity-check in the editor (no
+    component tests). Self-check: own files tsc+eslint clean. Whole-tree gate deferred to wave integration.
   - Move card components (`TileFrameGrid`/`TileFrameButton`/`NodeCard`/`TerrainCard`/`AssetCard`/
     `FavouriteItem`, `:930-1331`) → `panels/library/cards.tsx`; `AtlasSheetPicker` (`:1367-1643`) and
     `AnimatedStripPicker` (`:1644`) and `AssetReclassify` (`:1727`) → own files under
