@@ -356,9 +356,7 @@ export class GameScene extends Phaser.Scene {
       playChopFx: (input) => this.nodeFx.playChop(input),
       playFellFx: (input) => this.nodeFx.playFell(input),
     });
-    // Hydrate resource nodes from authored `node` objects (plan 018 A6). test.map.json carries none
-    // yet (see the Phase-A content ship gate) — hunger stays non-lethal via HUNGER_LETHAL until
-    // authored food lands, so a node-less map can't starve out.
+    // Hydrate resource nodes from authored `node` objects (plan 018 A6).
     this.resourceNodeManager.loadNodes(
       map.objects.filter((o): o is NodeObject => o.kind === 'node'),
     );

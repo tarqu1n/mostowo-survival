@@ -30,8 +30,8 @@ being knocked out is a dire, recoverable setback (relight it), **not** a loss (o
 - **The campfire-fuel retune is now ON the MVP path** (reverses the earlier "no fuel retune" note): with
   the fire load-bearing — light = claim, plus mob damage on top of fuel burn — the fuel numbers (sized
   for the old ~3.5-min cycle) must be retuned for the 15-min cycle.
-- **Hunger is IN the loop.** It's built and only non-lethal because the start map has no food — so this
-  is *author food on the MVP map + flip `HUNGER_LETHAL` + retune drain to the 15-min cycle*, not a new system.
+- **Hunger is IN the loop.** ✅ Now live (plan 041): food authored on the MVP map, `HUNGER_LETHAL` flipped,
+  drain retuned to the 15-min cycle — done as reuse + tuning, not a new system.
 - **NPC recruitment is skipped for MVP** — spawn a companion directly; Litrandil's quest is post-MVP.
 
 ## Build order
@@ -123,7 +123,7 @@ run wave, assert trap damage.
 > unified under a **`StructureManager` + behavior-module registry**, which plan 040's trap plugs into as
 > the third behavior. The **gate** (ally-permeable barrier) is deferred into later *upgraded-walls* work.
 
-### 4. Hunger live
+### 4. Hunger live ✅
 
 Author food on the map (berry bushes → berries already exist as an edible), set `HUNGER_LETHAL = true`,
 and **retune the drain** so hunger is a "range out for food across the day" pressure — not the current
@@ -131,6 +131,13 @@ and **retune the drain** so hunger is a "range out for food across the day" pres
 (step 0) has food, but flip it lethal *late* so it doesn't harass earlier playtesting.
 *Done when:* ignoring food across a day meaningfully threatens you; eating relieves it. *Test:* scenario
 runs a day with/without eating, assert the hunger→health cascade.
+
+> **Progress — DELIVERED (plan 041).** Drain retuned `0.4 → 0.15`/s (a full bar ≈ one 660s day, the "one
+> food run per day" pace); `HUNGER_LETHAL` flipped to `true` and reframed as a dev toggle; the starve→HP
+> cascade ratio left untouched. Berry bushes authored on `the-moon` near the camp resources (the food
+> gate). Acceptance: `tests/e2e/survival-hunger.spec.ts` runs a day with/without eating — the previously
+> known-red "a starving player loses HP" now passes, plus new full-day drain, without-eating cascade, and
+> eating-relieves-it specs.
 
 ### 5. The NPC (labour + muscle)
 

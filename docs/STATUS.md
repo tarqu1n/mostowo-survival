@@ -441,7 +441,9 @@ via `import.meta.glob`); walkability composites authored cells under runtime obs
 procedural; portals are parsed-and-held (no transitions yet). The old procedural
 `drawGround`/`spawnTrees` path and fixed `MAP_WIDTH`/`MAP_HEIGHT`/`BASE_ZONE` consts are gone.
 
-**Temp:** hunger is non-lethal (`HUNGER_LETHAL=false`) until the start map carries authored food.
+**Hunger is live** (plan 041, roadmap Step 4): drain retuned to 0.15/s (a full bar ≈ one day),
+`HUNGER_LETHAL=true` (dev toggle), starve→HP cascade ratio unchanged — a neglected day starves you into
+the cascade; eating berries (foraged from the berry bushes now authored on `the-moon`) relieves it.
 Adjacent-ring streaming is [plan 019](../plans/019-l1-map-streaming.md). **Still to author:** the
 test-content maps that exercise every feature end-to-end (plan 014 step 12) — which unblocks
 re-enabling lethal hunger and plan 019's second placement.

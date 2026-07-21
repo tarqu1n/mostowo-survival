@@ -118,7 +118,7 @@ test('golden debugState() snapshot survives a scripted world + combat sequence',
     enemyHitFlashes: 2, // hits #1 and #2 (survived); the killing #3 skips flashHit
     enemyAttacks: 2, // two club bites land during the now longer, cooldown-paced fight
     mode: 'combat',
-    hunger: 60.2, // 62 − HUNGER_DRAIN_PER_SEC (0.4/s) × the 4.5s of driven time (rounded, see normalize)
+    hunger: 61.3, // 62 − HUNGER_DRAIN_PER_SEC (0.15/s) × the 4.5s of driven time (rounded, see normalize)
     dayPhase: 'day',
     dayCount: 1,
     clockMs: 24500, // 20_000 + 1600 + (420*2 + 50) + 10*200, bucketed to the nearest 50 (see normalize)

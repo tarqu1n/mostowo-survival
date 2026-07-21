@@ -371,12 +371,12 @@ export const TWILIGHT_MS = 8_000;
 export const NIGHT_MAX_ALPHA = 1.0;
 
 /**
- * Hunger (see systems/needs.ts). HUNGER_DRAIN_PER_SEC empties a full HUNGER_MAX in ~250s — ~0.28 of a
- * full day/night cycle (900s at DAY_MS 660s + NIGHT_MS 240s), i.e. you'd starve well within one day.
- * NOTE: this drain was tuned against the old ~210s cycle; retune by feel now the cycle is ~4x longer.
- * That retune + flipping `HUNGER_LETHAL` is **roadmap Step 4** (hunger-live), NOT plan 038 — the
- * campfire-fuel retune above is deliberately separate. While starving (hunger <= 0), the
- * player takes STARVE_DAMAGE every STARVE_DAMAGE_INTERVAL_MS (1 HP / 2s).
+ * Hunger (see systems/needs.ts). HUNGER_DRAIN_PER_SEC empties a full HUNGER_MAX in ~667s (100 / 0.15)
+ * ≈ one day (DAY_MS 660s), the "one food run per day" pace: a day of neglect leaves you starving right
+ * as night falls, so eating has to become habitual. Feel-tunable — soften toward ~0.13/s (~770s) if a
+ * neglected-day-into-wave proves an unrecoverable spiral rather than clawback-able (see plan 041). The
+ * remaining Step-4 work beyond this drain is flipping `HUNGER_LETHAL` (below). While starving
+ * (hunger <= 0), the player takes STARVE_DAMAGE every STARVE_DAMAGE_INTERVAL_MS (1 HP / 2s).
  *
  * `HUNGER_LOW_FRACTION` is the "near-empty" cutoff (fraction of HUNGER_MAX): below it the HUD hunger
  * bars turn red AND a steady yellow edge vignette fades in (UIScene, same baked-texture approach as
@@ -385,7 +385,7 @@ export const NIGHT_MAX_ALPHA = 1.0;
  * cue round the screen edges.
  */
 export const HUNGER_MAX = 100;
-export const HUNGER_DRAIN_PER_SEC = 0.4;
+export const HUNGER_DRAIN_PER_SEC = 0.15;
 export const STARVE_DAMAGE = 1;
 export const STARVE_DAMAGE_INTERVAL_MS = 2_000;
 export const HUNGER_LOW_FRACTION = 0.2;
@@ -393,10 +393,10 @@ export const HUNGER_VIGNETTE_COLOR = 0xe0b020;
 export const HUNGER_VIGNETTE_MAX_ALPHA = 0.5;
 
 /**
- * TEMP stopgap (plan 018 critique #1): the start map has no food nodes yet and trunk auto-deploys;
- * keep hunger non-lethal until authored food lands, then set true / remove.
+ * Dev toggle — starvation reduces HP (via SurvivalClock) only when true. Default on for the MVP
+ * survival loop (plan 041); set `false` to disable starvation death during playtesting.
  */
-export const HUNGER_LETHAL = false;
+export const HUNGER_LETHAL = true;
 
 /** Map ID to load at game start (must match a key in maps/manifest.json). */
 export const START_MAP_ID = 'the-moon';

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { startGame, applyScenario, step, state } from './harness';
+import { SPAWN_TILE } from '../../src/config';
 
 // Tier-2: player death → scene restart. An enemy stood adjacent chips the player's HP down over
 // repeated contact hits (1s cooldown each); at 0 HP GameScene.scene.restart() re-runs create(),
@@ -22,6 +23,6 @@ test('the player dying restarts the scene and resets the world', async ({ page }
   expect(logs.some((l) => l.includes('restarting'))).toBe(true); // the death→restart signal
   const s = await state(page);
   expect(s.playerHp).toBe(10); // restarted at full HP
-  expect(s.pcol).toBe(22); // player back at the spawn centre (MAP_WIDTH/2 / TILE)
-  expect(s.prow).toBe(40); // (MAP_HEIGHT/2 / TILE)
+  expect(s.pcol).toBe(SPAWN_TILE.col); // player back at the authored spawn (plan 018 runtime map)
+  expect(s.prow).toBe(SPAWN_TILE.row);
 });

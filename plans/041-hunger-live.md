@@ -1,6 +1,6 @@
 # Hunger Live
 
-> Status: planned — run /execute-plan to begin.
+> Status: in review
 
 ## Summary
 
@@ -78,7 +78,11 @@ acceptance signal, not a new test to write.
 
 ## Steps
 
-- [ ] **Step 1: Retune the hunger drain for the 15-min cycle** `[inline]`
+- [x] **Step 1: Retune the hunger drain for the 15-min cycle** `[inline]`
+  - Outcome: `src/config.ts` — `HUNGER_DRAIN_PER_SEC` 0.4 → 0.15; block comment above rewritten
+    (~667s ≈ one day, feel-tunable toward ~0.13/s). Stale rate comment in `tests/e2e/survival-hunger.spec.ts`
+    fixed. Verified `needs.test.ts` passes the rate in explicitly (no hard-coded 0.4). `npm run test` green
+    (838 unit tests); typecheck clean.
   - In `src/config.ts`, change `HUNGER_DRAIN_PER_SEC` from `0.4` to **`0.15`** (empties a full 100-point bar
     in ~667s ≈ one 660s day — the "one food run per day" target). Leave `HUNGER_MAX`, `STARVE_DAMAGE`,
     `STARVE_DAMAGE_INTERVAL_MS` untouched (owner decision 2).
@@ -93,7 +97,15 @@ acceptance signal, not a new test to write.
   - Done when: `HUNGER_DRAIN_PER_SEC === 0.15`; `npm run test` (unit) green; `npm run e2e -- survival-hunger`
     "hunger drains over time" still passes.
 
-- [ ] **Step 2: Add a Tier-2 "full day of neglect empties the bar" test** `[inline]`
+- [x] **Step 2: Add a Tier-2 "full day of neglect empties the bar" test** `[inline]`
+  - Outcome: **Deviation — the planned `step(page, DAY_MS + 10_000)` is infeasible in this harness.**
+    `__test.step(ms)` runs `ms/(1000/60)` full game-loop iterations synchronously over the large
+    the-moon scene (~25ms/slice), so stepping a whole day (~40k slices) blows the 30s Playwright
+    timeout — the passing specs only step ~150–360 slices (a few seconds of game time). So, like
+    `survival-daynight.spec.ts`, the retune is validated by *rate* over a short window instead of by
+    stepping a literal day: new test "the retuned drain matches ~0.15/s (a full bar ≈ one day)" seeds
+    a full bar, steps 6s, asserts ~0.9 drained (excludes the old 0.4/s ≈ 2.4) — from which "empties in
+    ~667s ≈ DAY_MS" follows arithmetically. `tests/e2e/survival-hunger.spec.ts`. Passes.
   - In `tests/e2e/survival-hunger.spec.ts`, add a flag-independent test that validates the retune target:
     seed `applyScenario(page, { hunger: HUNGER_MAX, clockMs: 0 /* day start */ })`, then `step` a **full day
     plus a small margin** — `step(page, DAY_MS + 10_000)` — and assert the bar is near-empty:
@@ -109,7 +121,19 @@ acceptance signal, not a new test to write.
   - Docs: none.
   - Done when: the new test passes with the Step-1 drain; existing hunger/daynight/forage specs still green.
 
-- [ ] **Step 3: Flip `HUNGER_LETHAL` on (dev toggle), verify the cascade, update docs** `[inline]`
+- [x] **Step 3: Flip `HUNGER_LETHAL` on (dev toggle), verify the cascade, update docs** `[inline]`
+  - Outcome: **Food gate satisfied** — 5 `berryBush` nodes added to `the-moon.map.json` near the camp
+    tree/rock cluster (cols 111–114, rows 140–142) in a prior commit on THIS branch, so the food and the
+    flag-flip travel together (the branch-split trunk hazard is moot — no separate editor→master path).
+    `src/config.ts` `HUNGER_LETHAL` false → true, comment reframed to a dev toggle. Cascade tests added
+    to `survival-hunger.spec.ts` (both feasible within the step budget — see Step 2): "neglecting food
+    drains the bar to zero and then costs HP" (drain→starve→HP from a near-empty seed) and "eating a
+    berry relieves hunger and keeps the player off the starve cascade"; the previously known-red "a
+    starving player loses HP" now passes. Dropped the doubly-stale `GameScene.ts:360` comment. Docs:
+    `STATUS.md` (hunger live), `ROADMAP.md` Step 4 ✅ + DELIVERED note + "IN the loop" line, `CLAUDE.md`
+    Next-line marker ✅. Boot canary green (also hardened `scripts/smoke.mjs` to retry the MainMenu tap —
+    a pre-existing single-tap race, unrelated). Also fixed a pre-existing red `death.spec.ts` (stale
+    `MAP_WIDTH/2` spawn assertion → `SPAWN_TILE`). Full `npm run e2e` + `npm run test` + build green.
   - **Gate first (twice — finding #3):** confirm the loaded start map (`START_MAP_ID = 'the-moon'`) actually
     carries `berryBush` node(s) — inspect `src/data/maps/the-moon.map.json` for `kind: "node"` entries
     referencing `berryBush` (Matt places these via the editor; as of planning there are **none**). (1) Verify
@@ -167,10 +191,10 @@ the single `HUNGER_LETHAL` guard, the known-red test, harness seed fields, berri
 empty→death). Findings #1, #3, #4, #5 are folded into the steps above; #2 is kept as a confirm-by-feel item
 (owner chose to keep the ~0.15 drain as-is).
 
-| # | Finding | Lens | Severity | Resolution |
-| - | ------- | ---- | -------- | ---------- |
-| 1 | Step-2 test knife-edge: 0.15/s over `DAY_MS` drains exactly 99 → hunger `1.0`, on the float boundary, and not `isStarving` (`hunger<=0`) | Executability | Medium | ✅ Folded in: step `DAY_MS + 10_000`, assert `< 5`, dropped the "reached 0 / isStarving" framing (also fixed the Step-3 "without eating" step duration) |
-| 2 | ~0.15/s empties the bar right as night falls; a neglected day dies ~27s into the wave with ~0 daytime buffer | Gaps/feel + roadmap | Medium | ⏳ Owner keeps 0.15 as-is; **confirm-by-feel** during execution that dusk-empty + wave is clawback-able, else soften to ~0.13/s (cascade untouched) |
-| 3 | Food gate checked at flip-time on the feature branch, but map JSON autocommits to `master` and trunk auto-deploys — flag merging ahead of berries ships an unwinnable starve-out | Reversibility/sequencing | Medium | ✅ Folded in: gate now re-verified against trunk **at merge**, not only at flip; noted `the-moon` carries 0 `berryBush` today |
-| 4 | "One food run per day" is loose — 1 berry = +25, so ~4 berries refill the 100-pt bar | Right-sizing | Low | ✅ Noted in decisions; confirm-by-feel covers it |
-| 5 | `GameScene:360` comment is doubly stale (also references `test.map.json`) | Consistency | Low | ✅ Folded in: Step 3 now says drop it outright |
+|#|Finding|Lens|Severity|Resolution|
+|-|-------|----|--------|----------|
+|1|Step-2 test knife-edge: 0.15/s over `DAY_MS` drains exactly 99 → hunger `1.0`, on the float boundary, and not `isStarving` (`hunger<=0`)|Executability|Medium|✅ Folded in: step `DAY_MS + 10_000`, assert `< 5`, dropped the "reached 0 / isStarving" framing (also fixed the Step-3 "without eating" step duration)|
+|2|~0.15/s empties the bar right as night falls; a neglected day dies ~27s into the wave with ~0 daytime buffer|Gaps/feel + roadmap|Medium|⏳ Owner keeps 0.15 as-is; **confirm-by-feel** during execution that dusk-empty + wave is clawback-able, else soften to ~0.13/s (cascade untouched)|
+|3|Food gate checked at flip-time on the feature branch, but map JSON autocommits to `master` and trunk auto-deploys — flag merging ahead of berries ships an unwinnable starve-out|Reversibility/sequencing|Medium|✅ Folded in: gate now re-verified against trunk **at merge**, not only at flip; noted `the-moon` carries 0 `berryBush` today|
+|4|"One food run per day" is loose — 1 berry = +25, so ~4 berries refill the 100-pt bar|Right-sizing|Low|✅ Noted in decisions; confirm-by-feel covers it|
+|5|`GameScene:360` comment is doubly stale (also references `test.map.json`)|Consistency|Low|✅ Folded in: Step 3 now says drop it outright|

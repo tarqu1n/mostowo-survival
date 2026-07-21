@@ -44,16 +44,30 @@ ok('game booted (Boot → Preload → MainMenu)');
 // MainMenu starts the Game scene on any pointerdown; click the canvas centre (the FIT-scaled canvas
 // is letterboxed within the viewport, so viewport-centre may miss it). Reaching Game renders the
 // world + HUD, which compiles the WebGL shaders — the zero-error gate below is the shader-compile check.
+// Retry the tap while MainMenu is still active: game.isBooted flips long before MainMenu.create()
+// registers its pointerdown listener, so a single click can land in that gap and be dropped (the
+// documented "boot-timeout" race — see tests/e2e/harness.ts bootIntoGame). Retrying self-heals it.
+await page.waitForFunction(() => window.game?.scene?.isActive('MainMenu'), null, {
+  timeout: 10000,
+});
 const box = await page.locator('canvas').boundingBox();
+let gameActive = false;
 if (!box) fail('game canvas not found');
-else await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-
-await page
-  .waitForFunction(() => window.game.scene.getScene('Game')?.scene.isActive(), null, {
-    timeout: 5000,
-  })
-  .then(() => ok('Game scene active'))
-  .catch(() => fail('Game scene never became active'));
+else {
+  const [cx, cy] = [box.x + box.width / 2, box.y + box.height / 2];
+  for (let attempt = 0; attempt < 10 && !gameActive; attempt++) {
+    if (await page.evaluate(() => window.game.scene.isActive('MainMenu')))
+      await page.mouse.click(cx, cy);
+    gameActive = await page
+      .waitForFunction(() => window.game.scene.getScene('Game')?.scene.isActive(), null, {
+        timeout: 1500,
+      })
+      .then(() => true)
+      .catch(() => false);
+  }
+}
+if (gameActive) ok('Game scene active');
+else fail('Game scene never became active');
 await page
   .waitForFunction(() => window.game.scene.getScene('UI')?.scene.isActive(), null, {
     timeout: 5000,
