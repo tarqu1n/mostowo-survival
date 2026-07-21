@@ -397,6 +397,11 @@ export class CombatFxManager {
     bowTargetId: string | null,
     playerTile: Cell,
   ): void {
+    // No-work guard (plan 043 Step 15, perf lens item 2): with no enemies AND no bars still to tear
+    // down, every loop below is a no-op — skip the per-frame filter/sort/Set churn entirely. MUST also
+    // gate on `hpBars.size`, else bars for enemies that died this frame would never reach the destroy
+    // loop below and would linger.
+    if (enemies.length === 0 && this.hpBars.size === 0) return;
     const now = this.scene.time.now;
     const live = enemies.filter((z) => z.alive);
 

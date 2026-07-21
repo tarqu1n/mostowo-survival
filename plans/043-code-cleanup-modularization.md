@@ -421,7 +421,15 @@ delegate lanes — just driven inline, not blind-delegated.
   - Docs: note the new registry as an extension seam in CONVENTIONS (Step 18).
   - Done when: tripwire + queue/glow e2e green, new registry unit-tested, full gate green.
 
-- [ ] **Step 15: Apply safe perf fixes from the perf lens** `[inline]`
+- [x] **Step 15: Apply safe perf fixes from the perf lens** `[inline]`
+  - Outcome: applied the two `safe` + `[fix]` items only (items 2 & 3 in `docs/cleanup/perf.md`; every
+    other item is `[log]` or `needs-review` — left untouched). Item 2: no-work early-return at the top of
+    `CombatFxManager.syncEnemyHealthBars` — `if (enemies.length === 0 && this.hpBars.size === 0) return;`
+    (gates on `hpBars.size` too, so bars for enemies that died this frame still reach the destroy loop).
+    Item 3: `if (this.glowSprites.size === 0) return;` at the top of `TaskGlowRenderer.syncGlowTransforms`.
+    Both marked ✅ applied in perf.md. Gates: `check` green (925 tests), `build` green, **refactor-tripwire
+    green** (frame-accurate snapshot unchanged), combat.spec (incl. the HP-bar reveal/persist tests) +
+    death.spec green, smoke green (zero console errors). No visual regression.
   - Apply only the **safe** (behavior-preserving) items from `docs/cleanup/perf.md`: e.g. cache/reuse
     the enemy array instead of per-frame `enemyManager.all()` allocation, gate
     `taskGlowRenderer.syncGlowTransforms()` / `syncEnemyHealthBars` on there being something to do.

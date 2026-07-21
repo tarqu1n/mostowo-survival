@@ -194,6 +194,7 @@ export class TaskGlowRenderer {
    * sprite transform — a sway or a mid-fall lean must not move the tree's logical tile.
    */
   syncGlowTransforms(): void {
+    if (this.glowSprites.size === 0) return; // no queued-harvest halos → skip the Map-iterator alloc (plan 043 Step 15, perf item 3)
     for (const [id, glow] of this.glowSprites) {
       const s = this.deps.treeById(id)?.sprite;
       if (!s) continue;
