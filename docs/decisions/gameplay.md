@@ -6,6 +6,26 @@ Part of the [decision log index](../DECISIONS.md). Newest first.
 
 ---
 
+## 2026-07-21 — [DECIDED] NPC companion (plan 042): separate baseSupply, repair-consumes-supply, mobs-aggro-NPC downed then auto-revive-at-dawn, Rogue sprite, dev-spawn-only, full scope
+
+The MVP NPC (plan 042, ROADMAP Step 5) settled several calls; full detail in
+[plan 042](../../plans/042-npc-companion.md):
+
+- **Separate `baseSupply` stockpile, not the player `Inventory`.** The companion economy runs on a new
+  pure counts-only store (`wood`/`rock`, `src/systems/baseSupply.ts`) with **no withdraw UI** — chosen
+  over reusing the slot-backed player bag so gather/repair are decoupled from carried loot.
+- **Repair consumes stockpile supply.** The Repair day-role drains `baseSupply` wood to mend walls (idles
+  when empty), tying Gather and Repair economically through the one stockpile — not a free mend.
+- **Mobs can aggro the NPC → downed → auto-revive at dawn.** The monster FSM target was generalised from
+  **player-only** to **nearest-of-{player, NPC}**; a killed NPC is **downed** (inert on its Death strip,
+  not removed) and **auto-revives the next dawn**. Chosen so downed/revive is reachable in real play
+  without a permadeath/rescue system (post-MVP).
+- **Rogue sprite; dev-/scenario-spawned only.** The companion uses the **Rogue** Pixel Crawler actor; the
+  **recruit quest (Litrandil) stays post-MVP** — the NPC is spawned directly via dev/scenario for MVP.
+- **Full Step-5 scope retained** (not trimmed): one assignable day role (Gather↔Repair), 3 night postures
+  (Guard here / Follow / Refuel lights), tap-to-assign HUD popover. **All `NPC_*` tuning is flagged
+  placeholder** in `config.ts` for a later feel pass.
+
 ## 2026-07-20 — [DECIDED] Base-defence walls: mob-destructible + thorns archetype, deconstruct-not-combat, 4-way rotate (plan 037)
 
 Base-defence walls (plan 037, chunks 2a–2c) settled four gameplay calls; full rationale in

@@ -139,13 +139,29 @@ runs a day with/without eating, assert the hunger→health cascade.
 > known-red "a starving player loses HP" now passes, plus new full-day drain, without-eating cascade, and
 > eating-relieves-it specs.
 
-### 5. The NPC (labour + muscle)
+### 5. The NPC (labour + muscle) ✅
 
 Spawn one companion (no recruit quest). **Movement reuses the worker A\* + task queue**; **combat reuses
 the skeleton's** model. Give it one **day role** (gather or build) and one **night defend-posture** (hold
 near the campfire / a wall segment), reassignable.
 *Done when:* the NPC gathers by day and fights the wave by night, and you can switch its role.
 *Test:* scenario spawns an NPC, assigns a day task then a night posture, runs a full cycle.
+
+**Progress — DELIVERED by [plan 042](../plans/042-npc-companion.md):** one dev-/scenario-spawned
+companion (the **Rogue** sprite — new `NpcCharacter`, the 3rd `Character` subclass; owned by
+`src/scenes/world/CompanionManager.ts` with its own `TaskQueue`+executor, combat stepper, and postures).
+**Day** = one assignable role, **Gather** (harvest nearest wood/rock into a low carry cap, deposit at the
+hearth) ↔ **Repair** (mend the most-damaged wall, consuming stockpile wood; idle when empty) — tied through
+the new **`baseSupply`** store (pure `systems/baseSupply.ts`, counts-only `wood`/`rock`, **separate from the
+player `Inventory`** — no withdraw UI, shown in the HUD; gather fills it, repair drains it). **Night** = 3
+postures — **Guard here** (hold a placed point, engage in range, return to post), **Follow**, **Refuel
+lights** (feed the fire from base supply) — fighting the wave via the shared melee model
+(`systems/companionCombat.ts`). **Mobs can aggro the NPC** (the monster FSM target generalised from
+player-only to nearest-of-{player, NPC}) → it can be **downed** (inert on its Death strip, not removed) →
+**auto-revives at the next dawn** (what makes downed/revive reachable in play). Tap-the-NPC HUD assignment
+popover (Guard-here arms a one-tap place-point mode), same setters on the scenario/test API. **All `NPC_*`
+tuning in `config.ts` is flagged placeholder** (later feel pass); the **recruit quest is post-MVP**. This
+**closes the MVP path** — Steps 0–5 all delivered. See [STATUS.md](STATUS.md#npc-companion-plan-042).
 
 ## After this = the full loop
 

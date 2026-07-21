@@ -16,6 +16,12 @@ Shards: [rendering](decisions/rendering.md) · [architecture](decisions/architec
 
 ---
 
+## 2026-07-21 — [DECIDED] NPC companion (plan 042): separate baseSupply, repair-consumes-supply, mobs-aggro-NPC downed then auto-revive-at-dawn, Rogue sprite, dev-spawn-only, full scope
+
+Separate `baseSupply` stockpile (not the player `Inventory`), repair consumes supply, mobs aggro the NPC → downed → auto-revive at dawn, Rogue sprite, dev-/scenario-spawn only (recruit quest post-MVP), full Step-5 scope retained. Closes the MVP path.
+
+→ [gameplay.md](decisions/gameplay.md#2026-07-21--decided-npc-companion-plan-042-separate-basesupply-repair-consumes-supply-mobs-aggro-npc-downed-then-auto-revive-at-dawn-rogue-sprite-dev-spawn-only-full-scope)
+
 ## 2026-07-19 — [DECIDED] Combat controls (mobile): movepad + auto-surfacing Melee/Bow cluster; facing-biased auto-target w/ highlight; telegraphed enemies; minimal HP bars; no dodge
 
 Movepad + auto-surfacing action cluster (Melee/Bow, room for spells); melee slows movement a lot / bow a little; facing-biased auto-target with highlighted target; telegraphed enemy wind-ups; minimal attention-scoped monster HP bars; kite instead of a dodge.

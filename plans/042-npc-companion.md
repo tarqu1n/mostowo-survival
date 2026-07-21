@@ -257,7 +257,8 @@ under the owner's full-scope call.
   - Done when: `npm test` (unit) + the Playwright suite pass, including `companion.spec.ts`; the full
     roadmap acceptance loop is green end-to-end.
 
-- [ ] **Step 11: Docs** `[delegate]`
+- [x] **Step 11: Docs** `[delegate]`
+  - Outcome: `docs/ROADMAP.md` — Step 5 marked ✅ + a "Progress — DELIVERED by [plan 042]" block (mirrors Step 2/3; MVP path complete, Steps 0–5 all delivered). `docs/STATUS.md` — new `## NPC companion (plan 042)` subsystem section (mirrors plan-040 entry). `CLAUDE.md` (lean, net ~+3 lines): Status paragraph lists the NPC companion, Next arrow reworded to "MVP path is complete" ending `→ ✅ NPC (plan 042)`, `world/` architecture line notes `CompanionManager`/`NpcCharacter`. `docs/DECISIONS.md` + `docs/decisions/gameplay.md` — dated 2026-07-21 [DECIDED] index entry + full shard entry (separate baseSupply, repair-consumes-supply, mobs-aggro-NPC + downed/auto-revive, Rogue sprite, dev-spawn-only w/ recruit quest post-MVP, full scope). markdownlint 0 errors (all 79 md files); prettier clean. No code touched. (Agent noted a PRE-EXISTING gap: the DECISIONS.md index was already missing the 2026-07-20 shard entries for plans 036/037/enemy-rendering — left as-is, out of scope.)
   - Terse, high-signal updates:
     - `docs/ROADMAP.md` Step 5 — add a **"Progress — DELIVERED by [plan 042]"** block (mirror Step 2/3),
       noting the scope calls: single assignable day role (gather↔repair), separate `baseSupply`

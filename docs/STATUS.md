@@ -306,6 +306,37 @@ scenario `traps` placement + `trapIds`, `__test.rearmTrap(index)`. Tier-2: `spik
 acceptance driving `beginWave()` — a real wave mob crossing a trap takes its hit). Tier-1:
 `trapStats` in `stats.test.ts`.
 
+## NPC companion (plan 042)
+
+The roadmap's **NPC** (labour + muscle) — one AI companion (the **Rogue** Pixel Crawler sprite),
+**dev-/scenario-spawned only** (no recruit quest — post-MVP). New `src/entities/NpcCharacter.ts` (the 3rd
+`Character` subclass) owned by `src/scenes/world/CompanionManager.ts`, which holds the single NPC, its own
+`TaskQueue`+executor, a combat stepper, its postures, and the revive — reusing the worker A\* / task spine
+and the shared melee model.
+
+**Day role (Gather ↔ Repair).** One assignable role. **Gather** harvests the nearest wood/rock node into a
+low carry cap and deposits at the hearth; **Repair** mends the most-damaged wall, consuming wood from the
+base stockpile (idles when it's empty). The two are tied economically through the stockpile.
+
+**`baseSupply` (plan 042).** A new **pure, counts-only** store (`src/systems/baseSupply.ts`, `wood`/`rock`),
+deliberately **separate from the player `Inventory`** (no withdraw UI) and shown in the HUD. Gather fills it;
+repair (and the Refuel-lights night posture) drains it.
+
+**Night postures (3).** **Guard here** (hold a set point, engage in range, return to post), **Follow** (trail
+the player, fight alongside), and **Refuel lights** (keep the campfire fed from base supply). The NPC fights
+the wave with the shared melee combat model (telegraphed strike + weapon-pin rig) via pure
+`src/systems/companionCombat.ts`.
+
+**Mobs aggro the NPC → downed → auto-revive.** The monster FSM target was generalised from **player-only** to
+**nearest-of-{player, NPC}**, so wave mobs can attack the companion. A killed NPC is **downed** (left inert on
+its Death strip, not removed) and **auto-revives at the next dawn** — this is what makes the downed/revive path
+reachable in real play.
+
+**Assignment UI.** Tap the NPC to open a HUD popover (Day: Gather/Repair; Night: Guard here/Follow/Refuel
+lights); "Guard here" arms a one-tap place-point mode. The same setters are exposed on the scenario/test API.
+**All `NPC_*` tuning in `config.ts` is flagged placeholder** for a later feel pass (plan-040 convention). This
+closes ROADMAP Step 5 — the **MVP path is complete**.
+
 ## Node harvest feel (plan 031)
 
 - **Per-hit recoil:** each chop/mine hit nudges the node sprite directionally away from the actor
