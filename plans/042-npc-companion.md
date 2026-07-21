@@ -1,6 +1,6 @@
 # NPC Companion (labour + muscle)
 
-> Status: planned — run /execute-plan to begin.
+> Status: in review
 
 ## Summary
 
