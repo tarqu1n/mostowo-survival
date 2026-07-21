@@ -134,5 +134,6 @@ test('golden debugState() snapshot survives a scripted world + combat sequence',
     waveActive: false, // plan 038 Step 7: day-1 daytime scenario (clockMs 20_000) → no night wave
     waveSpawns: 0, // no wave ran → nothing spawned
     enemyKinds: [], // the one scripted enemy is dead by snapshot time → no live enemies
+    traps: [], // plan 040: appended to DebugState; this scenario places no spike traps
   });
 });

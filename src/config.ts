@@ -437,6 +437,21 @@ export const CAMPFIRE_FLAME_RISE_PX = 2;
 export const CAMPFIRE_SMOKE_RISE_PX = 22;
 
 /**
+ * Trap tuning (placeholder — tune vs wave DPS). The spike trap (plan 040) is an ARMED floor tile that
+ * triggers ONCE when an enemy stands on it, deals flat `SPIKE_TRAP_DAMAGE` through the normal kill
+ * path, then goes spent until re-armed (a dawn worker order + a tap).
+ *  - `SPIKE_TRAP_DAMAGE` 2: meaningfully hurts a skeleton (`kidZombie` maxHp 3 → 1, survives) but
+ *    doesn't one-shot a boar (maxHp 5 → 3) — decision #2. The #1 knob once felt vs the live wave.
+ *  - `SPIKE_TRAP_COST` {wood:5}: scarce range (a funnel-liner, not spammable) — placeholder.
+ *  - `SPIKE_TRAP_TRIGGER_MS` 120: the extend/strike anim beat (armed frame → peak) on trigger.
+ * Re-arm consumes worker-time only for MVP (no resource — decision #6); a material cost is a later
+ * tuning decision.
+ */
+export const SPIKE_TRAP_DAMAGE = 2;
+export const SPIKE_TRAP_COST: Record<string, number> = { wood: 5 };
+export const SPIKE_TRAP_TRIGGER_MS = 120;
+
+/**
  * Night wave (plan 038 Step 3 — `scenes/world/WaveDirector.ts`). At night, skeletons spawn from the
  * "treeline": a fixed direction (`WAVE_SPAWN_DIR`, north) off the **defended centre** (the nearest lit
  * hearth, else the player) at ~`WAVE_SPAWN_RADIUS` tiles, spread laterally up to `WAVE_SPAWN_SPREAD`,

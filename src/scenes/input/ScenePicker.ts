@@ -3,7 +3,13 @@ import { worldToTile } from '../../systems/grid';
 import { hurtboxContains, DEFAULT_HURTBOX } from '../../systems/hurtbox';
 import { treeStats, wallStats, enemyStats } from '../../systems/stats';
 import { BUILDABLES } from '../../data/buildables';
-import type { PointerPick, TreeNode, BuildSite, PlacedStructure } from '../../entities/types';
+import type {
+  PointerPick,
+  TreeNode,
+  BuildSite,
+  PlacedStructure,
+  TrapState,
+} from '../../entities/types';
 import type { InspectableStats } from '../../data/types';
 import type { MonsterCharacter } from '../../entities/MonsterCharacter';
 import type { GameScene } from '../GameScene';
@@ -68,7 +74,16 @@ export class ScenePicker {
     if (pick?.kind === 'tree') return { kind: 'harvest', treeId: pick.tree.id };
     if (pick?.kind === 'structure' && pick.structure.behavior === 'campfire')
       return { kind: 'refuel', campfireId: pick.structure.id };
-    // A wall structure falls through to a plain move to the tapped tile (deconstructing is a
+    // A SPENT spike trap resolves to a rearm worker order (walk over + re-prime it, plan 040); an ARMED
+    // trap has nothing to do, so it falls through to a plain move (its tile IS walkable — decision #5 —
+    // so a move onto it is harmless; the trigger only queries enemies, never the worker).
+    if (
+      pick?.kind === 'structure' &&
+      pick.structure.behavior === 'trap' &&
+      !(pick.structure.state as TrapState).armed
+    )
+      return { kind: 'rearm', trapId: pick.structure.id };
+    // A wall (or armed trap) falls through to a plain move to the tapped tile (deconstructing is a
     // DEMOLISH-mode-only intent — see GameScene's onTap + demolishMode; command-mode taps never unbuild
     // a wall).
     return { kind: 'move', col: worldToTile(x), row: worldToTile(y) };

@@ -83,6 +83,9 @@ export class TaskGlowRenderer {
       } else if (a.kind === 'deconstruct') {
         const s = this.deps.structureById(a.wallId);
         if (s) this.outlineStructure(s);
+      } else if (a.kind === 'rearm') {
+        const s = this.deps.structureById(a.trapId);
+        if (s) this.outlineStructure(s);
       } else {
         this.queueMarkers.push(
           this.scene.add

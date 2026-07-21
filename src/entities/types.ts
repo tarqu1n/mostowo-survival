@@ -115,6 +115,18 @@ export interface WallState {
 export type WallStructure = PlacedStructure<WallState>;
 
 /**
+ * A spike-trap structure's runtime state (plan 040). Its single {@link PlacedStructure.sprite} shows
+ * the spike sheet: `armed` true = primed (settled on the armed frame — fires when an enemy stands on
+ * the trap's tile, dealing one hit, then flips `armed` false); `armed` false = spent (held on the
+ * extended peak frame) until a `rearm` worker order (dawn auto-enqueue + tap) re-primes it. Trigger-once
+ * by construction — one enemy-on-tile → one damage application. See TrapBehavior.
+ */
+export interface TrapState {
+  armed: boolean;
+}
+export type TrapStructure = PlacedStructure<TrapState>;
+
+/**
  * What a pointer "raycast" landed on: the specific world entity whose *rendered sprite* is drawn
  * under the point (see {@link ScenePicker.pickSpriteAt}). `null` (the absence of a pick) means empty
  * ground — no interactive sprite there — and the caller falls back to a plain move-to-tile. A built

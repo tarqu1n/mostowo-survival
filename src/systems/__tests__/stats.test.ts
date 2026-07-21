@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { treeStats, wallStats, enemyStats, playerCombatStats } from '../stats';
+import { treeStats, wallStats, trapStats, enemyStats, playerCombatStats } from '../stats';
 import { BUILDABLES } from '../../data/buildables';
 import { ENEMIES } from '../../data/enemies';
 import { NODES } from '../../data/nodes';
-import type { TreeNode, BuildSite } from '../../entities/types';
+import type { TreeNode, BuildSite, TrapStructure } from '../../entities/types';
 import type { MonsterCharacter } from '../../entities/MonsterCharacter';
 import type { CombatantStats } from '../../data/types';
 
@@ -52,6 +52,27 @@ describe('wallStats', () => {
       name: 'Wall',
       maxHp: BUILDABLES.wall.maxHp,
       extra: [{ label: 'Status', value: 'Built' }],
+    });
+  });
+});
+
+describe('trapStats', () => {
+  const trap = (armed: boolean) =>
+    ({ id: 'trap-1', col: 6, row: 3, state: { armed } }) as unknown as TrapStructure;
+
+  it('reports "Armed" for a primed trap', () => {
+    expect(trapStats(trap(true))).toEqual({
+      name: 'Spike Trap',
+      maxHp: BUILDABLES.spike_trap.maxHp,
+      extra: [{ label: 'Status', value: 'Armed' }],
+    });
+  });
+
+  it('reports "Spent" for a fired trap', () => {
+    expect(trapStats(trap(false))).toEqual({
+      name: 'Spike Trap',
+      maxHp: BUILDABLES.spike_trap.maxHp,
+      extra: [{ label: 'Status', value: 'Spent' }],
     });
   });
 });

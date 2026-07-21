@@ -2,6 +2,7 @@
  * Buildable catalogue. Keyed by buildable id; add new placeable structures here.
  */
 
+import { SPIKE_TRAP_COST } from '../config';
 import type { BuildableDef } from './types';
 
 export const BUILDABLES: Record<string, BuildableDef> = {
@@ -42,5 +43,26 @@ export const BUILDABLES: Record<string, BuildableDef> = {
     animKey: 'campfire',
     tilesTall: 3, // flame height (Fire_01 48px → 3 tiles native) + the tappable pick column
     originY: 1,
+  },
+  // Spike trap (plan 040) — the roadmap's "one trap": an ARMED floor tile that triggers ONCE when an
+  // enemy stands on it (deals SPIKE_TRAP_DAMAGE, then goes spent) and is re-armed each morning by a
+  // worker order (+ tap). `blocksPath:false` is load-bearing: mobs must be able to walk ONTO it (that's
+  // how it fires), so it never joins BuildManager's occupied/walls set. NOT `baseOnly` — it lines the
+  // kill-funnel outside the base (decision #5). The third live/simulated buildable — routed to
+  // TrapBehavior on completion via the StructureManager registry (finishSite dispatch on `behavior`).
+  // maxHp is an inert display stat (traps aren't mob-damageable this slice); cost is a placeholder.
+  spike_trap: {
+    id: 'spike_trap',
+    name: 'Spike Trap',
+    cost: SPIKE_TRAP_COST,
+    color: 0x9a6b3f,
+    maxHp: 10,
+    armour: 0,
+    speed: 0,
+    blocksPath: false,
+    behavior: 'trap',
+    animKey: 'spikeTrap', // truthy → routes through the animated-buildable branch (like the campfire)
+    tilesTall: 1, // single-tile floor trap: the pick column collapses to the foot tile (like the wall)
+    originY: 0.5, // flat floor decal — centred ON its tile (mobs walk over it), not bottom-anchored
   },
 };

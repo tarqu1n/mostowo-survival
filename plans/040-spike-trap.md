@@ -1,6 +1,6 @@
 # Spike Trap — Trigger-Once Damage Tile, Re-Armed Each Morning
 
-> Status: planned — run /execute-plan to begin. **REVISED 2026-07-20 (premise refresh):** plan 037's
+> Status: in review. **REVISED 2026-07-20 (premise refresh):** plan 037's
 > **StructureManager + destructible walls have now LANDED** (items 2a–2c + 3), so the earlier "bespoke
 > `TrapManager`, no 037 dependency" framing is **obsolete**. The trap now ships as the **third behavior
 > module (`TrapBehavior`) in the landed `StructureManager` registry**, beside `CampfireBehavior` /
@@ -133,7 +133,8 @@ like the campfire.
 
 ## Steps
 
-- [ ] **Step 1: Confirm the spike art (variant already curated — do NOT re-pick)** `[inline]`
+- [x] **Step 1: Confirm the spike art (variant already curated — do NOT re-pick)** `[inline]`
+  - Outcome: Viewed `Traps/Spikes/2.png` (192×32, 6f×32×32; opaque-px profile f0=36 f1=94 f2=169 f3=156 f4=94 f5=36 confirms symmetric retract→extend→retract). Pinned frame roles in `docs/wired-art.md`: **armed=frame 1** (low/primed, visible — not the flush frame 0), **trigger=play armed→frame 2** (damage at peak), **spent=frame 2 held**, **re-arm=frame 2→1**. Frames 0,3–5 unused. No code touched.
   - The variant is **already chosen**: 037's art curation recorded **`Traps/Spikes/2` (wood-tone)** in
     `docs/wired-art.md` ("Base-defence structures (plan 037)"), frame geometry pinned — **6 frames ×
     32×32**, a symmetric retract→extend→retract: **frame 0 = retracted**, **frame 2 = full extend**.
@@ -147,7 +148,8 @@ like the campfire.
     plan-040 line) with the finalised armed/trigger/spent frame indices.
   - Done when: the frame roles are pinned so Step 2 needs no art judgement.
 
-- [ ] **Step 2: `spike_trap` buildable + `TrapBehavior` module** `[inline]`
+- [x] **Step 2: `spike_trap` buildable + `TrapBehavior` module** `[inline]`
+  - Outcome: Added `spike_trap` to `buildables.ts` (`behavior:'trap'`, `blocksPath:false`, not `baseOnly`, `cost:SPIKE_TRAP_COST`, `maxHp:10` placeholder, `animKey:'spikeTrap'`, `originY:0.5` — a centred floor decal). Added `structures.spikeTrap` (pack + single 6f sheet) + `spikeTrapKey`/`spikeTrapExtendKey`/`SPIKE_TRAP_ARMED_FRAME`(1)/`SPIKE_TRAP_PEAK_FRAME`(2) to `tileset.ts`; PreloadScene loads it cross-pack; actorAnims registers the extend anim (frames 1→2, `duration:SPIKE_TRAP_TRIGGER_MS`). New `TrapBehavior.ts` (owns `TrapStructure[]`, materialise on armed frame, reset/destroy discipline, narrow `hurtEnemyOnTile` dep); `TrapState={armed}` in `entities/types.ts`. Registered `'trap'` in `buildWorld()` (no `materialiseBuildable`/tick edits). Config block (DAMAGE 2 / COST {wood:5} / TRIGGER_MS 120) added. `trapStats` in `stats.ts`. Build palette auto-lists it (`Object.values(BUILDABLES)`). Typecheck+lint+834 unit tests green; prod build compiles; placement e2e (`spike-trap.spec.ts` test 1) confirms armed on a walkable (unblocked) tile. Registry regression covered by tripwire + campfire/wall specs (the 2 campfire failures reproduce on master — pre-existing env/Chromium-1194 issues, not this plan).
   - Add `spike_trap` to `src/data/buildables.ts`: `behavior:'trap'`, `blocksPath:false`, **not**
     `baseOnly`, `cost` = placeholder `SPIKE_TRAP_COST` (scarce range, e.g. `{wood:5}` — flag for tuning),
     placeholder `maxHp`, `animKey` + art refs for the Step-1 spike (`Traps/Spikes/2`).
@@ -175,7 +177,8 @@ like the campfire.
     walkable tile (enemies/player path across it); a scenario reads the trap's `armed` via the structures
     seam; campfire + walls still build identically (registry regression); `npm run smoke` green.
 
-- [ ] **Step 3: Trigger — armed trap damages an enemy on its tile, then spent** `[inline]`
+- [x] **Step 3: Trigger — armed trap damages an enemy on its tile, then spent** `[inline]`
+  - Outcome: `TrapBehavior.tick` fires each armed trap on an enemy whose **feet tile** matches (exact `col/row` — decision #3; **deviated from the research pointer's `enemyAt`**, which is hurtbox-based and would also fire on a torso overlapping from the adjacent tile — not "standing on the spikes"). Damage routed via a new public `EnemyManager.hurtEnemy` (wraps the private thorns `hurtMonster` → normal hit-flash/kill path); on hit plays the extend anim + flips `armed=false` (holds the peak/spent frame). Added `EnemyManager.hurtEnemy`. Tier-2 (`spike-trap.spec.ts`): enemy on an armed trap loses exactly `SPIKE_TRAP_DAMAGE` and the trap goes spent; a second enemy on the spent trap takes no damage — both pass.
   - In `TrapBehavior.tick(delta)`: for each **armed** trap, query the enemy-tile seam (`EnemyManager.enemyAt`,
     via the injected dep) for an enemy on the trap's tile; on a hit → play the **trigger (extend)** anim,
     apply flat `SPIKE_TRAP_DAMAGE` via `enemy.takeDamage` (normal kill path), set `armed=false`, settle on
@@ -186,7 +189,8 @@ like the campfire.
     by `SPIKE_TRAP_DAMAGE` and the trap `armed` flips to `false` (assert both); a second enemy on a spent
     trap takes no damage.
 
-- [ ] **Step 4: Re-arm — `rearm` worker order + tap-to-rearm + dawn auto-enqueue** `[inline]`
+- [x] **Step 4: Re-arm — `rearm` worker order + tap-to-rearm + dawn auto-enqueue** `[inline]`
+  - Outcome: Added `rearm{trapId}` to the `tasks.ts` `Action` union + cloned the refuel/deconstruct touchpoints in `GameScene` (`describeActionTarget`, dispatch→`runRearm`, `beginCurrent` rearm branch resolving the trap + standing adjacent, `enqueue` de-dupe, `isRearmQueued`/`toggleRearm`, `runRearm` condition-terminating when armed/gone) + a `rearm` branch in `TaskGlowRenderer` (outlines the trap). `ScenePicker.actionAt`: spent trap → `rearm`; armed trap falls through to a plain move (its tile is walkable — decision #5). `onTap` batches `rearm` like `refuel`. **Dawn hook** `GameScene.rearmTrapsAtDawn` subscribed to `time:changed` in `wireBus` (+ SHUTDOWN `off`): on `phase==='day'` it `enqueue`s a rearm for every spent trap — the first **system-initiated** order; reusing `enqueue` gives append-not-clobber + de-dupe for free. **Note:** the plan's `setDayPhase` suggestion emits nothing, so the test fires `time:changed{phase:'day'}` directly (the exact event SurvivalClock emits at dawn). Tier-2: tap-path (`rearmTrap` seam) re-arms; dawn edge auto-enqueues behind a pending player move (current unchanged, pending+1) and completes → armed — both pass.
   - Extend `src/systems/tasks.ts` `Action` union with `rearm` carrying `{trapId}`. Clone the `refuel`
     touchpoints in `GameScene.ts`: `enqueue` + `isRearmQueued`/`toggleRearm` de-dupe; `beginCurrent`
     rearm branch (resolve trap via the structures seam, condition-abort if already armed, else
@@ -206,7 +210,8 @@ like the campfire.
     (or `step()` across the edge) → a `rearm` auto-enqueues → the worker walks over and re-arms it →
     `armed=true`. Separately: tapping a spent trap queues a `rearm` that re-arms it.
 
-- [ ] **Step 5: Scenario API, `DebugState`, tests (incl. live wave), tripwire & docs** `[inline]`
+- [x] **Step 5: Scenario API, `DebugState`, tests (incl. live wave), tripwire & docs** `[inline]`
+  - Outcome: `testApi.ts` — scenario `traps` placement (mirrors campfires) + `trapIds` in the result; `DebugState.traps: {col,row,armed}[]` appended at the END + serialized; `harness.ts` mirrors the field + adds `traps()`/`rearmTrap()` bridges; `testTypes.ts` gains `ScenarioSpec.traps`/`ScenarioResult.trapIds`/`GameTestApi.rearmTrap`; `GameScene.installTestApi` adds the `rearmTrap` bridge (enqueues the real order, like `deconstructWall`). Refactor-tripwire golden bumped with `traps: []` (deliberate). Tests: Tier-1 `trapStats` (armed/spent) in `stats.test.ts`; Tier-2 `spike-trap.spec.ts` (5 tests incl. the **live-wave acceptance** — `beginWave()` spawns a real mob, `moveEnemy` crosses it onto the trap, assert the trap fired + the wave mob took `SPIKE_TRAP_DAMAGE`; teleport avoids the-moon spawn→hearth walkability uncertainty the wave.spec flags). All 5 spike-trap + tripwire pass; 834+2 unit tests pass; prod build compiles; smoke boots with zero console/page errors (the smoke click-to-start + 2 campfire specs fail identically on master — pre-existing Chromium-1194 env issues). Docs: STATUS.md full entry, ROADMAP Step 3 ✅ (tuning deferred), CLAUDE.md Status + Next, wired-art.md (Step 1). No 037 edits / no architecture-deviation (037 item 3 already `[DONE]`).
   - `testApi.ts`: add a scenario spec `traps` field (place via `finishSite(createBlueprint(c,r,'spike_trap'))`,
     optional `armed` seed); append a `DebugState` `traps: {col,row,armed}[]` field **at the END** of the
     interface + serializer (`:434-487`); update `tests/e2e/harness.ts` + the `refactor-tripwire` golden

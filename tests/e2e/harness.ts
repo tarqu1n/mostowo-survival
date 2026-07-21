@@ -46,6 +46,7 @@ export interface DebugState {
   waveActive: boolean;
   waveSpawns: number;
   enemyKinds: string[];
+  traps: Array<{ col: number; row: number; armed: boolean }>;
 }
 
 /**
@@ -220,6 +221,17 @@ export function beginWave(page: Page): Promise<void> {
 /** The live campfires (col/row/fuel/lit), spec order — a shortcut over `state(page).campfires`. */
 export function campfires(page: Page): Promise<DebugState['campfires']> {
   return page.evaluate(() => (window as any).game.__test.state().campfires);
+}
+
+/** The live spike traps (col/row/armed), spec order — a shortcut over `state(page).traps` (plan 040). */
+export function traps(page: Page): Promise<DebugState['traps']> {
+  return page.evaluate(() => (window as any).game.__test.state().traps);
+}
+
+/** Enqueue the real rearm worker order for the trap at `index` (the order a tap on a spent trap
+ *  enqueues, plan 040) — walk-adjacent → re-prime; returns false if there's no trap at that index. */
+export function rearmTrap(page: Page, index: number): Promise<boolean> {
+  return page.evaluate((i) => (window as any).game.__test.rearmTrap(i), index);
 }
 
 /** Emit a game event (drives the HUD-wired paths: mode toggles, zoom, attack, follow). */

@@ -101,16 +101,20 @@ player death loses — a knocked-out fire floods darkness, relight to recover) a
 meter** (mob attacks drain the existing fuel). **Deferred to the arena map (Step 0):** spawns anchor to
 the defended centre, not a real map treeline edge (the-moon's grid perimeter is void).
 
-### 3. One trap
+### 3. One trap ✅
 
 A single trap buildable placed by day from gathered resources (walls already prove the build/blueprint
 path). Ordered **after** the wave so it can be tuned as a funnel against real wave pathing.
 *Done when:* you place it by day and watch it damage/stop the wave at night. *Test:* place via scenario,
 run wave, assert trap damage.
 
-> **In progress — [plan 040](../plans/040-spike-trap.md)** (the "one trap", carved out of plan 037). The
-> spike trap ships as a `TrapBehavior` module on the StructureManager registry landed below. Marks this
-> step delivered when it lands.
+> **✅ Delivered — [plan 040](../plans/040-spike-trap.md)** (the "one trap", carved out of plan 037). The
+> **spike trap** ships as the third `TrapBehavior` module on the StructureManager registry landed below:
+> an armed floor tile that **triggers once** on an enemy standing on it, then is **re-armed each morning**
+> by a queued worker order (dawn auto-enqueue + tap). Acceptance met — a Tier-2 spec drives the **live
+> wave** (`beginWave()`) and asserts a real wave mob crossing the trap takes its hit. **Numeric tuning
+> deferred:** damage / build cost / re-arm economy vs wave DPS are flagged placeholders in `config.ts`
+> for a later feel pass. See [docs/STATUS.md](STATUS.md#spike-trap-plan-040).
 >
 > **Landed ahead of this step — base-defence walls + StructureManager ([plan 037](../plans/037-base-defence-structures.md)).**
 > Not a numbered MVP step (walls "already prove the build path"), but pulled in early: **destructible

@@ -236,6 +236,16 @@ export interface TilesetManifest {
       build: Record<Facing, StripAnim>;
       destroy: Record<Facing, StripAnim>;
     };
+    /**
+     * Spike trap (plan 040) — ONE sheet (`Traps/Spikes/2`, 6f × 32×32) loaded cross-pack from `pack`
+     * (like the barricade). TrapBehavior makes one sprite per placed trap: it settles on the armed
+     * frame, plays the extend/strike (armed frame → peak) on trigger, then holds the spent (extended)
+     * frame. Frame roles are pinned in docs/wired-art.md — see `SPIKE_TRAP_ARMED_FRAME`/`_PEAK_FRAME`.
+     */
+    spikeTrap: {
+      pack: string;
+      sheet: StripAnim;
+    };
   };
 }
 
@@ -598,6 +608,15 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
         up: { path: 'Traps/Barricades/U_2_Destroy.png', frameWidth: 36, frameSize: 64, frames: 6 },
       },
     },
+    // Spike trap (plan 040) — `Traps/Spikes/2` (wood-tone, owner pick), a single 192×32 sheet = 6
+    // frames of 32×32, a symmetric retract→extend→retract. Cross-pack from craftpix-dungeon (via
+    // `pack`, like the barricade). Frame roles pinned in docs/wired-art.md: armed = frame 1 (low/primed,
+    // visible), the strike plays armed→frame 2 (peak), spent holds frame 2. Only frames 1 & 2 are
+    // load-bearing — see SPIKE_TRAP_ARMED_FRAME / SPIKE_TRAP_PEAK_FRAME below.
+    spikeTrap: {
+      pack: 'craftpix-dungeon',
+      sheet: { path: 'Traps/Spikes/2.png', frameSize: 32, frames: 6 },
+    },
   },
 };
 
@@ -672,6 +691,21 @@ export const barricadeBuildKey = (facing: Facing): string => `barricade-build-${
  *  idle (identical to the Build strip's last frame), stepping to rubble (frame 5) as HP drops (the
  *  damage-stage render hook) and played through on destruction. See `structures.barricade`. */
 export const barricadeDestroyKey = (facing: Facing): string => `barricade-destroy-${facing}`;
+
+/** Texture key for the spike-trap sheet (`Traps/Spikes/2`, 6f) — TrapBehavior sets the armed/spent
+ *  frame directly on the sprite and plays {@link spikeTrapExtendKey} for the trigger. See
+ *  `structures.spikeTrap`. */
+export const spikeTrapKey = (): string => 'spike-trap';
+
+/** Anim key for the spike trap's extend/strike (armed frame → peak) — played once on trigger, after
+ *  which the sprite holds the spent (extended) frame. See `structures.spikeTrap` + docs/wired-art.md. */
+export const spikeTrapExtendKey = (): string => 'spike-trap-extend';
+
+/** Spike-trap frame roles (plan 040, pinned in docs/wired-art.md). ARMED = a low/primed frame
+ *  (deliberately NOT the flush frame 0, so a placed trap reads on the map); the strike animates
+ *  ARMED → PEAK; spent holds PEAK (fully extended). */
+export const SPIKE_TRAP_ARMED_FRAME = 1;
+export const SPIKE_TRAP_PEAK_FRAME = 2;
 
 /** Texture key for an item's icon image (loaded from `public/assets/icons/<icon>`). */
 export const iconKey = (id: string): string => `icon:${id}`;

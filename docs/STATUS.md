@@ -252,6 +252,42 @@ the attacker back through the same damage/kill path a player hit uses (`hurtMons
 `killEnemy`) — so a low-HP mob genuinely **dies** to the spiked palisade; thorns fire only on the mob's
 own attack tick, never passively. Tier-2: `wall-enemy-attack.spec.ts` (siege-then-reach + thorns-kill).
 
+## Spike trap (plan 040)
+
+The roadmap's **one trap**: `spike_trap` is the **third live/simulated buildable**, materialised by a
+new **`trap` behavior module** (`src/scenes/world/TrapBehavior.ts`) in the StructureManager registry
+beside `campfire`/`wall` — no bespoke manager, no `materialiseBuildable` edit (`finishSite` already
+dispatches on `behavior`; the whole wiring is one `register('trap', …)` line in `buildWorld()`). It is
+`blocksPath:false` (mobs walk **onto** it — that's how it fires; it never joins the occupancy set) and
+**not** `baseOnly` (it lines the kill-funnel). Each placed trap owns one centred floor sprite from the
+CraftPix `Traps/Spikes/2` sheet (cross-pack load, like the barricade), settled on the **armed** frame
+(frame 1 — low/primed, deliberately not the flush frame 0, so a placed trap reads); frame roles pinned
+in [wired-art.md](wired-art.md).
+
+**Trigger-once (Step 3).** `TrapBehavior.tick` fires an **armed** trap the moment a live enemy's **feet
+tile** matches the trap tile (an exact `col/row` match — decision #3 — via a scene-mediated dep over
+`EnemyManager`, *not* the hurtbox-based `enemyAt`, which would also fire on a torso overlapping from the
+adjacent tile). It deals flat `SPIKE_TRAP_DAMAGE` through the normal hit-flash/kill path
+(`EnemyManager.hurtEnemy`), plays the extend/strike anim (armed→peak), and flips `armed` false — the
+sprite holds the extended (spent) frame. Deterministic under `step()` (structures tick before enemy
+movement each frame).
+
+**Re-arm (Step 4).** A spent trap is re-primed by a **`rearm` worker order** (the third refuel-mirror
+order, after `deconstruct`): walk adjacent → `TrapBehavior.rearm` snaps the sprite back to the armed
+frame. Enqueued two ways — a **tap** on a spent trap (`ScenePicker.actionAt` → `rearm`; an armed trap's
+tap is a no-op / plain move, since its tile is walkable) and the game's **first system-initiated worker
+order**: a **dawn auto-enqueue** (`GameScene.rearmTrapsAtDawn` on the night→`'day'` `time:changed` edge)
+queues a `rearm` for every spent trap, routed through the same `enqueue` so it **appends behind** (never
+clobbers) pending player work and de-dupes via `isRearmQueued`. Re-arm costs **worker-time only** for
+MVP (no resource — decision #6). Numbers (`SPIKE_TRAP_DAMAGE` 2, `SPIKE_TRAP_COST` {wood:5},
+`SPIKE_TRAP_TRIGGER_MS`) are **flagged placeholders** in `config.ts` for a later wave-DPS tuning pass.
+
+DEV seams: `DebugState.traps` (`{col,row,armed}[]`, appended at the END — tripwire golden bumped),
+scenario `traps` placement + `trapIds`, `__test.rearmTrap(index)`. Tier-2: `spike-trap.spec.ts`
+(placement, trigger-once, tap-rearm, dawn auto-enqueue + append-not-clobber, and a **live-wave**
+acceptance driving `beginWave()` — a real wave mob crossing a trap takes its hit). Tier-1:
+`trapStats` in `stats.test.ts`.
+
 ## Node harvest feel (plan 031)
 
 - **Per-hit recoil:** each chop/mine hit nudges the node sprite directionally away from the actor

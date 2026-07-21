@@ -52,10 +52,12 @@ swappable weapons system, the **night-wave + campfire-defense loop** (paced tree
 seek the fire, per-night escalation, loop-close; fire-out = darkness, not a loss), and **destructible
 base-defence walls** (a 4-way palisade the player rotates + deconstructs; mobs siege a walled-off base
 and take thorns damage) unified with the campfire under a **`StructureManager` behavior registry**
-(plan 037) have all landed. **Full feature/plan history:** [docs/STATUS.md](docs/STATUS.md).
+(plan 037), and the **spike trap** (a trigger-once armed floor tile re-armed each morning by a queued
+worker order — the third `StructureManager` behavior module, plan 040) have all landed. **Full
+feature/plan history:** [docs/STATUS.md](docs/STATUS.md).
 
 **Next:** the ordered path to a first playable MVP is in [docs/ROADMAP.md](docs/ROADMAP.md) (✅ combat
-rework → ✅ night wave + campfire defense → ✅ base-defence walls → trap (plan 040) → hunger → NPC).
+rework → ✅ night wave + campfire defense → ✅ base-defence walls → ✅ trap (plan 040) → hunger → NPC).
 Full vision in
 [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md); [docs/DECISIONS.md](docs/DECISIONS.md) for settled vs open.
 

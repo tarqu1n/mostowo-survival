@@ -15,6 +15,7 @@ import {
   campfireSmokeKey,
   barricadeBuildKey,
   barricadeDestroyKey,
+  spikeTrapKey,
   iconKey,
   type TileSource,
   type StripAnim,
@@ -169,6 +170,15 @@ export class PreloadScene extends Phaser.Scene {
         });
       }
     }
+
+    // Spike trap structure (plan 040): ONE sheet, cross-pack from craftpix-dungeon (like the barricade,
+    // via `tilesetAssetUrl`, NOT the manifest-base `url()`). Loaded unconditionally so a placed/scenario
+    // trap always has a resident texture. Registered as the extend anim later (registerActorAnims).
+    const spikeTrap = manifest.structures.spikeTrap;
+    this.load.spritesheet(spikeTrapKey(), tilesetAssetUrl(spikeTrap.pack, spikeTrap.sheet.path), {
+      frameWidth: spikeTrap.sheet.frameWidth ?? spikeTrap.sheet.frameSize,
+      frameHeight: spikeTrap.sheet.frameSize,
+    });
 
     // Monster weapon art + the two hand images (off-hand fist + main-hand open grip): one static image
     // each (no anim), keyed like the derived tiles. GameScene resolves them via resolveTile(source).

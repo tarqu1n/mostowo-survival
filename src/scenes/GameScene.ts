@@ -38,6 +38,7 @@ import { breadcrumb, setCrashContext } from '../debug/crashReporter';
 import { TaskQueue, type Action } from '../systems/tasks';
 import { resolveMeleeAttack, resolveRangedAttack, objectAsDefender } from '../systems/combat';
 import { attackTiles } from '../systems/hurtbox';
+import type { DayPhase } from '../systems/daynight';
 import type { UIScene } from './UIScene';
 import type { GameTestApi } from '../entities/testTypes';
 import type { CharacterSprite } from '../entities/Character';
@@ -55,6 +56,7 @@ import { EnemyManager } from './world/EnemyManager';
 import { StructureManager } from './world/StructureManager';
 import { CampfireBehavior } from './world/CampfireBehavior';
 import { WallBehavior } from './world/WallBehavior';
+import { TrapBehavior } from './world/TrapBehavior';
 import { SurvivalClock } from './world/SurvivalClock';
 import { WaveDirector } from './world/WaveDirector';
 import { VisionController } from './fx/VisionController';
@@ -196,6 +198,12 @@ export class GameScene extends Phaser.Scene {
     return this.structureManager.behavior<WallBehavior>('wall');
   }
 
+  /** The spike-trap behavior module, reached through the structure registry — for the behavior-SPECIFIC
+   *  trap ops (rearm/trapById/trapAt) the generic StructureManager route doesn't cover (plan 040). */
+  private get trap(): TrapBehavior {
+    return this.structureManager.behavior<TrapBehavior>('trap');
+  }
+
   // Pointer "raycast" + the tap/inspect intent built on top of it (plan 015 Step 5) — see
   // src/scenes/input/ScenePicker.ts. Stateless (no fields but scene+deps, no SHUTDOWN teardown — see
   // its class doc). Constructed fresh in buildWorld() each (re)start, right after ResourceNodeManager/
@@ -270,6 +278,7 @@ export class GameScene extends Phaser.Scene {
     if (a.kind === 'refuel') return a.campfireId;
     if (a.kind === 'build') return a.siteId;
     if (a.kind === 'deconstruct') return a.wallId;
+    if (a.kind === 'rearm') return a.trapId;
     return `(${a.col},${a.row})`;
   }
 
@@ -463,6 +472,21 @@ export class GameScene extends Phaser.Scene {
         },
       }),
     );
+    // Spike traps (plan 040) — an armed trap fires on the enemy STANDING on its tile (exact feet-tile
+    // match, decision #3 — NOT enemyAt's hurtbox test), routed through EnemyManager's environmental-
+    // damage seam (the normal hit-flash/kill path). Scene-mediated, so TrapBehavior never edges to
+    // EnemyManager/MonsterCharacter directly (013/015 coupling rule).
+    this.structureManager.register(
+      'trap',
+      new TrapBehavior(this, {
+        hurtEnemyOnTile: (col, row, amount) => {
+          const z = this.enemyManager.all().find((e) => e.alive && e.col === col && e.row === row);
+          if (!z) return false;
+          this.enemyManager.hurtEnemy(z, amount);
+          return true;
+        },
+      }),
+    );
 
     // Pointer "raycast" + tap/inspect intent (plan 015 Step 5) — constructed here, after
     // ResourceNodeManager/EnemyManager/BuildManager all exist, so its deps close over their real
@@ -525,6 +549,7 @@ export class GameScene extends Phaser.Scene {
         if (
           action.kind === 'harvest' ||
           action.kind === 'refuel' ||
+          action.kind === 'rearm' ||
           pointer.getDuration() >= LONGPRESS_MS
         )
           this.enqueue(action);
@@ -612,6 +637,7 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on('debug:toggleTime', this.survivalClock.toggleDayNight, this.survivalClock); // dev menu: flip day/night
     this.game.events.on('debug:forceWave', this.onForceWave, this); // dev menu: jump to night + start a wave now
     this.game.events.on('time:changed', this.waveDirector.onTimeChanged, this.waveDirector); // start/stop the night wave on dusk/dawn
+    this.game.events.on('time:changed', this.rearmTrapsAtDawn, this); // dawn → auto-enqueue rearm for spent traps (plan 040)
     this.game.events.on('zoom:delta', this.pointerInput.adjustZoom, this.pointerInput);
     this.game.events.on('camera:center', this.pointerInput.centerOnPlayer, this.pointerInput);
     this.game.events.on('combat:attack', this.attack, this);
@@ -638,6 +664,7 @@ export class GameScene extends Phaser.Scene {
       );
       this.game.events.off('debug:forceWave', this.onForceWave, this);
       this.game.events.off('time:changed', this.waveDirector.onTimeChanged, this.waveDirector);
+      this.game.events.off('time:changed', this.rearmTrapsAtDawn, this);
       this.game.events.off('zoom:delta', this.pointerInput.adjustZoom, this.pointerInput);
       this.game.events.off('camera:center', this.pointerInput.centerOnPlayer, this.pointerInput);
       this.game.events.off('combat:attack', this.attack, this);
@@ -756,6 +783,14 @@ export class GameScene extends Phaser.Scene {
         this.enqueue({ kind: 'deconstruct', wallId: w.id });
         return true;
       },
+      // Enqueue the real rearm worker order for the trap at `index` (the order a tap on a spent trap
+      // enqueues) — drives the full walk-adjacent → re-prime path under step() (plan 040).
+      rearmTrap: (i) => {
+        const t = this.trap.all()[i];
+        if (!t) return false;
+        this.enqueue({ kind: 'rearm', trapId: t.id });
+        return true;
+      },
       beginWave: () => testApi.beginWave(),
       zoneAt: (c, r) => this.zoneAt(c, r),
       moveEnemy: (i, c, r) => testApi.moveEnemy(i, c, r),
@@ -841,6 +876,9 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'deconstruct':
         this.runDeconstruct(action);
+        break;
+      case 'rearm':
+        this.runRearm(action);
         break;
     }
     this.playerChar.updateAnim(this.harvestSwing);
@@ -969,6 +1007,22 @@ export class GameScene extends Phaser.Scene {
       if (!stand || !this.pathTo(stand)) this.completeCurrent();
       return;
     }
+    if (a.kind === 'rearm') {
+      const t = this.trap.trapById(a.trapId);
+      if (!t) return this.completeCurrent(); // trap gone (e.g. a scenario reset) — drop the order
+      if (t.state.armed) return this.completeCurrent(); // already re-armed (fired-and-reset race) — nothing to do
+      // Stand ADJACENT to the trap (a trap tile is walkable, but standing off it avoids re-tripping a
+      // just-re-armed trap on the worker's own feet — the trigger only queries enemies, but adjacency
+      // reads as "reach over and reset it", mirroring the fire/wall tend-from-adjacent orders).
+      const stand = reachableAdjacent(
+        this.playerChar.tile(),
+        { col: t.col, row: t.row },
+        this.isBlocked,
+        this.gridDims,
+      );
+      if (!stand || !this.pathTo(stand)) this.completeCurrent();
+      return;
+    }
     // build
     const site = this.buildManager.siteById(a.siteId);
     if (!site || site.done) return this.completeCurrent();
@@ -1009,6 +1063,10 @@ export class GameScene extends Phaser.Scene {
     }
     if (a.kind === 'deconstruct' && this.isDeconstructQueued(a.wallId)) {
       this.toggleDeconstruct(a.wallId);
+      return;
+    }
+    if (a.kind === 'rearm' && this.isRearmQueued(a.trapId)) {
+      this.toggleRearm(a.trapId);
       return;
     }
     const wasIdle = this.queue.current === null;
@@ -1059,6 +1117,21 @@ export class GameScene extends Phaser.Scene {
     const wasCurrent = this.queue.removeWhere(
       (x) => x.kind === 'deconstruct' && x.wallId === wallId,
     );
+    if (wasCurrent) this.beginCurrent();
+    this.emitTasks();
+  }
+
+  /** True if a trap already has a rearm order (current or pending) — de-dupes a tap AND the dawn
+   *  auto-enqueue so a trap is never queued for rearm twice (plan 040). */
+  private isRearmQueued(trapId: string): boolean {
+    return this.queue.all().some((x) => x.kind === 'rearm' && x.trapId === trapId);
+  }
+
+  /** Remove a trap's rearm order — the trap analogue of {@link toggleRefuel}: tapping a spent trap
+   *  that's already queued un-queues it (tap again to re-queue at the end). If it was the live rearm,
+   *  advance to the next (or go idle) so the worker stops heading to a trap you un-queued. */
+  private toggleRearm(trapId: string): void {
+    const wasCurrent = this.queue.removeWhere((x) => x.kind === 'rearm' && x.trapId === trapId);
     if (wasCurrent) this.beginCurrent();
     this.emitTasks();
   }
@@ -1172,6 +1245,40 @@ export class GameScene extends Phaser.Scene {
       this.wall.deconstruct(a.wallId); // remove + credit the partial refund
       this.completeCurrent(); // condition-terminate: the wall is gone
     }
+  }
+
+  /**
+   * Re-arm a spent spike trap (plan 040, decision #6): walk to the stand tile (set in beginCurrent),
+   * then on arrival re-prime the trap and END the order. Like {@link runDeconstruct} it's a
+   * walk-adjacent-then-act order that self-terminates on a *condition* (the trap is armed / gone), a
+   * single act with no per-interval loop, and consumes NO resource for MVP (worker-time only). If the
+   * trap vanished mid-walk, drop the order rather than stall — TrapBehavior.rearm also no-ops on a gone
+   * (or already-armed) trap. Drives both the tap-to-rearm and the dawn auto-enqueue.
+   */
+  private runRearm(a: Extract<Action, { kind: 'rearm' }>): void {
+    const t = this.trap.trapById(a.trapId);
+    if (!t || t.state.armed) return this.completeCurrent(); // gone or already re-armed — condition-terminate
+    if (this.playerChar.advancePath()) {
+      this.player.body.setVelocity(0, 0);
+      this.playerChar.faceTile(t.col, t.row); // face the trap as it's reset
+      this.trap.rearm(a.trapId); // re-prime it (worker-time only, no resource — decision #6)
+      this.completeCurrent();
+    }
+  }
+
+  /**
+   * Dawn hook (plan 040, decision #6): on the night→`'day'` edge, auto-enqueue a `rearm` for every
+   * SPENT trap — the game's first SYSTEM-initiated worker order (no player tap). `time:changed` only
+   * emits on a phase/day change (SurvivalClock.tick), so `phase==='day'` here IS the dawn edge. Routes
+   * through the same {@link enqueue} the player's tap uses, so these compose with any pending player
+   * order: enqueue APPENDS (never replaces the active order) and its `isRearmQueued` de-dupe means a
+   * trap already queued for rearm (e.g. a player tapped it overnight) isn't double-queued. Subscribed
+   * in {@link wireBus} with a SHUTDOWN `off` (mirrors WaveDirector.onTimeChanged).
+   */
+  private rearmTrapsAtDawn({ phase }: { phase: DayPhase }): void {
+    if (phase !== 'day') return;
+    for (const t of this.trap.all())
+      if (!t.state.armed) this.enqueue({ kind: 'rearm', trapId: t.id });
   }
 
   // --- Input gate ----------------------------------------------------------

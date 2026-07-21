@@ -53,6 +53,9 @@ export interface ScenarioSpec {
   campfires?: Array<[number, number]>;
   /** Seed every placed campfire's fuel (e.g. a near-empty fire for a drain/relight test). */
   campfireFuel?: number;
+  /** Spike traps placed built + ARMED, bypassing tilePlaceable (fixtures) — a spec drives one spent by
+   *  scripting an enemy onto its tile (plan 040). See __test.applyScenario. */
+  traps?: Array<[number, number]>;
   rng?: () => number;
   hunger?: number;
   clockMs?: number;
@@ -67,6 +70,7 @@ export interface ScenarioResult {
   enemyIds: string[];
   siteIds: string[];
   campfireIds: string[];
+  trapIds: string[];
 }
 
 /** The DEV-only debug surface installed at `window.game.__test` (see GameScene.create). */
@@ -102,6 +106,10 @@ export interface GameTestApi {
    *  demolish-mode tap enqueues) — drives the walk-adjacent → remove + partial-refund path under step()
    *  (plan 037 2b). Returns false if there's no wall at that index. */
   deconstructWall(index: number): boolean;
+  /** DEV/test-only: enqueue the real `rearm` worker order for the trap at `index` (the order a tap on a
+   *  spent trap enqueues) — drives the walk-adjacent → re-prime path under step() (plan 040). Returns
+   *  false if there's no trap at that index. */
+  rearmTrap(index: number): boolean;
   /** DEV/test-only: start a night wave immediately (plan 038 Step 3), independent of the day→night
    *  clock edge — the deterministic entry point for spawn/pacing specs. Idempotent. */
   beginWave(): void;

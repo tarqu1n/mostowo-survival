@@ -216,6 +216,13 @@ export class EnemyManager {
     else this.deps.flashHit(z.sprite);
   }
 
+  /** Damage a monster from an ENVIRONMENTAL source (a spike trap, plan 040) through the same
+   *  hit-flash/kill path a wall's thorns use. Public seam for TrapBehavior via its dep closure —
+   *  keeps `hurtMonster` (the internal thorns path) private while the trap reuses the exact kill route. */
+  hurtEnemy(z: MonsterCharacter, amount: number): void {
+    this.hurtMonster(z, amount);
+  }
+
   // --- Combat ----------------------------------------------------------------------
 
   /**

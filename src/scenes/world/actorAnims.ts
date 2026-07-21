@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ACTION_ANIM_FRAMERATE, DEATH_ANIM_FRAMERATE } from '../../config';
+import { ACTION_ANIM_FRAMERATE, DEATH_ANIM_FRAMERATE, SPIKE_TRAP_TRIGGER_MS } from '../../config';
 import {
   ACTIVE_TILESET,
   playerAnimKey,
@@ -13,6 +13,10 @@ import {
   campfireSmokeKey,
   barricadeBuildKey,
   barricadeDestroyKey,
+  spikeTrapKey,
+  spikeTrapExtendKey,
+  SPIKE_TRAP_ARMED_FRAME,
+  SPIKE_TRAP_PEAK_FRAME,
   type Facing,
   type Facing4,
   type DirEnemyState,
@@ -156,5 +160,21 @@ export function registerActorAnims(scene: Phaser.Scene): void {
         repeat: 0,
       });
     }
+  }
+
+  // Spike trap (structure, plan 040): the extend/strike anim (armed frame → peak), played ONCE on
+  // trigger; the sprite otherwise sits on a static armed/spent frame TrapBehavior sets directly, so
+  // only this sub-range (not the full 6-frame retract→extend→retract) is registered. Guarded like the
+  // blocks above; one-shot (repeat 0) so the last (peak) frame holds as the spent look.
+  if (!scene.anims.exists(spikeTrapExtendKey())) {
+    scene.anims.create({
+      key: spikeTrapExtendKey(),
+      frames: scene.anims.generateFrameNumbers(spikeTrapKey(), {
+        start: SPIKE_TRAP_ARMED_FRAME,
+        end: SPIKE_TRAP_PEAK_FRAME,
+      }),
+      duration: SPIKE_TRAP_TRIGGER_MS, // the strike beat (config), not the shared action framerate
+      repeat: 0,
+    });
   }
 }

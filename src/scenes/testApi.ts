@@ -25,6 +25,7 @@ import type { BuildManager } from './build/BuildManager';
 import type { StructureManager } from './world/StructureManager';
 import type { CampfireBehavior } from './world/CampfireBehavior';
 import type { WallBehavior } from './world/WallBehavior';
+import type { TrapBehavior } from './world/TrapBehavior';
 import type { WaveDirector } from './world/WaveDirector';
 import type { TaskGlowRenderer } from './fx/TaskGlowRenderer';
 import type { CombatFxManager } from './fx/CombatFxManager';
@@ -88,6 +89,10 @@ export interface DebugState {
   waveActive: boolean;
   waveSpawns: number;
   enemyKinds: string[];
+  // Appended (plan 040) — one entry per live spike trap (col/row + armed vs spent). Lets a Tier-2 spec
+  // assert the trigger flips armed→false, the dawn/tap rearm flips it back, and placement/regression.
+  // New DebugState fields go at the END + the refactor-tripwire golden is bumped in the same step.
+  traps: { col: number; row: number; armed: boolean }[];
 }
 
 /**
@@ -203,6 +208,9 @@ export class TestApi {
   private get wall(): WallBehavior {
     return this.deps.structureManager.behavior<WallBehavior>('wall');
   }
+  private get trap(): TrapBehavior {
+    return this.deps.structureManager.behavior<TrapBehavior>('trap');
+  }
 
   /**
    * Reset the live world to empty — destroy every tree/enemy/site/marker GameObject and clear all
@@ -308,6 +316,16 @@ export class TestApi {
     if (spec.campfireFuel != null)
       for (const cf of this.campfire.all()) cf.state.fuel = spec.campfireFuel;
 
+    // Spike traps (plan 040): mirror the campfire path (finishSite → materialiseBuildable →
+    // StructureManager.materialise → TrapBehavior). Placed ARMED; a spec drives one spent by scripting
+    // an enemy onto it. Bypassing tilePlaceable is fine + intended for fixtures.
+    const trapIds: string[] = [];
+    for (const [c, r] of spec.traps ?? []) {
+      this.deps.buildManager.finishSite(this.deps.buildManager.createBlueprint(c, r, 'spike_trap'));
+      const list = this.trap.all();
+      trapIds.push(list[list.length - 1].id);
+    }
+
     const siteIds: string[] = [];
     for (const [c, r] of spec.blueprints ?? [])
       siteIds.push(this.deps.buildManager.createBlueprint(c, r, 'wall').id);
@@ -351,7 +369,7 @@ export class TestApi {
 
     this.deps.updateVision();
     this.deps.emitTasks();
-    return { treeIds, rockIds, bushIds, enemyIds, siteIds, campfireIds };
+    return { treeIds, rockIds, bushIds, enemyIds, siteIds, campfireIds, trapIds };
   }
 
   /**
@@ -527,6 +545,7 @@ export class TestApi {
       waveActive: this.deps.waveDirector.isActive(),
       waveSpawns: this.deps.waveDirector.spawnedCount(),
       enemyKinds: aliveEnemies.map((z) => z.def.id),
+      traps: this.trap.all().map((t) => ({ col: t.col, row: t.row, armed: t.state.armed })),
     };
   }
 }

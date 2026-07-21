@@ -7,7 +7,13 @@
 import { BUILDABLES } from '../data/buildables';
 import { CAMPFIRE_FUEL_MAX } from '../config';
 import type { CombatantStats, InspectableStats } from '../data/types';
-import type { TreeNode, BuildSite, CampfireStructure, WallStructure } from '../entities/types';
+import type {
+  TreeNode,
+  BuildSite,
+  CampfireStructure,
+  WallStructure,
+  TrapStructure,
+} from '../entities/types';
 import type { MonsterCharacter } from '../entities/MonsterCharacter';
 
 export function treeStats(node: TreeNode): InspectableStats {
@@ -31,6 +37,16 @@ export function placedWallStats(wall: WallStructure): InspectableStats {
     maxHp: wall.state.maxHp,
     currentHp: wall.state.hp,
     extra: [{ label: 'Status', value: 'Built' }],
+  };
+}
+
+/** Inspect a LIVE spike trap (plan 040): its armed/spent status. maxHp is the inert display stat off
+ *  BUILDABLES (traps aren't mob-damageable this slice), so no currentHp bar — like the campfire. */
+export function trapStats(trap: TrapStructure): InspectableStats {
+  return {
+    name: 'Spike Trap',
+    maxHp: BUILDABLES.spike_trap.maxHp,
+    extra: [{ label: 'Status', value: trap.state.armed ? 'Armed' : 'Spent' }],
   };
 }
 

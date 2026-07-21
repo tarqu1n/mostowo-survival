@@ -230,6 +230,13 @@ wall/gate/trap render steps read paths + frames from.
   exact **armed / trigger / spent** frame assignment is finalised at the trap step (candidate: armed =
   a low frame, trigger = play 0→2 as the strike + apply damage on the extend, spent = hold extended,
   re-arm = retract to armed) — recorded here so that step consumes concrete frames.
+  - **FINALISED (plan 040, 2026-07-20):** frame roles pinned (opaque-pixel measure confirms the
+    symmetric profile: f0=36 f1=94 f2=169 f3=156 f4=94 f5=36). **Armed = frame 1** (spikes low/primed —
+    deliberately *not* frame 0, which is flush/near-invisible, so a placed trap reads on the map).
+    **Trigger = play armed→frame 2** (the extend/strike), apply `SPIKE_TRAP_DAMAGE` at the peak
+    (frame 2). **Spent = frame 2 held** (fully extended/stuck up — clear "fired" read vs the low
+    armed frame). **Re-arm = frame 2 → frame 1** (retract to primed). Frames 3–5 are unused (the
+    strike only needs the extend half). Only frames 1 & 2 are load-bearing state frames.
 - **Deferred siblings (catalogued so a later session doesn't re-discover them):** same `Traps/` folder
   — `Lightning`, `Barrel` (+`Boom`), and `Barricades/Archer` (turret + its `Arrow` projectile). Not
   wired by plan 037; only the spike trap ships now.
