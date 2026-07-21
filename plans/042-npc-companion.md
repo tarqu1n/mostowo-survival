@@ -1,6 +1,6 @@
 # NPC Companion (labour + muscle)
 
-> Status: in review
+> Status: deployed
 
 ## Summary
 
