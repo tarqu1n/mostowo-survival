@@ -242,6 +242,23 @@ export class CampfireBehavior implements StructureBehavior {
     return true;
   }
 
+  /**
+   * Add `amount` fuel to campfire `id` WITHOUT an Inventory spend — the companion's `refuel` night
+   * posture (plan 042 Step 8) sources its wood from the shared BASE-SUPPLY pool, not the player's bag,
+   * so it can't route through {@link feedOne} (which spends the Inventory). Performs the same fuel/sprite
+   * writes as feedOne otherwise: tops the tank up (clamped), relights an out fire on the zero-crossing,
+   * grows the flame to the new fuel, and bumps the HUD fire bar. No-op (returns false) on an unknown id.
+   */
+  refuel(id: string, amount: number): boolean {
+    const c = this.campfireById(id);
+    if (!c) return false;
+    c.state.fuel = feedFuel(c.state.fuel, amount, CAMPFIRE_FUEL_MAX);
+    if (!c.state.lit && isLit(c.state.fuel)) this.light(c);
+    else this.applyFlame(c);
+    this.emitFire();
+    return true;
+  }
+
   /** Brief red "can't feed" blink for a refuel that can't proceed (bag empty, or the fire's already
    *  topped up), so an aborted refuel reads as a refusal rather than a dead tap; restores the real tint
    *  after (none if lit, ash-grey if out). */

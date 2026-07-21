@@ -9,6 +9,9 @@ import {
   NPC_ATTACK_WINDUP_MS,
   NPC_ATTACK_COOLDOWN_MS,
   NPC_COMBAT_REPATH_MS,
+  NPC_FOLLOW_RADIUS_TILES,
+  CAMPFIRE_FEED_INTERVAL_MS,
+  CAMPFIRE_FUEL_PER_WOOD,
 } from '../../config';
 import type { DayPhase } from '../../systems/daynight';
 import { tileToWorldCenter } from '../../systems/grid';
@@ -83,6 +86,11 @@ export interface CompanionManagerDeps {
   /** Injectable combat rng (the scene's `this.rng`) for the strike's hit roll — threaded like
    *  {@link import('./EnemyManager').EnemyManagerDeps.rng} so the DEV test API's pinned rng reaches it. */
   rng(): number;
+  /** Add `amount` fuel to the currently-lit hearth WITHOUT an Inventory spend — the `refuel` night
+   *  posture (plan 042 Step 8) sources its wood from the base-supply pool (`supplyTake`), not the
+   *  player's bag, so it can't reuse the player's `feedOne` (which spends Inventory). Routes to
+   *  `CampfireBehavior.refuel`. Returns false (no-op) when no fire is lit. */
+  refuelFire(amount: number): boolean;
 }
 
 /** The narrow per-wall snapshot the `repair` planner reads (via {@link CompanionManagerDeps.walls}) —
@@ -129,15 +137,20 @@ const SUPPLY_KIND: Readonly<Record<string, SupplyItem>> = { wood: 'wood', stone:
  * together economically (gather fills the pool, repair drains it). An empty pool → idle (surface
  * nothing); a full wall is never targeted (no path-thrash), and reaching `maxHp` replans to the next.
  *
- * **Night combat (plan 042 Step 7).** By night the SAME per-frame drive runs a small dedicated combat
- * stepper instead of the day roles: acquire the nearest live enemy within {@link NPC_VISION} (the pure
- * {@link acquireNearestTarget}), chase to a stand-adjacent tile, and land a telegraphed strike on
- * contact — reusing the monster's acquire → chase → contact SHAPE (never its FSM), the shared
- * {@link resolveMeleeAttack}, and the weapon-pin swing. The hit routes back through the existing enemy
- * kill/flash/corpse path (`deps.damageEnemy`). A downed companion (0 HP, {@link NpcCharacter.die})
- * stays inert on its Death strip until the night→day edge revives it ({@link NpcCharacter.revive}) at
- * {@link NPC_REVIVE_HP}. Posture nuance (guard/follow/refuel positioning) is Step 8; this step just
- * fights the wave.
+ * **Night postures (plan 042 Steps 7–8).** By night the same per-frame drive runs the posture
+ * dispatcher ({@link driveNight}) instead of the day roles. The shared ENGAGE primitive
+ * ({@link engageNearest}, the Step-7 combat stepper) acquires the nearest live enemy within
+ * {@link NPC_VISION}, chases to a stand-adjacent tile, and lands a telegraphed strike on contact —
+ * reusing the monster's acquire → chase → contact SHAPE (never its FSM), the shared
+ * {@link resolveMeleeAttack}, and the weapon-pin swing; the hit routes back through the existing enemy
+ * kill/flash/corpse path (`deps.damageEnemy`). The THREE postures (Step 8) layer positioning/leash over
+ * it: **guard** ({@link driveGuard}) holds a set tile and returns to post; **follow**
+ * ({@link driveFollow}) trails the player (no path-thrash when the player is still) and fights
+ * alongside; **refuel** ({@link driveRefuel}) walks to the lit hearth and feeds it base-supply wood,
+ * holding where the fire was if none is lit. A downed companion (0 HP, {@link NpcCharacter.die}) stays
+ * inert on its Death strip until the night→day edge revives it ({@link NpcCharacter.revive}) at
+ * {@link NPC_REVIVE_HP} — consolidated with the posture-switch in {@link onPhaseChanged}, the single
+ * `time:changed` handler (Step 8).
  *
  * **Occupancy.** The companion's pathfinder veto is the player's `isBlocked` composite PLUS the
  * player's current tile, so the two actors never route onto the same tile. Its own tile is never
@@ -188,9 +201,24 @@ export class CompanionManager {
   private combatRepathElapsed = 0;
   /** The enemy id currently engaged — so a change of target forces an immediate repath. */
   private combatTargetId: string | null = null;
-  /** Previous phase, for the dawn (night→day) revive edge; `null` until the first tick so a scenario
-   *  seeded into day never spuriously revives on frame one. */
-  private prevPhase: DayPhase | null = null;
+
+  // --- Day/night handoff + night-posture state (plan 042 Step 8) ------------------------------------
+  /** The phase our day/night handoff last APPLIED — gates {@link onPhaseChanged} to a genuine phase
+   *  FLIP so a same-phase `applyClock` re-emit (a manual clock jump fires `time:changed` unconditionally)
+   *  is an idempotent no-op: no double-revive, no order re-thrash. `null` until the first flip. */
+  private appliedPhase: DayPhase | null = null;
+  /** The player tile the `follow` posture last pathed toward — a still player (same tile) never
+   *  triggers a repath, so a stationary player doesn't path-thrash the companion. */
+  private lastFollowTile: Cell | null = null;
+  /** The hearth-adjacent stand tile the `refuel` posture walks to — recomputed only when null, cleared
+   *  on a posture handoff so a re-entry re-derives it. */
+  private refuelStand: Cell | null = null;
+  /** Refuel-cadence accumulator (ms) — one wood fed per {@link CAMPFIRE_FEED_INTERVAL_MS}, mirroring
+   *  the player's refuel feed cadence. */
+  private refuelElapsed = 0;
+  /** Last-known lit hearth tile — the `refuel` posture holds here (and feeds nothing) when no fire is
+   *  currently lit (the documented "if none, hold where the fire was" fallback). */
+  private lastHearthTile: Cell | null = null;
 
   constructor(
     private readonly scene: GameScene,
@@ -224,37 +252,68 @@ export class CompanionManager {
   // --- Per-frame tick --------------------------------------------------------------
 
   /**
-   * Per-frame drive for the companion: reconcile the dawn revive, then run its role loop and refresh
-   * its animation. Above GameScene's no-action early-return, so it ticks whether or not the PLAYER has
-   * an active task. By DAY it gathers/repairs (plan 042 Steps 4/5); by NIGHT it fights the nearest live
-   * enemy (Step 7). A downed companion is left inert on its Death strip until the dawn revive stands it
-   * back up.
+   * Per-frame drive for the companion: run its current role/posture loop and refresh its animation.
+   * Above GameScene's no-action early-return, so it ticks whether or not the PLAYER has an active task.
+   * By DAY it gathers/repairs (plan 042 Steps 4/5); by NIGHT the posture dispatcher shapes where/how it
+   * fights ({@link driveNight} — guard/follow/refuel, Step 8). A downed companion is left inert on its
+   * Death strip until the dawn revive (in {@link onPhaseChanged}) stands it back up.
+   *
+   * **The role/posture BEHAVIOUR is polled here each frame** (phase + `dayRole`/`nightPosture`), so a
+   * scenario seeded straight into a phase — which emits no `time:changed` — behaves without any edge
+   * event. The once-per-transition SIDE EFFECTS (dawn revive, order/combat handoff) are consolidated
+   * into {@link onPhaseChanged}, the single `time:changed` handler (plan 042 Step 8) — the Step-7
+   * `update()` phase-edge revive was removed to keep exactly one code path per transition.
    */
   update(delta: number): void {
     const npc = this.npc;
     if (!npc) return;
-
-    // Dawn revive edge (plan 042 Step 7): on the night→day transition a downed companion stands back up
-    // at NPC_REVIVE_HP and resumes its day role. Edge-detected here (tracking the previous phase) rather
-    // than via a `time:changed` listener so the whole revive stays self-contained in this manager — Step
-    // 8 consolidates the full day/night role switch alongside it. Runs BEFORE the downed early-return so
-    // a still-downed companion is the one revived.
-    const phase = this.deps.dayPhase();
-    if (this.prevPhase === 'night' && phase === 'day' && npc.downed) {
-      npc.revive();
-      this.resetCombatState(); // clear any stale wind-up/engage so the next night starts fresh
-    }
-    this.prevPhase = phase;
-
     if (npc.downed) {
-      npc.updateAnim();
+      npc.updateAnim(); // inert on the Death strip until onPhaseChanged's dawn revive
       return;
     }
-    const day = phase === 'day';
+    const day = this.deps.dayPhase() === 'day';
     if (day && npc.dayRole === 'gather') this.driveGather(npc, delta);
     else if (day && npc.dayRole === 'repair') this.driveRepair(npc, delta);
-    else this.driveCombat(npc, delta); // night → engage the nearest live enemy (plan 042 Step 7)
+    else this.driveNight(npc, delta); // night → posture dispatcher (plan 042 Step 8)
     npc.updateAnim();
+  }
+
+  // --- Day/night handoff (plan 042 Step 8) — the single `time:changed` transition path ------------
+
+  /**
+   * Day/night role switch — the SINGLE transition path, subscribed to `time:changed` in
+   * `GameScene.wireBus` (with the paired SHUTDOWN `off`, mirroring `WaveDirector.onTimeChanged`).
+   * Consolidates the Step-7 `update()` phase-edge revive here so revive + posture-adopt + day-role-resume
+   * all happen ONCE per transition. Gated on a genuine phase FLIP via {@link appliedPhase}: a same-phase
+   * re-emit — a manual `applyClock` clock jump fires `time:changed` unconditionally — is an idempotent
+   * no-op, so it never double-revives or re-thrashes an in-flight order.
+   *
+   * On the night→day edge a downed companion revives ({@link NpcCharacter.revive}, itself idempotent —
+   * a no-op when already up) at `NPC_REVIVE_HP`; either edge clears the transient combat/order/posture
+   * movement state ({@link handoff}) so the incoming role/posture replans from a clean slate. The role
+   * (gather/repair) and posture (guard/follow/refuel) then resume automatically via {@link update}'s
+   * per-frame poll — this handler owns only the edge-triggered side effects, not the steady-state drive.
+   */
+  onPhaseChanged({ phase }: { phase: DayPhase }): void {
+    const npc = this.npc;
+    if (!npc) return;
+    if (phase === this.appliedPhase) return; // same-phase re-emit (clock jump) — idempotent no-op
+    this.appliedPhase = phase;
+    if (phase === 'day' && npc.downed) npc.revive(); // dawn revive (idempotent; no-op when already up)
+    this.handoff(npc); // clear stale order/combat/posture-movement state for a clean phase handoff
+  }
+
+  /** Clear the transient per-phase state — the order queue + its goal/cadence, the combat wind-up/engage,
+   *  the posture movement targets, and any in-flight path — on a day/night flip, so the incoming role or
+   *  posture starts from a clean slate rather than walking a stale target. */
+  private handoff(npc: NpcCharacter): void {
+    this.finishOrder(); // drop any gather/repair order + goal + chop/repair cadence
+    this.resetCombatState(); // drop any wind-up / engaged target / chase repath
+    this.lastFollowTile = null;
+    this.refuelStand = null;
+    this.refuelElapsed = 0;
+    npc.path = [];
+    npc.pathIndex = 0;
   }
 
   // --- Gather executor (the companion's slimmed task loop) -----------------------------------------
@@ -458,18 +517,41 @@ export class CompanionManager {
     if (this.deps.repairWall(wallId, NPC_REPAIR_HP_PER_TICK)) this.finishOrder(); // hit maxHp — mend the next damaged wall
   }
 
-  // --- Night combat executor (plan 042 Step 7) — the dedicated companion combat stepper --------------
+  // --- Night postures (plan 042 Step 8) — the posture dispatcher over the Step-7 combat primitive ---
 
   /**
-   * One frame of the companion's night combat: acquire the NEAREST live enemy within vision (the pure
-   * {@link acquireNearestTarget}), then — reusing the monster's acquire → chase → telegraphed-contact
-   * SHAPE (NOT its FSM) — either stand and land a telegraphed strike when in melee contact, or path to a
-   * tile adjacent to it and close in. No enemy in sight ⇒ settle in place (Step 8's postures refine
-   * positioning). Engages ENEMIES only (never the player / itself — they're not in the list).
+   * Night dispatcher: route to the executor for the companion's current {@link NpcCharacter.nightPosture}.
+   * The three postures share ONE ENGAGE primitive ({@link engageNearest}, the Step-7 combat stepper) and
+   * differ only in POSITIONING/leash: `guard` holds a set tile and returns to it, `follow` trails the
+   * player and fights alongside, `refuel` keeps the lit hearth fed. Default `follow` (also the entity's
+   * default) so an unspecified posture still behaves.
    */
-  private driveCombat(npc: NpcCharacter, delta: number): void {
-    this.playerTileTick = this.deps.playerTile();
+  private driveNight(npc: NpcCharacter, delta: number): void {
+    switch (npc.nightPosture) {
+      case 'guard':
+        this.driveGuard(npc, delta);
+        break;
+      case 'refuel':
+        this.driveRefuel(npc, delta);
+        break;
+      case 'follow':
+      default:
+        this.driveFollow(npc, delta);
+        break;
+    }
+  }
 
+  /**
+   * The shared night ENGAGE primitive (the plan 042 Step-7 combat stepper, generalised for Step 8):
+   * acquire the NEAREST live enemy within {@link NPC_VISION} (the pure {@link acquireNearestTarget}),
+   * then — reusing the monster's acquire → chase → telegraphed-contact SHAPE (NOT its FSM), the shared
+   * {@link resolveMeleeAttack}, and the weapon-pin swing — either stand and land a telegraphed strike in
+   * melee contact, or path to a tile adjacent to the target and close in. Returns the engaged target, or
+   * `null` when none is in range: unlike Step 7 it does NOT settle movement on the no-target branch — the
+   * CALLING POSTURE owns that idle/return/errand positioning (guard returns to post, follow trails the
+   * player, refuel tends the fire). Engages ENEMIES only (the player / itself are never in the list).
+   */
+  private engageNearest(npc: NpcCharacter, delta: number): CombatTarget | null {
     const target = acquireNearestTarget(
       { x: npc.sprite.x, y: npc.sprite.y },
       this.deps.enemies(),
@@ -478,8 +560,7 @@ export class CompanionManager {
     if (!target) {
       this.combatTargetId = null;
       this.combatWindupUntil = 0; // nothing to strike — drop any pending tell
-      npc.advancePath(); // settle any residual movement, issue no new orders
-      return;
+      return null; // caller does its posture's positioning
     }
 
     const npcTile = npc.tile();
@@ -490,7 +571,7 @@ export class CompanionManager {
       npc.sprite.body.setVelocity(0, 0);
       this.tryStrike(npc, target);
       this.combatTargetId = target.id;
-      return;
+      return target;
     }
 
     // Chase: refresh the path to a stand-adjacent tile on the repath cadence (or when the target changed
@@ -509,6 +590,111 @@ export class CompanionManager {
     this.combatTargetId = target.id;
     npc.advancePath();
     if (npc.isStuck()) this.repath(npc);
+    return target;
+  }
+
+  /**
+   * `guard` posture: hold a set tile, engage any mob that comes within range, and RETURN to post once
+   * the coast is clear. The guard tile defaults to where the companion stands on first guard drive (or a
+   * scenario's `guardAt` / the `setNpcGuardPoint` dev seam). Engagement range is the shared
+   * {@link NPC_VISION} — a natural leash: it chases only what it can SEE, then walks back — so it never
+   * wanders off after a fleeing mob. Idles in place (no path-thrash) once home.
+   */
+  private driveGuard(npc: NpcCharacter, delta: number): void {
+    this.playerTileTick = this.deps.playerTile();
+    if (!npc.guardPoint) npc.guardPoint = npc.tile(); // default the post to the current tile
+    const post = npc.guardPoint;
+
+    if (this.engageNearest(npc, delta)) return; // a mob is in range — fight it
+
+    // Coast clear — return to post; idle once there (don't re-path when already home / already heading).
+    const from = npc.tile();
+    if (from.col === post.col && from.row === post.row) {
+      npc.advancePath(); // at post — settle any residual movement
+      return;
+    }
+    const heading = this.goal != null && this.goal.col === post.col && this.goal.row === post.row;
+    if (!heading || npc.pathIndex >= npc.path.length) this.pathTo(npc, post);
+    npc.advancePath();
+    if (npc.isStuck()) this.repath(npc);
+  }
+
+  /**
+   * `follow` posture: stick near the player and fight alongside. Engages any mob in range first
+   * ({@link engageNearest}); otherwise trails the player, but only (re)paths once the player is beyond
+   * {@link NPC_FOLLOW_RADIUS_TILES} (Chebyshev) AND has stepped to a NEW tile since the last follow path
+   * — so a still player never makes it path-thrash (inside the radius it simply idles in place).
+   */
+  private driveFollow(npc: NpcCharacter, delta: number): void {
+    this.playerTileTick = this.deps.playerTile();
+    if (this.engageNearest(npc, delta)) {
+      this.lastFollowTile = null; // fighting broke formation — re-path fresh when we resume trailing
+      return;
+    }
+
+    const player = this.playerTileTick;
+    const from = npc.tile();
+    const cheb = Math.max(Math.abs(from.col - player.col), Math.abs(from.row - player.row));
+    if (cheb <= NPC_FOLLOW_RADIUS_TILES) {
+      npc.advancePath(); // close enough — settle, no repath (no thrash while the player stands still)
+      this.lastFollowTile = null;
+      return;
+    }
+
+    // Too far — (re)path toward a tile adjacent to the player, throttled to an actual player tile change.
+    const playerMoved =
+      this.lastFollowTile === null ||
+      this.lastFollowTile.col !== player.col ||
+      this.lastFollowTile.row !== player.row;
+    if (playerMoved || npc.pathIndex >= npc.path.length) {
+      const stand = reachableAdjacent(from, player, this.npcBlocked, this.deps.dims());
+      if (stand && this.pathTo(npc, stand))
+        this.lastFollowTile = { col: player.col, row: player.row };
+    }
+    npc.advancePath();
+    if (npc.isStuck()) this.repath(npc);
+  }
+
+  /**
+   * `refuel` posture: keep the lit hearth fed. Walk to a tile adjacent to the hearth, then on the
+   * player-refuel cadence ({@link CAMPFIRE_FEED_INTERVAL_MS}) withdraw one wood from the SHARED BASE
+   * SUPPLY and add {@link CAMPFIRE_FUEL_PER_WOOD} fuel to the fire (`deps.refuelFire`) — the same
+   * wood→fuel exchange the player's `refuel` order uses, sourced from the base pool rather than the bag,
+   * so an empty pool simply feeds nothing. Depends on a LIT hearth: when none is lit it holds at the
+   * last-known hearth tile and feeds nothing (the documented "if none, hold where the fire was"
+   * fallback). Kept simple — refuel prioritises the fire over fighting; a bite still lands via the
+   * Step-6 enemy AI (mobs target the NPC), it just doesn't fight back while tending.
+   */
+  private driveRefuel(npc: NpcCharacter, delta: number): void {
+    this.playerTileTick = this.deps.playerTile();
+    const hearth = this.deps.litHearthTile();
+    if (hearth) this.lastHearthTile = hearth;
+    const anchor = hearth ?? this.lastHearthTile;
+    if (!anchor) {
+      npc.advancePath(); // no fire has ever been lit — nothing to tend, settle in place
+      return;
+    }
+
+    // Establish a walk to a hearth-adjacent stand tile once (single MVP hearth); reused each frame after.
+    if (!this.refuelStand) {
+      const stand = reachableAdjacent(npc.tile(), anchor, this.npcBlocked, this.deps.dims());
+      if (stand) {
+        this.refuelStand = stand;
+        this.pathTo(npc, stand);
+      }
+    }
+    const arrived = npc.advancePath(); // true once at the stand tile (or with no path — already there)
+    if (npc.isStuck()) this.repath(npc);
+    if (!arrived) return;
+
+    npc.sprite.body.setVelocity(0, 0);
+    npc.faceTile(anchor.col, anchor.row); // tend toward the fire, whatever side we stood on
+    if (!hearth) return; // fire's out — hold where it was, feed nothing until it's relit
+    this.refuelElapsed += delta;
+    if (this.refuelElapsed < CAMPFIRE_FEED_INTERVAL_MS) return;
+    this.refuelElapsed = 0;
+    // One base-supply wood → CAMPFIRE_FUEL_PER_WOOD fuel (the player-refuel exchange). Empty pool → skip.
+    if (this.deps.supplyTake('wood', 1)) this.deps.refuelFire(CAMPFIRE_FUEL_PER_WOOD);
   }
 
   /**
@@ -589,8 +775,9 @@ export class CompanionManager {
   // --- Reset / teardown --------------------------------------------------------------
 
   /** Zero the gather/repair loop's state — an empty queue + carry buffer + cadence — AND the night
-   *  combat stepper's transient state + the phase-edge tracker. Called on (re)spawn and on the DEV
-   *  scenario reset so a fresh companion never inherits a prior run's haul, order, or pending strike. */
+   *  combat stepper's transient state, the night-posture movement state, and the day/night handoff
+   *  tracker. Called on (re)spawn and on the DEV scenario reset so a fresh companion never inherits a
+   *  prior run's haul, order, pending strike, follow/refuel target, or applied phase. */
   private resetGatherState(): void {
     this.queue.clear();
     this.carryBuf = { wood: 0, rock: 0 };
@@ -598,7 +785,11 @@ export class CompanionManager {
     this.repairElapsed = 0;
     this.goal = null;
     this.resetCombatState();
-    this.prevPhase = null;
+    this.appliedPhase = null;
+    this.lastFollowTile = null;
+    this.refuelStand = null;
+    this.refuelElapsed = 0;
+    this.lastHearthTile = null;
   }
 
   /**

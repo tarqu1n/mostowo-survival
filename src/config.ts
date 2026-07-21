@@ -216,6 +216,16 @@ export const NPC_REPAIR_WOOD_PER_TICK = 1;
 export const NPC_REPAIR_HP_PER_TICK = 2;
 export const NPC_REVIVE_HP = 3;
 /**
+ * Companion `follow` night posture (plan 042 Step 8). While following the player the companion holds
+ * station within this Chebyshev radius (tiles) and only (re)paths once the player steps beyond it — so
+ * a still player never makes it path-thrash. The `guard` posture leashes to its `guardPoint` and
+ * engages within the shared `NPC_VISION`; the `refuel` posture feeds the lit hearth one base-supply
+ * wood per `CAMPFIRE_FEED_INTERVAL_MS` (adding `CAMPFIRE_FUEL_PER_WOOD` fuel — the same wood→fuel
+ * exchange the player's refuel order uses), holding at the last-known hearth tile when no fire is lit.
+ * PLACEHOLDER tuning (un-playtested), flagged per plan 040's convention.
+ */
+export const NPC_FOLLOW_RADIUS_TILES = 3;
+/**
  * NPC body extent for combat targeting (see `Hurtbox`) — same ~1-wide, 2-tall silhouette as the
  * player (the Rogue is a humanoid of the same rough size). Occupancy stays the single feet tile.
  */

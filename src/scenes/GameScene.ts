@@ -517,6 +517,13 @@ export class GameScene extends Phaser.Scene {
         if (z) this.enemyManager.hurtEnemy(z, amount);
       },
       rng: () => this.rng(),
+      // Refuel night posture (plan 042 Step 8) — feed the lit hearth `amount` fuel WITHOUT an Inventory
+      // spend (the companion sources wood from the base-supply pool via `supplyTake`, not the player's
+      // bag), routed to CampfireBehavior.refuel on the lit hearth. False (no-op) when no fire is lit.
+      refuelFire: (amount) => {
+        const h = this.litHearth();
+        return h ? this.campfire.refuel(h.id, amount) : false;
+      },
     });
 
     // Build placement (plan 013 Step 6) — constructed fresh each (re)start; its constructor wires a
@@ -745,6 +752,11 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on('debug:forceWave', this.onForceWave, this); // dev menu: jump to night + start a wave now
     this.game.events.on('time:changed', this.waveDirector.onTimeChanged, this.waveDirector); // start/stop the night wave on dusk/dawn
     this.game.events.on('time:changed', this.rearmTrapsAtDawn, this); // dawn → auto-enqueue rearm for spent traps (plan 040)
+    this.game.events.on(
+      'time:changed',
+      this.companionManager.onPhaseChanged,
+      this.companionManager,
+    ); // night→adopt posture / day→resume role + revive (plan 042 Step 8)
     this.game.events.on('zoom:delta', this.pointerInput.adjustZoom, this.pointerInput);
     this.game.events.on('camera:center', this.pointerInput.centerOnPlayer, this.pointerInput);
     this.game.events.on('combat:attack', this.attack, this);
@@ -773,6 +785,11 @@ export class GameScene extends Phaser.Scene {
       this.game.events.off('debug:forceWave', this.onForceWave, this);
       this.game.events.off('time:changed', this.waveDirector.onTimeChanged, this.waveDirector);
       this.game.events.off('time:changed', this.rearmTrapsAtDawn, this);
+      this.game.events.off(
+        'time:changed',
+        this.companionManager.onPhaseChanged,
+        this.companionManager,
+      );
       this.game.events.off('zoom:delta', this.pointerInput.adjustZoom, this.pointerInput);
       this.game.events.off('camera:center', this.pointerInput.centerOnPlayer, this.pointerInput);
       this.game.events.off('combat:attack', this.attack, this);

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import {
   startGame,
   applyScenario,
@@ -10,6 +10,8 @@ import {
   walls,
   damageWall,
   moveEnemy,
+  emit,
+  order,
   type DebugState,
 } from './harness';
 
@@ -219,6 +221,7 @@ test('a mob adjacent to the companion deals it damage (the NPC is a valid threat
 // defended centre) so the night wave converges THERE, far from the row-3 skirmish — keeping the
 // companion's local fight a clean function of the mob(s) we place, not stray wave spawns.
 const NPC_REVIVE_HP = 3; // mirrors config.ts (harness DebugState carries no consts)
+const NPC_FOLLOW_RADIUS_TILES = 3; // mirrors config.ts (the `follow` posture's hold radius)
 const CAMP: [number, number] = [118, 140]; // near SPAWN_TILE — the lit hearth = the wave's defended centre
 
 /** Count of ALIVE enemies within `radius` tiles (Chebyshev) of the companion — the placed skirmish
@@ -297,4 +300,192 @@ test('a night companion is downed by real mob damage, then revives at the next d
   expect(dawn.companion!.downed).toBe(false); // …and the downed companion stood back up
   expect(dawn.companion!.hp).toBe(NPC_REVIVE_HP); // revived at NPC_REVIVE_HP
   expect(dawn.companion!.dayRole).toBe('gather'); // resumes its day role (default gather)
+});
+
+// Tier-2 (plan 042 Step 8): the three NIGHT POSTURES + the consolidated day/night role switch, through
+// the REAL scene. Step 8 (a) branches night behaviour on `nightPosture` — guard (hold a post, engage in
+// range, return), follow (trail the player, fight alongside, no thrash when the player is still), refuel
+// (feed the lit hearth) — and (b) consolidates the day↔night handoff (revive + posture-adopt + day-role-
+// resume) onto ONE idempotent `time:changed` listener (CompanionManager.onPhaseChanged). Driven
+// deterministically with step(); the clock is flipped with the same `debug:toggleTime` dev event the
+// menu uses (a manual `applyClock` jump, which also fires `time:changed` — exercising the idempotency).
+// A lit CAMP hearth far from each skirmish is the wave's defended centre, so night spawns converge THERE
+// and the local fight stays a clean function of the mob(s) we place (the Step-7 pattern).
+
+test('toggling the clock day→night→day flips the companion between its day role and night posture', async ({
+  page,
+}) => {
+  test.setTimeout(60_000); // a live scene + several driven-frame windows across two clock flips
+  await startGame(page);
+
+  // Companion in the proven-walkable row-3 band: `repair` by day (mends a wall in place — no hearth
+  // walk, so the far CAMP hearth doesn't pull it away), `guard` by night (holds its post, does NOT
+  // repair). The flip is read off the WALL: repair advances hp by DAY and is suspended by NIGHT. No
+  // enemies here — the guard/follow/refuel COMBAT behaviour is covered by the dedicated specs below.
+  await applyScenario(page, {
+    player: [3, 3],
+    companion: { at: [8, 3], dayRole: 'repair', nightPosture: 'guard', guardAt: [8, 3] },
+    walls: [[6, 3]],
+    campfires: [CAMP], // far → the night wave converges on the camp, never the row-3 wall
+    startPhase: 'day',
+    baseSupply: { wood: 40 },
+  });
+  await step(page, 1000); // let the wall's build anim settle on its intact idle frame
+  await damageWall(page, 0, 10); // knock it well down so there's headroom to mend across all phases
+  const hp0 = (await walls(page))[0].hp;
+
+  // DAY: the repair day-role advances the wall.
+  await step(page, 2500);
+  expect((await state(page)).dayPhase).toBe('day');
+  const hpDay1 = (await walls(page))[0].hp;
+  expect(hpDay1).toBeGreaterThan(hp0); // repaired by day
+
+  // Flip to NIGHT (manual clock jump — applyClock fires time:changed(night), driving onPhaseChanged).
+  await emit(page, 'debug:toggleTime');
+  expect((await state(page)).dayPhase).toBe('night');
+  await damageWall(page, 0, 4); // re-damage: if repair were still running, hp would climb back
+  const hpNight0 = (await walls(page))[0].hp;
+  await step(page, 3000);
+  const hpNight1 = (await walls(page))[0].hp;
+  expect(hpNight1).toBe(hpNight0); // guard posture — repair is suspended, the wall is left untouched
+  expect((await state(page)).companion!.downed).toBe(false); // nothing near it — it just holds post
+
+  // Flip back to DAY: the day role RESUMES (the consolidated switch) — the wall advances once more.
+  await emit(page, 'debug:toggleTime');
+  expect((await state(page)).dayPhase).toBe('day');
+  await step(page, 2500);
+  const hpDay2 = (await walls(page))[0].hp;
+  expect((await state(page)).companion!.dayRole).toBe('repair');
+  expect(hpDay2).toBeGreaterThan(hpNight1); // repair resumed after the night
+});
+
+test('the consolidated day/night switch revives a downed companion on a manual dawn jump (idempotent)', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await startGame(page);
+
+  // Seeded straight into night with a downed companion (far CAMP hearth keeps the wave away from it).
+  await applyScenario(page, {
+    player: [3, 3],
+    companion: { at: [8, 3], nightPosture: 'guard', guardAt: [8, 3], downed: true },
+    campfires: [CAMP],
+    startPhase: 'night',
+  });
+  await step(page, 200);
+  expect((await state(page)).companion!.downed).toBe(true); // still down at night (no dawn yet)
+
+  // Manual jump to DAY — applyClock fires time:changed(day); the single consolidated handler revives it.
+  await emit(page, 'debug:toggleTime');
+  await step(page, 200);
+  const day = await state(page);
+  expect(day.dayPhase).toBe('day');
+  expect(day.companion!.downed).toBe(false); // revived on the dawn edge (through the time:changed path)
+  expect(day.companion!.hp).toBe(NPC_REVIVE_HP);
+
+  // Jump night→day again: the handler is idempotent — no double-revive, no re-heal, no re-collapse.
+  await emit(page, 'debug:toggleTime'); // → night
+  await step(page, 200);
+  await emit(page, 'debug:toggleTime'); // → day
+  await step(page, 200);
+  const again = await state(page);
+  expect(again.dayPhase).toBe('day');
+  expect(again.companion!.downed).toBe(false);
+  expect(again.companion!.hp).toBe(NPC_REVIVE_HP); // unchanged — the second dawn was a no-op (already up)
+});
+
+test('a night GUARD companion holds its post, engages a mob in range, and returns to post', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await startGame(page);
+
+  // Companion posted at [8,3]; a club mob two tiles west at [6,3] (within NPC_VISION = 4 tiles), nearer
+  // to the NPC (2) than to the player at [3,3] (3), so it engages the NPC. Far CAMP hearth = the wave's
+  // defended centre → night spawns converge THERE, keeping this a clean function of the one placed mob.
+  await applyScenario(page, {
+    player: [3, 3],
+    companion: { at: [8, 3], nightPosture: 'guard', guardAt: [8, 3] },
+    enemies: [{ at: [6, 3], weaponId: 'club' }],
+    campfires: [CAMP],
+    startPhase: 'night',
+  });
+
+  const before = await state(page);
+  expect(before.companion!.col).toBe(8); // posted where placed
+  expect(enemiesNearCompanion(before, 5)).toBe(1); // the one skirmish mob (wave is at the far camp)
+
+  await step(page, 4000); // engage + kill the mob, then walk back to post
+
+  const after = await state(page);
+  expect(enemiesNearCompanion(after, 5)).toBe(0); // the guard killed the mob that came into range
+  expect(after.companion!.downed).toBe(false); // it won the exchange
+  const c = after.companion!;
+  expect(Math.max(Math.abs(c.col - 8), Math.abs(c.row - 3))).toBeLessThanOrEqual(1); // returned toward post
+});
+
+test('a night FOLLOW companion stays near the player as the player moves', async ({ page }) => {
+  test.setTimeout(60_000);
+  await startGame(page);
+
+  // Player + companion in the row-3 band, follow posture; far CAMP hearth so the night wave stays away.
+  // The companion starts a full 5 tiles from the player (beyond the follow radius) so it must trail.
+  await applyScenario(page, {
+    player: [7, 3],
+    companion: { at: [8, 3], nightPosture: 'follow' },
+    campfires: [CAMP],
+    startPhase: 'night',
+  });
+
+  const before = await state(page);
+  expect(before.companion!.col).toBe(8);
+
+  // Walk the player west across the band; the follow companion trails it (a queued move runs at night
+  // when no movepad is held — the movepad-precedence override only engages on an actual pad hold).
+  await order(page, { kind: 'move', col: 3, row: 3 });
+  await step(page, 6000);
+
+  const after = await state(page);
+  const cheb = Math.max(
+    Math.abs(after.companion!.col - after.pcol),
+    Math.abs(after.companion!.row - after.prow),
+  );
+  expect(after.pcol).toBe(3); // the player walked west to [3,3]
+  expect(after.companion!.col).toBeLessThan(8); // the companion trailed it westward (it followed)
+  expect(cheb).toBeLessThanOrEqual(NPC_FOLLOW_RADIUS_TILES + 1); // and ended within the follow radius
+});
+
+// refuel: with the NPC in refuel posture at night by a lit hearth, the fire's fuel ends HIGHER than an
+// identical run whose base-supply pool is empty (the NPC stands at the fire but has nothing to feed it).
+// Isolated by keeping the window short — the wave spawns ~14 tiles out and can't reach the hearth in it —
+// so the only fuel deltas are natural burn (both runs) and the NPC's feeding (the fed run only).
+const REFUEL_FUEL_START = 60; // a known mid level with headroom to rise and stay comfortably lit
+
+async function fuelAfterRefuelWindow(page: Page, wood: number): Promise<number> {
+  await applyScenario(page, {
+    player: [3, 3], // far from the hearth → the LIT HEARTH is the wave's defended centre, not the player
+    companion: { at: [CAMP[0], CAMP[1] + 1], nightPosture: 'refuel' }, // one tile from the CAMP hearth
+    campfires: [CAMP],
+    campfireFuel: REFUEL_FUEL_START,
+    startPhase: 'night',
+    baseSupply: { wood },
+  });
+  await step(page, 4000); // several feed cadences; the treeline spawns don't reach the fire this soon
+  return (await state(page)).campfires[0].fuel;
+}
+
+test('a night REFUEL companion slows the fire-fuel decline (feeds the hearth from base supply)', async ({
+  page,
+}) => {
+  test.setTimeout(90_000); // two live-scene windows
+  await startGame(page);
+
+  // Baseline: the SAME scenario with an EMPTY pool — the refuel NPC stands at the fire yet feeds nothing,
+  // so only natural burn touches the fuel over the window.
+  const baseline = await fuelAfterRefuelWindow(page, 0);
+  // With wood in the pool the refuel NPC feeds the hearth each cadence, so its fuel ends far higher.
+  const fed = await fuelAfterRefuelWindow(page, 20);
+
+  expect(baseline).toBeLessThan(REFUEL_FUEL_START); // natural burn only → fuel fell
+  expect(fed).toBeGreaterThan(baseline); // feeding measurably slowed (here reversed) the decline
 });
