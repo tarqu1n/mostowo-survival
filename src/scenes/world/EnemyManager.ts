@@ -4,6 +4,7 @@ import type { CombatantStats } from '../../data/types';
 import { enemyDeathKey } from '../../data/tileset';
 import { hurtboxContains, hurtboxTiles, DEFAULT_HURTBOX } from '../../systems/hurtbox';
 import type { Cell, Dims } from '../../systems/pathfind';
+import type { Threat } from '../../systems/monsterAI';
 import {
   MonsterCharacter,
   type MonsterSpawnOpts,
@@ -23,11 +24,12 @@ import type { GameScene } from '../GameScene';
  * env (per-bite hit rolls) so the DEV-only test API's pinned rng reaches both.
  */
 export interface EnemyManagerDeps {
-  /** The worker's current tile — the tick env's `playerTile` (also derives `playerBodyTiles`). */
+  /** The player's current tile — the player threat's `tile` (also derives its body tiles). */
   playerTile(): Cell;
-  /** The player sprite's world position — the tick env's `playerPos` (chase/lunge targeting). */
+  /** The player sprite's world position — the player threat's `pos` (chase/lunge targeting). */
   playerPos(): { x: number; y: number };
-  /** The player's stat bag — hurtbox for `playerBodyTiles`, plus armour/dodge for bite resolution. */
+  /** The player's stat bag — hurtbox for the player threat's body tiles, plus armour/dodge for bite
+   *  resolution. */
   playerStats(): CombatantStats;
   /** Grid bounds for pathing/placement checks. */
   dims(): Dims;
@@ -40,6 +42,19 @@ export interface EnemyManagerDeps {
   onPlayerHurt(): void;
   /** Apply bite damage to the player (scene-owned: emits hp events / triggers the death path). */
   damagePlayer(amount: number): void;
+  /** Plan 042 Step 6 — the companion NPC as a threat snapshot (tile + world pos + stats + downed), or
+   *  null when none is spawned. Mobs add it to their per-tick threat list UNLESS downed (never pile on a
+   *  corpse). A narrow scene-mediated snapshot, mirroring `litHearth()` — no manager↔manager edge. */
+  companion(): {
+    tile: Cell;
+    pos: { x: number; y: number };
+    stats: CombatantStats;
+    downed: boolean;
+  } | null;
+  /** Landed-bite feedback on the companion (its sprite flash) — the NPC twin of onPlayerHurt (plan 042). */
+  onNpcHurt(): void;
+  /** Apply bite damage to the companion NPC (scene-owned: routes to its takeDamage + downed collapse). */
+  damageNpc(amount: number): void;
   /** Plan 038 Step 4 — the nearest lit hearth the night wave targets (id + tile + world pos), or null
    *  when none is lit. Shared across the tick (one hearth in the MVP); wave mobs (`seeksFire`) path to
    *  it + strike it. */
@@ -176,20 +191,43 @@ export class EnemyManager {
    *  MonsterCharacter.update. */
   update(): void {
     const pt = this.deps.playerTile();
+    const playerStats = this.deps.playerStats();
+    // The threat list (plan 042 Step 6): the player, always, plus the companion NPC when spawned AND
+    // not downed. The FSM (acquire/chase) picks the nearest of these; the mob never targets itself (it's
+    // not in the list) and a downed/absent NPC is simply omitted, so it's never a valid target.
+    const threats: Threat[] = [
+      {
+        kind: 'player',
+        pos: this.deps.playerPos(),
+        tile: pt,
+        bodyTiles: hurtboxTiles(pt, playerStats.hurtbox ?? DEFAULT_HURTBOX),
+        stats: playerStats,
+      },
+    ];
+    const npc = this.deps.companion();
+    if (npc && !npc.downed) {
+      threats.push({
+        kind: 'npc',
+        pos: npc.pos,
+        tile: npc.tile,
+        bodyTiles: hurtboxTiles(npc.tile, npc.stats.hurtbox ?? DEFAULT_HURTBOX),
+        stats: npc.stats,
+      });
+    }
     const env: MonsterTickEnv = {
       nowMs: this.scene.time.now,
-      playerTile: pt,
-      playerPos: this.deps.playerPos(),
-      playerBodyTiles: hurtboxTiles(pt, this.deps.playerStats().hurtbox ?? DEFAULT_HURTBOX),
-      playerStats: this.deps.playerStats(),
+      threats,
       dims: this.deps.dims(),
       isBlocked: (col, row) => this.deps.isBlocked(col, row),
       rng: () => this.deps.rng(),
       lungeAt: (m, x, y) => this.deps.lungeAt(m, x, y),
       beginWindUp: (m, ms) => this.deps.beginWindUp(m, ms),
       endWindUp: (m) => this.deps.endWindUp(m),
-      onPlayerHurt: () => this.deps.onPlayerHurt(),
-      damagePlayer: (amount) => this.deps.damagePlayer(amount),
+      // Dispatch the bite's landed-hit feedback + damage to whichever threat the mob engaged.
+      onThreatHurt: (threat) =>
+        threat.kind === 'player' ? this.deps.onPlayerHurt() : this.deps.onNpcHurt(),
+      damageThreat: (threat, amount) =>
+        threat.kind === 'player' ? this.deps.damagePlayer(amount) : this.deps.damageNpc(amount),
       fire: this.deps.litHearth(), // plan 038 Step 4 — shared fire target for this tick's wave mobs
       attackFire: (id, amount) => this.deps.attackFire(id, amount),
       // Plan 037 chunk 2c — the generic structure-target seam (mirrors the fire seam above): find the

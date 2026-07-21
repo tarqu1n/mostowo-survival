@@ -181,7 +181,8 @@ under the owner's full-scope call.
   - Done when: a scenario places a damaged wall + NPC in `repair` role by day with wood in supply →
     wall HP climbs toward max and supply wood falls; empty supply → no repair. E2e-asserted.
 
-- [ ] **Step 6: Generalise mob threat-targeting to `{player, NPC}`** `[inline]`
+- [x] **Step 6: Generalise mob threat-targeting to `{player, NPC}`** `[inline]`
+  - Outcome: (Sub-agent's final report was truncated; coordinator re-ran the full acceptance gate to verify.) `MonsterInputs` replaced the four baked `player*` fields with `threats: Threat[]` (`Threat = {kind:'player'|'npc', pos, tile, bodyTiles, stats}`); `monsterAI.ts` gained `nearestThreat()`/`threatByKind()` helpers, `stepMonster` acquire/veer/de-aggro/chase pick the nearest eligible threat within vision, fire-seek preempt generalised to "any threat present". `MonsterCharacter.update` contact-damage retargets whichever threat it engages; `seek`/`siege` unchanged. `EnemyManager` builds the per-tick threats list: player always, companion pushed only when spawned AND not `downed` (never piles on a downed NPC); added `companion()`/`onCompanionHurt`/`damageCompanion` deps wired in `buildWorld()`. Player enemy auto-target enumerates enemies only → NPC already excluded. `monsterAI.test.ts` edits mechanical (single-elem threats) + new cases (NPC-nearer→acquires-NPC, downed/absent→not-acquired, threat-present-preempts-fire). Verified: typecheck clean, monsterAI 29 pass, full suite 865 pass (+8), lint 0 errors, build clean, companion e2e 7/7 incl. "mob adjacent to NPC deals it damage".
   - Resolves critique #1. Generalise the monster FSM's baked player target: change `MonsterInputs`
     from `playerPos/playerTile/playerBodyTiles/playerStats` to a **list/nearest-threat** abstraction
     (e.g. `threats: {pos,tile,bodyTiles,stats,kind}[]`), and update `stepMonster` acquire/veer/

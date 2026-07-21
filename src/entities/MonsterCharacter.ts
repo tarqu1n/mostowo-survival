@@ -36,6 +36,7 @@ import {
   initialMonsterState,
   type MonsterMode,
   type MonsterState,
+  type Threat,
   type Vec2,
 } from '../systems/monsterAI';
 import { resolveMeleeAttack } from '../systems/combat';
@@ -65,12 +66,11 @@ export interface MonsterSpawnOpts {
  */
 export interface MonsterTickEnv {
   nowMs: number;
-  playerTile: Cell;
-  playerPos: Vec2;
-  /** The player's body tiles (feet + torso overhang) — a bite lands on contact with ANY of them,
-   *  so a tall player is reachable by its drawn torso, not only its feet tile. */
-  playerBodyTiles: Cell[];
-  playerStats: CombatantStats;
+  /** Every combatant this mob may aggro this tick (plan 042 Step 6) — the player plus the companion NPC
+   *  when present + not downed. Fed straight into the FSM inputs (acquire/chase pick the nearest), and
+   *  read here to test melee contact + resolve the bite against whichever threat the FSM engaged. The
+   *  player is always present (and always the fallback for a scenario-forced `chase` spawn). */
+  threats: Threat[];
   dims: Dims;
   isBlocked: (col: number, row: number) => boolean;
   rng: () => number;
@@ -78,12 +78,14 @@ export interface MonsterTickEnv {
   lungeAt: (monster: MonsterCharacter, targetX: number, targetY: number) => void;
   /** Play the wind-up telegraph — a ramping warning tint over `durationMs` (CombatFxManager.beginWindUp). */
   beginWindUp: (monster: MonsterCharacter, durationMs: number) => void;
-  /** Clear the wind-up telegraph — the strike is landing, or the player escaped (CombatFxManager.endWindUp). */
+  /** Clear the wind-up telegraph — the strike is landing, or the threat escaped (CombatFxManager.endWindUp). */
   endWindUp: (monster: MonsterCharacter) => void;
-  /** Landed-bite feedback — flash + camera kick + damage vignette (scene-owned bus emission). */
-  onPlayerHurt: () => void;
-  /** Apply bite damage to the player (scene-owned: emits hp events / triggers the death path). */
-  damagePlayer: (amount: number) => void;
+  /** Landed-bite feedback for the struck threat (plan 042 Step 6) — the player's is flash + camera kick
+   *  + damage vignette; the NPC's is a sprite flash. Dispatched by `threat.kind` scene-side. */
+  onThreatHurt: (threat: Threat) => void;
+  /** Apply bite damage to the struck threat (player or companion NPC) through its own damage/death path
+   *  (scene-owned). Dispatched by `threat.kind` scene-side (plan 042 Step 6). */
+  damageThreat: (threat: Threat, amount: number) => void;
   /** Plan 038 Step 4 — the nearest lit hearth the wave targets, or `null` when none is lit. Shared
    *  across the tick (one hearth in the MVP); a `seeksFire` mob paths to `tile` and strikes it. */
   fire: { id: string; tile: Cell; pos: Vec2 } | null;
@@ -250,8 +252,7 @@ export class MonsterCharacter extends Character {
         nowMs: env.nowMs,
         monster: { col: this.col, row: this.row },
         monsterPos: { x: this.sprite.x, y: this.sprite.y },
-        playerPos: env.playerPos,
-        playerTile: env.playerTile,
+        threats: env.threats, // plan 042 Step 6 — player + (undowned) NPC; FSM picks the nearest
         acquireRadiusPx: this.def.vision ?? 0,
         chaseDropRadiusPx: MONSTER_CHASE_DROP_RADIUS_PX,
         veerBandPx: MONSTER_VEER_BAND_PX,
@@ -271,21 +272,26 @@ export class MonsterCharacter extends Character {
     );
     this.ai = decision.state;
 
-    // Chase + in melee contact with the player: telegraphed stand-and-bite (plan 035a Step 1). Instead
-    // of an instant contact-bite, the enemy freezes in a readable wind-up first (the clunk fix), then
-    // strikes; leaving contact mid-wind-up cancels it.
+    // Chase + in melee contact with the engaged threat: telegraphed stand-and-bite (plan 035a Step 1,
+    // generalised to any threat in plan 042 Step 6). Instead of an instant contact-bite, the enemy
+    // freezes in a readable wind-up first (the clunk fix), then strikes; leaving contact mid-wind-up
+    // cancels it. The engaged threat is the one aggro stuck to (chaseKind); a scenario-forced `chase`
+    // spawn with no chaseKind falls back to the player (always in the list).
     if (this.ai.mode === 'chase') {
-      if (this.inContactWith(env.playerBodyTiles)) {
+      const target =
+        env.threats.find((t) => t.kind === this.ai.chaseKind) ??
+        env.threats.find((t) => t.kind === 'player');
+      if (target && this.inContactWith(target.bodyTiles)) {
         // The equipped weapon sets the base damage; unarmed falls back to the shared unarmed damage.
         const baseDmg = this.weapon ? this.weapon.def.damage : UNARMED_BASE_DAMAGE;
-        this.strikeContact(env, env.playerPos.x, env.playerPos.y, () => {
-          const dmg = resolveMeleeAttack(this.def, env.playerStats, baseDmg, env.rng);
-          if (dmg > 0) env.onPlayerHurt(); // flash + camera kick + damage vignette when the bite lands
-          env.damagePlayer(dmg);
+        this.strikeContact(env, target.pos.x, target.pos.y, () => {
+          const dmg = resolveMeleeAttack(this.def, target.stats, baseDmg, env.rng);
+          if (dmg > 0) env.onThreatHurt(target); // flash (+ camera/vignette for the player) on a landed bite
+          env.damageThreat(target, dmg);
         });
         return;
       }
-      this.cancelWindUp(env); // left contact while winding up → the player dodged the tell: whiff
+      this.cancelWindUp(env); // left contact while winding up → the threat dodged the tell: whiff
     }
     // Seek + in contact with the fire: the SAME telegraphed strike, but it drains the fire's fuel
     // (plan 038 Step 4). A fire has no armour/dodge, so a flat WAVE_FIRE_ATTACK_DAMAGE drain.

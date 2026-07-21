@@ -6,19 +6,20 @@
  *
  * FSM: `idle` → `wander` | `patrol` → back to `idle`, with `chase` preempting any calm mode, and
  * `seek` (plan 038 Step 4 — the night wave's objective-target behaviour) sitting between them: a mob
- * flagged `seeksFire` with a lit hearth to attack walks to it and (caller-side) strikes it, but player
- * radius-acquire still **preempts** seek (near the player it fights the player — the roaming-pull),
- * returning to the fire once the player is gone. `seek` needs `fireTile` in the inputs; with no lit
- * fire the mob falls back to the calm modes (and will still acquire the player). `siege` (plan 037 2c
+ * flagged `seeksFire` with a lit hearth to attack walks to it and (caller-side) strikes it, but a
+ * threat within radius still **preempts** seek (near a threat it fights the threat — the roaming-pull),
+ * returning to the fire once the threat is gone. `seek` needs `fireTile` in the inputs; with no lit
+ * fire the mob falls back to the calm modes (and will still acquire a threat). `siege` (plan 037 2c
  * — base-defence) preempts everything: when the caller finds its objective (player/fire) is **walled
  * off** (`findPath` → null) it resolves the blocking structure and feeds its tile as `siegeTarget`; the
  * mob then walks adjacent to that wall and (caller-side) bashes it, resuming chase/seek once it breaks
  * through. `siegeTarget` is caller-computed (it owns the A*), so the pure FSM never runs pathfinding.
  *  - **Acquire** is radius-only (world px) using the enemy's own `acquireRadiusPx` (= `EnemyDef.vision`);
- *    no line-of-sight / wall occlusion.
- *  - **De-aggro** is distance-only (no timeout): as the player nears the outer edge of chase range the
- *    monster keeps chasing but its target is perturbed by up to `veerMaxTiles` (ramping with distance —
- *    "losing the scent"); past `chaseDropRadiusPx` it gives up and drops back to an idle beat.
+ *    no line-of-sight / wall occlusion. Of all eligible `threats` (player + companion NPC, plan 042
+ *    Step 6) the NEAREST within radius is taken, and aggro then sticks to it (`chaseKind`).
+ *  - **De-aggro** is distance-only (no timeout): as the acquired threat nears the outer edge of chase
+ *    range the monster keeps chasing but its target is perturbed by up to `veerMaxTiles` (ramping with
+ *    distance — "losing the scent"); past `chaseDropRadiusPx` it gives up and drops back to an idle beat.
  *  - **wander** = an aimless random reachable tile within `wanderRadiusTiles`, walked once then back to
  *    idle. **patrol** = a set route walked waypoint-to-waypoint with a pause at each. A monster patrols
  *    iff it carries a non-empty `patrolRoute`, else it wanders.
@@ -26,6 +27,7 @@
  * All randomness comes through the injected `rng` so tests are deterministic (mirrors `combat.ts`).
  */
 
+import type { CombatantStats } from '../data/types';
 import type { Cell, Dims } from './pathfind';
 
 export type MonsterMode = 'idle' | 'wander' | 'patrol' | 'chase' | 'seek' | 'siege';
@@ -34,6 +36,29 @@ export type MonsterMode = 'idle' | 'wander' | 'patrol' | 'chase' | 'seek' | 'sie
 export interface Vec2 {
   x: number;
   y: number;
+}
+
+/** Which kind of combatant a threat is — the player, or an ally NPC companion (plan 042 Step 6). */
+export type ThreatKind = 'player' | 'npc';
+
+/**
+ * A combatant a mob can aggro + attack (plan 042 Step 6 — generalised from the single baked player
+ * target so a mob can menace the companion too). The pure FSM reads `pos` (radius acquire/de-aggro),
+ * `tile` (the chase target before veer), and `kind` (which threat aggro stuck to); `bodyTiles`/`stats`
+ * ride along unused by the FSM — the caller ({@link MonsterCharacter}) reads them to test melee
+ * contact and resolve the bite against the engaged threat. A downed/absent NPC is simply omitted from
+ * the list by the caller, so it's never a valid threat.
+ */
+export interface Threat {
+  kind: ThreatKind;
+  /** World-pixel position — the radius acquire/de-aggro check is in world px. */
+  pos: Vec2;
+  /** Current tile — the chase target before veer perturbation. */
+  tile: Cell;
+  /** Body tiles (feet + torso overhang) — a bite lands on contact with ANY of them (caller-side). */
+  bodyTiles: Cell[];
+  /** Combat stat bag — armour/dodge for the caller's bite resolution. */
+  stats: CombatantStats;
 }
 
 /** The monster's persisted AI state — lives on the scene's enemy instance; `stepMonster` reads it
@@ -55,6 +80,11 @@ export interface MonsterState {
   patrolIndex: number;
   /** Last chase repath time (ms) — throttles A* recompute to the caller's repath cadence. */
   lastChaseRepathMs: number;
+  /** Which threat aggro stuck to when this mob acquired (plan 042 Step 6) — so a chase tracks the SAME
+   *  threat it locked onto (the old single-player stickiness), and the caller knows which threat to
+   *  bite. `undefined` outside of chase / on a scenario-forced `chase` spawn (the caller falls back to
+   *  the player then). Set on acquire, re-synced each chase tick. */
+  chaseKind?: ThreatKind;
 }
 
 /** A read-only snapshot of the world + tuning the FSM needs to decide one step. */
@@ -62,11 +92,13 @@ export interface MonsterInputs {
   nowMs: number;
   /** Monster's current tile (the scene snaps this as the monster reaches path waypoints). */
   monster: Cell;
-  /** Monster & player world-pixel positions — radius checks are in world px. */
+  /** Monster's world-pixel position — radius checks are in world px. */
   monsterPos: Vec2;
-  playerPos: Vec2;
-  /** Player's current tile — the chase target before veer perturbation. */
-  playerTile: Cell;
+  /** Every combatant this mob may aggro (plan 042 Step 6) — the player plus the companion NPC when
+   *  present + not downed. Acquire/veer/de-aggro/chase all pick the NEAREST eligible threat within
+   *  vision; a size-1 list (the player alone) reproduces the classic single-target behaviour exactly.
+   *  The caller builds it (excluding a downed/absent NPC, and never the mob itself). */
+  threats: Threat[];
   /** Acquire radius (world px) = `EnemyDef.vision`. */
   acquireRadiusPx: number;
   chaseDropRadiusPx: number;
@@ -149,21 +181,38 @@ function clampTile(c: Cell, dims: Dims): Cell {
   };
 }
 
-/** The player's tile, perturbed by up to `veerMaxTiles` when inside the veer band (else exact). */
-function perturbedChaseTarget(inputs: MonsterInputs, d: number, rng: () => number): Cell {
+/** The chased threat's tile, perturbed by up to `veerMaxTiles` when inside the veer band (else exact). */
+function perturbedChaseTarget(
+  inputs: MonsterInputs,
+  targetTile: Cell,
+  d: number,
+  rng: () => number,
+): Cell {
   const maxOff = chaseVeerMaxTiles(
     d,
     inputs.chaseDropRadiusPx,
     inputs.veerBandPx,
     inputs.veerMaxTiles,
   );
-  if (maxOff <= 0) return { ...inputs.playerTile };
+  if (maxOff <= 0) return { ...targetTile };
   const dcol = Math.round((rng() * 2 - 1) * maxOff);
   const drow = Math.round((rng() * 2 - 1) * maxOff);
-  return clampTile(
-    { col: inputs.playerTile.col + dcol, row: inputs.playerTile.row + drow },
-    inputs.dims,
-  );
+  return clampTile({ col: targetTile.col + dcol, row: targetTile.row + drow }, inputs.dims);
+}
+
+/** The threat nearest the monster (world px), or `null` when the list is empty. */
+function nearestThreat(inputs: MonsterInputs): { threat: Threat; dist: number } | null {
+  let best: { threat: Threat; dist: number } | null = null;
+  for (const threat of inputs.threats) {
+    const d = distPx(inputs.monsterPos, threat.pos);
+    if (!best || d < best.dist) best = { threat, dist: d };
+  }
+  return best;
+}
+
+/** The listed threat of the given kind (the one aggro stuck to), or `undefined` if absent/kind unset. */
+function threatByKind(inputs: MonsterInputs, kind: ThreatKind | undefined): Threat | undefined {
+  return kind === undefined ? undefined : inputs.threats.find((t) => t.kind === kind);
 }
 
 /** A random reachable (in-bounds, unblocked, non-self) tile within `radius`, or `null` if none found. */
@@ -307,42 +356,56 @@ export function stepMonster(
   inputs: MonsterInputs,
   rng: () => number = Math.random,
 ): MonsterDecision {
-  const d = distPx(inputs.monsterPos, inputs.playerPos);
-
   // Siege (plan 037 chunk 2c): the caller found the objective walled off and resolved the blocking wall
-  // — bash it until it falls. Preempts EVERYTHING, including acquire: a walled-off mob has the player in
+  // — bash it until it falls. Preempts EVERYTHING, including acquire: a walled-off mob has a threat in
   // radius but unreachable, so it must break through rather than re-acquire-and-fail-to-path each tick.
   // Cleared caller-side (siegeTarget → null) once the wall breaks, dropping straight back to acquire.
   if (inputs.siegeTarget) {
     return stepSiege(prev, inputs.siegeTarget);
   }
 
-  // Acquire: any calm mode flips to chase the instant the player is within radius.
-  if (prev.mode !== 'chase' && d <= inputs.acquireRadiusPx) {
+  const nearest = nearestThreat(inputs);
+
+  // Acquire: any calm/seek mode flips to chase the instant a threat is within radius — the NEAREST one
+  // wins, and aggro sticks to it (chaseKind). With one threat (the player) this is the classic acquire.
+  if (prev.mode !== 'chase' && nearest && nearest.dist <= inputs.acquireRadiusPx) {
     return {
       state: {
         ...prev,
         mode: 'chase',
+        chaseKind: nearest.threat.kind,
         lastChaseRepathMs: inputs.nowMs,
         timerMs: 0,
         goalTile: null,
       },
-      targetTile: perturbedChaseTarget(inputs, d, rng),
+      targetTile: perturbedChaseTarget(inputs, nearest.threat.tile, nearest.dist, rng),
       repath: true,
     };
   }
 
-  // Chase: track the player (veering near the edge) until the hard drop distance.
+  // Chase: track the acquired threat (by kind, so aggro stays stuck to whoever it locked onto), veering
+  // near the edge, until the hard drop distance. A scenario-forced `chase` spawn (no chaseKind) — or an
+  // acquired threat that vanished from the list (e.g. an NPC that just went down) — falls back to the
+  // nearest remaining threat, so a chasing mob always has a target while any threat exists.
   if (prev.mode === 'chase') {
+    const target = threatByKind(inputs, prev.chaseKind) ?? nearest?.threat;
+    if (!target) {
+      // Degenerate: no threats at all to chase (the player is always present in real play) → drop out.
+      return { state: enterIdle(prev, inputs, rng), targetTile: null, repath: false };
+    }
+    const d = distPx(inputs.monsterPos, target.pos);
     if (d > inputs.chaseDropRadiusPx) {
       return { state: enterIdle(prev, inputs, rng), targetTile: null, repath: false }; // lost them
     }
+    const chaseKind = target.kind; // re-sync (covers the forced-chase / retarget fallbacks)
     if (inputs.nowMs - prev.lastChaseRepathMs < inputs.repathMs) {
-      return { state: prev, targetTile: inputs.playerTile, repath: false }; // keep advancing existing path
+      // keep advancing existing path
+      const state = prev.chaseKind === chaseKind ? prev : { ...prev, chaseKind };
+      return { state, targetTile: target.tile, repath: false };
     }
     return {
-      state: { ...prev, lastChaseRepathMs: inputs.nowMs },
-      targetTile: perturbedChaseTarget(inputs, d, rng),
+      state: { ...prev, chaseKind, lastChaseRepathMs: inputs.nowMs },
+      targetTile: perturbedChaseTarget(inputs, target.tile, d, rng),
       repath: true,
     };
   }

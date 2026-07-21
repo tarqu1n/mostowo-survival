@@ -176,3 +176,35 @@ test('a repair-role companion with an empty base supply does not repair the wall
   expect((await walls(page))[0].hp).toBe(hpBefore); // no wood → the wall is left untouched
   expect((await state(page)).baseSupply.wood).toBe(0); // nothing withdrawn (idle, no error)
 });
+
+// Tier-2 (plan 042 Step 6): the NPC is now a valid mob threat. A mob adjacent to the companion acquires
+// it (the NEAREST threat — nearer than the player here) and bites it, so its HP falls. The companion has
+// no combat AI yet (Step 7), so it just stands and takes the hit — that's the point of this step's e2e.
+// A gather-role companion by DAY with NO nodes to gather stands still (nothing to do), and day means no
+// night wave, so the only enemy is the one we placed — deterministic. Driven with step().
+test('a mob adjacent to the companion deals it damage (the NPC is a valid threat)', async ({
+  page,
+}) => {
+  test.setTimeout(60_000); // a live scene + a mob's bite cadences — fill-rate-heavy under parallel load
+  await startGame(page);
+
+  // Companion at [8,3]; a plain mob one tile west at [7,3] (orthogonally adjacent → Chebyshev 1, in
+  // melee contact at once). The player sits at [3,3]: within the mob's vision too, but the NPC (16px) is
+  // nearer than the player (64px), so the nearest-threat pick lands on the NPC. Same proven-walkable
+  // row-3 band the gather/repair specs use; no trees → the gather-role NPC stands idle and holds station.
+  await applyScenario(page, {
+    player: [3, 3],
+    companion: { at: [8, 3], dayRole: 'gather' },
+    enemies: [{ at: [7, 3] }],
+    startPhase: 'day',
+  });
+
+  const before = (await companion(page))!;
+  expect(before.hp).toBe(8); // NPC_MAX_HP — full-health baseline
+  expect(before.col).toBe(8); // standing where it was placed (nothing to gather → holds station)
+
+  await step(page, 3000); // a few ~1s bite cadences — enough for the mob to land hits
+
+  const after = (await companion(page))!;
+  expect(after.hp).toBeLessThan(before.hp); // the mob acquired + bit the NPC → its HP fell
+});

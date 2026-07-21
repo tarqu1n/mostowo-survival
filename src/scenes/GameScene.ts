@@ -422,6 +422,21 @@ export class GameScene extends Phaser.Scene {
       rng: () => this.rng(),
       onPlayerHurt: () => this.onPlayerHurt(),
       damagePlayer: (amount) => this.damagePlayer(amount),
+      // Companion NPC as a threat (plan 042 Step 6) — a narrow snapshot assembled from CompanionManager
+      // (the scene mediates; no manager↔manager edge). Null when unspawned; EnemyManager omits a downed
+      // NPC from the threat list. `damageNpc`/`onNpcHurt` are the NPC twins of the player bite seams.
+      companion: () => {
+        const npc = this.companionManager.get();
+        if (!npc) return null;
+        return {
+          tile: npc.tile(),
+          pos: { x: npc.sprite.x, y: npc.sprite.y },
+          stats: npc.stats,
+          downed: npc.downed,
+        };
+      },
+      onNpcHurt: () => this.onNpcHurt(),
+      damageNpc: (amount) => this.damageNpc(amount),
       litHearth: () => this.litHearth(),
       attackFire: (id, amount) => this.campfire.damageFire(id, amount),
       // Structure-target seam (plan 037 2c) — the wall a walled-off mob bashes, plus its combat defender
@@ -1436,6 +1451,28 @@ export class GameScene extends Phaser.Scene {
       maxHp: this.playerChar.stats.maxHp,
     });
     if (this.playerChar.hp <= 0) this.killPlayer();
+  }
+
+  /** Apply a mob's bite to the companion NPC (plan 042 Step 6 — the NPC twin of {@link damagePlayer}).
+   *  A no-op once downed (mobs stop targeting it, but this also guards against an in-flight strike landing
+   *  the same tick it collapsed). On a lethal blow it collapses into the `downed` state via the
+   *  character-side die(); the dawn revive that stands it back up is plan 042 Step 7. FX are cleaned up
+   *  first, mirroring the enemy kill path, so no in-flight flash tween pokes the (surviving) sprite. */
+  private damageNpc(amount: number): void {
+    const npc = this.companionManager.get();
+    if (!npc || npc.downed || amount <= 0) return;
+    npc.takeDamage(amount);
+    if (npc.hp <= 0) {
+      this.fx.cleanupActorFx(npc.sprite); // stop any in-flight hit-flash before the collapse
+      npc.die(); // character-side collapse → downed; CompanionManager idles it on the Death strip
+    }
+  }
+
+  /** Landed-bite feedback on the companion — its sprite flash (the NPC twin of {@link onPlayerHurt},
+   *  without the player-only screen-edge damage vignette / camera kick). No-op if it's gone/downed. */
+  private onNpcHurt(): void {
+    const npc = this.companionManager.get();
+    if (npc && !npc.downed) this.fx.flashHit(npc.sprite);
   }
 
   /** Attack the tiles the current melee swing covers: flat damage via the shared combat formula to
