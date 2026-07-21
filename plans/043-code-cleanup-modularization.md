@@ -176,7 +176,15 @@ duplicated pan/zoom viewport in `LibraryPanel.AtlasSheetPicker` and `ObjectEdito
 
 ### Phase 2 — Shared foundations (parallel: B) — new files only, no consumer rewiring yet
 
-- [ ] **Step 5: Extract shared pan/zoom hook + zoom constants** `[delegate]` (parallel: B)
+- [x] **Step 5: Extract shared pan/zoom hook + zoom constants** `[delegate]` (parallel: B)
+  - Outcome: created `src/editor/zoom.ts` (`ZOOM_MIN=1`/`ZOOM_MAX=8`/`ZOOM_STEP=0.5` + `clampZoom`) and
+    `src/editor/hooks/usePanZoom.ts`. API: `usePanZoom(scale: number): PanZoom` — `scale` is passed IN
+    (the two call sites compute base fit-scale differently: AtlasSheetPicker from a fixed px budget,
+    RegionsEditor from a ResizeObserver). Exposes both ready-made `onCanvasPointerDown/Move/Up` (for the
+    pan-only AtlasSheetPicker, Step 9) AND low-level `isPanTrigger`/`beginPan`/`movePan`/`endPan` +
+    `spaceHeld`/`isPanning`/`zoom`/`setZoom`/`viewportRef`/`hoveringRef` (for RegionsEditor's larger
+    draw/move/resize/pan drag union + panMode toggle, Step 10). Pointer capture left to the caller. Files
+    unused for now. `npm run check` + `npm run build` green.
   - Create `src/editor/hooks/usePanZoom.ts` (mirror `hooks/useIsCompact.ts` style) capturing the
     shared viewport logic (`spaceHeld`/`isPanning`/`pendingAnchor`/`hoveringRef`/`viewportRef`/
     `onCanvasPointerDown/Move/Up` + clamp) common to `AtlasSheetPicker` and `RegionsEditor`. Create
@@ -186,7 +194,14 @@ duplicated pan/zoom viewport in `LibraryPanel.AtlasSheetPicker` and `ObjectEdito
   - Docs: none yet (CONVENTIONS update lands in Step 18).
   - Done when: files exist, `npm run check` + editor build green.
 
-- [ ] **Step 6: Extract pure region-geometry + alpha-opacity helpers with tests** `[delegate]` (parallel: B)
+- [x] **Step 6: Extract pure region-geometry + alpha-opacity helpers with tests** `[delegate]` (parallel: B)
+  - Outcome: created `src/editor/regionGeometry.ts` (exports `Handle` type, `clampN`, `normRect`,
+    `resizeBox`; `Box` re-imported from `./regions`; UI-coupled `HANDLES`/`HANDLE_POS` left in the
+    component for Step 10), `src/editor/pixelAlpha.ts` (framework-free RGBA→alpha maths only —
+    `extractAlphaChannel(img)` + `alphaAt(channel,x,y)`; the DOM/canvas half stays in the component
+    effect, wired in Step 10), and `src/editor/__tests__/regionGeometry.test.ts` (**27 cases** incl.
+    pixelAlpha via a synthetic Uint8ClampedArray — no real canvas needed). `npm run check` green with the
+    27 new tests in the run; `npm run build` green. Source lifted verbatim in behaviour (Step-10 tripwire relies on it).
   - Create `src/editor/regionGeometry.ts` (pure `normRect`/`resizeBox`/`clampN` lifted from
     `ObjectEditorTab.tsx:447-480`) and `src/editor/pixelAlpha.ts` (one canvas alpha-opacity read,
     generalizing `ObjectEditorTab.tsx:555-568`). Add `src/editor/__tests__/regionGeometry.test.ts`
