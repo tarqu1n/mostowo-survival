@@ -489,3 +489,45 @@ test('a night REFUEL companion slows the fire-fuel decline (feeds the hearth fro
   expect(baseline).toBeLessThan(REFUEL_FUEL_START); // natural burn only → fuel fell
   expect(fed).toBeGreaterThan(baseline); // feeding measurably slowed (here reversed) the decline
 });
+
+// Tier-2 (plan 042 Step 9): the assignment menu's cross-scene WIRING. The menu (UIScene popover, opened
+// by tapping the NPC) drives the companion by emitting `npc:*` events that GameScene routes to the SAME
+// setter methods the Step-2 `__test` seams call — so a menu pick and the harness share one code path.
+// Here we emit those exact button events on the bus (what the popover's onDown handlers do) and read the
+// reassignment back through the real scene. The menu MODEL (which option → which event) is unit-tested
+// in src/scenes/npcMenu.test.ts; the pixel-level open/close/tap is manual-verify (mapping a pointer to a
+// world sprite is flaky under parallel Playwright load — see the harness boot-timeout note).
+
+test('the menu day/night assign events reassign the companion live (shared setter path)', async ({
+  page,
+}) => {
+  await startGame(page);
+
+  await applyScenario(page, {
+    player: [10, 10],
+    companion: { at: [12, 10] }, // defaults: dayRole 'gather', nightPosture 'follow'
+  });
+  expect(await companion(page)).toMatchObject({ dayRole: 'gather', nightPosture: 'follow' });
+
+  // What the DAY "Repair" + NIGHT "Refuel lights" rows emit on tap (see UIScene.onNpcMenuOption).
+  await emit(page, 'npc:assignDayRole', 'repair');
+  await emit(page, 'npc:assignNightPosture', 'refuel');
+  expect(await companion(page)).toMatchObject({ dayRole: 'repair', nightPosture: 'refuel' });
+
+  // And back the other way — the change is live each time (the executor polls the fields per frame).
+  await emit(page, 'npc:assignDayRole', 'gather');
+  await emit(page, 'npc:assignNightPosture', 'guard');
+  expect(await companion(page)).toMatchObject({ dayRole: 'gather', nightPosture: 'guard' });
+});
+
+test('a menu assign event with no companion spawned is a safe no-op', async ({ page }) => {
+  await startGame(page);
+  await applyScenario(page, { player: [10, 10] }); // no companion
+
+  await emit(page, 'npc:assignDayRole', 'repair');
+  await emit(page, 'npc:assignNightPosture', 'refuel');
+  await emit(page, 'npc:beginPlaceGuard');
+  await emit(page, 'npc:cancelPlaceGuard');
+
+  expect((await state(page)).companion).toBeNull(); // nothing to mutate, nothing crashed
+});

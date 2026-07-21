@@ -12,6 +12,7 @@ import type {
 } from '../../entities/types';
 import type { InspectableStats } from '../../data/types';
 import type { MonsterCharacter } from '../../entities/MonsterCharacter';
+import type { NpcCharacter } from '../../entities/NpcCharacter';
 import type { GameScene } from '../GameScene';
 
 /**
@@ -37,6 +38,9 @@ export interface ScenePickerDeps {
   /** Inspect-panel stats for a picked structure — routed to its owning behavior module
    *  (StructureManager.stats), so ScenePicker stays behavior-agnostic. */
   structureStats(struct: PlacedStructure): InspectableStats;
+  /** The single AI companion, or null when none is spawned (CompanionManager.get()) — the
+   *  assignment-menu open hit-test ({@link ScenePicker.companionAt}) reads it (plan 042 Step 9). */
+  companion(): NpcCharacter | null;
 }
 
 /**
@@ -99,6 +103,24 @@ export class ScenePicker {
     return pick?.kind === 'structure' && pick.structure.behavior === 'wall'
       ? pick.structure
       : undefined;
+  }
+
+  // --- Companion-menu intent --------------------------------------------------
+
+  /** The AI companion if its sprite is drawn under a world point — hit on its foot tile (a reliable
+   *  target even where the art is transparent between the feet) OR an opaque pixel of its sprite, the
+   *  same two-tier raycast trees/structures use. Else null. A thin standalone hit-test like
+   *  {@link wallAt}: the NPC isn't in the general {@link pickSpriteAt} candidate list, so tapping it
+   *  never competes with world entities for a draw-order pick — GameScene routes a hit to opening the
+   *  assignment menu (plan 042 Step 9), a side effect, not one of the Command-mode {@link Action}s. */
+  companionAt(x: number, y: number): NpcCharacter | null {
+    const npc = this.deps.companion();
+    if (!npc) return null;
+    const col = worldToTile(x);
+    const row = worldToTile(y);
+    const foot = npc.tile();
+    if ((foot.col === col && foot.row === row) || this.alphaHit(npc.sprite, x, y)) return npc;
+    return null;
   }
 
   // --- Inspect-mode intent ----------------------------------------------------

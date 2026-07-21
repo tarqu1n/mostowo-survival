@@ -24,13 +24,14 @@ import {
   INVENTORY_SLOTS,
   DEFAULT_MAX_STACK,
   PLAYER_LIGHT_RADIUS,
+  RENDER_SCALE,
 } from '../config';
 import { ITEMS } from '../data/items';
 import { NODES } from '../data/nodes';
 import { BUILDABLES } from '../data/buildables';
 import { Inventory } from '../systems/Inventory';
 import { BaseSupply } from '../systems/baseSupply';
-import { tileKey, tileToWorldCenter } from '../systems/grid';
+import { tileKey, tileToWorldCenter, worldToTile } from '../systems/grid';
 import { findPath, reachableAdjacent, type Cell } from '../systems/pathfind';
 import { originOf } from '../systems/mapRuntime';
 import { mapBlocks } from '../systems/mapWalkability';
@@ -56,6 +57,7 @@ import { ResourceNodeManager } from './world/ResourceNodeManager';
 import { DecorManager } from './world/DecorManager';
 import { EnemyManager } from './world/EnemyManager';
 import { CompanionManager } from './world/CompanionManager';
+import type { NpcCharacter, NpcDayRole, NpcNightPosture } from '../entities/NpcCharacter';
 import { StructureManager } from './world/StructureManager';
 import { CampfireBehavior } from './world/CampfireBehavior';
 import { WallBehavior } from './world/WallBehavior';
@@ -122,6 +124,12 @@ export class GameScene extends Phaser.Scene {
   // mode — turning either on turns the other off. Non-destructive: toggling it never cancelAll()s the
   // queue (mirrors build mode). UIScene mirrors it via `demolish:modeChanged` for the DEMOLISH button.
   private demolishMode = false;
+
+  // Guard-point placement (plan 042 Step 9): armed by the companion assignment menu's "Guard here"
+  // option, it makes the NEXT command-mode world tap set the companion's guard tile (and its night
+  // posture to `guard`), then disarms — the arm→place→disarm shape build placement uses. A tap back
+  // on the NPC while armed cancels it (as does Escape). Layered on command mode like demolish mode.
+  private placingGuardPoint = false;
 
   // Auto-surface combat controls (plan 035a Step 3): recomputed every frame (updateCombatActive) —
   // true while a live enemy is within COMBAT_ACTIVE_RADIUS_TILES of the player OR it's night. Drives
@@ -335,6 +343,7 @@ export class GameScene extends Phaser.Scene {
     this.nodeFx.reset();
     this.mode = 'command';
     this.demolishMode = false; // a death-restart starts clear of demolish mode (UIScene resynced in buildWorld)
+    this.placingGuardPoint = false; // …and clear of any half-armed guard-point placement (plan 042 Step 9)
     // baseSupply is (re)constructed fresh in buildWorld (like the shared Inventory), so a death-restart
     // starts with an empty pool without an explicit reset here — see plan 042 Step 3.
   }
@@ -603,6 +612,7 @@ export class GameScene extends Phaser.Scene {
       allSites: () => this.buildManager.allSites(),
       structures: () => this.structureManager.all(),
       structureStats: (s) => this.structureManager.stats(s),
+      companion: () => this.companionManager.get(),
     });
 
     // Queue/glow presentation (plan 013 Step 6) — pure presentation over the queue, so it has no
@@ -635,6 +645,28 @@ export class GameScene extends Phaser.Scene {
       getMode: () => this.mode,
       isMovepadHeld: () => this.ui.isMovepadHeld(),
       onTap: (pointer) => {
+        // Guard-point placement (plan 042 Step 9): while armed by the assignment menu's "Guard here",
+        // the tap places the point — UNLESS it landed back on the NPC, which cancels (the menu's other
+        // documented escape hatch). Checked first so it fully owns the tap while armed, mirroring the
+        // build-placement arm→place→disarm shape (and demolish mode's own first-check below).
+        if (this.placingGuardPoint) {
+          if (this.scenePicker.companionAt(pointer.worldX, pointer.worldY)) {
+            this.cancelPlaceGuardPoint(); // tapped the NPC again — cancel, don't post here
+            return;
+          }
+          this.setNpcGuardPoint(worldToTile(pointer.worldX), worldToTile(pointer.worldY));
+          this.setNpcNightPosture('guard'); // posting a point also adopts the guard posture
+          this.placingGuardPoint = false;
+          return;
+        }
+        // A tap on the companion opens its assignment menu (day role / night posture) instead of
+        // issuing a world order — so tapping the NPC never also moves the player onto its tile. Checked
+        // before demolish/actionAt, the same priority a campfire's refuel gets in ScenePicker.actionAt.
+        const npc = this.scenePicker.companionAt(pointer.worldX, pointer.worldY);
+        if (npc) {
+          this.openNpcMenu(npc);
+          return;
+        }
         // Demolish mode (plan 037 2b): a tap on a finished wall enqueues its deconstruct order; a tap
         // on empty ground / a non-wall does nothing (no move/harvest). Checked before the normal tap
         // dispatch so it fully owns the tap while the mode is on.
@@ -766,6 +798,12 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on('needs:eat', this.survivalClock.onNeedsEat, this.survivalClock);
     this.game.events.on('combat:move', this.onCombatMove, this);
     this.game.events.on('combat:moveEnd', this.onCombatMoveEnd, this);
+    // Companion assignment menu (plan 042 Step 9) — UIScene's popover buttons route back here through
+    // the same shared setters the `__test` seams call; "Guard here" arms the place-point mode.
+    this.game.events.on('npc:assignDayRole', this.setNpcDayRole, this);
+    this.game.events.on('npc:assignNightPosture', this.setNpcNightPosture, this);
+    this.game.events.on('npc:beginPlaceGuard', this.beginPlaceGuardPoint, this);
+    this.game.events.on('npc:cancelPlaceGuard', this.cancelPlaceGuardPoint, this); // Escape while armed
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off('build:toggle', this.buildManager.toggleBuild, this.buildManager);
@@ -799,6 +837,10 @@ export class GameScene extends Phaser.Scene {
       this.game.events.off('needs:eat', this.survivalClock.onNeedsEat, this.survivalClock);
       this.game.events.off('combat:move', this.onCombatMove, this);
       this.game.events.off('combat:moveEnd', this.onCombatMoveEnd, this);
+      this.game.events.off('npc:assignDayRole', this.setNpcDayRole, this);
+      this.game.events.off('npc:assignNightPosture', this.setNpcNightPosture, this);
+      this.game.events.off('npc:beginPlaceGuard', this.beginPlaceGuardPoint, this);
+      this.game.events.off('npc:cancelPlaceGuard', this.cancelPlaceGuardPoint, this);
     });
 
     this.emitTasks();
@@ -924,21 +966,12 @@ export class GameScene extends Phaser.Scene {
       zoneAt: (c, r) => this.zoneAt(c, r),
       moveEnemy: (i, c, r) => testApi.moveEnemy(i, c, r),
       setPlayerMelee: (id) => testApi.setPlayerMelee(id),
-      // Companion scaffold setters (plan 042 Step 2) — mirror rearmTrap: reach the single NPC through
-      // the manager + write a scaffold field (no-op if no companion is spawned). Behaviour that reads
-      // these lands in later steps; setNpcGuardPoint's tile isn't surfaced in debugState yet.
-      setNpcDayRole: (role) => {
-        const npc = this.companionManager.get();
-        if (npc) npc.dayRole = role;
-      },
-      setNpcNightPosture: (posture) => {
-        const npc = this.companionManager.get();
-        if (npc) npc.nightPosture = posture;
-      },
-      setNpcGuardPoint: (c, r) => {
-        const npc = this.companionManager.get();
-        if (npc) npc.guardPoint = { col: c, row: r };
-      },
+      // Companion assignment setters (plan 042 Step 2) — route to the SHARED scene methods the
+      // assignment menu also calls (plan 042 Step 9), so the harness and the in-game menu drive exactly
+      // one code path. No-op if no companion is spawned; each writes a live-polled field.
+      setNpcDayRole: (role) => this.setNpcDayRole(role),
+      setNpcNightPosture: (posture) => this.setNpcNightPosture(posture),
+      setNpcGuardPoint: (c, r) => this.setNpcGuardPoint(c, r),
     };
     (this.game as unknown as { __test?: GameTestApi }).__test = api;
   }
@@ -1687,6 +1720,60 @@ export class GameScene extends Phaser.Scene {
    *  own build mode, so this closes the loop without them knowing demolish exists). */
   private onBuildModeChanged(active: boolean): void {
     if (active && this.demolishMode) this.setDemolishMode(false);
+  }
+
+  // --- Companion assignment (plan 042 Step 9) — the SHARED setter path the assignment menu AND the
+  // `__test` seams both call, so the in-game popover and the harness drive exactly one code path. Each
+  // is a no-op when no companion is spawned; the fields are polled live by CompanionManager.update, so
+  // a change takes effect on the next frame (no restart of an in-flight role/posture needed). ------
+
+  /** Set the companion's day job (Gather / Repair). Wired to the menu's `npc:assignDayRole` + the
+   *  `setNpcDayRole` `__test` seam. */
+  private setNpcDayRole(role: NpcDayRole): void {
+    const npc = this.companionManager.get();
+    if (npc) npc.dayRole = role;
+  }
+
+  /** Set the companion's night posture (Guard / Follow / Refuel). Wired to the menu's
+   *  `npc:assignNightPosture` (and "Guard here"'s place-then-adopt) + the `setNpcNightPosture` seam. */
+  private setNpcNightPosture(posture: NpcNightPosture): void {
+    const npc = this.companionManager.get();
+    if (npc) npc.nightPosture = posture;
+  }
+
+  /** Set the companion's night guard tile. Wired to the guard-placement tap (below) + the
+   *  `setNpcGuardPoint` seam; the `guard` posture holds this tile (see CompanionManager.driveGuard). */
+  private setNpcGuardPoint(col: number, row: number): void {
+    const npc = this.companionManager.get();
+    if (npc) npc.guardPoint = { col, row };
+  }
+
+  /** Menu "Guard here" (`npc:beginPlaceGuard`): arm the one-tap place-the-point mode — the next
+   *  command-mode world tap sets the guard tile + adopts the guard posture (see the onTap dep). No-op
+   *  with no companion, so a stray event can't strand the world in a placing state. */
+  private beginPlaceGuardPoint(): void {
+    if (this.companionManager.get()) this.placingGuardPoint = true;
+  }
+
+  /** Disarm guard-point placement without posting one — Escape, or a tap back on the NPC. */
+  private cancelPlaceGuardPoint(): void {
+    this.placingGuardPoint = false;
+  }
+
+  /** A tap on the companion opened its assignment menu: hand UIScene the NPC's current role/posture
+   *  (to highlight the live rows) plus its on-screen position in design space — the world sprite point
+   *  mapped through the main camera (`worldView` origin × zoom) and down by RENDER_SCALE, since the
+   *  HUD is authored in un-zoomed BASE_WIDTH×BASE_HEIGHT units. UIScene clamps it on screen. */
+  private openNpcMenu(npc: NpcCharacter): void {
+    const cam = this.cameras.main;
+    const x = ((npc.sprite.x - cam.worldView.x) * cam.zoom) / RENDER_SCALE;
+    const y = ((npc.sprite.y - cam.worldView.y) * cam.zoom) / RENDER_SCALE;
+    this.game.events.emit('npc:menuOpen', {
+      x,
+      y,
+      dayRole: npc.dayRole,
+      nightPosture: npc.nightPosture,
+    });
   }
 
   /** True while the movepad is authoritative — manual Combat mode OR the combatActive auto-surface
