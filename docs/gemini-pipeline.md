@@ -9,7 +9,20 @@ and [ASSETS.md](ASSETS.md) (art pipeline: active pack, extraction, what's wired,
 
 Matt's home server (**guppi** repo / Beelink) has a working Gemini image-gen setup we can mirror.
 The API key is `GEMINI_API_KEY`, stored in `guppi/house-helper/.env` (**gitignored — never commit
-it**, and it's on the home LAN, not reachable from a cloud dev sandbox).
+it, and never write it into the repo or a build**).
+
+**Getting the key from a cloud Claude session** (don't ask Matt to paste it): the sandbox can reach
+guppi over the Tailnet using the `TAILSCALE_KEY`/`GUPPI_PASSWORD` env vars it already carries — follow
+the verified shell recipe in [MOBILE-EDITOR-ACCESS.md](MOBILE-EDITOR-ACCESS.md#claude-getting-a-shell-on-guppi--working-on-the-build-there),
+then read the key straight off the server, e.g.
+
+```bash
+gssh 'grep -h GEMINI_API_KEY /home/guppi/house-helper/.env'   # capture into this session's env only
+```
+
+Export it into the running shell for the generate step; keep it **in-memory** (never echo it into a
+committed file, log, or preview). The Gemini endpoint itself is public Google — only the *key* needs
+guppi, so once it's in env, generation runs from the sandbox like anywhere else.
 
 Reference implementation to copy from: **`guppi/house-helper/catalog_icons.py`**. Key facts:
 
