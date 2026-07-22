@@ -27,8 +27,14 @@ shaped and checked*, that one's about *how the system is structured*.
 - **Editor styling (dev-only):** the Map Builder (`src/editor/**`) uses **Tailwind v4** (CSS-first,
   no config file — `@tailwindcss/vite`) + **shadcn/ui** components (copied into `src/editor/ui/`, own
   the code). The brown/cream palette is a single set of `@theme` tokens in `editor.css`, wired to
-  shadcn's semantic CSS vars. Tailwind is scoped to `editor.html` only — the game page never imports
-  it, so no preflight touches Phaser. Not in the prod bundle (plan 020).
+  shadcn's semantic CSS vars. Editor Tailwind (`editor.css`) ships only in `editor.html`, not the
+  prod bundle (plan 020).
+- **Game-page Tailwind (plan 046):** the DOM/React HUD (`src/hud/**`) also uses Tailwind v4, so the
+  **game page now loads Tailwind** — but scoped: `src/hud/hud.css` imports only the theme + utilities
+  layers and **omits preflight** (no global `*`/`html`/`body`/`canvas` reset), replacing it with a
+  minimal reset scoped under `#hud-root`. Nothing selects the Phaser canvas, so pixel-art crispness is
+  untouched. (Contrast the editor's plain `@import "tailwindcss"`, which injects preflight — safe only
+  because the editor owns its whole page.)
 
 ## The markdown-is-model-context rule
 

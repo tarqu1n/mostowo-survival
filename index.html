@@ -33,10 +33,21 @@
         align-items: center;
         justify-content: center;
       }
+      /* DOM/React HUD overlay (plan 046) — floats above the Phaser canvas, same box as #game.
+         pointer-events:none so empty HUD space falls through to the world; interactive controls
+         opt back in with pointer-events:auto. Positioned here (not in hud.css) so the layout holds
+         even before React mounts. */
+      #hud-root {
+        position: absolute;
+        inset: 0;
+        z-index: 10;
+        pointer-events: none;
+      }
     </style>
   </head>
   <body>
     <div id="game"></div>
+    <div id="hud-root"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

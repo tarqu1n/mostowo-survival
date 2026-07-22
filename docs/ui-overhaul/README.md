@@ -12,7 +12,9 @@ build-stack decision, and **three candidate design directions**.
   Spells · Night`. The **hotbar** shows in play; **Build** and **Spells** open the
   populated catalogs so you can judge how each direction handles volume. Self-contained,
   no build step, no external hosting.
-- **Status (v3): DECIDED — Field Kit (B).** Owner (Matt) selected Field Kit over the earlier
+- **Status (v4): IN PROGRESS — Field Kit (B).** Migration underway per plan 046 (React overlay +
+  scoped Tailwind mounted; components/cutover following). Direction (v3): Owner (Matt) selected
+  Field Kit over the earlier
   Twin Grip lean: the labelled morphing command bar is the most legible/discoverable and the
   safest first overhaul. Scope: **full HUD migration**, portrait-first, spells deferred,
   6-slot manual-pin hotbar. Implementation plan: [`plans/046-field-kit-hud-overlay.md`](../../plans/046-field-kit-hud-overlay.md);

@@ -104,7 +104,19 @@ crispness proven at the Step 1 gate before any component is built on top.
 
 ## Steps
 
-- [ ] **Step 1: Mount an empty React overlay on the game page + scope Tailwind** `[inline]`
+- [x] **Step 1: Mount an empty React overlay on the game page + scope Tailwind** `[inline]`
+  - Outcome: `index.html` gains `#hud-root` (absolute inset-0, z-index 10, `pointer-events:none`,
+    positioned inline so layout holds pre-mount). `src/hud/hud.css` scopes Tailwind v4 by declaring
+    `@layer theme, base, components, utilities;` then importing only `tailwindcss/theme.css` +
+    `tailwindcss/utilities.css` (NO preflight) + a reset scoped under `#hud-root`. `src/hud/main.tsx`
+    (`mountHud()` → `createRoot(#hud-root)`) + `src/hud/GameHud.tsx` (skeleton + debug badge), invoked
+    from `src/main.ts` after `new Phaser.Game`. Docs: `docs/STANDARDS.md` Tailwind claim corrected
+    (game page now loads scoped Tailwind), `docs/ui-overhaul/README.md` status → "in progress".
+    `npm run build` green; built CSS verified free of global preflight (no `*`/`html`/`body`/`canvas`
+    reset — only Tailwind's harmless `--tw-*` var defaults + the `#hud-root` reset), canvas crispness
+    untouched. `npm run smoke` boot canary passed clean (0 console/page errors). Lint + prettier clean.
+    Note: full e2e deferred to end of plan (env renders headless frames ~1.7× slower than the
+    reference box; frame-stepping specs tip the 30s Playwright timeout — not a functional regression).
   - `index.html`: add `<div id="hud-root">` over `#game` (absolute, inset 0, `z-index`
     above the canvas, `pointer-events:none`). `src/hud/hud.css` — **concrete Tailwind v4
     scoping** (there is no repo precedent; do NOT just `@import "tailwindcss"`, which injects

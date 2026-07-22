@@ -1,0 +1,53 @@
+/* Field Kit DOM/React HUD styles (plan 046) — Tailwind v4 entry, SCOPED to the game page.
+ *
+ * This reverses the editor's isolation: the game page (index.html) now loads Tailwind. But the
+ * plain `@import "tailwindcss"` the editor uses injects Tailwind's PREFLIGHT — a global
+ * `*,::before,::after {}` reset plus bare `html`/`body`/`img`/`canvas` rules. On the editor that's
+ * fine (it owns its whole page); here it would restyle the Phaser `<canvas>` and `#game`, and
+ * `img { display:block; max-width:100% }`-style rules can force layout/scaling changes that soften
+ * pixel-art. So we deliberately OMIT preflight and hand-write a minimal reset scoped under
+ * `#hud-root`, touching nothing outside the overlay.
+ *
+ * Mechanism (Tailwind v4): declare the cascade layers, then import ONLY the theme + utilities
+ * layers — never `preflight.css`. Utilities still work; no global reset is emitted. */
+@layer theme, base, components, utilities;
+
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+/* Shared palette tokens (@theme) live in src/ui-react/tokens.css — imported at Step 4 once the
+ * tokens are extracted. Kept out of here so this file stays the scoping mechanism only. */
+
+/* Minimal reset, scoped to the overlay only — replaces the preflight bits the HUD actually needs
+ * without any selector reaching #game, the canvas, or bare html/body. */
+#hud-root,
+#hud-root *,
+#hud-root *::before,
+#hud-root *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0 solid transparent;
+}
+
+#hud-root {
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#hud-root button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  cursor: pointer;
+}
