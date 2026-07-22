@@ -1,5 +1,10 @@
 import Phaser from 'phaser';
-import { ACTION_ANIM_FRAMERATE, DEATH_ANIM_FRAMERATE, SPIKE_TRAP_TRIGGER_MS } from '../../config';
+import {
+  ACTION_ANIM_FRAMERATE,
+  DEATH_ANIM_FRAMERATE,
+  NPC_ATTACK_ANIM_FRAMERATE,
+  SPIKE_TRAP_TRIGGER_MS,
+} from '../../config';
 import {
   ACTIVE_TILESET,
   playerAnimKey,
@@ -100,7 +105,7 @@ export function registerActorAnims(scene: Phaser.Scene): void {
   for (const [state, frameRate, repeat] of [
     ['idle', 6, -1], // slow, gentle breathing bob (matches the skeleton idle)
     ['walk', 10, -1],
-    ['attack', ACTION_ANIM_FRAMERATE, 0], // one-shot overhead dagger slash (plan 043)
+    ['attack', NPC_ATTACK_ANIM_FRAMERATE, 0], // one-shot overhead dagger slash (plan 043) — slower than a generic swing
     ['death', DEATH_ANIM_FRAMERATE, 0],
   ] as const) {
     const key = npcAnimKey(state);

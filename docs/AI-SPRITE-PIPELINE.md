@@ -84,6 +84,12 @@ reference crop in `reference_png()`. `--dry-run` composes prompts with no key/sp
    - **re-inject accents last**: detect the gen's own blue-eye / purple-mouth pixels and
      repaint them in the pack's exact tones; reduce each eye blob to **1px** at its
      centroid (`_one_px_per_blob`).
+8. **Emit a game-speed GIF preview** (`write_preview` → gitignored
+   `scripts/.gen-icons/rogue_attack_preview.gif`) at `PREVIEW_FPS`. **Preview it before
+   wiring** — this is the step that catches a "too fast / too slow" animation up front
+   (the first wiring shipped at 20fps and read way too fast in-game). **Keep `PREVIEW_FPS`
+   in sync with the in-game rate** (`NPC_ATTACK_ANIM_FRAMERATE` in `src/config.ts`, 10fps)
+   so the preview is honest.
 
 **The failure ladder** (why outline-first, recorded so nobody re-walks it):
 

@@ -202,6 +202,13 @@ export const NPC_ATTACK_WINDUP_MS = 300;
  * (un-playtested), flagged per plan 040's convention — retune vs wave DPS once the loop is playable.
  */
 export const NPC_ATTACK_COOLDOWN_MS = 700;
+/**
+ * Playback rate of the companion's one-shot attack strip (plan 043). Deliberately SLOWER than a
+ * generic `ACTION_ANIM_FRAMERATE` (20fps) swing: at 6 frames this is ~600ms, so the dagger slash
+ * reads as a deliberate telegraph and fits inside the strike cadence (windup + cooldown ≈ 1s) rather
+ * than blowing through in 300ms. Keep the GIF-preview fps in `process_gemini.py` in sync with this.
+ */
+export const NPC_ATTACK_ANIM_FRAMERATE = 10;
 export const NPC_COMBAT_REPATH_MS = 300;
 export const NPC_REPAIR_MS = 400;
 /**
