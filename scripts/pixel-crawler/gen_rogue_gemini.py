@@ -50,6 +50,10 @@ BG_GREEN = ("CRITICAL BACKGROUND: one flat uniform PURE GREEN background hex #00
             "gradient, shadow or ground. CRITICAL EDGE: draw a clean 2px PURE WHITE outline "
             "wrapping the whole character so it separates cleanly from the green. No text, "
             "no numbers, no border, no frame.")
+# The chroma key MUST be far from the character's own colours. The rogue is olive-GREEN,
+# so a green key eats the cloak on keyout — magenta (its opposite) is the safe key here.
+BG_MAGENTA = ("CRITICAL BACKGROUND: one flat uniform MAGENTA background hex #FF00FF, no "
+              "gradient, shadow or ground. No text, no numbers, no border, no frame.")
 STRIP = ("Lay them out as ONE HORIZONTAL ROW on one line — a sprite-sheet / film strip — "
          "left to right, all the SAME small size, feet on ONE shared ground baseline, with "
          "clear equal gaps between frames and nothing overlapping.")
@@ -75,12 +79,13 @@ def reference_png() -> bytes:
 
 
 def pose_guide_png() -> bytes:
-    """A left-to-right strip of Body_A slice poses as flat BLACK SILHOUETTES on grey.
+    """A left-to-right strip of Body_A slice poses as flat BLACK, BODY-ONLY silhouettes.
 
-    Silhouettes (not the textured actor) so NO appearance leaks into the generation —
-    the first attempt fed the textured Body_A actor and the model copied its axe and even
-    its bald head into some frames. This mirrors the paper's separation: the Pose-Guider
-    carries pose only; identity comes solely from the reference image."""
+    Silhouettes (not the textured actor) so NO appearance leaks — the textured actor made
+    the model copy its axe and bald head. And BODY-ONLY: the Body_A axe (grey/white blade
+    + the white swing-arc) is dropped from the silhouette so its raised-WEAPON shape can't
+    transfer either; the model then draws the rogue's own small dagger. Mirrors the paper's
+    Pose-Guider = pose only; identity + weapon come from the reference/prompt."""
     sheet = Image.open(SLICE).convert("RGBA")
     px = sheet.load()
     fw = sheet.height
@@ -92,7 +97,9 @@ def pose_guide_png() -> bytes:
         sp = sil.load()
         for y in range(fw):
             for x in range(fw):
-                if px[fi * fw + x, y][3] > 40:
+                r, g, b, a = px[fi * fw + x, y]
+                blade = max(r, g, b) - min(r, g, b) <= 24 and min(r, g, b) >= 45
+                if a > 40 and not blade:            # body only — drop the axe/arc
                     sp[x, y] = (20, 20, 20, 255)
         canvas.alpha_composite(sil.resize((cell, cell), Image.NEAREST), (i * cell, 0))
     out = RAW / "_pose_guide.png"
@@ -115,7 +122,7 @@ VARIANTS = {
         f"poses, in the same left-to-right order, holding a small dagger, as ONE horizontal "
         f"row of {len(POSE_FRAMES)} equal evenly-spaced frames on a shared feet baseline. "
         f"Copy ONLY the body pose and limb positions from image 2 — keep image 1's hood, "
-        f"colours, proportions and style. {FLAT} {BG_GREEN}"),
+        f"colours, proportions and style. {FLAT} {BG_MAGENTA}"),
 }
 
 

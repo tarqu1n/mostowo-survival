@@ -130,9 +130,13 @@ def posterize_cel(sheet):
     eyes = M & (H >= 128) & (H <= 178) & (S >= 55) & (V >= 70)   # pale blue
     mouth = M & (H >= 188) & (H <= 232) & (S >= 55)              # purple/magenta
 
-    metal = M & (S < 46)                                   # near-neutral -> blade
-    orange = M & ~metal & (H < 26) & (S >= 90)             # warm+low-hue -> belt
-    olive = M & ~metal & ~orange                           # everything else -> cloak
+    # Classify by HUE, not just saturation: a desaturated gen (green-bg spill can drop the
+    # cloud to S~30) must still read as olive, or it floods to grey. So warm-hued pixels
+    # are cloak even when dull; metal is only genuinely neutral/cool low-sat pixels (blade).
+    warm = (H >= 12) & (H <= 75)
+    orange = M & warm & (H < 26) & (S >= 90)               # warm + low-hue + saturated -> belt
+    metal = M & ~orange & ~warm & (S < 80)                 # neutral/cool + low-sat -> blade
+    olive = M & ~orange & ~metal                           # all warm-hued (even dull) -> cloak
 
     # Brightness thresholds from the olive PERCENTILES (not fixed) so the ramp adapts to
     # whatever lighting the generation has — a darker gen won't collapse to shadow. Skewed

@@ -44,10 +44,12 @@ Prompt patterns that worked (`VARIANTS` in the gen script):
   `row5a` variant produced a clean ordered strip; grid/2-row layouts came out irregular.
 - **Flat / chunky / low-detail** wording — the closer the gen is to flat pixel art, the
   less the downscale has to fight.
-- **Flat chroma-key background** — Gemini image models cannot output alpha, so generate on
-  a flat key and remove it later (widely reported). Either magenta `#FF00FF`, or (cleaner
-  edges) green `#00FF00` **plus a 2px white outline buffer** so edge AA blends into white,
-  not the character's colours; `keyout` auto-detects which and strips the buffer.
+- **Flat chroma-key background, contrasting the subject** — Gemini can't output alpha, so
+  generate on a flat key and remove it later. **The key must be far from the character's
+  own colours** or keyout eats the character (green key destroyed the olive rogue — see
+  "Upgrades tried"). Magenta `#FF00FF` suits the olive rogue; pick per-subject. A 2px white
+  outline buffer helps edge AA regardless; `keyout` auto-detects magenta/green + strips the
+  buffer.
 - **Optional pose-conditioning** (`--only pose`) — pass a second image, a **black
   silhouette** pose-guide strip, so frames follow a controlled arc. Use silhouettes, not a
   textured actor (which leaks its appearance); ideally body-only so the weapon shape
@@ -124,24 +126,31 @@ each one actually did:
   asset no longer needs its thresholds hand-tuned.
 - **Green key + white-outline buffer + background-agnostic keyout** (gen `BG_GREEN`;
   process `keyout` auto-detects magenta *or* green and erodes the white buffer ring) —
-  *works, situational.* The silhouette keys out cleaner than magenta+defringe. But the
-  green generations came back with **heavier internal shading**, which the cel step then
-  turns blotchy — so for *this* asset it wasn't clearly better than the flat magenta gen.
-  Lesson: the win is at the edge; push the prompt hard toward flat/chunky or it costs you
-  in the fill.
-- **Pose-conditioning** (gen `--only pose`: a second image, the Body_A slice motion as a
-  POSE guide) — *the informative one.* First attempt fed the **textured** actor and the
-  model copied its appearance — an axe in one frame, Body_A's bald head in another
-  (identity leak). Switching the guide to flat **black silhouettes** fixed the identity
-  leak completely (all frames on-model) and gave a controlled, smooth 6-frame arc — but
-  the silhouette still encodes the raised *weapon* shape, so the drawn blade skews
-  axe/scythe. Next refinement: silhouette the **body only** (drop the weapon) so pose
-  transfers without the weapon shape. This is exactly the paper's ReferenceNet (identity)
-  vs Pose-Guider (pose-only) separation — a textured guide muddies the two.
+  *tried and REJECTED for this character.* The green key **eats a green/olive character**:
+  the cloak is close enough to `#00FF00` that keyout removes it, leaving mostly the dark
+  outline (the downscaled body came back near-neutral grey, not olive). **Rule: the chroma
+  key must be far from the subject's own colours** — magenta for a green character. Keep
+  the white-outline-buffer idea, but on a *contrasting* key.
+- **Hue-based material classification** (in `posterize_cel`) — *kept, a real fix.* The
+  first cel rule called any low-saturation pixel "metal"; a desaturated generation then
+  flooded the cloak to grey (90 of 151 body px mis-labelled metal in one test). Now
+  materials are split by **hue** — warm-hued pixels are cloak even when dull; metal is only
+  neutral/cool low-sat pixels (the actual blade).
+- **Pose-conditioning** (gen `--only pose`: a second image, a silhouette of the Body_A
+  slice motion) — *works, and is the recommended way to get a controlled arc.* Findings, in
+  order discovered: (1) a **textured** actor guide leaks appearance (drew an axe, and one
+  frame reverted to Body_A's bald head); (2) a **black-silhouette** guide fixes the
+  identity leak (all frames on-model) but its raised-*weapon* shape still transferred
+  (blade skewed axe/scythe); (3) a **body-only silhouette** (drop the Body_A blade + arc
+  from the silhouette) fixes that too — the model draws the rogue's own small dagger, and
+  the result is a coherent 6-frame arc that processes to clean flat olive **on a magenta
+  key**. This is the paper's ReferenceNet (identity) vs Pose-Guider (pose-only) separation
+  done by hand — the guide must carry pose ONLY.
 
-**Meta-finding:** the hand-tuned cel step is the pipeline's weak link — it flattens *flat*
-generations beautifully but blotches richly-shaded ones. Prompt for flatness first; the
-real fix is a learned pixelizer (below).
+**Meta-finding:** two things gate quality — (a) key colour must contrast the subject, and
+(b) the hand-tuned cel step flattens flat generations well but struggles with heavy
+internal shading, so prompt for flatness. A learned pixelizer (below) is the real fix for
+(b).
 
 **Learned pixelizer (Deep Unsupervised Pixelization) — assessed, deferred.** It's the
 right tool for the shaded-gen problem, but not runnable here: it ships **no pretrained
