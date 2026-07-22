@@ -1,6 +1,6 @@
 # Test Setup Review & Overhaul (Phase 1)
 
-> Status: in review
+> Status: deployed
 
 ## Summary
 
