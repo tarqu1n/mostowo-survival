@@ -12,9 +12,9 @@ export interface DevMenuDeps {
 
 /**
  * Dev menu (dev-only): a bottom-right DEV toggle opening a small olive Panel of build-testing helpers
- * — Spawn Enemy, a day/night flip, and Force Wave. Only the toggle button and the Panel go in the HUD
- * hit-region; the buttons nested in the Panel ride its bounds/visibility. The day/night button's
- * label tracks the current phase (kept live by UIScene.onTimeChanged → {@link setPhaseLabel}).
+ * — Spawn Enemy, Spawn NPC, a day/night flip, and Force Wave. Only the toggle button and the Panel go
+ * in the HUD hit-region; the buttons nested in the Panel ride its bounds/visibility. The day/night
+ * button's label tracks the current phase (kept live by UIScene.onTimeChanged → {@link setPhaseLabel}).
  */
 export class DevMenu {
   private devButton!: Button;
@@ -42,7 +42,7 @@ export class DevMenu {
     // children (like the Wellbeing eat-rows), so they show/hide and hit-test with the panel — only
     // the panel itself is pushed to hudElements. Hidden until DEV is tapped.
     const dpw = 124;
-    const dph = 128; // fits three dev buttons (SPAWN ENEMY / GO NIGHT / FORCE WAVE) + the label
+    const dph = 158; // fits four dev buttons (SPAWN ENEMY / SPAWN NPC / GO NIGHT / FORCE WAVE) + the label
     this.devPanel = new Panel(
       this.scene,
       BASE_WIDTH - dpw / 2 - 8,
@@ -58,13 +58,23 @@ export class DevMenu {
     );
     this.devPanel.addText(14, { fontSize: '10px', color: UI_THEME.olive.text }).setText('DEV MENU');
 
-    const spawnEnemyButton = new Button(this.scene, 0, -4, {
+    const spawnEnemyButton = new Button(this.scene, 0, -34, {
       width: 108,
       height: 24,
       label: 'SPAWN ENEMY',
       variant: 'olive',
       fontSize: 11,
       onDown: () => this.scene.game.events.emit('debug:spawnEnemy'),
+    });
+    // Spawn the dev-/scenario-only companion Rogue by the player (plan 042) — the on-screen twin of the
+    // console `window.game.events.emit('debug:spawnNpc')`, so the NPC is testable on a phone too.
+    const spawnNpcButton = new Button(this.scene, 0, -4, {
+      width: 108,
+      height: 24,
+      label: 'SPAWN NPC',
+      variant: 'olive',
+      fontSize: 11,
+      onDown: () => this.scene.game.events.emit('debug:spawnNpc'),
     });
     const initialTimeLabel = this.deps.initialPhase === 'day' ? 'GO NIGHT' : 'GO DAY';
     this.devTimeButton = new Button(this.scene, 0, 26, {
@@ -84,7 +94,7 @@ export class DevMenu {
       fontSize: 11,
       onDown: () => this.scene.game.events.emit('debug:forceWave'),
     });
-    this.devPanel.add([spawnEnemyButton, this.devTimeButton, forceWaveButton]);
+    this.devPanel.add([spawnEnemyButton, spawnNpcButton, this.devTimeButton, forceWaveButton]);
     this.deps.addHudElement(this.devPanel);
   }
 
