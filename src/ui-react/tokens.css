@@ -1,0 +1,105 @@
+/* Shared React-UI palette tokens (plan 046, Step 4) — the single source the game-page HUD reads.
+ *
+ * This is the canonical brown/cream palette (`@theme`), shadcn/ui's semantic CSS vars wired to it
+ * (`:root`), and the shadcn utility bindings (`@theme inline`) — the reusable token core, with none
+ * of the editor-only styling. Imported by src/hud/hud.css (after its Tailwind theme+utilities layers)
+ * so Tailwind processes these blocks for the game page.
+ *
+ * DUPLICATED VERBATIM from src/editor/editor.css for now (same hex values, same var names).
+ * Consolidating the editor + HUD onto one token file is deliberately OUT OF SCOPE for plan 046 — the
+ * editor keeps its own copy this step (see the plan's Out-of-scope note). Deliberately OMITTED here:
+ * `@import 'tailwindcss'` (hud.css imports the theme + utilities layers itself), the `@utility
+ * pixelated`, the `@keyframes lib-strip-play`, and the editor's `@layer base { html,body / #editor-root }`
+ * page baseline — those are editor-page concerns and must never touch the game page's canvas / body. */
+
+/* Canonical palette (plan 020) — raw brown/cream values, each defined exactly once. Token names
+ * deliberately avoid shadcn's semantic utility names (background/foreground/card/popover/primary/
+ * secondary/muted/accent/destructive/border/input/ring), which shadcn owns below. Two names differ
+ * from the plan's suggestions because of that collision: #5a4632 is `--color-active` (plan said
+ * --color-accent; shadcn owns accent=#3a2f2a) and #a99a8c is `--color-fg-dim` (plan said
+ * --color-muted; shadcn owns muted=surface-subtle). #3a2f2a (default border) has no palette token —
+ * use shadcn's `border-border` / `bg-border`. */
+@theme {
+  --color-app: #14100f;
+  --color-inset: #0e0b0a;
+  --color-inset-2: #17120f;
+  --color-raised: #1b1614;
+  --color-surface-subtle: #241d1a;
+  --color-surface: #2c2420;
+  --color-surface-3: #3a302b;
+  --color-border-muted: #6a5d54;
+  --color-active: #5a4632;
+  --color-accent-border: #7a5c3c;
+  --color-fg-bright: #f4ecd8;
+  --color-fg: #e8e0d8;
+  --color-fg-2: #d8c9bb;
+  --color-fg-muted: #c9bcae;
+  --color-fg-dim: #a99a8c;
+  --color-muted-2: #8a7f76;
+  --color-gold: #e0b020;
+  --color-gold-light: #f0d890;
+  --color-selection: #5fd0ff;
+  --color-pink: #e0708a;
+  --color-warm: #e0a08c;
+  --color-danger: #e07a6a;
+  --color-danger-strong: #b23b3b;
+  --color-danger-bg: #4a2420;
+  --color-danger-fg: #f4d0c8;
+  --color-ok-bg: #2f4632;
+  --color-ok-border: #46703c;
+}
+
+/* shadcn/ui semantic variables, wired to the palette tokens above (one palette). #3a2f2a (border /
+ * button-hover) is the only raw hex here — it's a shadcn semantic, not a palette utility. */
+:root {
+  color-scheme: dark;
+
+  --background: var(--color-app);
+  --foreground: var(--color-fg);
+  --card: var(--color-raised);
+  --card-foreground: var(--color-fg);
+  --popover: var(--color-raised);
+  --popover-foreground: var(--color-fg);
+  --primary: var(--color-active);
+  --primary-foreground: var(--color-fg-bright);
+  --secondary: var(--color-surface);
+  --secondary-foreground: var(--color-fg);
+  --muted: var(--color-surface-subtle);
+  --muted-foreground: var(--color-muted-2);
+  --border: #3a2f2a;
+  --accent: var(--border);
+  --accent-foreground: var(--color-gold-light);
+  --destructive: var(--color-danger-strong);
+  --destructive-foreground: var(--color-danger-fg);
+  --input: var(--color-inset);
+  --ring: var(--color-accent-border);
+  --radius: 4px;
+}
+
+/* Bind shadcn's color/radius UTILITIES (bg-primary, text-muted-foreground, border-border, …) to the
+ * :root semantic vars, per the Tailwind-v4 shadcn convention. These names are disjoint from the
+ * @theme palette names above, so no token is defined twice and there are no circular var() refs. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+}

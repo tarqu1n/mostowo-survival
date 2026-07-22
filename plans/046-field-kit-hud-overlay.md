@@ -200,7 +200,27 @@ crispness proven at the Step 1 gate before any component is built on top.
     simulated SHUTDOWN→START); a temporary `GameHud` readout shows live HP/hunger/day
     ticking in-game.
 
-- [ ] **Step 4: Game-scoped shared primitives, tokens, and data prep** `[delegate]`
+- [x] **Step 4: Game-scoped shared primitives, tokens, and data prep** `[delegate]`
+  - Outcome: `src/ui-react/tokens.css` — the `@theme` palette + `:root` shadcn-semantic + `@theme
+    inline` utility-binding blocks copied VERBATIM from `editor.css` (editor-only bits omitted:
+    `@import 'tailwindcss'`, `@utility pixelated`, `lib-strip-play`, `@layer base html/body/#editor-
+    root`); imported from `src/hud/hud.css` after the Tailwind layer imports. `src/hud/lib/utils.ts`
+    (`cn`) + `src/hud/ui/{button,tabs,sheet,dialog,tooltip,slider,select}.tsx` copied from
+    `src/editor/ui/` — only rewrite was `@/editor/lib/utils`→`@/hud/lib/utils` (+ `@/editor/ui/button`
+    →`@/hud/ui/button` in dialog.tsx). `src/config.ts` += `HUD_HOTBAR_SLOTS = 6` (store's local
+    `HOTBAR_SLOTS` left untouched — low-churn; a later step migrates it). `src/data/types.ts`
+    `BuildableDef` += `readonly category?: 'defense'|'survival'|'craft'`; `src/data/buildables.ts`
+    tagged wall/spike_trap→defense, campfire→survival. **Correction to Step 1's reset (applied here,
+    inline):** the `#hud-root` reset in `hud.css` was UNLAYERED, so it outranked `@layer utilities`
+    and silently defeated spacing/border utilities + `<button>` bg/color across the HUD (the sample
+    Button rendered unstyled). Wrapped it in `@layer base` (ranked below `utilities` by the layer
+    decl) — scoping invariant intact, utilities now win inside the overlay (mirrors editor.css).
+    Verified: typecheck + lint clean (0 errors; no warnings in touched files); `npm run build` +
+    built-CSS scoping re-check clean (no global `*`/`html`/`body`/`canvas` preflight; `.bg-primary`
+    etc. present); 932 unit tests + smoke canary green; one-off headless render confirmed a sample
+    `<Button>` now computes `bg-primary` rgb(90,70,50)=`--color-active`, padding 8/16px, radius 4px
+    (temp sample then removed — GameHud restored exactly). Duplication with `src/editor/ui` accepted
+    per plan.
   - Extract the `@theme` palette tokens from `src/editor/editor.css` into
     `src/ui-react/tokens.css`; import it from `src/hud/hud.css` (do **not** rewire
     `editor.css` now — consolidation is out of scope). Create `src/hud/ui/` by copying the

@@ -23,6 +23,7 @@ export const BUILDABLES: Record<string, BuildableDef> = {
     behavior: 'wall', // live/simulated — routed to WallBehavior on completion (see finishSite dispatch)
     thorns: 1, // wave-time tuning knob
     orientable: true, // player-rotate at placement picks the facing (down/right/up/left)
+    category: 'defense', // HUD build-catalog tab (plan 046)
   },
   // Base-only light source; always burning once built, drains fuel continuously (see
   // config.CAMPFIRE_FUEL_* — plan 012 Context & decisions). Renders as two layers (ember base + a
@@ -42,6 +43,7 @@ export const BUILDABLES: Record<string, BuildableDef> = {
     animKey: 'campfire',
     tilesTall: 3, // flame height (Fire_01 48px → 3 tiles native) + the tappable pick column
     originY: 1,
+    category: 'survival', // HUD build-catalog tab (plan 046)
   },
   // Spike trap (plan 040) — the roadmap's "one trap": an ARMED floor tile that triggers ONCE when an
   // enemy stands on it (deals SPIKE_TRAP_DAMAGE, then goes spent) and is re-armed each morning by a
@@ -69,5 +71,6 @@ export const BUILDABLES: Record<string, BuildableDef> = {
     // art up off the tile). The pick column spans those 2 rows; it still occupies ONE logical tile.
     tilesTall: 2,
     originY: 0.5,
+    category: 'defense', // HUD build-catalog tab (plan 046)
   },
 };

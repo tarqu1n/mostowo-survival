@@ -15,39 +15,49 @@
 @import 'tailwindcss/theme.css' layer(theme);
 @import 'tailwindcss/utilities.css' layer(utilities);
 
-/* Shared palette tokens (@theme) live in src/ui-react/tokens.css — imported at Step 4 once the
- * tokens are extracted. Kept out of here so this file stays the scoping mechanism only. */
+/* Shared palette tokens (@theme / :root / @theme inline) live in src/ui-react/tokens.css — the same
+ * canonical brown/cream palette + shadcn wiring the editor uses, so the HUD's shadcn primitives
+ * (bg-primary, text-muted-foreground, border-border, …) resolve. Imported AFTER the Tailwind theme +
+ * utilities layers above so Tailwind processes its @theme blocks. Only tokens + the :root vars ship —
+ * no editor-only page baseline, so nothing here reaches #game, the canvas, or bare html/body. */
+@import '../ui-react/tokens.css';
 
 /* Minimal reset, scoped to the overlay only — replaces the preflight bits the HUD actually needs
- * without any selector reaching #game, the canvas, or bare html/body. */
-#hud-root,
-#hud-root *,
-#hud-root *::before,
-#hud-root *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  border: 0 solid transparent;
-}
+ * without any selector reaching #game, the canvas, or bare html/body. Placed in `@layer base` (which
+ * the layer order above ranks BELOW `utilities`) so Tailwind utilities + the shadcn primitives win
+ * inside the overlay: an UNLAYERED reset would outrank every utility regardless of specificity and
+ * silently defeat spacing/border utilities (and bg/color on `<button>`s) across the whole HUD —
+ * mirrors how editor.css layers its own baseline. */
+@layer base {
+  #hud-root,
+  #hud-root *,
+  #hud-root *::before,
+  #hud-root *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid transparent;
+  }
 
-#hud-root {
-  font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    Helvetica,
-    Arial,
-    sans-serif;
-  line-height: 1.4;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
+  #hud-root {
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      Roboto,
+      Helvetica,
+      Arial,
+      sans-serif;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
 
-#hud-root button {
-  font: inherit;
-  color: inherit;
-  background: none;
-  cursor: pointer;
+  #hud-root button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    cursor: pointer;
+  }
 }

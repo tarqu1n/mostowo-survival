@@ -54,6 +54,8 @@ export const GROUND_CHUNK_ROWS = 32;
 export const INVENTORY_SLOTS = 20;
 /** Slots surfaced on the always-visible hotbar (the first N inventory slots). Must be ≤ INVENTORY_SLOTS. */
 export const HOTBAR_SLOTS = 5;
+/** Slots on the Field Kit HUD quick-swap hotbar (plan 046 — the DOM/React overlay's build/tool row). */
+export const HUD_HOTBAR_SLOTS = 6;
 /** Fallback per-slot stack size for any item whose def omits `maxStack`. */
 export const DEFAULT_MAX_STACK = 50;
 

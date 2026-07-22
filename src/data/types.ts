@@ -139,6 +139,10 @@ export interface BuildableDef extends ObjectStats {
   /** Marks a buildable whose placement facing can be rotated by the player before placing (plan 037):
    *  each placed instance stores its own `facing`. The wall sets it; omit ⇒ a fixed-orientation buildable. */
   orientable?: boolean;
+  /** Which HUD build-catalog tab this buildable lives under (plan 046). `craft` is reserved for future
+   *  content — no `craft` buildable exists yet, so the catalog renders a tab only per category with ≥1
+   *  entry. Omit ⇒ untabbed (defaults handled by the catalog). */
+  readonly category?: 'defense' | 'survival' | 'craft';
   /** Height (in tiles) the sprite is scaled to stand — for multi-tile animated buildables. */
   tilesTall?: number;
   /** Sprite anchor Y (mirrors ResourceNodeDef.originY) — bottom-anchored so a tall structure overhangs upward. */
