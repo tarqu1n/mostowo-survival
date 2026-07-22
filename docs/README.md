@@ -34,4 +34,5 @@ surface stays lean — load the one leaf a task needs, not the whole set.
 - [CRAFTPIX.md](CRAFTPIX.md) — importing CraftPix.net asset packs (scripted ingest): theme packs, no-shadow variants, directional-sheet slicing
 - [ASSET-EXPERIMENTS.md](ASSET-EXPERIMENTS.md) — art R&D log: tileset candidates, AI-gen trials, `style_match.py`
 - [gemini-pipeline.md](gemini-pipeline.md) — operational Gemini item-icon pipeline (endpoint, key, workflow); see also [scripts/gen-icons/README.md](../scripts/gen-icons/README.md)
+- [AI-SPRITE-PIPELINE.md](AI-SPRITE-PIPELINE.md) — reusable playbook for **generating animated pack-matching sprites** via Gemini image-to-image + an outline-first cel-shade downscale (Rogue attack was the first); includes prior-art / papers
 - [RENDERING.md](RENDERING.md) — custom PostFX pipelines + "when to reach for a shader"
