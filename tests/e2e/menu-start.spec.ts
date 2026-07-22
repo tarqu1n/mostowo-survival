@@ -16,7 +16,13 @@ test('tapping the title screen to start does not issue a move order on the map',
   page,
 }) => {
   await page.goto('/', { waitUntil: 'load' });
-  await page.waitForFunction(() => (window as any).game?.isBooted, null, { timeout: 15_000 });
+  // Wait for MainMenu to be ACTIVE, not merely isBooted: isBooted flips long before MainMenu.create()
+  // registers its "tap to start" pointerdown listener, so pressing straight after isBooted races that
+  // gap and the boundary-press below gets dropped (game never starts → __test times out). Gating on the
+  // active scene mirrors harness.bootIntoGame's await-ready and removes that flake under parallel load.
+  await page.waitForFunction(() => (window as any).game?.scene?.isActive('MainMenu'), null, {
+    timeout: 15_000,
+  });
 
   const box = await page.locator('canvas').boundingBox();
   if (!box) throw new Error('game canvas not found');

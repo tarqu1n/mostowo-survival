@@ -7,6 +7,7 @@ import { startGame, applyScenario, order, step, state, emit, held } from './harn
 
 test('worker forages a bush for berries, then eats one to restore hunger', async ({ page }) => {
   await startGame(page);
+  await step(page, 16); // stop the live RAF loop BEFORE setup — the whole forage runs in driven frames
   // Bush one tile to the east of the worker; seed hunger mid-range so a berry visibly raises it.
   const { bushIds } = await applyScenario(page, { player: [3, 3], bushes: [[5, 3]], hunger: 40 });
 

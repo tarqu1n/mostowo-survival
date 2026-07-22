@@ -44,6 +44,7 @@ test('a chasing monster gives up when the player escapes past the drop radius', 
 
 test('a patrol-route monster cycles its waypoints', async ({ page }) => {
   await startGame(page);
+  await step(page, 16); // stop the live RAF loop BEFORE setup — no variable-delta frames move the mob
   // Player far away (never within the 80px vision), so the monster stays calm and patrols. Route is a
   // 2-tile horizontal hop on the known-clear row-10 band; it spawns ON waypoint 0 (the natural authoring
   // pattern) to also exercise the same-tile-first-waypoint path.
@@ -62,8 +63,8 @@ test('a patrol-route monster cycles its waypoints', async ({ page }) => {
 
   const cols: number[] = [];
   const modes: string[] = [];
-  for (let i = 0; i < 24; i++) {
-    await step(page, 400); // ~9.6s total — several out-and-back cycles (pause 1s + ~0.7s travel each leg)
+  for (let i = 0; i < 30; i++) {
+    await step(page, 400); // ~12s total — several out-and-back cycles with headroom (pause 1s + ~0.7s travel each leg)
     const s = await state(page);
     cols.push(s.enemyTiles[0].col);
     modes.push(s.enemyModes[0]);
