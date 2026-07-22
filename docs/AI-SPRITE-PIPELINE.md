@@ -1,8 +1,9 @@
 # AI sprite pipeline — generating animated, pack-matching sprites
 
 A reusable two-stage workflow for **adding a missing animation to an existing pack
-character** (first use: the Rogue's attack strip, plan 042 shipped no attack art). It
-worked well enough to generalise, so this is the playbook.
+character** (first use: the Rogue's attack strip, plan 042 shipped no attack art; second: the
+player's bow-fire strip — see "Second asset" below). It worked well enough to generalise, so
+this is the playbook.
 
 **The two stages** (one script each, both in `scripts/pixel-crawler/`):
 
@@ -163,6 +164,42 @@ right tool for the shaded-gen problem, but not runnable here: it ships **no pret
 weights** (you'd have to train it, needing the dataset + a GPU) and pins Python 3.5 /
 PyTorch 0.4.0 / Ubuntu 16.04. Revisit on a GPU box with a trained/ported checkpoint; until
 then the cel step stands and "prompt flat" is the mitigation.
+
+## Second asset — the player bow (side-only) — learnings
+
+The second run of this pipeline: a **player (Body_A) bow-fire** strip, replacing the coded
+Pierce stand-in the bow lock reused (`gen_bow_gemini.py` + `process_bow.py`). What it taught
+that the rogue didn't:
+
+- **Scope to the facing the model can actually draw.** The player is 3-way, but Gemini
+  cannot hold a coherent bow fired **toward/away from camera** — the front/back frames
+  rotate to a side-aim, drop the bow, or turn to mush, whichever way you prompt. Side
+  profile is where it's strong. So we ship the AI **side** strip (flipX for L/R) and keep the
+  Pierce `attack` strip as the **down/up stand-in** (`PlayerCharacter.updateAnim` branches on
+  facing). Chasing all three just burned generations. Decide the shippable facings up front.
+- **Force the prop into EVERY frame.** The model drops the bow in the ready/recover frames
+  unless told — repeatedly — to keep it. A `BOW_EVERY` clause ("the character GRIPS the bow,
+  VISIBLE in EVERY frame, incl. the first and last") fixed the missing-bow frames. Restate
+  props like you restate the background; once isn't enough.
+- **Let the game's FX carry the money beat.** The bow already fires a coded arrow tracer at
+  the target, so the strip doesn't need a crisp "arrow leaving" frame — a consistent *draw*
+  reads fine. Picking the consistent-bow sample over the one with a nice loose frame (but a
+  dropped bow elsewhere) was the right trade. Know what the surrounding FX already sells.
+- **Density-based frame split** (`split_figures`). Bows/arrows bridge the gaps between
+  figures, so an any-opaque column projection **merges** them (a 5-figure row split into 3).
+  Threshold each column by its opaque-pixel COUNT — torsos are tall solid columns, props are
+  a few px — find the N torso cores and cut at their midpoints; fall back to an equal N-split.
+- **Per-facing reorder + frame reuse.** The chosen side sample's 5th frame dropped the bow, so
+  reuse frame 0 (bow-in-hand ready) as the recover frame — keeps the prop and loops cleanly
+  back to idle. `REORDER` is keyed per facing.
+- **Geometry/palette differ from the rogue** (per-asset, as expected): Body_A is 64px, ~30px
+  body, feet at y47 (not 56px/y53); and it's ONE warm skin/hair/wood ramp + green eyes — no
+  competing materials, so `posterize_cel` is simpler here (no hue-split, just the warm ramp).
+- **Getting the key from a cloud session:** pull `GEMINI_API_KEY` off guppi over the Tailnet
+  (see [gemini-pipeline.md](gemini-pipeline.md)) — it is no longer "unreachable from a sandbox".
+
+**Meta:** the generation is the lever, the processing is downstream. Two knobs did the work —
+prompt the prop into every frame, and scope to the facings the model draws well.
 
 ## Prior art & references (how this is done in the wild)
 

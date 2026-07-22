@@ -42,8 +42,18 @@ KEY_TOL = 130     # high enough to also key the anti-aliased pink ring around th
 PREVIEW_FPS = 11
 PREVIEW_SCALE = 6
 PREVIEW_BG = (46, 46, 58)
-# Output frame order (0-based). Prompted in draw->release order already, so identity.
-REORDER = [0, 1, 2, 3, 4]
+# Output frame order per facing (0-based indices into the generated left-to-right row).
+# The chosen raw strips: side's poses come out ready-late, so front-load the ready frame;
+# down/up already read draw->release->recover left-to-right. Falls back to identity if a
+# strip has a different frame count.
+# Only `side` is generated via this pipeline (plan: ship the side bow mirrored L/R; the
+# front/back facings keep the coded Pierce stand-in — the model can't hold a coherent bow
+# firing toward/away from camera). side sample 3's frames read ready/draw/fulldraw/loose,
+# and its 5th raw frame drops the bow, so reuse frame 0 (bow-in-hand ready) as the recover
+# frame — keeps the bow visible in every frame and loops cleanly back to idle.
+REORDER = {
+    "side": [0, 1, 2, 3, 0],
+}
 
 # Cel-shade palette, sampled from Body_A Idle_Side. One warm ramp (deep->light) carries
 # skin + hair + wooden bow (all warm; separated only by brightness); green eyes re-injected.
@@ -170,19 +180,43 @@ def defringe(a, iters=4):
     return a
 
 
-def split_columns(mask):
-    cols = mask.any(0)
-    runs, x, W = [], 0, mask.shape[1]
+def _core_runs(count, thr):
+    """Runs of columns whose opaque-pixel COUNT clears `thr` (the figure torsos)."""
+    runs, x, W = [], 0, len(count)
     while x < W:
-        if cols[x]:
+        if count[x] >= thr:
             x0 = x
-            while x < W and cols[x]:
+            while x < W and count[x] >= thr:
                 x += 1
-            if x - x0 >= 8:                        # ignore stray specks
+            if x - x0 >= 6:                        # ignore thin specks
                 runs.append((x0, x - 1))
         else:
             x += 1
     return runs
+
+
+def split_figures(mask, expect):
+    """Split the row into `expect` per-figure cells, robust to bows/arrows that bridge the
+    gaps between figures (a plain any-opaque projection merges those — that gave a 3-wide
+    'down' and 4-wide 'up'). A figure's torso is a TALL solid column; its bow/arrow limbs
+    are only a few px tall, so thresholding each column by its opaque-pixel COUNT finds the
+    torso cores while the thin props drop out. Cut at the midpoints between adjacent core
+    centres so each figure keeps its own bow/arrow. Falls back to an equal split if the
+    core count doesn't match `expect` (e.g. a pose whose torso density dips mid-body)."""
+    count = mask.sum(0)
+    W = mask.shape[1]
+    thr = max(12, int(0.15 * count.max())) if count.max() else 12
+    runs = _core_runs(count, thr)
+    if len(runs) != expect:
+        cols = np.where(count > 0)[0]
+        if cols.size == 0:
+            return []
+        lo, hi = cols.min(), cols.max()
+        step = (hi - lo + 1) / expect
+        return [(int(lo + i * step), int(lo + (i + 1) * step) - 1) for i in range(expect)]
+    centres = [(a + b) // 2 for a, b in runs]
+    bounds = [0] + [(centres[i] + centres[i + 1]) // 2 for i in range(len(centres) - 1)] + [W]
+    return [(bounds[i], bounds[i + 1] - 1) for i in range(len(centres))]
 
 
 def build(direction, sample):
@@ -192,9 +226,10 @@ def build(direction, sample):
         raise SystemExit(f"missing raw strip {src.relative_to(ROOT)} — run gen_bow_gemini.py")
     a = keyout(Image.open(src))
     mask = a[:, :, 3] > 16
-    runs = split_columns(mask)
-    if len(runs) < 2:
-        raise SystemExit(f"expected a multi-figure row, found {len(runs)} column runs")
+    expect = len(REORDER.get(direction, [])) or 5
+    runs = split_figures(mask, expect)
+    if len(runs) != expect:
+        raise SystemExit(f"expected {expect} figures, split found {len(runs)}")
 
     figs = []
     for x0, x1 in runs:
@@ -206,7 +241,8 @@ def build(direction, sample):
     ref = heights[len(heights) // 2]              # median (the standing frames)
     scale = BODY_H / ref
 
-    order = REORDER if len(figs) == len(REORDER) else list(range(len(figs)))
+    want = REORDER.get(direction, list(range(len(figs))))
+    order = want if len(figs) == len(want) else list(range(len(figs)))
     figs = [figs[i] for i in order]
 
     n = len(figs)

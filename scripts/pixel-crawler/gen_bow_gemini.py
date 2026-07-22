@@ -67,17 +67,23 @@ STRIP = ("Lay them out as ONE HORIZONTAL ROW on one line — a sprite-sheet / fi
 # full draw -> loose -> follow-through) so the three strips read as one action from three
 # angles; only the camera-relative wording changes.
 FRAMES = {
-    "side": ("side view facing RIGHT: (1) standing, bow raised in the left hand out front, "
-             "arrow just nocked, string slack; (2) starting the draw — right hand pulling "
-             "the string back, elbow rising; (3) FULL DRAW — bow arm straight out front, "
-             "string pulled all the way back to the cheek, body taut; (4) LOOSE — string "
-             "snapped forward, arrow leaving the bow, hands recoiling; (5) follow-through, "
-             "bow arm settling, string slack again"),
-    "down": ("front view facing the viewer (camera), aiming slightly DOWNWARD: (1) standing, "
-             "bow raised across the body, arrow just nocked; (2) starting the draw, drawing "
-             "hand pulling back toward the chest; (3) FULL DRAW, bow pushed out toward the "
-             "viewer, string drawn to the chin, arms wide; (4) LOOSE, string forward, arrow "
-             "leaving toward the viewer; (5) follow-through, arms lowering"),
+    "side": ("side view facing RIGHT, the bow held out front in the left hand throughout: "
+             "(1) standing at ready, bow raised in the left hand out front, arrow just "
+             "nocked, string slack; (2) starting the draw — right hand pulling the string "
+             "back, elbow rising, bow still held out front; (3) FULL DRAW — bow arm straight "
+             "out front, string pulled all the way back to the cheek, body taut; (4) LOOSE — "
+             "bow still out front in the left hand, string snapped forward, arrow leaving the "
+             "bow; (5) follow-through, bow still held out front in the left hand, bow arm "
+             "settling, string slack again"),
+    "down": ("front view, the character stays SQUARE TO THE VIEWER (camera) the whole time — "
+             "do NOT turn sideways, do NOT aim left or right, keep the body facing straight "
+             "at the camera in every frame — with the bow held HORIZONTALLY across the body "
+             "and the arrow pointing DOWN toward the viewer: (1) standing square-on, bow held "
+             "low across the waist, arrow just nocked; (2) raising the bow to chest height, "
+             "starting to draw, both elbows lifting out level and symmetric; (3) FULL DRAW, "
+             "bow pushed toward the viewer at chest height, string drawn back, elbows wide and "
+             "level; (4) LOOSE, string forward, arrow leaving toward the viewer; (5) follow-"
+             "through, bow lowering, still square to the camera"),
     "up": ("back view facing AWAY from the viewer, aiming UPWARD/away: (1) standing seen from "
            "behind, bow raised, arrow just nocked; (2) starting the draw, drawing elbow "
            "lifting out to the side; (3) FULL DRAW, bow pushed up-and-away, string drawn "
@@ -99,11 +105,21 @@ def reference_png(direction: str) -> bytes:
     return out.read_bytes()
 
 
+# The model likes to drop the prop in the ready/recover frames. Force it to keep the bow in
+# every frame (this fixed the side strip's missing-bow frames 4/5). Restated because the
+# model doesn't reliably carry a constraint stated only once.
+BOW_EVERY = ("CRITICAL: the character GRIPS the wooden bow in the bow hand and it is clearly "
+             "VISIBLE in EVERY single frame — including the first (ready) and last (follow-"
+             "through) frame. Never drop, stow, lower out of view, or omit the bow in any "
+             "frame. Every frame must show the full bow.")
+
+
 def prompt_for(direction: str) -> str:
     return (
         f"The attached image is the reference character: {CHAR} Redraw THIS EXACT same "
         f"character across 5 frames of firing a bow, {FRAMES[direction]}. Same character, "
-        f"hair, clothes, colours and proportions in every frame. {STRIP} {FLAT} {BG_MAGENTA}"
+        f"hair, clothes, colours and proportions in every frame. {BOW_EVERY} {STRIP} {FLAT} "
+        f"{BG_MAGENTA}"
     )
 
 

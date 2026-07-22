@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import {
   ACTION_ANIM_FRAMERATE,
+  BOW_DRAW_MS,
   DEATH_ANIM_FRAMERATE,
   NPC_ATTACK_ANIM_FRAMERATE,
   SPIKE_TRAP_TRIGGER_MS,
@@ -8,6 +9,7 @@ import {
 import {
   ACTIVE_TILESET,
   playerAnimKey,
+  playerBowKey,
   enemyWalkKey,
   enemyIdleKey,
   enemyDeathKey,
@@ -64,6 +66,20 @@ export function registerActorAnims(scene: Phaser.Scene): void {
       });
     },
   );
+  // Player bow-fire (plan 035a follow-up): one single-orientation strip (side; flipX-faced), a
+  // one-shot draw→loose held for the bow lock. Timed by `duration` = BOW_DRAW_MS (not the shared
+  // action framerate) so the 5-frame draw always fills the exact lock window, however it's tuned.
+  if (!scene.anims.exists(playerBowKey)) {
+    scene.anims.create({
+      key: playerBowKey,
+      frames: scene.anims.generateFrameNumbers(playerBowKey, {
+        start: 0,
+        end: playerActor.bow.frames - 1,
+      }),
+      duration: BOW_DRAW_MS,
+      repeat: 0,
+    });
+  }
   // Enemy (skeleton): a single Run strip (frame 0 doubles as the idle pose, flipped by movement-x —
   // the mob sheets ship no directional variants) plus a one-shot Death collapse played on kill.
   if (!scene.anims.exists(enemyWalkKey)) {

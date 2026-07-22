@@ -5,6 +5,7 @@ import {
   sheetKey,
   tileImageKey,
   playerAnimKey,
+  playerBowKey,
   enemyWalkKey,
   enemyIdleKey,
   enemyDeathKey,
@@ -124,6 +125,9 @@ export class PreloadScene extends Phaser.Scene {
       for (const state of playerStates)
         loadStrip(playerAnimKey(state, facing), player[state][facing]);
     });
+    // Player bow-fire: one single-orientation strip (side; flipX-faced), loaded unconditionally
+    // like the NPC attack. The down/up bow lock still reuses the Pierce `attack` strips above.
+    loadStrip(playerBowKey, player.bow);
     loadStrip(enemyWalkKey, enemy.walk);
     loadStrip(enemyIdleKey, enemy.idle); // 32px Idle bob — its own footprint (Phase B)
     loadStrip(enemyDeathKey, enemy.death);

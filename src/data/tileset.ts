@@ -186,6 +186,14 @@ export interface TilesetManifest {
       gather: Record<Facing, StripAnim>;
       attack: Record<Facing, StripAnim>;
       death: Record<Facing, StripAnim>;
+      /**
+       * Bow-fire draw→loose (plan 035a follow-up). SINGLE orientation — an AI-generated side
+       * strip (docs/AI-SPRITE-PIPELINE.md) that bakes its own bow, faced L/R by `flipX` like
+       * the NPC. Only `side` ships: the model can't hold a coherent bow firing toward/away
+       * from camera, so the down/up facings reuse the coded Pierce (`attack`) stand-in
+       * (PlayerCharacter.updateAnim). Played one-shot over `BOW_DRAW_MS` during the bow lock.
+       */
+      bow: StripAnim;
     };
     /**
      * Enemy: single-orientation Run (`walk`) strip + a one-shot Death collapse (see GameScene.killEnemy),
@@ -453,6 +461,14 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
           frameSize: 64,
           frames: 8,
         },
+      },
+      // bow = an AI-generated side draw→loose strip (5 frames of 64px, bakes its own bow),
+      // sitting in _derived/player/ beside the pack sheets — the dedicated art the bow lock
+      // used to fake with the Pierce strip. Side-only (flipX-faced); see the type doc above.
+      bow: {
+        path: '_derived/player/Bow_Side-Sheet.png',
+        frameSize: 64,
+        frames: 5,
       },
     },
     enemy: {
@@ -774,6 +790,10 @@ export const resolveTile = (source: TileSource): { key: string; frame?: number }
 /** Texture/anim key for a player state+facing strip, e.g. `player-walk-side`. */
 export const playerAnimKey = (state: PlayerState, facing: Facing): string =>
   `player-${state}-${facing}`;
+
+/** Texture/anim key for the player's single-orientation bow-fire strip (side; flipX-faced).
+ *  Facing-less like {@link enemyWalkKey} — the down/up facings reuse the Pierce `attack` key. */
+export const playerBowKey = 'player-bow-side';
 
 /** Texture/anim key for the enemy Run strip (frame 0 doubles as the Phase-A frozen idle). */
 export const enemyWalkKey = 'enemy-walk';

@@ -9,7 +9,7 @@ import {
   UNARMED_BASE_DAMAGE,
   UNARMED_MELEE_SHAPE,
 } from '../config';
-import { ACTIVE_TILESET, playerAnimKey, type PlayerState } from '../data/tileset';
+import { ACTIVE_TILESET, playerAnimKey, playerBowKey, type PlayerState } from '../data/tileset';
 import type { AttackShape } from '../data/types';
 import type { MeleeWeapon } from '../data/weapons';
 import { worldToTile } from '../systems/grid';
@@ -125,15 +125,20 @@ export class PlayerCharacter extends Character {
     if (this.dying) return; // death collapse owns the sprite until the restart
     if (this.scene.time.now < this.attackLockUntil) return; // attack swing in progress — don't stomp it
     if (this.scene.time.now < this.bowLockUntil) {
-      // Bow draw/release: the pack ships no bow rig, so the release body pose reuses the Pierce
-      // (attack) strip as a coded stand-in for the draw window — a committed forward motion that
-      // reads as loosing a shot. The arrow tracer + target highlight (CombatFxManager) carry the
-      // actual "ranged" read; the light BOW_MOVE_SLOW still lets you kite. A dedicated bow anim/art
-      // is a later polish pass. Held (looped) for the window so update()'s per-frame call can't stomp
-      // it back to idle/walk — same "one state owns the sprite" discipline as the attack-lock above.
+      // Bow draw/loose. SIDE has dedicated art — a one-shot draw→loose strip (playerBowKey,
+      // AI-generated, bakes its own bow) played and held for the lock. DOWN/UP have no bow art
+      // (the model can't hold a coherent bow toward/away from camera), so they still reuse the
+      // Pierce (`attack`) strip as a coded stand-in — a committed forward motion that reads as
+      // loosing. Either way the arrow tracer + target highlight (CombatFxManager) carry the
+      // actual "ranged" read, and the light BOW_MOVE_SLOW lets you kite. Held (played with
+      // ignoreIfPlaying) for the window so update()'s per-frame call can't stomp it back to
+      // idle/walk — same "one state owns the sprite" discipline as the attack-lock above.
       const facing = this.facingDir();
       this.sprite.setFlipX(facing === 'side' && this.lastFacing.dCol < 0);
-      this.sprite.anims.play(playerAnimKey('attack', facing), true);
+      this.sprite.anims.play(
+        facing === 'side' ? playerBowKey : playerAnimKey('attack', facing),
+        true,
+      );
       return;
     }
     const facing = this.facingDir();
