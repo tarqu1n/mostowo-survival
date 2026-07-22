@@ -470,7 +470,17 @@ delegate lanes — just driven inline, not blind-delegated.
 
 ### Phase 5 — optimise-context + docs (sequential, inline)
 
-- [ ] **Step 17: Run the `optimise-context` skill on the always-loaded context** `[inline]`
+- [x] **Step 17: Run the `optimise-context` skill on the always-loaded context** `[inline]`
+  - Outcome: the `optimise-context` skill is **not installed in this execution container** (empty plugin
+    config, no hermes plugin present), so applied its documented principle by hand: keep CLAUDE.md a lean
+    always-loaded index, don't shard the load-on-demand leaves (critique #3), update the architecture map to
+    the post-refactor layout. Edited CLAUDE.md's map only — `src/systems/` now lists `orders` (Action-kind
+    registry) + `mapFormat/` barrel; `src/scenes/` lists `combat/CombatController` + `hud/` per-widget
+    builders (GameScene/UIScene = thin composition roots); `src/editor/` describes the Zustand
+    `store/slices/*` composition, `scene/*` controllers, and shared `usePanZoom`/`zoom`/`regionGeometry`/
+    `pixelAlpha` modules. **Standing cost:** 5.4 KB → 6.3 KB (90 lines) — the ~0.9 KB is the accurate map,
+    not dead weight; leaves stay load-on-demand (zero standing cost) so no sharding. `lint:md` green (0
+    errors, 84 files). markdown-is-model-context rule preserved (no Prettier on `.md`).
   - Invoke the `optimise-context` skill (hermes-dev plugin) on the **genuinely always-loaded** file:
     `CLAUDE.md` (loaded every turn). Its job is to minimise *standing* token cost — so the target is
     the always-loaded index, not the load-on-demand leaves. **Re-scoped per critique #3:** do NOT
@@ -488,7 +498,19 @@ delegate lanes — just driven inline, not blind-delegated.
   - Done when: `optimise-context` applied to CLAUDE.md, architecture map matches shipped structure,
     `lint:md` green, standing cost validated as reduced-or-already-minimal (with the rationale noted).
 
-- [ ] **Step 18: Update architecture docs to the new module layout** `[inline]`
+- [x] **Step 18: Update architecture docs to the new module layout** `[inline]`
+  - Outcome: `CLAUDE.md` map already done in Step 17. Edited **`docs/CONVENTIONS.md`** — new bullets:
+    order-kind registry (`systems/orders.ts`) as the order-extension seam mirroring
+    `StructureManager`+`BUILDABLES`; HUD widgets (`scenes/hud/`); big-pure-module barrel (`mapFormat/`);
+    editor Zustand slice composition (`store/slices/*`); editor scene controllers (`scene/*`, incl. the
+    `inputController` vs Phaser `Scene.input` name gotcha); shared editor viewport modules
+    (`usePanZoom`/`zoom`/`regionGeometry`/`pixelAlpha`); and updated the Manager-pattern header to
+    `{build,combat,fx,hud,input,world}/` + `combat/CombatController`. **`docs/EDITOR.md`** — `mapFormat.ts`
+    refs repointed to the `mapFormat/` barrel + `mapFormat/schema.ts`; added a terse "Code layout"
+    pointer to CONVENTIONS. **`docs/STATUS.md`** — new "Code cleanup & modularization (plan 043)" section
+    (splits table with real line counts, order registry, safe-perf, standards, testability; refactor-
+    tripwire = the no-gameplay-change proof). Line counts verified against the tree (GameScene 1648).
+    Terse/high-signal, no duplication (EDITOR points at CONVENTIONS). `lint:md` green (0 errors, 84 files).
   - Update `CLAUDE.md`'s architecture map, `docs/CONVENTIONS.md` (editor slice pattern, new
     `editor/scene/` + `scenes/hud/` + `scenes/combat/` dirs, `usePanZoom`/shared-editor modules, the
     Action-kind registry as the new order-extension seam, `mapFormat/` barrel), `docs/EDITOR.md`, and

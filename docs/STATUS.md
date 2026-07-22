@@ -478,3 +478,30 @@ the cascade; eating berries (foraged from the berry bushes now authored on `the-
 Adjacent-ring streaming is [plan 019](../plans/019-l1-map-streaming.md). **Still to author:** the
 test-content maps that exercise every feature end-to-end (plan 014 step 12) — which unblocks
 re-enabling lethal hunger and plan 019's second placement.
+
+## Code cleanup & modularization (plan 043)
+
+A repo-wide, behaviour-preserving cleanup pass: every file over ~1000 lines split into cohesive modules
+(public export surfaces kept via barrels/composition roots, so no consumer changed), the clear code
+smells / competing-standards fixed, and the order-handling seam re-architected. Pinned throughout by the
+`refactor-tripwire` Tier-2 golden snapshot (unchanged) — no gameplay change. Findings recorded in
+`docs/cleanup/{smells,standards,perf,extensibility}.md` (applied rows ticked, logged rows retained).
+
+- **Splits.** `editorStore.ts` 3662→93 (barrel over ~15 `store/slices/*`); `EditorScene.ts` 2367→370
+  (`scene/*` controllers); `LibraryPanel.tsx` 1766→835 + `ObjectEditorTab.tsx` 1129→45 (onto shared
+  `hooks/usePanZoom` + pure `zoom`/`regionGeometry`/`pixelAlpha`, unit-tested); `GameScene.ts` 1965→1648
+  (`combat/CombatController` + `world/DevWorldTools` + the registry below); `UIScene.ts` 1389→352
+  (per-widget `scenes/hud/*`); `systems/mapFormat.ts` → `mapFormat/` barrel (`schema`/`parse`/`serialize`/
+  `resize`).
+- **Order-kind registry (Step 14).** New pure `src/systems/orders.ts` (`ORDER_META` + generic
+  `orderTargetId`/`isOrderQueued`/`toggleOrder`) mirrors `StructureManager`+`BUILDABLES`; GameScene keeps
+  only `orderBeginners`/`orderRunners` dispatch tables. Collapsed the `isXQueued`/`toggleX` quartet,
+  `describeActionTarget`, and the glow-highlight branch into data; `wireBus()` is one on/off table so it
+  can't drift. +14 unit tests.
+- **Safe perf (Step 15).** Two no-work early-returns only (`syncEnemyHealthBars`, `syncGlowTransforms`);
+  every heavier perf item stayed logged (needs-review).
+- **Standards (Step 16).** `spike_trap` cost inlined into `data/buildables.ts` beside `wall`/`campfire`
+  (removed `SPIKE_TRAP_COST` from `config.ts`); STANDARDS.md event-namespace list completed. Logged items
+  (parked portals, disabled two-finger gesture, game-bus-vs-editor-Zustand split) left untouched by design.
+- **Testability.** New pure modules are unit-tested (`orders`, `regionGeometry`/`pixelAlpha`); total
+  suite 925 tests. Architecture patterns for all the above: [CONVENTIONS.md](CONVENTIONS.md).

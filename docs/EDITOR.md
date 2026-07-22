@@ -4,6 +4,12 @@ The in-repo map editor (plan 014). A React chrome wrapping one Phaser viewport, 
 Vite page in dev only — **never** in the prod build (`build.rollupOptions.input` stays index-only).
 Authors the custom-JSON maps the game loads at runtime.
 
+**Code layout** (plan 043 cleanup): the editor's own modules follow the seams documented in
+[CONVENTIONS.md](CONVENTIONS.md) — `store/editorStore.ts` is a barrel composing domain `store/slices/*`,
+`EditorScene.ts` composes `scene/*` controllers (input/camera/texture-bake/render), and
+`LibraryPanel`/`ObjectEditorTab` share `hooks/usePanZoom` + the pure `zoom`/`regionGeometry`/`pixelAlpha`
+modules. Editor structure is not a prod concern (Tailwind + this whole tree are dev-only).
+
 ## Run
 
 ```sh
@@ -166,7 +172,9 @@ node's skin. An omitted `skin` ⇒ the def's first skin, so legacy maps round-tr
 
 Do **not** treat this doc as the schema. The authoritative shapes + validators are:
 
-- **Map** (`*.map.json`): `src/systems/mapFormat.ts` — `parseMap`/`serializeMap`/`createEmptyMap`/
+- **Map** (`*.map.json`): `src/systems/mapFormat/` (barrel — split into `schema`/`parse`/`serialize`/
+  `resize` behind `index.ts`, plan 043; import path `systems/mapFormat` unchanged) —
+  `parseMap`/`serializeMap`/`createEmptyMap`/
   `migrateMap`, and the `MapFile` type. `terrain` is editor-only (the game reads baked
   `TileLayer.cells`, never the semantic mask). Terrain autotile bakes at a cropped edge self-heal on the next Save via `rebakeTerrainsForSave()`.
 - **World** (`world.json`): `src/systems/worldLayout.ts` — `parseWorldLayout`/`validateWorld`, the
@@ -185,7 +193,7 @@ Do **not** treat this doc as the schema. The authoritative shapes + validators a
   invariant: a void cell has `0` in every tile layer, zone `0`, and no object footprint over it. All
   paint tools skip void. Void feeds `isBlocked` as blocked at runtime.
 - **Objects** are one array with a `kind` discriminator (`node`/`decor`/`portal`), each with a stable
-  string `id`. Nodes have an optional `depthBias?: number` field for same-row draw-order control; absent ⇒ 0 (see `rowDepthOffset` in mapFormat.ts). Anything that can change at runtime **must be an object**, never painted into tile
+  string `id`. Nodes have an optional `depthBias?: number` field for same-row draw-order control; absent ⇒ 0 (see `rowDepthOffset` in `mapFormat/schema.ts`). Anything that can change at runtime **must be an object**, never painted into tile
   layers (see persistence contract).
 
 ## Generated artifacts — never hand-edit

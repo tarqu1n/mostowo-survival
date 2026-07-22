@@ -34,6 +34,16 @@ _To be firmed up as we go. Starting position:_
   on-site job: place a passable _blueprint_ (wood reserved on placement), worker paths to a reachable
   adjacent tile and works `BUILD_MS`, then it becomes a blocking wall. `hudHitTest` is visibility-aware
   so hidden buttons don't swallow world taps. Pathing obstacles = completed walls + live trees.
+- **Order-kind registry (`src/systems/orders.ts`, plan 043) — the order-extension seam, mirroring
+  `StructureManager`+`BUILDABLES`.** The per-kind _decision data_ for worker orders lives in one pure,
+  Phaser-free module: `ORDER_META` (`Record<Action['kind'], {highlight, dedupeOnEnqueue}>`) plus generic
+  `orderTargetId`/`sameOrderTarget`/`isOrderQueued`/`toggleOrder` over `Action`/`TaskQueue`. `GameScene`
+  keeps only the scene-coupled halves as dispatch tables keyed by the same `Action['kind']`
+  (`orderBeginners` = walk-to-stand-tile, `orderRunners` = per-frame). Adding an order kind is a data
+  entry + two handlers — no more editing an `isXQueued`/`toggleX` quartet, `describeActionTarget`, and a
+  `TaskGlowRenderer` highlight branch in lockstep. Pure ⇒ unit-tested directly
+  (`systems/__tests__/orders.test.ts`). `wireBus()` is likewise one `[event, handler, ctx]` table iterated
+  for both `on` and the SHUTDOWN `off`, so the two can't drift.
 - **Footprint vs hurtbox.** A creature's **footprint** (movement, occupancy, pathfinding) is always its
   single feet tile — logic keys off `col`/`row`, never the sprite transform. Its **hurtbox** (combat
   targeting: Punch/Inspect hit-tests, contact reach) is a separate, data-driven tile extent that can
@@ -77,9 +87,10 @@ _To be firmed up as we go. Starting position:_
   by enemy `id` under `ACTIVE_TILESET.actors.directional` and animated via `dirEnemyAnimKey`. One
   `MonsterCharacter` handles both — the discriminator branches the anim/footprint selection, so adding a
   directional creature is a data + manifest entry, not a new actor class.
-- **Manager pattern (`src/scenes/{build,fx,input,world}/`, `src/scenes/testApi.ts`, plans 013/015).**
-  Self-contained scene concerns — build placement (`BuildManager`), queue-glow rendering
-  (`TaskGlowRenderer`), combat FX (`CombatFxManager`), pointer/camera gestures
+- **Manager pattern (`src/scenes/{build,combat,fx,hud,input,world}/`, `src/scenes/testApi.ts`, plans
+  013/015/043).** Self-contained scene concerns — build placement (`BuildManager`), queue-glow rendering
+  (`TaskGlowRenderer`), combat FX (`CombatFxManager`), player-combat orchestration
+  (`combat/CombatController`, plan 043), pointer/camera gestures
   (`PointerInputController`), the DEV test API (`testApi.ts`), resource-node spawn/harvest/regrow
   (`ResourceNodeManager`), enemy spawn/AI-tick/kill (`EnemyManager`), the day/night+hunger clock
   (`SurvivalClock`), fog-of-war/vision (`VisionController`), and pointer-pick + tap-intent
@@ -93,6 +104,34 @@ _To be firmed up as we go. Starting position:_
   stays the composition root and keeps the task-execution loop. One-shot setup that isn't stateful
   (no deps object, no teardown) stays a plain free function instead — e.g. `world/actorAnims.ts`'s
   `registerActorAnims` and `world/groundRenderer.ts`'s `drawGround`.
+- **HUD widgets (`src/scenes/hud/`, plan 043).** `UIScene` decomposes the same way: per-widget builders
+  (HUD bars, wellbeing panel, build controls, combat controls, inspect panel, dev menu, NPC-assign, mode/
+  top-centre controls) each own their GameObjects + `onXChanged` handlers and push interactive elements
+  back via an `addHudElement` closure, so `UIScene`'s single `hudElements` hit-region list stays
+  authoritative. Widgets type against `Phaser.Scene` (no circular import); `UIScene` stays the composition
+  root keeping the bus wiring + SHUTDOWN teardown.
+- **Big pure modules split behind a barrel.** `systems/mapFormat/` is a directory
+  (`schema`/`parse`/`serialize`/`resize`) with an `index.ts` re-export, so the `systems/mapFormat` import
+  path and full export surface are unchanged for all consumers (plan 043) — the API-preserving split rule.
+- **Editor store = composed Zustand slices (`src/editor/store/`, plan 043).** `editorStore.ts` is the
+  barrel: one `create<EditorState>()(subscribeWithSelector(…))` composing ~15 domain slices
+  (`store/slices/*`: document/tools/underlay/world/nodeDefs/resizeRename/paint/walkability/zones/shape/
+  terrain/layers/favourites/tilePalettes/objects) + `store/shared.ts` (history + reconcile helpers). Each
+  slice is `(set, get) => ({…})`; cross-domain actions route through the combined `get()`/`set()`.
+  `EditorState` stays ONE interface, slices typed `EditorSlice<Pick<EditorState, …>>` so `create()`
+  compile-verifies the Picks partition it. Pure command builders sit beside their `*Ops.ts`. The barrel
+  re-exports the full surface (`useEditorStore` + selectors/consts/types) — consumers don't change.
+- **Editor scene = composition root + controllers (`src/editor/scene/`, plan 043).** `EditorScene.ts`
+  wires `EditorInputController` (pointer/gesture/keyboard/tool-dispatch) + `EditorCameraController` (both
+  classes taking the scene, removing listeners in `destroy()` — fields are `inputController`/
+  `cameraController`, _not_ `input`, which collides with Phaser's `Scene.input`) plus the free-fn
+  renderers `textureBaker`/`overlaysRenderer`/`objectRenderer` + `scene/constants.ts`. Same rule as the
+  game managers.
+- **Shared editor viewport modules (plan 043).** One pan/zoom hook `hooks/usePanZoom(scale)` + pure
+  `zoom.ts` (`ZOOM_MIN/MAX/STEP` + `clampZoom`), `regionGeometry.ts` (`normRect`/`resizeBox`/`clampN`),
+  and `pixelAlpha.ts` (RGBA→alpha maths) unify what `LibraryPanel.AtlasSheetPicker` and
+  `ObjectEditorTab.RegionsEditor` used to duplicate; the pure three are unit-tested
+  (`editor/__tests__/regionGeometry.test.ts`).
 - **Fx-teardown pattern** (`CombatFxManager`, `NodeFxManager` — the two exemplars). Tweens live in a
   `Map` keyed per sprite; restarting one `.stop()`s (never `.remove()`s) the prior tween before
   starting fresh, and every `onUpdate`/`onComplete` is `.active`-guarded. A scene-alive

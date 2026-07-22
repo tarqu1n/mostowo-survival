@@ -25,21 +25,28 @@ Data-driven content · pure systems · decoupled scenes:
 
 - **`src/data/`** — content as data (`ITEMS`/`NODES`/`BUILDABLES`) + shared schemas (`types.ts`:
   `BaseStats`/`CombatantStats`/`ObjectStats`; `tileset.ts`: `ACTIVE_TILESET`).
-- **`src/systems/`** — pure, testable logic: `pathfind` (A*), `tasks` (order queue), `grid`,
-  `Inventory`, `combat`.
+- **`src/systems/`** — pure, testable logic: `pathfind` (A*), `tasks` (order queue) + `orders`
+  (Action-kind registry — per-kind order metadata/decision core, mirrors `StructureManager`), `grid`,
+  `Inventory`, `combat`, `mapFormat/` (schema/parse/serialize/resize behind a barrel).
 - **`src/entities/`** — actor classes owning their sprite (`Character` → `PlayerCharacter`/`MonsterCharacter`).
 - **`src/scenes/`** — Boot → Preload → MainMenu → Game (world) + `UIScene` HUD overlay; comms via
   `game.events` (`build:*`) + shared `registry`. Game boots into an **authored map** loaded at runtime
-  (`systems/mapRuntime.ts`, plan 018 — not procedural gen). `fx`/`input`/`build`/`world` hold the extracted
-  scene managers (`world/` = the state-owning world subsystems, e.g. `ResourceNodeManager`/`EnemyManager`/`CompanionManager` — the last owns the single `NpcCharacter` ally).
+  (`systems/mapRuntime.ts`, plan 018 — not procedural gen). `fx`/`input`/`build`/`combat`/`world` hold the
+  extracted scene managers (`world/` = state-owning world subsystems, e.g.
+  `ResourceNodeManager`/`EnemyManager`/`CompanionManager` — the last owns the single `NpcCharacter` ally;
+  `combat/CombatController`); `hud/` holds `UIScene`'s per-widget builders (bars/wellbeing/build/combat/
+  inspect/dev-menu). `GameScene`/`UIScene` stay thin composition roots.
 - **`src/ui/`** — Container-based UI kit (`Button`, `Panel`, `arrangeRow/Column/Grid`, `theme`).
 - **`src/render/`** — baked textures (e.g. `glowTexture.ts`), not frame-loop shaders.
 - **`src/editor/`** — dev-only Map Builder (`editor.html`), styled with **Tailwind v4 + shadcn/ui**
   (canonical palette as `@theme` tokens in `editor.css`); excluded from the prod build — the game
-  page never loads Tailwind. Compact/touch shell below a breakpoint (`hooks/useIsCompact.ts`) swaps
-  panels for drawers and adds a per-tool `ContextBar.tsx` mirroring keyboard actions on-screen.
-  Hosted always-on on the home server **guppi** for phone authoring — how Claude gets a shell there
-  and works on the live build: [docs/MOBILE-EDITOR-ACCESS.md](docs/MOBILE-EDITOR-ACCESS.md).
+  page never loads Tailwind. State is Zustand: `store/editorStore.ts` composes domain `store/slices/*`;
+  `EditorScene.ts` composes `scene/*` controllers (input/camera/texture-bake/render). Shared pure
+  modules: `hooks/usePanZoom` + `zoom`/`regionGeometry`/`pixelAlpha` (unit-tested). Compact/touch shell
+  below a breakpoint (`hooks/useIsCompact.ts`) swaps panels for drawers and adds a per-tool
+  `ContextBar.tsx` mirroring keyboard actions on-screen. Hosted always-on on the home server **guppi**
+  for phone authoring — how Claude gets a shell there and works on the live build:
+  [docs/MOBILE-EDITOR-ACCESS.md](docs/MOBILE-EDITOR-ACCESS.md).
 - **`tests/`** — three-tier harness (unit / scenario / boot canary).
 
 Patterns each seam follows: [docs/CONVENTIONS.md](docs/CONVENTIONS.md).
