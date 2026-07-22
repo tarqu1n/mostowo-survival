@@ -100,6 +100,7 @@ export function registerActorAnims(scene: Phaser.Scene): void {
   for (const [state, frameRate, repeat] of [
     ['idle', 6, -1], // slow, gentle breathing bob (matches the skeleton idle)
     ['walk', 10, -1],
+    ['attack', ACTION_ANIM_FRAMERATE, 0], // one-shot overhead dagger slash (plan 043)
     ['death', DEATH_ANIM_FRAMERATE, 0],
   ] as const) {
     const key = npcAnimKey(state);

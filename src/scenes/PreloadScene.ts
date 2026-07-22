@@ -132,6 +132,7 @@ export class PreloadScene extends Phaser.Scene {
     // dev spawn / CompanionManager (Step 2) always has a resident texture. The Run sheet backs `walk`.
     loadStrip(npcAnimKey('walk'), npc.walk);
     loadStrip(npcAnimKey('idle'), npc.idle);
+    loadStrip(npcAnimKey('attack'), npc.attack);
     loadStrip(npcAnimKey('death'), npc.death);
 
     // Directional enemies (dir4, e.g. the boar): each state×facing strip is its own spritesheet, keyed

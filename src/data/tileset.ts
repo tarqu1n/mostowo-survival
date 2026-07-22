@@ -38,7 +38,7 @@ export type PlayerState = 'idle' | 'walk' | 'chop' | 'mine' | 'gather' | 'attack
  * doubles as the downed/revive visual. Single-orientation like the skeleton — `side` is faked by
  * `flipX`, so there's no per-facing strip and no attack strip (the swing reads via the weapon rig).
  */
-export type NpcState = 'idle' | 'walk' | 'death';
+export type NpcState = 'idle' | 'walk' | 'attack' | 'death';
 
 /** A terrain tile: a standalone PNG (load.image) OR frame N of a sheet sliced at TILE_SIZE. */
 export type TileSource =
@@ -204,17 +204,19 @@ export interface TilesetManifest {
       hand: HandArt;
     };
     /**
-     * NPC companion (the Rogue, plan 042) — a single-orientation actor shaped EXACTLY like the
-     * skeleton `enemy` above: an `idle` bob + a `walk` (its "Run" sheet) + a one-shot `death`
-     * collapse, faced by `flipX` (no per-facing strip), plus the same weapon-art catalogue + `hand`
-     * mitt rig so its melee reads without a dedicated attack strip. `idle`/`walk` carry per-frame
-     * `mainHand`/`offHand` anchors; the held weapon + both fists pin to them each tick, exactly as on
-     * the skeleton. Stats live in config.ts (`NPC_*`) + data/weapons.ts (`MELEE_WEAPONS`), not here.
+     * NPC companion (the Rogue, plan 042) — a single-orientation actor shaped like the skeleton
+     * `enemy` above: an `idle` bob + a `walk` (its "Run" sheet) + a one-shot `death` collapse, faced
+     * by `flipX` (no per-facing strip), plus the same weapon-art catalogue + `hand` mitt rig for its
+     * at-rest/idle/walk look. `idle`/`walk` carry per-frame `mainHand`/`offHand` anchors that pin the
+     * held weapon + both fists each tick. Plus a one-shot `attack` strip (plan 043) — an AI-generated
+     * dagger slash that bakes its own dagger + hands (no anchors), so the pinned rig is hidden while it
+     * plays. Stats live in config.ts (`NPC_*`) + data/weapons.ts (`MELEE_WEAPONS`), not here.
      */
     npc: {
       render: ActorRender;
       idle: StripAnim;
       walk: StripAnim;
+      attack: StripAnim;
       death: StripAnim;
       weapons: Record<string, WeaponArt>;
       hand: HandArt;
@@ -620,6 +622,17 @@ export const PIXEL_CRAWLER_TILESET: TilesetManifest = {
         frameSize: 32,
         frames: 12,
         render: { scale: 1, originX: 0.5, originY: 0.92 },
+      },
+      // Attack — the one-shot overhead dagger slash (plan 043). AI-generated via the Gemini
+      // image-to-image pipeline (docs/AI-SPRITE-PIPELINE.md): a 336×56 strip, 6 frames of 56px, content
+      // ~30px with feet at y53, so it grounds on its own render (originY 53/56). UNLIKE idle/walk it
+      // draws its OWN baked dagger + hands, so it carries NO anchors — NpcCharacter.playAttack hides the
+      // pinned weapon/mitts for its duration and re-shows them on completion.
+      attack: {
+        path: '_derived/rogue/Slice_Side-Sheet.png',
+        frameSize: 56,
+        frames: 6,
+        render: { scale: 1, originX: 0.5, originY: 0.95 },
       },
       // The rogue's short blade — ART ONLY (gameplay stats in data/weapons.ts MELEE_WEAPONS, shared
       // id). Reuses the skeleton's extracted knife blade as a stand-in for a `cleaver` (the short-swing

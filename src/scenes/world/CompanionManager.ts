@@ -703,7 +703,7 @@ export class CompanionManager {
    * ({@link NPC_ATTACK_COOLDOWN_MS}) is open, then on completion resolve the hit through the shared
    * {@link resolveMeleeAttack} (attacker = NPC stats, defender = the enemy's stats, base = the equipped
    * cleaver's damage) and route the damage back through the existing enemy kill/flash/corpse path
-   * (`deps.damageEnemy`). The visible swing rides the weapon-pin rig ({@link NpcCharacter.swingWeapon}).
+   * (`deps.damageEnemy`). The visible strike is the one-shot dagger-slash strip ({@link NpcCharacter.playAttack}).
    */
   private tryStrike(npc: NpcCharacter, target: CombatTarget): void {
     const now = this.scene.time.now;
@@ -711,7 +711,7 @@ export class CompanionManager {
       if (now >= this.combatWindupUntil) {
         this.combatWindupUntil = 0;
         this.combatReadyAt = now + NPC_ATTACK_COOLDOWN_MS; // gate the next wind-up (the bite cadence)
-        npc.swingWeapon(target.tile.col, target.tile.row); // coded swing + face the struck tile
+        npc.playAttack(target.tile.col, target.tile.row); // one-shot dagger-slash strip + face the struck tile
         const dmg = resolveMeleeAttack(
           npc.stats,
           target.stats,

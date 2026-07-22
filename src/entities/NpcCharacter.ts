@@ -65,9 +65,14 @@ export class NpcCharacter extends Character {
    *  (Step 7) reads its `damage`/`attackShape`. Fixed at construction; no inventory/equip UI yet. */
   readonly meleeWeapon: MeleeWeapon;
 
-  /** Which footprint the sprite currently shows — the 32px Idle vs the 64px Run/`walk` — so
-   *  {@link setFootprint} only swaps scale/origin/body on an actual state change (see the skeleton). */
-  private activeStrip: 'idle' | 'walk' = 'walk'; // the constructor sets up the 64px Run footprint
+  /** Which footprint the sprite currently shows — the 32px Idle, the 64px Run/`walk`, or the 56px
+   *  one-shot `attack` — so {@link setFootprint} only swaps scale/origin/body on an actual state change
+   *  (see the skeleton). `attack` is transient; {@link playAttack} sets it and {@link updateAnim}
+   *  swaps back to idle/walk once the strip finishes. */
+  private activeStrip: 'idle' | 'walk' | 'attack' = 'walk'; // the constructor sets up the 64px Run footprint
+  /** True while the one-shot attack strip is playing: {@link updateAnim} yields (the strip owns the
+   *  sprite) and the pinned weapon/mitts are hidden (the strip draws its own dagger + hands). */
+  private attacking = false;
   /** The held blade (plain image, no physics body), pinned to the main hand each tick. `swingRot` is
    *  the live coded-swing angle (deg) the directed strike tween drives (plan 042 Step 7); 0 at rest, so
    *  a still companion holds the blade at its rest angle. */
@@ -145,6 +150,7 @@ export class NpcCharacter extends Character {
    */
   updateAnim(): void {
     if (this.downed) return; // death collapse owns the sprite until the (later) revive
+    if (this.attacking) return; // the one-shot attack strip owns the sprite until it completes
     const moving = this.sprite.body.velocity.lengthSq() > 1;
     this.setFootprint(moving ? 'walk' : 'idle');
     if (moving) {
@@ -165,6 +171,10 @@ export class NpcCharacter extends Character {
    */
   override die(): void {
     this.downed = true;
+    // Cancel an in-flight attack strip so its completion listener can't fire post-death (die plays the
+    // Death anim, so 'animationcomplete-attack' would never arrive and `attacking` would stick).
+    this.attacking = false;
+    this.sprite.off(`animationcomplete-${npcAnimKey('attack')}`);
     if (this.weapon) {
       this.scene.tweens.killTweensOf(this.weapon); // stop an in-flight swing before the image goes away
       this.weapon.sprite.destroy();
@@ -218,6 +228,47 @@ export class NpcCharacter extends Character {
         if (w.sprite.active) w.sprite.setScale(baseScale);
       },
     });
+  }
+
+  /**
+   * Play the one-shot overhead dagger-slash ATTACK strip (plan 043) toward the struck tile — the
+   * AI-generated sheet ({@link docs/AI-SPRITE-PIPELINE.md}) that replaces the coded {@link swingWeapon}
+   * as the companion's visible strike. The strip has its own 56px footprint and draws its OWN baked
+   * dagger + hands, so the pinned weapon/mitts are hidden for its duration and re-shown on completion;
+   * `updateAnim` yields while it plays, then swaps back to idle/walk (activeStrip 'attack' forces the
+   * {@link setFootprint} re-apply). Purely visual — the hit is resolved by `CompanionManager`. No-op
+   * while downed.
+   */
+  playAttack(col: number, row: number): void {
+    if (this.downed) return;
+    this.faceTile(col, row);
+    const t = this.tile();
+    const dCol = Math.sign(col - t.col);
+    if (dCol !== 0) this.sprite.setFlipX(dCol < 0); // art faces right; mirror to face left
+    this.attacking = true;
+    this.activeStrip = 'attack';
+    const npc = ACTIVE_TILESET.actors.npc;
+    const render = npc.attack.render ?? npc.render;
+    this.sprite.setTexture(npcAnimKey('attack'), 0);
+    this.sprite.setScale(render.scale).setOrigin(render.originX, render.originY);
+    this.sprite.setData('baseScale', render.scale);
+    this.fitBody(render);
+    this.setRigVisible(false); // the strip draws its own dagger + hands
+    const key = npcAnimKey('attack');
+    this.sprite.off(`animationcomplete-${key}`); // drop any stale listener from a rapid re-strike
+    this.sprite.once(`animationcomplete-${key}`, () => {
+      this.attacking = false;
+      this.setRigVisible(true); // updateAnim re-pins + swaps footprint back next tick
+    });
+    this.sprite.anims.play(key);
+  }
+
+  /** Show/hide the pinned weapon + both mitts as one — hidden while the attack strip (which bakes its
+   *  own dagger + hands) plays, so the two don't double up. */
+  private setRigVisible(visible: boolean): void {
+    this.weapon?.sprite.setVisible(visible);
+    this.hands?.main.setVisible(visible);
+    this.hands?.off.setVisible(visible);
   }
 
   /**
