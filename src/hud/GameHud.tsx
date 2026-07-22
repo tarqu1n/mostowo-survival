@@ -1,5 +1,7 @@
 import { BASE_WIDTH, BASE_HEIGHT } from '@/config';
 import { useCanvasRect } from './hooks/useCanvasRect';
+import { useBridge } from './hooks/useBridge';
+import { useHudStore } from './store';
 
 /**
  * Root of the DOM/React HUD overlay (plan 046, Field Kit). Lives at the page level over the Phaser
@@ -14,6 +16,7 @@ import { useCanvasRect } from './hooks/useCanvasRect';
  *    stay clear of notches / home indicators. Interactive clusters mount inside this from Step 5 on.
  */
 export function GameHud() {
+  useBridge();
   const rect = useCanvasRect();
 
   // Until the canvas is measured, render nothing positioned — avoids a flash at the wrong place.
@@ -72,6 +75,40 @@ export function GameHud() {
       >
         HUD ✓ ×{rect.scale.toFixed(2)}
       </div>
+
+      {/* TEMP (Step 3): live store readout proving the event bridge feeds the store in-game. Removed
+          once the real meter cluster lands (Step 9). */}
+      <StoreReadout />
+    </div>
+  );
+}
+
+/** TEMP debug readout (Step 3): HP / hunger / day straight off the HUD store, to eyeball that the
+ *  bridge maps live game events into the store. Subscribes to just the fields it shows. */
+function StoreReadout() {
+  const hp = useHudStore((s) => s.hp);
+  const maxHp = useHudStore((s) => s.maxHp);
+  const hunger = useHudStore((s) => s.hunger);
+  const maxHunger = useHudStore((s) => s.maxHunger);
+  const dayPhase = useHudStore((s) => s.dayPhase);
+  const dayCount = useHudStore((s) => s.dayCount);
+  return (
+    <div
+      data-testid="hud-store-readout"
+      style={{
+        position: 'absolute',
+        top: 26,
+        left: 8,
+        padding: '2px 6px',
+        borderRadius: 4,
+        background: 'rgba(20, 16, 15, 0.7)',
+        color: '#f4ecd8',
+        font: '11px ui-monospace, monospace',
+        pointerEvents: 'none',
+      }}
+    >
+      HP {Math.round(hp)}/{maxHp} · food {Math.round(hunger)}/{maxHunger} · Day {dayCount} [
+      {dayPhase}]
     </div>
   );
 }

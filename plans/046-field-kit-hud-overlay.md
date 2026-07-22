@@ -162,7 +162,27 @@ crispness proven at the Step 1 gate before any component is built on top.
     window resize and letterboxing (portrait + a deliberately wide window); insets visibly
     inset the interactive layer.
 
-- [ ] **Step 3: HUD store + event bridge (+ unit test)** `[inline]`
+- [x] **Step 3: HUD store + event bridge (+ unit test)** `[inline]`
+  - Outcome: `src/hud/store.ts` — Zustand store (`subscribeWithSelector`, mirrors `useEditorStore`)
+    with every planned field + named setter actions; `HotbarSlot`/`HOTBAR_SLOTS=6` local (Step 4 adds
+    the `HUD_HOTBAR_SLOTS` config const). Notable calls: `waveInfo` is derived (`{active: phase===
+    'night'}`) since there is NO dedicated wave event — a wave runs the whole night; `orientable` is
+    computed from `BUILDABLES` in `setSelection`; a `hitNonce` counter models the payload-less
+    `player:hit` for the Step 9 vignette; `needs:eat` payload key is `itemId` (verified against
+    `SurvivalClock.onNeedsEat`), NPC role/posture inbound payloads are the real `NpcDayRole`/
+    `NpcNightPosture` unions. `src/hud/bridge.ts` — `initBridge(bus, registry)` subscribes all 16
+    outbound events → setters, rebinds the `Inventory` `'change'` listener when the registry
+    `inventory` swaps (fresh instance each restart — detaches the dead one first, listens to both
+    `setdata` + `changedata-inventory`), and returns `{emit(InboundEvent), dispose()}`; the typed
+    `InboundEvent` union is the HUD→world channel later steps fire on. Modelled against minimal
+    `EventBus`/`Registry` interfaces so the test mocks them. `src/hud/hooks/useBridge.ts` wires
+    init/dispose in a StrictMode-safe effect + exposes the singleton via `hudBridge()`; `GameHud`
+    calls it + shows a TEMP `StoreReadout` (removed at Step 9). NO game-code change (no `wireBus`
+    edit). `src/hud/__tests__/bridge.test.ts` (7 tests, node-pure) green: full event→store mapping,
+    `emit` passthrough, inventory rebind, death→restart re-sync (store persists, rebinds to the new
+    inventory, dead one stops driving it), dispose. typecheck + lint clean; smoke boot canary green
+    (HUD mounts + bridge wires, 0 console errors); one-off headless in-game check confirmed the
+    readout updates live for day/night toggle (`[day]`→`[night]`) and hunger drain (`food 100`→`41`).
   - `src/hud/store.ts`: Zustand store — `hp/maxHp`, `hunger`, `fire`, `supply {wood,rock}`,
     `dayPhase/dayCount/time`, `waveInfo`, `tasks` summary, `mode`, `buildMode/selection/
     orientable`, `demolishMode`, `combatActive`, `inspectTarget`, `inventory` snapshot,
