@@ -44,8 +44,14 @@ Prompt patterns that worked (`VARIANTS` in the gen script):
   `row5a` variant produced a clean ordered strip; grid/2-row layouts came out irregular.
 - **Flat / chunky / low-detail** wording — the closer the gen is to flat pixel art, the
   less the downscale has to fight.
-- **Solid magenta `#FF00FF` background** — Gemini image models cannot output alpha, so
-  generate on a flat chroma key and key it out later (a known, widely-reported limitation).
+- **Flat chroma-key background** — Gemini image models cannot output alpha, so generate on
+  a flat key and remove it later (widely reported). Either magenta `#FF00FF`, or (cleaner
+  edges) green `#00FF00` **plus a 2px white outline buffer** so edge AA blends into white,
+  not the character's colours; `keyout` auto-detects which and strips the buffer.
+- **Optional pose-conditioning** (`--only pose`) — pass a second image, a **black
+  silhouette** pose-guide strip, so frames follow a controlled arc. Use silhouettes, not a
+  textured actor (which leaks its appearance); ideally body-only so the weapon shape
+  doesn't transfer. See "Upgrades tried" below.
 - **Restate background + style in every prompt** — the model doesn't reliably carry them.
 - **Generate several variants, keep the cleanest.** Cheap; the model is stochastic.
 
@@ -56,8 +62,9 @@ reference crop in `reference_png()`. `--dry-run` composes prompts with no key/sp
 
 `process_gemini.py`, pipeline order and the reason for each step:
 
-1. **Key out magenta** (`KEY_TOL` high, ~130) — high enough to also remove the
-   anti-aliased pink *ring* around the figure, not just pure magenta.
+1. **Key out the background** (`keyout`, `KEY_TOL` ~130) — auto-detects the bg colour
+   from the corners (magenta *or* green), keyed high enough to also remove the
+   anti-aliased ring; in green mode it also erodes the white outline buffer inward.
 2. **Split the row into per-figure columns** — content-aware (gaps between opaque
    columns), NOT a uniform grid; the model never spaces frames perfectly evenly.
 3. **Defringe** (`defringe`) — bleed edge RGB outward into the transparent border so the
@@ -70,7 +77,8 @@ reference crop in `reference_png()`. `--dry-run` composes prompts with no key/sp
    - draw the **silhouette edge + dark internal seams black** first (locks clean shapes);
    - **flat-fill interiors by MATERIAL**, classified from hue/saturation (olive cloak /
      near-neutral blade greys / low-hue belt orange) so materials never compete, with the
-     **shade chosen by brightness** off a small ramp;
+     **shade chosen by brightness** off a small ramp (thresholds are **percentiles** of
+     the frame's own brightness, so the fill adapts to the generation's exposure);
    - **re-inject accents last**: detect the gen's own blue-eye / purple-mouth pixels and
      repaint them in the pack's exact tones; reduce each eye blob to **1px** at its
      centroid (`_one_px_per_blob`).
@@ -103,6 +111,43 @@ Per-asset knobs: the palette ramps (`OUTLINE`/`OLIVE`/`METAL`/`ORANGE`/`EYE`/`MO
 4. Iterate on a zoomed strip preview: tune brightness thresholds (shadow vs highlight),
    material hue cutoffs, and accent detection until it sits next to the source sprite.
 5. Commit the **processed sheet only**; leave raws in the gitignored scratch dir.
+
+## Upgrades tried on the rogue (v2) — outcomes
+
+Three research-driven upgrades, tested end-to-end. What's in the scripts now and what
+each one actually did:
+
+- **Percentile brightness thresholds** (in `posterize_cel`) — *kept, a real win.* The
+  olive ramp's shade cutoffs are now the 24/46/72nd percentiles of the frame's olive
+  brightness, not fixed values, so the fill adapts to whatever exposure a generation has
+  instead of collapsing to shadow. This is the main generalisation improvement — a new
+  asset no longer needs its thresholds hand-tuned.
+- **Green key + white-outline buffer + background-agnostic keyout** (gen `BG_GREEN`;
+  process `keyout` auto-detects magenta *or* green and erodes the white buffer ring) —
+  *works, situational.* The silhouette keys out cleaner than magenta+defringe. But the
+  green generations came back with **heavier internal shading**, which the cel step then
+  turns blotchy — so for *this* asset it wasn't clearly better than the flat magenta gen.
+  Lesson: the win is at the edge; push the prompt hard toward flat/chunky or it costs you
+  in the fill.
+- **Pose-conditioning** (gen `--only pose`: a second image, the Body_A slice motion as a
+  POSE guide) — *the informative one.* First attempt fed the **textured** actor and the
+  model copied its appearance — an axe in one frame, Body_A's bald head in another
+  (identity leak). Switching the guide to flat **black silhouettes** fixed the identity
+  leak completely (all frames on-model) and gave a controlled, smooth 6-frame arc — but
+  the silhouette still encodes the raised *weapon* shape, so the drawn blade skews
+  axe/scythe. Next refinement: silhouette the **body only** (drop the weapon) so pose
+  transfers without the weapon shape. This is exactly the paper's ReferenceNet (identity)
+  vs Pose-Guider (pose-only) separation — a textured guide muddies the two.
+
+**Meta-finding:** the hand-tuned cel step is the pipeline's weak link — it flattens *flat*
+generations beautifully but blotches richly-shaded ones. Prompt for flatness first; the
+real fix is a learned pixelizer (below).
+
+**Learned pixelizer (Deep Unsupervised Pixelization) — assessed, deferred.** It's the
+right tool for the shaded-gen problem, but not runnable here: it ships **no pretrained
+weights** (you'd have to train it, needing the dataset + a GPU) and pins Python 3.5 /
+PyTorch 0.4.0 / Ubuntu 16.04. Revisit on a GPU box with a trained/ported checkpoint; until
+then the cel step stands and "prompt flat" is the mitigation.
 
 ## Prior art & references (how this is done in the wild)
 

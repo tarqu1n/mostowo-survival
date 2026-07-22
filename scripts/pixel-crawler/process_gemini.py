@@ -52,14 +52,28 @@ ORANGE = [(181, 108, 48), (232, 150, 82)]  # belt / sash
 EYE = (12, 152, 214)                       # idle glowing blue
 MOUTH = (147, 45, 139)                     # idle purple grin
 
-MAGENTA = np.array([255, 0, 255])
 NEIGHBOURS = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]
 
 
 def keyout(im):
+    """Background-agnostic chroma key. Samples the corners for the bg colour (magenta or
+    green), keys it out, and — when the bg is green (the white-outline-buffer variant) —
+    erodes the near-white buffer ring inward so only the character's colour edge remains
+    (interior whites like the blade aren't border-adjacent, so they survive)."""
     a = np.asarray(im.convert("RGBA")).astype(np.int16)
-    d = np.sqrt(((a[:, :, :3] - MAGENTA) ** 2).sum(2))
+    h, w = a.shape[:2]
+    corners = np.array([a[0, 0, :3], a[0, w - 1, :3], a[h - 1, 0, :3], a[h - 1, w - 1, :3]])
+    bg = np.median(corners, axis=0)
+    d = np.sqrt(((a[:, :, :3] - bg) ** 2).sum(2))
     a[d < KEY_TOL, 3] = 0
+    if bg[1] > bg[0] + 40 and bg[1] > bg[2] + 40:          # green bg -> strip white buffer
+        near_white = a[:, :, :3].min(2) > 180
+        alpha = a[:, :, 3]
+        for _ in range(4):
+            adj = np.zeros(alpha.shape, bool)
+            for dy, dx in NEIGHBOURS[:4]:
+                adj |= np.roll(np.roll(alpha <= 16, dy, 0), dx, 1)
+            alpha[near_white & (alpha > 16) & adj] = 0
     return a.astype(np.uint8)
 
 
@@ -119,11 +133,19 @@ def posterize_cel(sheet):
     metal = M & (S < 46)                                   # near-neutral -> blade
     orange = M & ~metal & (H < 26) & (S >= 90)             # warm+low-hue -> belt
     olive = M & ~metal & ~orange                           # everything else -> cloak
-    _fill_by_brightness(out, olive, V, OLIVE, OLIVE_THRESH)
+
+    # Brightness thresholds from the olive PERCENTILES (not fixed) so the ramp adapts to
+    # whatever lighting the generation has — a darker gen won't collapse to shadow. Skewed
+    # so the two lightest tones dominate (the pack's highlight green, not the shadow).
+    ov = V[olive]
+    olive_thr = ([int(np.percentile(ov, p)) for p in (24, 46, 72)]
+                 if ov.size else OLIVE_THRESH)
+    _fill_by_brightness(out, olive, V, OLIVE, olive_thr)
     _fill_by_brightness(out, metal, V, METAL, [110, 185])
     _fill_by_brightness(out, orange, V, ORANGE, [150])
 
-    out[M & (V < 38)] = OUTLINE                            # dark seams / face void
+    void_cut = min(34, int(np.percentile(V[M], 6))) if M.any() else 34
+    out[M & (V < void_cut)] = OUTLINE                      # dark seams / face void
     bnd = np.zeros(M.shape, bool)                          # silhouette edge
     for dy, dx in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
         bnd |= M & ~np.roll(np.roll(M, dy, 0), dx, 1)
