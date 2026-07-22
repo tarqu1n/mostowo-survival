@@ -38,12 +38,21 @@ First real `ci.yml` run on `master` (run #2, sha `f71204f`, 2 shards × 2 worker
 
 ### Owner decisions (this session)
 
-- **Interim CI-green first (Step 1):** master CI is red now; a quick Phase-1-style stabilization
-  goes green before the multi-step migration, then the migration removes the render cost and the
-  inflated timeouts come back down at the end (Step 8). Keeps the tracking issue closed during the work.
-- **Hard-gate the deploy at the end (Step 9):** once CI e2e is fast + green, add `needs: [ci]` to
-  `deploy.yml` so a red e2e/smoke blocks the deploy (reverses plan 044's "non-blocking" note — a red
-  run just slipped through to master, which is the case for gating).
+- **Interim CI-green first (Step 1), merged to master early:** master CI is red now; a quick
+  Phase-1-style stabilization goes green, then the migration removes the render cost and the inflated
+  timeouts come back down at the end (Step 8). **Merge Step 1 to master on its own** as soon as a
+  `workflow_dispatch` branch run is green — only a real *push* run closes the `notify` tracking issue
+  (`notify` is `github.event_name == 'push'`-only), so branch-only validation never closes it. Continue
+  the migration on the branch after that merge; Step 8's timeout reduction lands via the final merge.
+- **Hard-gate the deploy at the end (Step 9) via `workflow_run`:** once CI e2e is fast + green, gate
+  the deploy on a green CI run (reverses plan 044's "non-blocking" note — a red run just slipped
+  through to master). **Not** `needs: [ci]` — GitHub `needs:` only links jobs *within one workflow
+  file*, and there is no `ci` job (ci.yml's jobs are `static-unit`/`e2e`/`smoke`/`notify`; deploy.yml's
+  are `build`/`deploy`), so `needs: [ci]` would fail to parse. Instead trigger `deploy.yml` on
+  `workflow_run: {workflows: [CI], types: [completed]}` and deploy only when
+  `github.event.workflow_run.conclusion == 'success'`. This **serializes** deploy after CI (no longer
+  parallel) — that is the intended trade for a gate. The incorrect `needs: [ci]` suggestion in
+  `ci.yml`'s header comment (and plan 044) must be corrected too, not copied forward.
 
 ### Carried-over Phase-2 scope (from plan 044, critique-corrected)
 
@@ -109,8 +118,15 @@ workflow, so this infra work pulls in the project's stated way of building.
   - Side effects: more Actions minutes if shards increase; artifact-upload names already keyed by
     shard. Local `npm run e2e` unaffected (it doesn't shard).
   - Docs: none yet (Step 9 rewrites docs).
+  - **Merge cadence (Finding 2):** once a `workflow_dispatch` branch run is green, merge *this step
+    alone* to master (fast-forward or a small PR) so the real push run closes the `notify` tracking
+    issue — branch `workflow_dispatch` runs never do (notify is push-only). Then keep migrating on the
+    branch. If you'd rather not merge mid-migration, that's fine too — but then drop the
+    "closes the tracking issue" goal: master simply stays red (CI is non-blocking; deploy is
+    unaffected) until the final merge.
   - Done when: a `workflow_dispatch` CI run on the feature branch is **green** (all shards + smoke);
-    the chosen levers + interim-timeout comments are in place.
+    the chosen levers + interim-timeout comments are in place; (if merging early) the master push run
+    is green and the tracking issue auto-closes.
 
 - [ ] **Step 2: Coverage-map audit (the hard gate)** `[inline]`
   - Read **all 30** `tests/e2e/*.spec.ts` and produce `plans/045-coverage-map.md`: one row per spec —
@@ -122,6 +138,14 @@ workflow, so this infra work pulls in the project's stated way of building.
     that spec's wiring, or the map names the exact Node test to add first (in Step 3/5). Cross-check
     each delete candidate against `src/**/__tests__/*.test.ts` (esp. `wave`, `hurtbox`, `daynight`,
     `needs`, `combat`, `monsterAI`).
+  - **Explicitly classify `survival-forage.spec.ts`** — it is the 30th spec and is absent from the
+    carried-over verdict list above (Finding 5); give it a verdict like the rest (likely
+    convert-stepLogic: it drives a `needs:eat` emit + forage through scene-coupled managers).
+  - **Flag real-scene/real-map/real-camera wiring (Finding 3):** for every `delete` row, check whether
+    any assertion exercises the *live* scene/map/camera (not just emit→reducer-pure state) — e.g.
+    wave's "walkable spawns local to camp" (real map walkability) or zoom's "broadcasts clamped value"
+    (real camera apply). If so, **downgrade that sub-assertion to convert-stepLogic**, don't delete it;
+    a fake-deps Node twin won't cover it. Reserve `delete` for genuinely emit→reducer-pure blocks.
   - Side effects: none (read-only + one new plan doc).
   - Docs: the coverage map itself.
   - Done when: `plans/045-coverage-map.md` classifies all 30 specs; every `delete` row names its
@@ -146,21 +170,27 @@ workflow, so this infra work pulls in the project's stated way of building.
 
 - [ ] **Step 4: Add a render-free `stepLogic(ms)` to `TestApi` (+ DEV-gated composite suppress)** `[inline]`
   - Add `stepLogic(ms)` beside `step(ms)` in `src/scenes/testApi.ts`: same fixed-1/60s
-    `game.step(clock, fixedDelta)` loop, but **suppress the render cost** around it. Primary lever: a
-    DEV-gated suppress flag read by `SurvivalClock.composite()` (`src/scenes/world/SurvivalClock.ts`)
-    that makes it early-return (skip the RT `fill` + per-fire `erase`) while set; secondary:
-    `scene.sys.setVisible(false)` around the loop. Set before the loop, **always restore in a
-    `finally`** (a thrown step must not leave the scene hidden/suppressed). Keep the seam **minimal +
-    documented** (044 Finding 5): one boolean, DEV-only, one comment at each site. Default `step(ms)`
-    is unchanged (still renders — for the genuinely-render specs).
+    `game.step(clock, fixedDelta)` loop, but **suppress the render cost** around it. Set before the
+    loop, **always restore in a `finally`** (a thrown step must not leave the scene hidden/suppressed).
+    Default `step(ms)` is unchanged (still renders — for the genuinely-render specs).
+  - **Measure the levers independently before committing to the shipping-method edit (Finding 4):**
+    the dominant cost of driving ~1320 frames may be the *whole* per-frame scene render, not only
+    `SurvivalClock.composite()`. First try `scene.sys.setVisible(false)` (or skipping the render pass)
+    alone and time a pilot spec; **only if** that doesn't remove the dominant cost, add the DEV-gated
+    suppress flag read by `SurvivalClock.composite()` (early-return past the RT `fill` + per-fire
+    `erase`). Prefer the smallest seam that gets the win — a config/scene lever beats editing a
+    shipping method. If the flag is needed, keep it **minimal + DEV-only + documented** (044 Finding 5):
+    one boolean, `import.meta.env.DEV`-gated, one comment at each site.
   - Expose `stepLogic` on `window.game.__test` (same DEV gate as `step`) and add a `stepLogic(page,
     ms)` helper in `tests/e2e/harness.ts` next to `step`.
-  - Side effects: `SurvivalClock.composite()` is a shipping method — the flag must be DEV-gated
-    (`import.meta.env.DEV`) so `vite build` strips it and prod render is byte-identical. Verify the
-    prod bundle via `npm run smoke`. Confirm one converted spec is materially faster + still correct.
+  - Side effects: if the composite flag is used, `SurvivalClock.composite()` is a shipping method — the
+    flag must be DEV-gated (`import.meta.env.DEV`) so `vite build` strips it and prod render is
+    byte-identical; verify via `npm run smoke`. Either way, confirm a converted spec is faster + still
+    correct.
   - Docs: none yet (Step 9).
-  - Done when: `stepLogic` exists + is exposed; a pilot conversion (e.g. `survival-daynight`) passes
-    and is visibly faster; `step()` still renders; `npm run smoke` green (flag absent from prod).
+  - Done when: `stepLogic` exists + is exposed; a pilot conversion (e.g. `survival-daynight`, currently
+    ~29s/test on CI) drops to **a few seconds** and stays green; `step()` still renders; `npm run
+    smoke` green (any flag absent from prod). Record which lever(s) were needed for Step 8's numbers.
 
 - [ ] **Step 5: Migrate-down + DELETE the truly-pure specs (gated on Node coverage)** `[inline]`
   - **Only after** the covering Node test exists (Step 2 map + Step 3): delete the truly-pure specs
@@ -170,12 +200,17 @@ workflow, so this infra work pulls in the project's stated way of building.
       verdict to convert-stepLogic** rather than delete. Then delete the spec.
     - `weapon-reach-arc.spec.ts` — confirm `hurtbox.test.ts` (or add) covers the reach/cleave hit-tile
       geometry; then delete.
-    - The wave **pacing-only slice** in `wave.spec.ts` (no-day-spawn, `beginWave` pacing, first-tick
-      reconcile, escalation, force-wave) — covered by Step 3's `waveDirector.test.ts` + existing
-      `wave.test.ts`; **delete only those `test(...)` blocks**, keep the mixed ones for Step 6.
-    - `zoom.spec.ts` — if a pure clamp/round fn isn't already unit-tested, extract/cover it in Node,
-      then delete the spec (the camera-apply is a thin wiring line not worth a browser spec); if the
-      audit found a genuine render assertion, downgrade to split (Step 7) instead.
+    - The wave **pacing-only slice** in `wave.spec.ts` — delete only the genuinely emit→reducer-pure
+      blocks now covered by Step 3's `waveDirector.test.ts` + existing `wave.test.ts` (pacing curve,
+      escalation, force-wave, first-tick reconcile). **Do NOT delete** "beginWave starts a paced wave
+      of **walkable spawns local to the camp**" — it exercises real-map walkability a fake-deps Node
+      twin can't cover (Finding 3): **convert it to `stepLogic`** in Step 6 instead. Keep the mixed
+      tests for Step 6.
+    - `zoom.spec.ts` — Node-cover the pure clamp/round fn (extract it if not already a pure fn). The
+      "broadcasts the clamped value" assertion reads the **real camera** (`cameraZoom`) — real-camera
+      wiring a Node twin won't cover (Finding 3), so **keep a trimmed `stepLogic`/no-step browser
+      assertion** for the camera-apply + broadcast rather than deleting outright. Only delete the
+      spec entirely if the audit confirms the camera read adds nothing over the Node clamp test.
   - Side effects: `wave.spec.ts` is edited here (delete slice) **and** in Step 6 (convert mixed) — do
     Step 5's wave edits first to avoid churn. Update any shared fixtures in `tests/e2e/scenarios.ts`
     left unused.
@@ -223,23 +258,33 @@ workflow, so this infra work pulls in the project's stated way of building.
   - Side effects: config + timeout annotations only. Do the reduction *last* — trimming before the
     render cost is gone would re-introduce flakes (plan 044's explicit warning).
   - Docs: none yet (Step 9).
-  - Done when: e2e wall is materially below ~8.5 min, **green on two consecutive `workflow_dispatch`
-    runs**, timeouts right-sized, before/after numbers recorded for Step 9.
+  - Done when: e2e wall is **at least halved from ~8.5 min (target ≲3–4 min)**, **green on two
+    consecutive `workflow_dispatch` runs**, timeouts right-sized, before/after numbers recorded for
+    Step 9. (Target is a guide, not a gate — record the real number even if it lands higher.)
 
 - [ ] **Step 9: Hard-gate the deploy on CI + rewrite the docs** `[inline]`
-  - Add `needs: [ci]` to `deploy.yml`'s build/deploy job so a red CI (e2e/smoke) blocks the deploy
-    (the owner decision; reverses plan 044's non-blocking note). Confirm the two workflows still start
-    in parallel and only the deploy waits. Note the change in a workflow comment.
+  - Gate the deploy on a green CI run via **`workflow_run`** (Finding 1 — `needs: [ci]` is impossible:
+    `needs:` only links jobs in the *same* file, and there is no `ci` job). Change `deploy.yml`'s
+    trigger to `workflow_run: {workflows: [CI], types: [completed]}` (keep/adjust the branch filter to
+    master) and guard the build/deploy jobs with
+    `if: github.event.workflow_run.conclusion == 'success'` so a red CI (failed e2e/smoke) never
+    deploys. This **serializes** deploy after CI — no longer parallel; that is the intended trade for a
+    gate. Ensure the deploy still checks out the exact SHA CI ran (`github.event.workflow_run.head_sha`).
+    **Also fix the stale `needs: [ci]` suggestion** in `ci.yml`'s header comment (lines ~6–7) so the
+    wrong idea isn't propagated. Note the new trigger model in a workflow comment.
   - Docs (token-lean): `docs/testing.md` — Phase 2 done: `step` vs `stepLogic`, the re-tiered
     tier-table, new e2e wall, CI now a hard gate. `docs/decisions/testing.md` — dated `[DECIDED]`
     Phase-2 entry (re-tier rationale, `stepLogic` seam, delete/convert/split outcome, before/after
-    numbers, `needs: [ci]`) + `docs/DECISIONS.md` index line. `docs/STANDARDS.md` — tooling table:
-    deploy now gated on CI. `docs/STATUS.md` — test-harness line refreshed. Root `CLAUDE.md` only if
-    the "three-tier harness" line is now inaccurate (it isn't — leave it).
-  - Side effects: with `needs: [ci]`, a genuinely-red CI now stops deploys — intended; call it out in
-    the decision entry so it isn't a surprise.
-  - Done when: deploy depends on green CI; docs accurately + tersely describe the re-tiered suite and
-    the gate; a fresh session could follow the `step`/`stepLogic` split without rediscovery.
+    numbers, the `workflow_run` gate) + `docs/DECISIONS.md` index line. `docs/STANDARDS.md` — tooling
+    table: deploy now gated on CI (via `workflow_run`, serialized after CI). `docs/STATUS.md` —
+    test-harness line refreshed. Root `CLAUDE.md` only if the "three-tier harness" line is now
+    inaccurate (it isn't — leave it).
+  - Side effects: with the `workflow_run` gate, a genuinely-red CI now stops deploys and deploy no
+    longer runs parallel to CI — intended; call both out in the decision entry so they aren't a surprise.
+  - Done when: `deploy.yml` triggers on `workflow_run` and deploys only on CI `conclusion == 'success'`
+    (verified by a green→deploy and a forced red→no-deploy); the stale ci.yml comment is fixed; docs
+    accurately + tersely describe the re-tiered suite and the gate; a fresh session could follow the
+    `step`/`stepLogic` split without rediscovery.
 
 ## Out of scope
 
@@ -253,4 +298,17 @@ workflow, so this infra work pulls in the project's stated way of building.
 
 ## Critique
 
-<!-- filled in by /critique-plan before execution -->
+> Fresh-eyes review (2026-07-22). Verdict: sound, roadmap-aligned re-tier with disciplined
+> delete-gating — but its capstone hard-gate (`needs: [ci]`) was technically infeasible as written,
+> and Step 1's "unblock master" rationale didn't hold under branch-only validation. Both resolved in
+> this revision (owner decisions: `workflow_run` gate; merge Step 1 to master early). Findings 3–6
+> folded into Steps 2/4/5/8.
+
+|#|Finding|Severity|Resolution in this revision|
+|-|-------|--------|---------------------------|
+|1|`needs: [ci]` can't gate across workflow files — no `ci` job exists; deploy.yml would fail to parse.|High|Step 9 rewritten to gate via `workflow_run` (deploy after CI, serialized) + fix the stale ci.yml comment. (Owner: `workflow_run`.)|
+|2|`workflow_dispatch` branch runs never close the master `notify` tracking issue (notify is push-only).|Medium|Step 1 now states the merge cadence: merge Step 1 to master early so a real push run closes the issue. (Owner: merge early.)|
+|3|Delete-bucket over-aggression: wave "walkable spawns local to camp" + zoom "broadcasts clamped value" hit real map/camera wiring a fake-deps Node twin won't cover.|Medium|Step 5 downgrades those to convert-`stepLogic`; Step 2 map must flag any delete row touching real scene/map/camera wiring.|
+|4|Step 4 assumed `composite()` is *the* cost + made the shipping-method flag primary; full scene render may dominate.|Medium|Step 4 now measures `setVisible(false)` alone first; the DEV-gated composite flag is added only if needed.|
+|5|`survival-forage.spec.ts` (30th spec) missing from the carried-over verdict list.|Low|Step 2 now classifies it explicitly (likely convert-`stepLogic`).|
+|6|"materially/visibly faster" acceptance is soft (Steps 4/6/8).|Low|Step 4 names a per-test target (~29s→a few s); Step 8 targets ≥halved wall (≲3–4 min).|
