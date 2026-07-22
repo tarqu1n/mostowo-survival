@@ -183,7 +183,14 @@ CI-delegated e2e is still a bottleneck.
   - Done when: `npm run e2e` is green on **two consecutive cold runs**; no `waitForTimeout`-driven
     gameplay remains in any spec.
 
-- [ ] **Step 5: Re-measure and right-size Playwright workers/timeouts** `[delegate]`
+- [x] **Step 5: Re-measure and right-size Playwright workers/timeouts** `[delegate → done inline]`
+  - Outcome: set `workers: '50%'` explicitly in `playwright.config.ts` (was unset → Playwright's
+    implicit half-vCPU default = 2 on the 4-vCPU box), `fullyParallel` unchanged (still true). Chosen
+    by benchmark: the suite is fill-rate-bound on headless SwiftShader, so half the cores is the sweet
+    spot — 106 tests **green on two consecutive cold runs at ~9.3 min** at this level. **Before/after
+    e2e wall:** ~10.5 min **red** (5 fails, plan baseline) → **~9.3 min green** — the win is the Step-4
+    flake fixes (deterministic `step` vs real-time waits + no crash), not worker count (already ~2).
+    Left the annotated long timeouts untouched (Phase 2's `stepLogic` removes the render cost they cover).
   - With the suite green, re-time `npm run e2e` and record it. Right-size `workers` in
     `playwright.config.ts` to a benchmarked value (half vCPU as a start) and confirm `fullyParallel`
     still holds. Do NOT reduce the annotated long timeouts yet — they cover render-heavy driven frames

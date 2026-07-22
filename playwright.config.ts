@@ -23,6 +23,12 @@ export default defineConfig({
   // file and docs/WORKFLOW.md.
   globalSetup: './tests/e2e/global-setup.ts',
   fullyParallel: true,
+  // Half the vCPUs (plan 044 Step 5). These specs drive real rendered frames on headless SwiftShader,
+  // which is fill-rate-bound: past ~half the cores the workers contend for the GPU and the suite gets
+  // slower AND flakier, not faster. Benchmarked at 50% (= 2 workers on the 4-vCPU dev box): 106 tests,
+  // green on two consecutive cold runs at ~9.3 min. Portable across bigger CI runners; CI shards also
+  // pin `--workers=2` per shard. (Phase 2's render-free stepLogic is what will actually cut the wall.)
+  workers: '50%',
   retries: 0,
   reporter: [['list']],
   use: {
