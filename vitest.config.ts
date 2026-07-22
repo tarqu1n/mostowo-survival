@@ -17,5 +17,13 @@ export default defineConfig({
     environment: 'node',
     passWithNoTests: true,
     include: ['src/**/*.test.ts', 'src/**/__tests__/**/*.test.ts', 'scripts/**/*.test.mjs'],
+    // Overhead trim (plan 044): default `forks` + `isolate:true` spins one child process per file and
+    // re-transforms the module graph in each — most of the wall time is that overhead, not the ~0.9s of
+    // actual test execution. All unit tests are pure Node with no cross-file side effects (systems are
+    // pure; the editor Zustand store specs already `beforeEach`-reset their module state), so a shared
+    // worker thread with isolation off is safe and much cheaper. If a future spec needs a fresh module
+    // graph, re-enable isolation narrowly via a `test.projects` entry rather than flipping this globally.
+    pool: 'threads',
+    isolate: false,
   },
 });

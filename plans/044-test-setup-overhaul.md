@@ -80,7 +80,12 @@ CI-delegated e2e is still a bottleneck.
 
 ## Steps (Phase 1)
 
-- [ ] **Step 1: Cut Vitest per-run overhead** `[inline]`
+- [x] **Step 1: Cut Vitest per-run overhead** `[inline]`
+  - Outcome: `vitest.config.ts` — added `pool: 'threads'` + `isolate: false` with an explanatory
+    comment. `npm test` wall dropped **7.86s → ~1.3s** (925 tests / 66 files, all green across two
+    runs). Overhead was the whole cost: prepare 4.63s→0.25s, collect 4.96s→2.18s, transform 1.75s→1.3s;
+    test-exec itself was already ~0.5s. **No editor-store carve-out needed** — the Zustand store specs'
+    existing `beforeEach` resets hold under `isolate:false`. No red tests, so no scoped isolation added.
   - Edit `vitest.config.ts`: switch to `pool: 'threads'` and set `isolate: false` (all unit tests are
     pure Node with no cross-file side effects). Re-run `npm test` and record the new wall time.
   - **Risk to check:** module-singleton bleed with `isolate:false` — the editor Zustand store tests
