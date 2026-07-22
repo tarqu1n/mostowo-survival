@@ -32,6 +32,13 @@ BODY_H = 26      # target standing body height (px) — matches the idle rogue
 FRAME_W, FRAME_H = 56, 56
 BASELINE = 53    # feet y within the frame
 KEY_TOL = 130    # high enough to also key the anti-aliased pink ring around the figure
+# GIF preview: play back at the SAME rate the game uses (NPC_ATTACK_ANIM_FRAMERATE in
+# src/config.ts) so animation speed is judged BEFORE wiring — this is the step that
+# catches a "way too fast" attack up front. Keep this fps in sync with that constant.
+PREVIEW_FPS = 10
+PREVIEW_SCALE = 8
+PREVIEW_BG = (46, 46, 58)
+PREVIEW = ROOT / "scripts/.gen-icons" / "rogue_attack_preview.gif"
 # Output frame order (0-based indices into the generated left-to-right row). The raw
 # strip's poses aren't the animation order we want; this re-sequences them. Owner call
 # 2026-07-21: 3 2 4 5 1 (1-based) -> raised, wind-up, slash, follow-through, ready.
@@ -243,7 +250,24 @@ def build(variant):
     dst = OUT / "Slice_Side-Sheet.png"
     sheet.save(dst)
     print(f"wrote {dst.relative_to(ROOT)}  ({sheet.width}x{sheet.height}, {n} frames of {FRAME_W}x{FRAME_H})")
+    write_preview(sheet, n)
     return dst
+
+
+def write_preview(sheet, n):
+    """Emit a looping GIF of the sheet at the in-game playback rate (PREVIEW_FPS) — so a
+    reviewer sees the animation at real speed before it's wired. Gitignored scratch."""
+    frames = []
+    for i in range(n):
+        fr = sheet.crop((i * FRAME_W, 0, i * FRAME_W + FRAME_W, FRAME_H))
+        fr = fr.resize((FRAME_W * PREVIEW_SCALE, FRAME_H * PREVIEW_SCALE), Image.NEAREST)
+        canvas = Image.new("RGBA", fr.size, PREVIEW_BG + (255,))
+        canvas.alpha_composite(fr)
+        frames.append(canvas.convert("P", palette=Image.ADAPTIVE))
+    PREVIEW.parent.mkdir(parents=True, exist_ok=True)
+    frames[0].save(PREVIEW, save_all=True, append_images=frames[1:],
+                   duration=round(1000 / PREVIEW_FPS), loop=0, disposal=2)
+    print(f"preview -> {PREVIEW.relative_to(ROOT)}  ({PREVIEW_FPS}fps, matches in-game)")
 
 
 if __name__ == "__main__":
