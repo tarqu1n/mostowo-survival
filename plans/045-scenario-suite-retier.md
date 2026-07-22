@@ -20,12 +20,12 @@ cut**: every deleted spec's wiring is Node-covered first.
 
 First real `ci.yml` run on `master` (run #2, sha `f71204f`, 2 shards × 2 workers):
 
-| Job | test-exec | job wall | result |
+|Job|test-exec|job wall|result|
 |---|---|---|---|
-| static-unit | 2s | ~53s | ✅ |
-| smoke | ~9s | ~62s | ✅ |
-| e2e shard 1 | 5.8m | ~6m24s | ❌ (1 fail) |
-| e2e shard 2 | 7.3m | ~8m36s | ❌ (3 fail) |
+|static-unit|2s|~53s|✅|
+|smoke|~9s|~62s|✅|
+|e2e shard 1|5.8m|~6m24s|❌ (1 fail)|
+|e2e shard 2|7.3m|~8m36s|❌ (3 fail)|
 
 - e2e gates CI at **~8.5 min** (static+smoke are ~1 min). The 4 reds are all `page.evaluate`
   timeouts on **render-heavy driven-frame** specs: `campfire.spec:206` (refuel walk, 30s),
