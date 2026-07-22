@@ -6,6 +6,34 @@ Part of the [decision log index](../DECISIONS.md). Newest first.
 
 ---
 
+## 2026-07-22 — [DECIDED] UI overhaul: DOM/React HUD overlay, "Field Kit" direction (plan 046)
+
+Replaces the hand-placed Phaser HUD (`UIScene` + `src/scenes/hud/*`) with a **DOM/React
+overlay** floating over the Phaser canvas. Research, three design directions, and interactive
+mockups live in [`docs/ui-overhaul/`](../ui-overhaul/README.md); the build plan is
+`plans/046-field-kit-hud-overlay.md`. Settled calls:
+
+- **Engine split:** DOM/React owns all HUD/menus (bars, meters, day/night dial, hotbar,
+  catalogs, drawers, inspect/companion/dev). Phaser keeps the world, camera, and *in-world*
+  markers (build ghost, target outline, floating text, mob HP bars) + canvas gesture
+  mechanics. A thin **event bridge** connects the existing `game.events` bus ⇄ a Zustand
+  store (mirrors the editor's store-as-bridge pattern); GameScene's `wireBus()` event table
+  is unchanged — only the `hudHitTest`/`isMovepadHeld` deps-closures and `scene.launch('UI')`
+  wiring are touched, at cutover.
+- **Direction:** **Field Kit (B)** — a persistent bottom command bar that morphs by mode
+  (Scavenge/Build/Fight) + a persistent **6-slot manual-pin hotbar** + tabbed bottom-sheet
+  catalogs (loadout-vs-catalog two-tier model). Chosen over the earlier Twin Grip lean for
+  legibility/discoverability and as the safest first overhaul. Twin Grip / Emberlight are not
+  built, but the bridge/tokens/primitives/hotbar/catalog work is direction-agnostic.
+- **Stack:** reuse the editor's React 19 + Tailwind v4 + shadcn/ui (all already deps). This
+  **reverses** the prior "the game page never loads Tailwind" isolation — Tailwind now ships
+  on `index.html`, scoped under `#hud-root` with global preflight omitted (concrete mechanism
+  in plan Step 1). The `src/editor/ui` primitives are copied to `src/hud/ui` for now
+  (consolidation deferred).
+- **Scope:** full HUD migration in one plan, **portrait-first** (CSS structured for a later
+  landscape reflow), **spells deferred** (catalog is spell-ready but no spell content ships;
+  combat keeps melee/bow).
+
 ## 2026-07-15 — [DECIDED] Map Builder editor + map/world file format (plan 014)
 
 Resolves the 2026-07-11 [OPEN] "want a map editor" steer below. The editor is a **React chrome over

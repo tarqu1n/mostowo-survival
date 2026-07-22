@@ -12,9 +12,13 @@ build-stack decision, and **three candidate design directions**.
   Spells · Night`. The **hotbar** shows in play; **Build** and **Spells** open the
   populated catalogs so you can judge how each direction handles volume. Self-contained,
   no build step, no external hosting.
-- **Status (v2):** Twin Grip is the current front-runner (per Matt — likes the always-open
-  gamepad). Awaiting a final direction decision (see [Open questions](#open-questions)).
-  Nothing built yet — next step is `plan-feature` on the chosen direction.
+- **Status (v3): DECIDED — Field Kit (B).** Owner (Matt) selected Field Kit over the earlier
+  Twin Grip lean: the labelled morphing command bar is the most legible/discoverable and the
+  safest first overhaul. Scope: **full HUD migration**, portrait-first, spells deferred,
+  6-slot manual-pin hotbar. Implementation plan: [`plans/046-field-kit-hud-overlay.md`](../../plans/046-field-kit-hud-overlay.md);
+  decision recorded in [`docs/DECISIONS.md`](../DECISIONS.md). Twin Grip / Emberlight are not
+  being built (the shared bridge/tokens/hotbar/catalog work is direction-agnostic, so a later
+  pivot keeps most of it). Open questions Q1–Q5 are resolved (see plan Context).
 
 ---
 
@@ -22,14 +26,14 @@ build-stack decision, and **three candidate design directions**.
 
 Audit of `src/scenes/hud/*` and `src/ui/*`:
 
-| Area | Problem |
-| --- | --- |
-| **Readability** | HP/food bars at 8px, hints 8–9px, zoom buttons 24×24 — below the ~44px hit / ~16px-on-screen a phone needs. All text, no icons. Monospace-only. |
-| **Layout** | Every widget computes x/y off fixed `BASE_WIDTH/HEIGHT` (360×640). No safe-area insets, no landscape, no reflow beyond `Scale.FIT` letterboxing. |
-| **Clutter** | Top-right column (BUILD→CANCEL→ITEMS→DEMOLISH) manually offset; adding a button re-tunes neighbours. A dead, dimmed SPELL slot already occupies screen space. |
-| **No tokens** | `theme.ts` has colours + one font size; every gap/pad/size is a local literal. "Retune the whole look" isn't really possible. |
-| **Scale** | No menu structure that holds depth. With dozens of buildings and a spell roster coming, three cost-labelled rows won't do. |
-| **Interaction** | `SlotGrid` inventory is display-only (no select/drag/equip — deferred). No hotbar for quick-swapping a weapon or downing a potion mid-fight. |
+|Area|Problem|
+|----|-------|
+|**Readability**|HP/food bars at 8px, hints 8–9px, zoom buttons 24×24 — below the ~44px hit / ~16px-on-screen a phone needs. All text, no icons. Monospace-only.|
+|**Layout**|Every widget computes x/y off fixed `BASE_WIDTH/HEIGHT` (360×640). No safe-area insets, no landscape, no reflow beyond `Scale.FIT` letterboxing.|
+|**Clutter**|Top-right column (BUILD→CANCEL→ITEMS→DEMOLISH) manually offset; adding a button re-tunes neighbours. A dead, dimmed SPELL slot already occupies screen space.|
+|**No tokens**|`theme.ts` has colours + one font size; every gap/pad/size is a local literal. "Retune the whole look" isn't really possible.|
+|**Scale**|No menu structure that holds depth. With dozens of buildings and a spell roster coming, three cost-labelled rows won't do.|
+|**Interaction**|`SlotGrid` inventory is display-only (no select/drag/equip — deferred). No hotbar for quick-swapping a weapon or downing a potion mid-fight.|
 
 Design intent already on record (`docs/GAME-DESIGN.md`): mobile-first, portrait, touch
 baseline; "the day must be legible"; left-thumb movepad + right-thumb action cluster for
@@ -140,9 +144,10 @@ Engine choice is **independent** of which look wins; all three directions sit on
 ## 6. Three directions
 
 Same game, same control set, three philosophies. Live mockups + per-direction control maps
-in [`pitch.html`](./pitch.html). Ordered front-runner first.
+in [`pitch.html`](./pitch.html). (**B — Field Kit — is the selected direction**; A and C are
+kept for the record.)
 
-### C — Twin Grip · *"Two thumbs, always on the sticks."* (front-runner)
+### C — Twin Grip · *"Two thumbs, always on the sticks."* (considered; not selected)
 The gamepad never leaves: left corner = move ring, right corner = a live action wheel whose
 **petals are your loadout** (equipped attacks + spells, one flick each). A slim **hotbar**
 rides the bottom edge between the thumbs for weapons/items/spells. The wheel's centre (▦)
@@ -153,7 +158,7 @@ Lineage: console twin-stick · radial action games · Diablo Immortal loadout.
 landscape-native, maximises world. **−** highest learning curve; wheel petals hide labels
 until learned; most to build & tune (radial + catalog).
 
-### B — Field Kit · *"One bar that becomes whatever the moment needs."* (safe / legible)
+### B — Field Kit · *"One bar that becomes whatever the moment needs."* (SELECTED)
 A persistent bottom command bar that **morphs by mode**, with the **hotbar** riding just
 above it at all times. Scavenge: Build/Pack/Craft/Status; Build: catalog tray +
 Rotate/Place/Cancel; Fight: move pad + Attack/Bow/Cast pulled from the hotbar. Deep menus
@@ -172,25 +177,22 @@ Lineage: Kingdom Two Crowns · The Long Dark.
 actions without chrome. **−** can hide decision info (K2C's known flaw); no always-on
 gamepad (slower to act); deep menus feel like a context switch.
 
-**Suggested path:** build **C (Twin Grip)** as the base, borrow **B**'s labelled catalog
-grids wholesale (same DOM component), and keep a **Field Kit fallback layout** in pocket as
-the accessible / low-dexterity option (same data, calmer surface). The **hotbar** is common
-to all three — build it first whichever way we lean.
+**Chosen path:** build **B (Field Kit)** — the labelled morphing command bar — as a full HUD
+migration. The **hotbar** and **catalog grids** are direction-agnostic and reusable if the
+interaction model is ever revisited toward Twin Grip / Emberlight.
 
 ---
 
-## Open questions
+## Resolved questions (were open in v2)
 
-1. **Confirm Twin Grip** as the base (with Field Kit catalogs + fallback), or a different
-   blend?
-2. **Wheel size** — how many petals before the catalog takes over? (Suggest cap at 6 +
-   centre.)
-3. **Hotbar length & assignment** — 5 or 6 slots? Manual pin only, or auto-populate recent?
-4. **Real building/spell rosters** — mockups use placeholders; what's the actual planned
-   list so catalog categories are right?
-5. **Portrait-only first**, or portrait + landscape from the start (Twin Grip is built for
-   both)?
+1. **Direction** → **Field Kit (B)**, full migration.
+2. **Wheel size** → N/A (Field Kit has no radial wheel; it uses a morphing command bar).
+3. **Hotbar** → **6 slots, manual pin** (long-press to pin from a catalog/pack).
+4. **Rosters** → still placeholder content; catalog is built data-driven off `BUILDABLES`
+   and renders a category tab only when it has ≥1 entry, so it grows as real content lands
+   (no empty Craft tab today).
+5. **Orientation** → **portrait-first**; CSS structured so landscape is a later reflow.
 
-Once a direction is chosen: `plan-feature` → `critique-plan` → `execute-plan`, staged as
-event bridge → token system → hotbar + catalog components → the wheel/bar surface →
-per-mode wiring.
+Plan: [`plans/046-field-kit-hud-overlay.md`](../../plans/046-field-kit-hud-overlay.md)
+(critiqued). Next: `execute-plan` — staged event bridge → tokens → hotbar + catalog
+components → command-bar surface → per-mode wiring → cutover.

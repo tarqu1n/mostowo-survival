@@ -16,6 +16,12 @@ Shards: [rendering](decisions/rendering.md) · [architecture](decisions/architec
 
 ---
 
+## 2026-07-22 — [DECIDED] UI overhaul: DOM/React HUD overlay, "Field Kit" direction (plan 046)
+
+Retire the hand-placed Phaser HUD for a DOM/React overlay over the canvas (event bridge ⇄ Zustand store; reuse the editor's React+Tailwind+shadcn stack, Tailwind now scoped onto the game page). Direction: **Field Kit** (morphing command bar + 6-slot manual-pin hotbar + tabbed catalogs). Full migration, portrait-first, spells deferred. Supersedes the Twin Grip lean recorded in `docs/ui-overhaul/`.
+
+→ [architecture.md](decisions/architecture.md#2026-07-22--decided-ui-overhaul-domreact-hud-overlay-field-kit-direction-plan-046)
+
 ## 2026-07-22 — [DECIDED] Test-setup overhaul Phase 1 (plan 044): fast local loop, CI owns the browser tier
 
 Vitest overhead cut (threads + isolate:false → unit 7.9s→~1.3s); fast pre-push (typecheck+unit) + `check:all`; separate non-blocking `ci.yml` (unit + sharded e2e + smoke) that opens a tracking issue on failure, parallel to deploy; 5 flakes fixed in-place + a real campfire crash; e2e green on two consecutive cold runs; Phase 2 (re-tier/`stepLogic`) deferred to plan 045.

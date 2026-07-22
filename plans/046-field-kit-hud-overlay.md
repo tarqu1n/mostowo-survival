@@ -43,9 +43,13 @@ primitives exist as copied source in `src/editor/ui/*.tsx`; `cn` in `src/editor/
   neither side imports the other." Our bridge is the inverse of `PhaserViewport.tsx` — React
   floats *above* the canvas rather than hosting it.
 - **Event bus is the sanctioned scene↔UI seam** (`docs/CONVENTIONS.md`): the HUD is a bus
-  peer. `GameScene.wireBus()` (`src/scenes/GameScene.ts:~799`) already treats
-  `game.events` as opaque strings, so a DOM emitter is a **drop-in peer to `UIScene` and
-  needs zero GameScene changes** (except the movepad-held path, Step 10).
+  peer. `GameScene.wireBus()` (`src/scenes/GameScene.ts:~799`) already treats `game.events`
+  as opaque strings, so the DOM emitter drops in as a peer to `UIScene` for all *event*
+  traffic. **GameScene-side edits are NOT zero** — they are confined and land at defined
+  steps: the `hudHitTest`/`isMovepadHeld` **deps-closures** (`GameScene.ts:~663/672/782`,
+  direct method calls, not events) are rewired at Step 10, and the `this.ui` field +
+  `scene.launch('UI')`/`scene.get('UI')` wiring is removed at Step 13 (cutover). No changes
+  to the `wireBus()` event table itself.
 - **Event names** (`namespace:action`, verified): outbound (world→HUD) `player:hpChanged`,
   `player:hit`, `hunger:changed`, `fire:changed`, `supply:changed`, `time:changed`,
   `tasks:changed`, `mode:changed`, `build:modeChanged`, `demolish:modeChanged`,
@@ -65,9 +69,12 @@ primitives exist as copied source in `src/editor/ui/*.tsx`; `cn` in `src/editor/
   canvas rect (`game.scale.canvas.getBoundingClientRect()`, resubscribe on
   `Phaser.Scale.Events.RESIZE`) to map design px → CSS px. `BASE_WIDTH=360`,
   `BASE_HEIGHT=640`, `TILE_SIZE=16` in `src/config.ts`.
-- **Teardown:** cross-scene listeners are torn down on `SHUTDOWN` (restart-leak hazard). The
-  bridge must mirror this — re-sync on GameScene START/SHUTDOWN and clean up on React
-  unmount.
+- **Lifecycle:** the React overlay lives at the **page** level and must **persist across
+  GameScene death→restart** — it does NOT tear down on scene `SHUTDOWN`. Bridge listeners
+  attach to the scene-outliving `game.events` (+ registry `inventory`); on GameScene `START`
+  the bridge **re-syncs** store state (GameScene re-emits current values at ~`GameScene.ts:
+  783-793`), and only fully unsubscribes on React unmount / `game.destroy`. (Contrast: the
+  old per-scene `UIScene` DID tear down on SHUTDOWN — that convention does not transfer.)
 - **Data:** `src/data/types.ts` (`ItemDef`, `BuildableDef {id,name,cost,color,icon?,
   orientable?,...}`), `ITEMS` (`wood`/`stone`/`berries`), `BUILDABLES`
   (`wall`/`campfire`/`spike_trap`). No spell schema exists. `Inventory`
@@ -77,27 +84,39 @@ primitives exist as copied source in `src/editor/ui/*.tsx`; `cn` in `src/editor/
   `lint-staged` (eslint+prettier on `*.tsx`), pre-push typecheck+unit. Tests: Vitest node
   (pure units), Playwright e2e (`window.game.__test`, DEV-only), `npm run smoke`.
 
-**Direction fit (`README.md`/`ROADMAP.md`):** MVP path is complete; the game is explicitly
-mobile-first/portrait/touch and "the day must be legible." This overhaul is the natural
-next investment after the feature-complete MVP — it retires the UI debt catalogued in
-`docs/ui-overhaul/README.md §1` and unblocks the depth (many buildings, later spells) the
-roadmap implies.
+**Direction decision (recorded, not just chat):** owner (Matt) selected **Field Kit** over
+the earlier Twin Grip front-runner. `docs/ui-overhaul/README.md` status is updated to record
+this and there is a `docs/DECISIONS.md` entry (per the repo's "every reusable decision goes
+in the repo" rule). The shared infrastructure (event bridge, tokens, primitives, hotbar,
+catalog grids) is direction-agnostic; only the morphing command bar is Field-Kit-specific —
+so most of the migration survives even if the interaction model is later revisited.
+
+**Direction fit (`README.md`/`docs/ROADMAP.md`):** MVP path is complete; the game is
+explicitly mobile-first/portrait/touch and "the day must be legible." This overhaul is the
+natural next investment after the feature-complete MVP — it retires the UI debt catalogued in
+`docs/ui-overhaul/README.md §1` and unblocks the depth (many buildings, later spells).
 
 **Top risk — flagged for Step 1:** this deliberately **reverses** the current isolation
-guarantee ("the game page never loads Tailwind"). Tailwind preflight must be scoped so it
-cannot touch the canvas or leak resets into game DOM. Prove the scoping before building any
-component on top of it.
+guarantee ("the game page never loads Tailwind"). There is **no in-repo precedent** for
+scoped preflight — the editor owns its whole page and never scopes it, so that is not a
+proof point. The concrete Tailwind v4 mechanism (see Step 1) must be nailed down and canvas
+crispness proven at the Step 1 gate before any component is built on top.
 
 ## Steps
 
 - [ ] **Step 1: Mount an empty React overlay on the game page + scope Tailwind** `[inline]`
   - `index.html`: add `<div id="hud-root">` over `#game` (absolute, inset 0, `z-index`
-    above the canvas, `pointer-events:none`). `src/hud/hud.css`: `@import "tailwindcss"`
-    with **preflight scoped to `#hud-root`** (Tailwind v4: keep base reset from leaking onto
-    `#game`/canvas — scope under the root selector; verify no global `*{}` reset bleeds).
-    `src/hud/main.tsx`: `createRoot(#hud-root).render(<StrictMode><GameHud/></StrictMode>)`,
-    `import './hud.css'`; invoke it from `src/main.ts` after the Phaser boot. `src/hud/
-    GameHud.tsx`: skeleton root (`pointer-events:none`) with a temporary debug badge.
+    above the canvas, `pointer-events:none`). `src/hud/hud.css` — **concrete Tailwind v4
+    scoping** (there is no repo precedent; do NOT just `@import "tailwindcss"`, which injects
+    a global `*,::before,::after{}` preflight reset that would touch the canvas/`#game`):
+    import the layers explicitly and **omit global preflight** — `@layer theme, base,
+    components, utilities;` then `@import "tailwindcss/theme.css" layer(theme);` and
+    `@import "tailwindcss/utilities.css" layer(utilities);` (skip `preflight.css`), and
+    hand-write a minimal reset scoped under `#hud-root` (box-sizing, margin, font) so no rule
+    selects the canvas or bare `html/body`. `src/hud/main.tsx`:
+    `createRoot(#hud-root).render(<StrictMode><GameHud/></StrictMode>)`, `import './hud.css'`;
+    invoke from `src/main.ts` after the Phaser boot. `src/hud/GameHud.tsx`: skeleton root
+    (`pointer-events:none`) with a temporary debug badge.
   - Side effects: prod bundle now ships React+Tailwind on the only prod entry
     (`index.html` — Rollup input is already pinned there, no `vite.config.ts` change).
     Confirm `npm run build`, `npm run smoke`, and the e2e boot canary stay green; confirm
@@ -126,15 +145,17 @@ component on top of it.
     orientable`, `demolishMode`, `combatActive`, `inspectTarget`, `inventory` snapshot,
     `hotbar` loadout (6 slots), `following/zoom`. `src/hud/bridge.ts`: on init subscribe all
     outbound events + registry `inventory` `'change'` → store setters; expose typed
-    `emit(event, payload)` for the inbound union; teardown fn mirroring the `SHUTDOWN`
-    convention; re-sync on GameScene START/SHUTDOWN and on React unmount. Wire bridge init
-    at mount.
-  - Side effects: **GameScene needs no change.** Must survive GameScene restart (death →
-    scene restart) without leaking listeners or going stale.
+    `emit(event, payload)` for the inbound union; re-sync on GameScene `START`, persist
+    across `SHUTDOWN`, unsubscribe only on React unmount / `game.destroy` (see Lifecycle
+    above). Wire bridge init at mount.
+  - Side effects: no `wireBus()` **event-table** change in this step (the deps-closure +
+    `scene` wiring edits come at Steps 10/13). Must survive GameScene restart (death → scene
+    restart) without leaking listeners or going stale — re-sync, don't tear down.
   - Docs: code comments only.
   - Done when: `src/hud/__tests__/bridge.test.ts` (node-pure, mock emitter + registry)
-    passes for event→store mapping, `emit` passthrough, and teardown; a temporary `GameHud`
-    readout shows live HP/hunger/day ticking in-game.
+    passes for event→store mapping, `emit` passthrough, and restart re-sync (state survives a
+    simulated SHUTDOWN→START); a temporary `GameHud` readout shows live HP/hunger/day
+    ticking in-game.
 
 - [ ] **Step 4: Game-scoped shared primitives, tokens, and data prep** `[delegate]`
   - Extract the `@theme` palette tokens from `src/editor/editor.css` into
@@ -145,8 +166,10 @@ component on top of it.
     paths to game scope. Data prep so parallel components only *read* shared files:
     `src/config.ts` add `HUD_HOTBAR_SLOTS = 6`; `src/data/types.ts` add optional
     `category?: 'defense' | 'survival' | 'craft'` to `BuildableDef`; `src/data/buildables.ts`
-    tag the three existing entries (`wall`→defense, `spike_trap`→defense,
-    `campfire`→survival).
+    tag the three existing entries (`wall`→defense, `spike_trap`→defense, `campfire`→
+    survival). The `craft` value stays in the union for future content but **no `craft`
+    buildable exists yet**, so the catalog must render tabs only for categories that have ≥1
+    entry (today: Defense, Survival — no empty Craft tab).
   - Side effects: minor duplication with `src/editor/ui` (accepted; future consolidation is
     out of scope). Adding an optional field to `BuildableDef` is backwards-compatible.
   - Done when: primitives typecheck and a sample `<Button>`/`<Tabs>` renders styled inside
@@ -177,9 +200,11 @@ component on top of it.
     movepad emits normalized vectors. Behaviour verified at Step 10.
 
 - [ ] **Step 7: Drawer components — build catalog, pack, status** `[delegate]` (parallel: A)
-  - `src/hud/components/BuildCatalog.tsx` (tabbed Defense/Survival/Craft from
-    `BuildableDef.category`, scrollable grid off `BUILDABLES` with cost + affordability dim,
-    select → `build:select`, long-press → pin), `src/hud/components/PackDrawer.tsx` (full
+  - `src/hud/components/BuildCatalog.tsx` (tabs derived from the categories actually present
+    in `BUILDABLES` — today Defense/Survival, no empty Craft tab; a category grid appears
+    only when it has ≥1 entry, so tabs grow automatically as content lands — scrollable grid
+    with cost + affordability dim, select → `build:select`, long-press → pin),
+    `src/hud/components/PackDrawer.tsx` (full
     inventory grid from the store snapshot, selectable slots, consumable tap → `needs:eat`,
     long-press → pin), `src/hud/components/StatusDrawer.tsx` (meters + stats from
     `playerStats` + eat list → `needs:eat`). Use the `sheet` primitive for the drawer shell.
@@ -205,10 +230,13 @@ component on top of it.
     `GameHud` (CSS radial-gradient tied to `player:hit` / hunger threshold) and drop the
     Phaser vignette images.
   - Side effects: `UIScene` still runs (other widgets remain) — ensure no double-render of
-    migrated widgets. Watch the restart path.
+    migrated widgets. Watch the restart path. **Adapt the e2e spec(s) covering this cluster
+    in THIS step** (zoom/follow assertions in `gestures`/`zoom` specs now query the DOM, not
+    canvas objects) — do not defer them to cutover.
   - Docs: none.
-  - Done when: e2e/manual — HP/food/fire/supply, day/night phase + wave banner, zoom, and
-    follow all match prior behaviour and update live; vignettes fire on hit/starving.
+  - Done when: adapted zoom/follow spec(s) pass; HP/food/fire/supply, day/night phase + wave
+    banner, zoom, and follow all match prior behaviour and update live; vignettes fire on
+    hit/starving.
 
 - [ ] **Step 10: Integrate hotbar + command bar + movepad-held bridge; retire
   BuildControls/CombatControls/ModeControls** `[inline]`
@@ -238,6 +266,7 @@ component on top of it.
     `WellbeingPanel`, `InventoryWidget`, and the Phaser build palette from `UIScene`.
   - Side effects: `Inventory` becomes read-for-display + eat/select actions via events; no
     change to `Inventory` internals. Persisted loadout must tolerate items no longer owned.
+    Adapt the e2e spec(s) covering the build palette / inventory to DOM queries in THIS step.
   - Docs: none.
   - Done when: eat from pack/status, build-select from the catalog, pin an item and see it on
     the hotbar (surviving reload), and open/close drawers by swipe — all verified.
@@ -248,22 +277,27 @@ component on top of it.
     `inspect:hide`, `npc:menuOpen` + `npc:*`, `debug:*`. Remove `InspectPanel`,
     `NpcAssignMenu`, and the Phaser `DevMenu` from `UIScene`.
   - Side effects: the NPC guard-placement flow (`npc:beginPlaceGuard` → one-tap point place)
-    must still work end-to-end through the DOM menu.
+    must still work end-to-end through the DOM menu. Adapt any inspect/companion e2e spec(s)
+    to DOM queries in THIS step.
   - Docs: none.
   - Done when: inspect an enemy/tree/structure, assign companion Day/Night postures + place a
     guard point, and use dev spawn/time/wave — all verified.
 
 - [ ] **Step 13: Cutover — remove UIScene + retire the hudHitTest input path** `[inline]`
-  - Remove `UIScene` from the scene list in `src/main.ts` and delete `src/scenes/UIScene.ts`
-    + `src/scenes/hud/*` (now fully replaced). Retire the `hudHitTest`/`addHudElement` path
-    and its `PointerInputController` closure — DOM `pointer-events` capture now gates taps
-    (root `pointer-events:none`, `auto` on controls; empty HUD space falls through to the
-    canvas). Keep the `movepadHeld` gate from Step 10. Check `src/ui/*` (Phaser kit) for any
-    remaining non-editor consumers; if none, delete it, else leave with a note.
-  - Side effects: existing e2e specs that assert on the canvas HUD must move to DOM queries
-    (`tests/e2e/*.spec.ts` — `combat`, `build`, `wave`, `gestures`, `menu-start`); update
-    `tests/e2e/refactor-tripwire.spec.ts`. `window.game.__test` may need small HUD-state
-    hooks (DEV-only).
+  - Remove `UIScene` from the scene list in `src/main.ts`; remove the GameScene-side wiring
+    that references it — the `this.ui` field and any `scene.launch('UI')`/`scene.get('UI')`
+    calls (`GameScene.ts`) — then delete `src/scenes/UIScene.ts` + `src/scenes/hud/*` (now
+    fully replaced). Retire the `hudHitTest`/`addHudElement` deps-closure and its
+    `PointerInputController` use — DOM `pointer-events` capture now gates taps (root
+    `pointer-events:none`, `auto` on controls; empty HUD space falls through to the canvas).
+    Keep the `movepadHeld` gate from Step 10. **Sweep now-dead consts** in `src/config.ts`
+    (`HOTBAR_SLOTS`, `INVENTORY_SLOTS` — verify no remaining consumers; `HUD_HOTBAR_SLOTS`
+    supersedes). Check `src/ui/*` (Phaser kit) for any remaining non-editor consumers; if
+    none, delete it, else leave with a note.
+  - Side effects: most canvas-HUD specs were DOM-adapted in their retiring steps (9–12); this
+    step handles the **remainder + cross-cutting** — `tests/e2e/refactor-tripwire.spec.ts`
+    (structure guard) and any spec still asserting on `UIScene`. `window.game.__test` may need
+    small DEV-only HUD-state hooks. Confirm no spec still references deleted Phaser HUD code.
   - Docs: none (docs land in Step 14).
   - Done when: no `UIScene` in the scene list, no dead Phaser HUD code, full e2e suite +
     smoke green, and manual play shows the complete DOM HUD with world gestures intact.
@@ -291,4 +325,31 @@ component on top of it.
 - **Consolidating `src/editor/ui` and `src/hud/ui`** into one shared package (and rewiring
   `editor.css`/`components.json` aliases) — deliberately duplicated for now.
 - **Twin Grip / Emberlight** directions and the always-open radial wheel — Field Kit only.
+- **Craft catalog tab** — hidden until at least one `craft`-category buildable exists (the
+  category is reserved in the schema; the tab renders itself once content lands).
 - **New juice/haptics** beyond parity (tap-ack, vignettes) — polish pass is separate.
+
+## Critique
+
+> Reviewed 2026-07-22 (fresh-eyes pass). Findings below were resolved in this revision:
+> plan renumbered 045→**046** (045 was reserved for the test re-tier); direction decision
+> recorded in `docs/ui-overhaul/README.md` + `docs/DECISIONS.md`; the "zero GameScene
+> changes" claim corrected (deps-closure at Step 10, `scene`/`this.ui` removal at Step 13);
+> Tailwind v4 preflight-scoping mechanism made concrete (Step 1); e2e adaptation distributed
+> into each retiring step; bridge lifecycle reworded to persist-and-re-sync; dead consts
+> swept at Step 13; empty Craft tab dropped. Full-migration scope confirmed by owner.
+
+**Verdict:** Technically well-grounded and convention-aware; the two blocking issues
+(unratified direction + plan-number collision) are resolved, remaining findings folded into
+the steps.
+
+|#|Finding|Lens|Severity|Resolution|
+|-|-------|----|--------|----------|
+|1|Built Field Kit while docs recorded Twin Grip as front-runner; decision only in chat|Strategic fit / reversibility|High|Owner (Matt) confirmed Field Kit; recorded in `docs/ui-overhaul/README.md` + `DECISIONS.md`|
+|2|Plan number 045 already reserved for the test re-tier (Phase 2 of plan 044)|Consistency|Medium|Renumbered to 046|
+|3|"Zero GameScene changes" inaccurate (`this.ui`, `scene.launch`, deps-closures)|Gaps / executability|Medium|Reworded; edits assigned to Steps 10 & 13|
+|4|Full catalog/loadout for 3 buildables + empty Craft tab|Right-sizing|Medium|Full migration kept (owner); Craft tab hidden until content exists|
+|5|Tailwind preflight scoping hand-wavy; "editor proves it" a false precedent|Gaps / risks|Medium|Concrete v4 layer-import + scoped reset in Step 1; false precedent removed|
+|6|e2e adaptation big-banged at cutover|Executability / sequencing|Medium|Each retiring step (9–12) now adapts its own spec(s)|
+|7|Bridge "teardown on SHUTDOWN" wrong for a page-level overlay|Gaps|Low|Reworded to persist across restart + re-sync on START|
+|8|Dead `HOTBAR_SLOTS`/`INVENTORY_SLOTS` left in config|Consistency|Low|Swept in Step 13 cleanup|
