@@ -206,6 +206,8 @@ test("a mob attack (damageFire) knocks the fire's light out — dark, not a loss
 test('a refuel order walks the worker to the fire, feeds it, then self-terminates', async ({
   page,
 }) => {
+  // plan 045 Step 1 interim — reduced in Step 8 once stepLogic removes the render cost
+  test.setTimeout(60_000);
   await startGame(page);
   const { campfireIds } = await applyScenario(page, {
     player: [22, 40],

@@ -8,6 +8,8 @@ import { DAY_MS, NIGHT_MS, TWILIGHT_MS, NIGHT_MAX_ALPHA } from '../../src/config
 // derived phase/day state. Seed clockMs near a boundary so only a few driven slices cross it.
 
 test('day flips to night and the night overlay darkens', async ({ page }) => {
+  // plan 045 Step 1 interim — reduced in Step 8 once stepLogic removes the render cost
+  test.setTimeout(60_000);
   await startGame(page);
   // Seed mid-day, just before the dusk cross-fade begins (overlay fully clear).
   await applyScenario(page, { clockMs: DAY_MS - TWILIGHT_MS - 100 });

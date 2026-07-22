@@ -36,7 +36,9 @@ jobs:
       - run: npm run test
 
   # (2) Tier-2 Playwright scenarios, matrix-sharded so the ~10-min suite fans across runners.
-  # Start at 2 shards / 2 workers each and benchmark (plan 044 Step 5). retries:0 (flakes must surface).
+  # plan 045 Step 1 interim: --workers=1 per shard (was 2) — the hosted runners are GPU-contended, so
+  # a second worker made the render-heavy driven-frame specs time out. Serialising per shard removes
+  # that contention. Reverted/re-tuned in Step 8 once stepLogic removes the render cost. retries:0.
   e2e:
     runs-on: ubuntu-latest
     strategy:
@@ -53,7 +55,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       # CI env is auto-set by Actions → playwright.config reuseExistingServer:false, so it boots its
       # own vite dev server (port 5174) for the __test API. No SMOKE_CHROMIUM_PATH → managed Chromium.
-      - run: npx playwright test --shard=${{ matrix.shard }}/2 --workers=2
+      - run: npx playwright test --shard=${{ matrix.shard }}/2 --workers=1
       - if: failure()
         uses: actions/upload-artifact@v4
         with:

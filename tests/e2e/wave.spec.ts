@@ -77,6 +77,8 @@ test('a wave auto-starts when the clock is seeded straight into night (first-tic
 test('a fire-seeking mob with no player near attacks the fire (drains its fuel)', async ({
   page,
 }) => {
+  // plan 045 Step 1 interim — reduced in Step 8 once stepLogic removes the render cost
+  test.setTimeout(60_000);
   await startGame(page);
   const { campfireIds } = await applyScenario(page, {
     player: FAR_PLAYER, // ~80 tiles away → the mob never acquires the player, so it stays on the fire

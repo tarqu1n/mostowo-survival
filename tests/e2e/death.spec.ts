@@ -10,7 +10,8 @@ test('the player dying restarts the scene and resets the world', async ({ page }
   // fullyParallel contention on the headless SwiftShader renderer (fill-rate sensitive — see
   // docs/RENDERING.md) this runs near the default 30s budget; native-scale actors nudged it over.
   // The work is deterministic, just wall-clock-heavy, so give it headroom rather than hide a flake.
-  test.setTimeout(60_000);
+  // plan 045 Step 1 interim — reduced in Step 8 once stepLogic removes the render cost
+  test.setTimeout(120_000);
   const logs: string[] = [];
   page.on('console', (m) => logs.push(m.text()));
 
