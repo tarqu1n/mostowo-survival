@@ -14,9 +14,13 @@ import { Movepad } from './Movepad';
  * active layout is driven by the `mode` PROP (integration sets it at Step 10, not a store read), and
  * each control emits its matching inbound event on the bridge or calls a drawer-open callback prop.
  *
- *  - **scavenge** → Build · Pack · Craft · Status (Build also toggles build mode; the rest open drawers)
+ *  - **scavenge** → Build · Pack · Status (Build also toggles build mode; the rest open drawers)
  *  - **build**    → a buildable tray + Rotate / Place / Cancel / Demolish
  *  - **fight**    → the {@link Movepad} + Attack / Bow
+ *
+ * There is deliberately no Craft button: the game has no item-crafting system — building structures
+ * from `BUILDABLES` (the Build catalog) is the only "crafting" — so the mockup's Craft affordance has
+ * no backing action and is omitted until a craft system exists (plan 046 "Out of scope").
  */
 export type CommandBarMode = 'scavenge' | 'build' | 'fight';
 
@@ -26,8 +30,6 @@ interface CommandBarProps {
   onBuild?: () => void;
   /** Open the pack/inventory drawer (Step 7). */
   onPack?: () => void;
-  /** Open the craft drawer (Step 7). */
-  onCraft?: () => void;
   /** Open the status/wellbeing drawer (Step 7). */
   onStatus?: () => void;
   /** Passed through to the fight-mode {@link Movepad}: reports its held-state up (Step 10 wiring). */
@@ -44,7 +46,6 @@ export function CommandBar({
   mode,
   onBuild,
   onPack,
-  onCraft,
   onStatus,
   onMoveHeldChange,
   className,
@@ -115,9 +116,6 @@ export function CommandBar({
           </Button>
           <Button variant="secondary" className="h-10 flex-1" onClick={onPack}>
             Pack
-          </Button>
-          <Button variant="secondary" className="h-10 flex-1" onClick={onCraft}>
-            Craft
           </Button>
           <Button variant="secondary" className="h-10 flex-1" onClick={onStatus}>
             Status

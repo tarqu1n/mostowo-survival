@@ -405,8 +405,37 @@ crispness proven at the Step 1 gate before any component is built on top.
     demolishing walls, cancel-queue, movepad movement, melee/bow, and mode toggles all work;
     empty-HUD taps still reach the world.
 
-- [ ] **Step 11: Integrate drawers + pin-to-hotbar + interactive inventory; retire
+- [x] **Step 11: Integrate drawers + pin-to-hotbar + interactive inventory; retire
   WellbeingPanel/InventoryWidget/build palette** `[inline]`
+  - Outcome: `GameHud`'s `ActionLayer` now owns a single `openDrawer` state and renders `BuildCatalog`
+    /`PackDrawer`/`StatusDrawer`, wired to `CommandBar`'s `onBuild`/`onPack`/`onStatus`. **Craft button
+    dropped** (deviation, flagged): the game has no item-crafting system — building structures IS the
+    only crafting — so the mockup's Craft affordance had no backing action; removed `onCraft` prop +
+    button (documented in CommandBar). **playerStats:** added a `playerStats: CombatantStats | null`
+    store field + `setPlayerStats`; `bridge.ts` reads registry `playerStats` at init and follows
+    `setdata`/`changedata-playerStats` (mirrors the inventory bind, disposed cleanly) — StatusDrawer's
+    Step-7 TODO resolved, stat rows (Max HP/Armour/Speed/Vision/Strength/Dex/Dodge) now render, hidden
+    until the bag resolves. **Persistence:** new pure `src/hud/hotbarStorage.ts` (null-safe
+    localStorage, normalises to `HUD_HOTBAR_SLOTS`, drops stale/unknown ids to empty slots but keeps
+    unowned-but-valid pins, malformed record → treated absent never throws); `useBridge` hydrates it at
+    mount (`loadHotbar(START_MAP_ID)`) then subscribes to persist every `hotbar` change (`saveHotbar`).
+    **Keyed per save via `START_MAP_ID`** (`mostowo-hud:hotbar:the-moon`) — the game has no save-slot
+    system yet, so the loaded map id stands in as the save identity (key scheme extends when real saves
+    land). PackDrawer/StatusDrawer eat (`needs:eat`) + BuildCatalog select (`build:select`) + long-press
+    pin were already built in Step 7 — this step wired them live. **Retired from `UIScene`:**
+    `WellbeingPanel` + `InventoryWidget` (imports, fields, construction, the `inv`/`playerHp`/`playerMaxHp`
+    state, `refreshInventory`/`updateHealthBar`/`updateHungerBar`/`seedMaxHp`/`onPlayerHp`/`onHungerChanged`
+    - their `player:hpChanged`/`hunger:changed` subs, and `setHotbarVisible`); the `.ts` files stay on disk
+    for the Step 13 sweep (matches Steps 9–10). The Phaser build palette was already gone (Step 10). Only
+    remaining UIScene widgets: Inspect/Dev/NPC-assign (Step 12). **Verification:** `npm run typecheck`
+    (0 errors, TS 5.9.3 — note: this container booted with node_modules unpopulated + a stray global tsc
+    6.0.2 that emitted a spurious `baseUrl` TS5101; a clean `npm ci` fixed it, no tsconfig change needed),
+    `npm run lint` (0 errors; ~100 pre-existing test/e2e `any` warnings), `npm run build`, and
+    `SMOKE_CHROMIUM_PATH=… npm run smoke` all green; `npm test` 939 passing (+7 new: 2 bridge playerStats,
+    5 hotbarStorage). Targeted e2e green UNCHANGED (event-driven, not Phaser-HUD queries): build (3),
+    block-full, survival-forage, survival-hunger (5) = 10 passed. A one-off headless DOM check confirmed
+    Status/Pack/Build drawers open, Build tabs = Defense/Survival (no Craft), long-press pins "Wall" onto
+    the hotbar, it persists to `mostowo-hud:hotbar:the-moon` and survives a reload, 0 console errors.
   - Wire `BuildCatalog`, `PackDrawer`, `StatusDrawer` as bottom sheets opened from the
     command bar. Implement pin-to-hotbar (store loadout mutation + `localStorage` persistence,
     keyed per save). Make inventory slots interactive (select + eat via `needs:eat`; build

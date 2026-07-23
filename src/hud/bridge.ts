@@ -1,6 +1,6 @@
 import { useHudStore } from './store';
 import type { HudMode } from './store';
-import type { InspectableStats } from '@/data/types';
+import type { CombatantStats, InspectableStats } from '@/data/types';
 import type { NpcDayRole, NpcNightPosture } from '@/entities/NpcCharacter';
 
 /**
@@ -172,19 +172,31 @@ export function initBridge(bus: EventBus, registry: Registry): Bridge {
   };
   bindInventory((registry.get('inventory') as InventoryLike | undefined) ?? null);
 
+  // --- Registry `playerStats`: static per run, re-set on restart --------------
+  // GameScene sets the player's combat stat bag on the registry (GameScene.ts ~473); the Status drawer
+  // renders it. It's plain data (not an emitter) that changes only across a restart, so we read it once
+  // at init and follow the same setdata/changedata-<key> registry signals as the inventory.
+  const syncPlayerStats = (value: unknown): void =>
+    store.setPlayerStats((value as CombatantStats | undefined) ?? null);
+  syncPlayerStats(registry.get('playerStats'));
+
   // `setdata` fires on the first-ever set of a key; `changedata-<key>` on every later set (restart).
   const onSetData = (_parent: unknown, key: string, value: unknown): void => {
     if (key === 'inventory') bindInventory((value as InventoryLike | null) ?? null);
+    else if (key === 'playerStats') syncPlayerStats(value);
   };
   const onInventoryData = (_parent: unknown, value: unknown): void =>
     bindInventory((value as InventoryLike | null) ?? null);
+  const onPlayerStatsData = (_parent: unknown, value: unknown): void => syncPlayerStats(value);
   registry.events.on('setdata', onSetData);
   registry.events.on('changedata-inventory', onInventoryData);
+  registry.events.on('changedata-playerStats', onPlayerStatsData);
   unsubs.push(() => {
     if (boundInv) boundInv.off('change', onInvChange);
     boundInv = null;
     registry.events.off('setdata', onSetData);
     registry.events.off('changedata-inventory', onInventoryData);
+    registry.events.off('changedata-playerStats', onPlayerStatsData);
   });
 
   let disposed = false;

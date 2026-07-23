@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { PLAYER_MAX_HP, HUNGER_MAX } from '@/config';
 import { BUILDABLES } from '@/data/buildables';
-import type { InspectableStats } from '@/data/types';
+import type { CombatantStats, InspectableStats } from '@/data/types';
 
 /**
  * The DOM/React HUD's single source of truth (plan 046 Step 3). A Zustand store that mirrors the
@@ -74,6 +74,10 @@ export interface HudState {
   demolishMode: boolean;
   combatActive: boolean;
   inspectTarget: InspectableStats | null;
+  /** The player's combat stat bag (armour/speed/strength/…), surfaced by GameScene on the registry
+   *  (`playerStats`). Static per run; `null` until the bridge reads it. Feeds the Status drawer's stat
+   *  rows (plan 046 Step 11 — the DOM replacement for the legacy WellbeingPanel stats). */
+  playerStats: CombatantStats | null;
   /** Aggregate item counts by id (the `Inventory.snapshot()` shape). */
   inventory: Record<string, number>;
   hotbar: HotbarSlot[];
@@ -100,11 +104,13 @@ export interface HudActions {
   setDemolishMode(on: boolean): void;
   setCombatActive(on: boolean): void;
   setInspect(target: InspectableStats | null): void;
+  setPlayerStats(stats: CombatantStats | null): void;
   setInventory(inventory: Record<string, number>): void;
   setHotbar(hotbar: HotbarSlot[]): void;
   /** Pin an item/buildable into the loadout — used by the long-press "pin" affordance on catalog/pack
-   *  entries (plan 046). In-memory only for now: fills the first empty slot, no-op if already pinned or
-   *  the bar is full. `localStorage` persistence + per-save keying land at Step 11. */
+   *  entries (plan 046). Fills the first empty slot, no-op if already pinned or the bar is full. The
+   *  store holds the loadout in memory; `localStorage` persistence (keyed per save) is a side-effect
+   *  subscription wired in `useBridge` (Step 11), so any `setHotbar`/`pinToHotbar` change is saved. */
   pinToHotbar(entry: NonNullable<HotbarSlot>): void;
   setFollowing(on: boolean): void;
   setZoom(zoom: number): void;
@@ -131,6 +137,7 @@ const initialState: HudState = {
   demolishMode: false,
   combatActive: false,
   inspectTarget: null,
+  playerStats: null,
   inventory: {},
   hotbar: new Array<HotbarSlot>(HOTBAR_SLOTS).fill(null),
   following: true,
@@ -160,6 +167,7 @@ export const useHudStore = create<HudState & HudActions>()(
     setDemolishMode: (demolishMode) => set({ demolishMode }),
     setCombatActive: (combatActive) => set({ combatActive }),
     setInspect: (inspectTarget) => set({ inspectTarget }),
+    setPlayerStats: (playerStats) => set({ playerStats }),
     setInventory: (inventory) => set({ inventory }),
     setHotbar: (hotbar) => set({ hotbar }),
     pinToHotbar: (entry) =>

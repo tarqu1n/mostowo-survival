@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   BASE_WIDTH,
   BASE_HEIGHT,
@@ -19,6 +19,9 @@ import { ResourceChips } from './components/ResourceChips';
 import { Hotbar } from './components/Hotbar';
 import { CommandBar } from './components/CommandBar';
 import type { CommandBarMode } from './components/CommandBar';
+import { BuildCatalog } from './components/BuildCatalog';
+import { PackDrawer } from './components/PackDrawer';
+import { StatusDrawer } from './components/StatusDrawer';
 
 /** `0xRRGGBB` (config colour) → a CSS hex string. The vignette configs are shared with the (now
  *  retired) Phaser bake, which stored them as numbers. */
@@ -90,11 +93,17 @@ export function GameHud() {
  * store — build mode wins, then the combat auto-surface / manual combat mode, else scavenge (mirrors
  * the old `UIScene` precedence). The movepad's held-state is pushed to the registry `movepadHeld` flag
  * via the bridge so `PointerInputController` suppresses world pan/tap while the pad is dragged.
+ *
+ * The scavenge morph's Build/Pack/Status buttons open the Tier-2 bottom-sheet drawers (Step 11); only
+ * one is open at a time, tracked here. Build additionally toggles build mode (handled in CommandBar).
  */
+type OpenDrawer = 'build' | 'pack' | 'status' | null;
+
 function ActionLayer() {
   const gameMode = useHudStore((s) => s.mode);
   const buildMode = useHudStore((s) => s.buildMode);
   const combatActive = useHudStore((s) => s.combatActive);
+  const [openDrawer, setOpenDrawer] = useState<OpenDrawer>(null);
 
   const barMode: CommandBarMode = buildMode
     ? 'build'
@@ -102,12 +111,24 @@ function ActionLayer() {
       ? 'fight'
       : 'scavenge';
 
+  const toggle = (which: NonNullable<OpenDrawer>) => (open: boolean) =>
+    setOpenDrawer(open ? which : null);
+
   return (
     <div className="absolute inset-x-0 bottom-0 flex flex-col items-stretch gap-1.5 px-2 pb-2">
       <div className="flex justify-center">
         <Hotbar />
       </div>
-      <CommandBar mode={barMode} onMoveHeldChange={(held) => hudBridge()?.setMovepadHeld(held)} />
+      <CommandBar
+        mode={barMode}
+        onBuild={() => setOpenDrawer('build')}
+        onPack={() => setOpenDrawer('pack')}
+        onStatus={() => setOpenDrawer('status')}
+        onMoveHeldChange={(held) => hudBridge()?.setMovepadHeld(held)}
+      />
+      <BuildCatalog open={openDrawer === 'build'} onOpenChange={toggle('build')} />
+      <PackDrawer open={openDrawer === 'pack'} onOpenChange={toggle('pack')} />
+      <StatusDrawer open={openDrawer === 'status'} onOpenChange={toggle('status')} />
     </div>
   );
 }

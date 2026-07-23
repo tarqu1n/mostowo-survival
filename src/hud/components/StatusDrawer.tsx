@@ -11,11 +11,9 @@ import { Button } from '@/hud/ui/button';
  * legacy Phaser `WellbeingPanel`: renders the survival meters and the tap-to-eat edible list
  * (→ `needs:eat`, guarded to stock > 0), matching its behaviour.
  *
- * NOTE ON STATS: the plan's Step 7 line reads "meters + stats from `playerStats` + eat list", but the
- * HUD store does NOT expose `playerStats` (armour/speed/strength/… — the legacy panel read these off
- * the Phaser `registry`). This component renders ONLY store-backed data. It deliberately does not read
- * the registry or add a store field for the stat rows.
- * TODO(Step 11/integration): wire the playerStats stat rows once the store exposes them.
+ * STATS: the store's `playerStats` (armour/speed/strength/… — the player's combat stat bag, surfaced by
+ * GameScene on the registry and mirrored into the store by the bridge at Step 11) drives the stat rows,
+ * matching the legacy WellbeingPanel; rows are hidden until it resolves.
  *
  * Presentational only: reads the store, emits `needs:eat` via the bridge.
  */
@@ -64,9 +62,23 @@ export function StatusDrawer({ open, onOpenChange }: StatusDrawerProps): React.J
   const fire = useHudStore((s) => s.fire);
   const supply = useHudStore((s) => s.supply);
   const inventory = useHudStore((s) => s.inventory);
+  const playerStats = useHudStore((s) => s.playerStats);
 
   // Edible items are data-driven off ITEMS[id].nutrition (present ⇒ edible — see ItemDef).
   const edibles = Object.values(ITEMS).filter((it) => it.nutrition != null);
+
+  // Player stat rows (mirrors the legacy WellbeingPanel). `vision` is optional on the stat bag.
+  const statRows: { label: string; value: number | string }[] = playerStats
+    ? [
+        { label: 'Max HP', value: playerStats.maxHp },
+        { label: 'Armour', value: playerStats.armour },
+        { label: 'Speed', value: playerStats.speed },
+        { label: 'Vision', value: playerStats.vision ?? '—' },
+        { label: 'Strength', value: playerStats.strength },
+        { label: 'Dex', value: playerStats.dex },
+        { label: 'Dodge', value: playerStats.dodge },
+      ]
+    : [];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -100,7 +112,21 @@ export function StatusDrawer({ open, onOpenChange }: StatusDrawerProps): React.J
             </div>
           </div>
 
-          {/* TODO(Step 11/integration): stat rows (armour/speed/strength/…) once the store exposes playerStats. */}
+          {statRows.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                Stats
+              </p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                {statRows.map((row) => (
+                  <div key={row.label} className="flex justify-between">
+                    <span className="text-muted-foreground">{row.label}</span>
+                    <span className="font-medium text-foreground">{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col gap-2">
             <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">

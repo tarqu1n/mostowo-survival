@@ -1,6 +1,9 @@
 import { useEffect } from 'react';
+import { START_MAP_ID } from '@/config';
 import { initBridge } from '../bridge';
 import type { Bridge, EventBus, Registry } from '../bridge';
+import { useHudStore } from '../store';
+import { loadHotbar, saveHotbar } from '../hotbarStorage';
 
 /**
  * The live event bridge (plan 046 Step 3), or `null` before the HUD mounts / after it unmounts.
@@ -33,7 +36,20 @@ export function useBridge(): void {
     }
     const bridge = initBridge(game.events, game.registry);
     active = bridge;
+
+    // Hydrate the pinned hotbar loadout from localStorage (keyed per save — see hotbarStorage), then
+    // persist every subsequent change. Hydrate BEFORE subscribing so the initial load doesn't echo a
+    // redundant write. The store persists across a scene restart, so this only re-runs on a real
+    // (re)mount / page reload.
+    const persisted = loadHotbar(START_MAP_ID);
+    if (persisted) useHudStore.getState().setHotbar(persisted);
+    const unsubHotbar = useHudStore.subscribe(
+      (st) => st.hotbar,
+      (hotbar) => saveHotbar(START_MAP_ID, hotbar),
+    );
+
     return () => {
+      unsubHotbar();
       bridge.dispose();
       if (active === bridge) active = null;
     };

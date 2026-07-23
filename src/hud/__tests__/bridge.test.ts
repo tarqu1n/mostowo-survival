@@ -128,6 +128,23 @@ describe('outbound event → store mapping', () => {
   });
 });
 
+describe('playerStats registry binding', () => {
+  it('reads playerStats already on the registry at init', () => {
+    const stats = { maxHp: 20, armour: 2, speed: 60, strength: 3, dex: 1, dodge: 5 };
+    registry.set('playerStats', stats);
+    init();
+    expect(s().playerStats).toEqual(stats);
+  });
+
+  it('re-reads playerStats when the registry re-sets it (restart)', () => {
+    registry.set('playerStats', { maxHp: 20, armour: 2, speed: 60, strength: 3, dex: 1, dodge: 5 });
+    init();
+    const next = { maxHp: 25, armour: 4, speed: 55, strength: 5, dex: 2, dodge: 8 };
+    registry.set('playerStats', next);
+    expect(s().playerStats).toEqual(next);
+  });
+});
+
 describe('inventory registry binding', () => {
   it('snapshots an inventory already on the registry at init', () => {
     registry.set('inventory', new MockInventory({ wood: 4 }));
