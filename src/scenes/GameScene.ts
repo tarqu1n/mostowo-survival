@@ -948,6 +948,8 @@ export class GameScene extends Phaser.Scene {
       walls: () => testApi.walls(),
       damageWall: (i, amount) => testApi.damageWall(i, amount),
       enemyHps: () => testApi.enemyHps(),
+      nodes: () => testApi.nodes(),
+      setNodeProgress: (id, ms) => testApi.setNodeProgress(id, ms),
       // Enqueue the real deconstruct worker order for the wall at `index` (the order the demolish-mode
       // tap enqueues) — drives the full walk-adjacent → remove + refund path under step() (plan 037 2b).
       deconstructWall: (i) => {

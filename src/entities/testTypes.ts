@@ -35,6 +35,10 @@ export interface ScenarioSpec {
   trees?: Array<[number, number]>;
   rocks?: Array<[number, number]>;
   bushes?: Array<[number, number]>;
+  /** Wrecked tents (`salvagedTent`) — the `oneShot` two-stage salvage→clear node (plan 047). Placed
+   *  live/full; a spec salvages one (a timed `harvest`) to leave a permanent ruined husk, then clears
+   *  the husk (a timed `clear`) to remove it. Ids returned as `tentIds`. See __test.applyScenario. */
+  tents?: Array<[number, number]>;
   enemies?: Array<
     | [number, number]
     | {
@@ -82,6 +86,7 @@ export interface ScenarioResult {
   treeIds: string[];
   rockIds: string[];
   bushIds: string[];
+  tentIds: string[];
   enemyIds: string[];
   siteIds: string[];
   campfireIds: string[];
@@ -117,6 +122,16 @@ export interface GameTestApi {
   /** DEV/test-only: live enemies' current HP, spec order (plan 037 2c) — lets the enemy-attack spec
    *  watch a mob's HP fall to a spiked wall's thorns. NOT part of DebugState (no golden bump). */
   enemyHps(): number[];
+  /** DEV/test-only: the live resource nodes (id/col/row/alive/oneShot), placement order (plan 047) — a
+   *  standalone read seam (like {@link walls}) for the salvage-lifecycle spec to assert a salvaged
+   *  `oneShot` ruin stays present-but-dead (no regrow) and is then gone after `clear`. NOT part of
+   *  DebugState, so the refactor-tripwire golden stays untouched. */
+  nodes(): { id: string; col: number; row: number; alive: boolean; oneShot: boolean }[];
+  /** DEV/test-only: seed a node's persistent timed-action accumulator (`progressMs`, plan 047) so a
+   *  salvage/clear crosses its threshold in a few driven frames instead of the real 20s/40s — the same
+   *  reason `campfireFuel` is seeded rather than burnt down in real time. Also exercises resume: a timed
+   *  action picks up from the seeded progress. Returns false if there's no node with that id. */
+  setNodeProgress(id: string, ms: number): boolean;
   /** DEV/test-only: enqueue the real `deconstruct` worker order for the wall at `index` (the order the
    *  demolish-mode tap enqueues) — drives the walk-adjacent → remove + partial-refund path under step()
    *  (plan 037 2b). Returns false if there's no wall at that index. */

@@ -250,6 +250,25 @@ export function enemyHps(page: Page): Promise<number[]> {
   return page.evaluate(() => (window as any).game.__test.enemyHps());
 }
 
+/** The live resource nodes (id/col/row/alive/oneShot), placement order (plan 047) — lets the
+ *  salvage-lifecycle spec assert a salvaged oneShot ruin stays present-but-dead (no regrow) then is
+ *  gone after clear. NOT part of DebugState. */
+export function nodes(
+  page: Page,
+): Promise<Array<{ id: string; col: number; row: number; alive: boolean; oneShot: boolean }>> {
+  return page.evaluate(() => (window as any).game.__test.nodes());
+}
+
+/** Seed a node's persistent timed-action accumulator (`progressMs`, plan 047) so a salvage/clear
+ *  crosses its threshold in a few driven frames instead of the real 20s/40s — mirrors `campfireFuel`
+ *  seeding. Also exercises resume-from-persisted-progress. Returns false if no node has that id. */
+export function setNodeProgress(page: Page, id: string, ms: number): Promise<boolean> {
+  return page.evaluate(({ id, ms }) => (window as any).game.__test.setNodeProgress(id, ms), {
+    id,
+    ms,
+  });
+}
+
 /** Start a night wave immediately (plan 038 Step 3), independent of the day→night clock edge. */
 export function beginWave(page: Page): Promise<void> {
   return page.evaluate(() => (window as any).game.__test.beginWave());

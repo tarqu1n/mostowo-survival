@@ -16,6 +16,12 @@ Shards: [rendering](decisions/rendering.md) · [architecture](decisions/architec
 
 ---
 
+## 2026-07-23 — [DECIDED] Salvage node lifecycle (plan 047): oneShot no-regrow node, generic `clear` order, timed actions with node-persistent progress, shake-as-looping-tween
+
+The wrecked-tent becomes a two-stage **salvage → clear** lifecycle: a `oneShot` node (never regrows, ruin keeps blocking its tile) salvaged by a timed ~20s `harvest`, then a generic `clear` order (~40s) rolls `clearLoot` and removes it to free the tile. Progress persists on the node across cancel; shake is a `repeat:-1` tween + an HP-bar-style progress bar; both actions reuse the `gather` anim stand-in. Player-only.
+
+→ [gameplay.md](decisions/gameplay.md#2026-07-23--decided-salvage-node-lifecycle-plan-047-oneshot-no-regrow-node-generic-clear-order-timed-actions-with-node-persistent-progress-shake-as-looping-tween)
+
 ## 2026-07-22 — [DECIDED] UI overhaul: DOM/React HUD overlay, "Field Kit" direction (plan 046)
 
 Retire the hand-placed Phaser HUD for a DOM/React overlay over the canvas (event bridge ⇄ Zustand store; reuse the editor's React+Tailwind+shadcn stack, Tailwind now scoped onto the game page). Direction: **Field Kit** (morphing command bar + 6-slot manual-pin hotbar + tabbed catalogs). Full migration, portrait-first, spells deferred. Supersedes the Twin Grip lean recorded in `docs/ui-overhaul/`. **Landed 2026-07-23** — `UIScene`/`src/scenes/hud/*`/`src/ui/*` deleted, taps gated by DOM `pointer-events` (no more `hudHitTest`); deviations: no Craft tab yet, `INVENTORY_SLOTS` kept.

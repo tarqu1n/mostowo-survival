@@ -353,6 +353,39 @@ closes ROADMAP Step 5 — the **MVP path is complete**.
 Tuning: `CHOP_RECOIL_PX`/`CHOP_RECOIL_MS`/`CHOP_RECOIL_SQUASH`/`CHOP_TREMBLE_PX`/`CHOP_TREMBLE_DEG`/
 `TREE_FELL_MS`/`TREE_FELL_ARC_DEG`/`TREE_FELL_FADE_MS`/`ROCK_CRUMBLE_MS`/`BUSH_RUSTLE_MS` in `config.ts`.
 
+## Salvage node lifecycle (plan 047)
+
+The wrecked-tent node (`salvagedTent`) is a **two-stage, player-only lifecycle** on top of the salvage
+loot table (plan 008 above): a `oneShot` no-regrow node that is **salvaged**, then optionally
+**cleared**.
+
+- **Schema:** `ResourceNodeDef` gains `oneShot?: boolean` (never regrows) and `clearLoot?: LootTable`
+  (rolled when the ruin is cleared); both parsed/validated in `systems/nodeDefs.ts`. Generic — only
+  `salvagedTent` uses them in shipped data.
+- **SALVAGE** — a **timed** `harvest` (~20s, `SALVAGE_MS`), modelled on `build`'s progress-accumulator:
+  `runHarvest` accumulates `TreeNode.progressMs` for `oneShot`+`loot` nodes and fells **once** at the
+  threshold (rolls `loot`). Leaves a **permanent ruined husk** — `ResourceNodeManager` guards the
+  regrow `delayedCall` on `!oneShot`, and `hasBlockingNode` keeps a dead one-shot ruin **blocking its
+  tile** (reversing the usual "dead node frees its tile"). The ruin stays tappable/inspectable.
+- **CLEAR** — a new **generic `clear` order kind** (valid on any depleted `oneShot` ruin) — a longer
+  timed action (~40s, `CLEAR_MS`, `beginClear`/`runClear`): rolls the optional `clearLoot` scrap,
+  `removeNode`s the node (destroy + free tile + repath, mirrors wall `deconstruct`), and frees the tile
+  for building/pathing.
+- **Persistent progress:** `progressMs` lives **on the node** and survives cancel/re-queue (re-issuing
+  resumes); it resets only on stage completion (salvage→ruin resets it for the clear stage).
+- **Feedback:** both actions drive a **continuous shake** (a `repeat:-1` NodeFxManager tween, not a
+  frame-loop shader) + a **world-space progress bar** (mirrors the enemy HP-bar renderer). A queued
+  `clear` glows its ruin like a queued `harvest` glows a live node (`TaskGlowRenderer`). Teardown is a
+  blanket `stopAllShakes`+`hideAllActionProgress` at the top of `beginCurrent` (the one chokepoint for
+  both cancel and order-switch — the fx are looping/floating, so `completeCurrent` alone can't be
+  trusted to clean up on a toggle-cancel).
+- **Player anim:** both salvage and clear reuse the `gather` motion stand-in (`harvestAnimMotion`); no
+  new player strip.
+
+Tuning: `SALVAGE_MS`/`CLEAR_MS` + `NODE_SHAKE_PX`/`_DEG`/`_HZ` + `NODE_PROGRESS_BAR_W`/`_H`/`_Y_OFFSET`
+in `config.ts`. E2e: `tests/e2e/salvage-lifecycle.spec.ts` (drives the full lifecycle; seeds
+`progressMs` to cross the timed thresholds cheaply).
+
 ## Rendering (art, glow, crisp actors)
 
 - **Active art is Pixel Crawler** (plan 005): `ACTIVE_TILESET` in `src/data/tileset.ts`; the Zombie

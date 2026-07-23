@@ -323,6 +323,14 @@ export class TestApi {
       bushIds.push(this.deps.trees()[this.deps.trees().length - 1].id);
     }
 
+    // Wrecked tents (plan 047) — the `oneShot` salvage→clear node. Placed live/full via the same
+    // addNode path as the other species; a spec salvages one to leave a permanent ruin, then clears it.
+    const tentIds: string[] = [];
+    for (const [c, r] of spec.tents ?? []) {
+      this.deps.addNode(NODES.salvagedTent, c, r);
+      tentIds.push(this.deps.trees()[this.deps.trees().length - 1].id);
+    }
+
     // Pass the buildable id EXPLICITLY (never rely on the default selectedBuildableId, which a prior
     // tryPlace may have moved — belt-and-suspenders alongside BuildManager.reset()'s reset to 'wall').
     for (const [c, r] of spec.walls ?? [])
@@ -417,7 +425,7 @@ export class TestApi {
 
     this.deps.updateVision();
     this.deps.emitTasks();
-    return { treeIds, rockIds, bushIds, enemyIds, siteIds, campfireIds, trapIds };
+    return { treeIds, rockIds, bushIds, tentIds, enemyIds, siteIds, campfireIds, trapIds };
   }
 
   /**
@@ -508,6 +516,30 @@ export class TestApi {
       .enemies()
       .filter((z) => z.alive)
       .map((z) => z.hp);
+  }
+
+  /** DEV/test-only: the live resource nodes (id/col/row/alive/oneShot), placement order — a standalone
+   *  read seam (like {@link walls}) for the salvage-lifecycle spec (plan 047). Lets it assert a salvaged
+   *  `oneShot` tent stays present-but-dead (a ruin, no regrow) and is then absent after `clear` removes
+   *  it. NOT part of the serialized {@link DebugState}, so the refactor-tripwire golden stays untouched. */
+  nodes(): { id: string; col: number; row: number; alive: boolean; oneShot: boolean }[] {
+    return this.deps.trees().map((t) => ({
+      id: t.id,
+      col: t.col,
+      row: t.row,
+      alive: t.alive,
+      oneShot: t.def.oneShot ?? false,
+    }));
+  }
+
+  /** DEV/test-only: seed a node's persistent `progressMs` accumulator (plan 047) so a salvage/clear
+   *  crosses its threshold in a few driven frames rather than the real 20s/40s (mirrors `campfireFuel`
+   *  seeding). Also exercises resume-from-persisted-progress. Returns false if no node has that id. */
+  setNodeProgress(id: string, ms: number): boolean {
+    const t = this.deps.treeById(id);
+    if (!t) return false;
+    t.progressMs = ms;
+    return true;
   }
 
   /** DEV/test-only: start a night wave immediately (plan 038 Step 3) — the deterministic entry point

@@ -282,17 +282,27 @@ for items from a predefined set instead of a single fixed yield.
   > [MOBILE-EDITOR-ACCESS.md](MOBILE-EDITOR-ACCESS.md#claude-getting-a-shell-on-guppi--working-on-the-build-there).
   > Keep the key in-memory only; never commit/echo it.
 - **Node def:** `salvagedTent` in `src/data/maps/nodes.json` — `maxHp:1`, `blocksPath:true`,
-  `harvestAnim:'salvage'`, the 17 skins above (each with a `_searched` depleted swap), regrows like a
-  rock (10 min) **for now** (the one-time-harvest + "clear the area" mechanic is the next step). Six
-  instances (all 3 orientations) placed near the camp in `the-moon.map.json`.
-- **Loot mechanic (the actually-new bit):** a node def may carry a `loot` table
-  (`ResourceNodeDef.loot`, validated by `parseLootTable` in `systems/nodeDefs.ts`) — `rolls` weighted
-  draws from a `drops` set, each a `[min,max]` quantity. When present, `ResourceNodeManager.chop`
-  rolls it (pure `rollLoot`, `src/systems/loot.ts`) through the same yield sink instead of the fixed
-  `yieldItemId`. The tent's set: cloth / wood / berries / cannedFood.
-- **`'salvage'` has no bespoke player strip yet** — `harvestAnimMotion` (`systems/nodeDefs.ts`) maps it
-  to the `gather` (forage/rummage) motion for the swing + depletion fx, the reskin-stand-in pattern
-  chop/mine/punch already use. Swap in a real salvage strip by editing that one mapper.
+  `harvestAnim:'salvage'`, `oneShot:true` (no regrow — see the lifecycle below), the 17 skins above
+  (each with a ruined depleted swap). Six instances (all 3 orientations) placed near the camp in
+  `the-moon.map.json`.
+- **Two-stage lifecycle (plan 047):** salvage is now a *timed* action, not the old single hit.
+  **SALVAGE** (a ~20s `harvest`, `SALVAGE_MS`) rolls the `loot` table once and leaves a **permanent
+  ruined husk** that still blocks its tile — a `oneShot` node never regrows (`ResourceNodeManager`
+  guards the regrow `delayedCall` on `!oneShot`, and `hasBlockingNode` keeps a dead one-shot ruin
+  blocking). The husk stays tappable to **CLEAR** it (a ~40s generic `clear` order, `CLEAR_MS`) — rolls
+  the optional `clearLoot` scrap, removes the node, and frees the tile for building/pathing. Both
+  actions shake the node + float a progress bar (`NodeFxManager`), and progress (`TreeNode.progressMs`)
+  **persists across cancel/re-queue** so re-issuing resumes where it left off.
+- **Loot mechanic:** a node def may carry a `loot` table (`ResourceNodeDef.loot`, validated by
+  `parseLootTable` in `systems/nodeDefs.ts`) — `rolls` weighted draws from a `drops` set, each a
+  `[min,max]` quantity. When present, `ResourceNodeManager.chop` rolls it (pure `rollLoot`,
+  `src/systems/loot.ts`) through the same yield sink instead of the fixed `yieldItemId`; the salvage
+  set is cloth / wood / berries / cannedFood. **`clearLoot`** is the same table shape, rolled by
+  `GameScene.runClear` when the husk is cleared (the tent's is a small cloth/wood payout); a one-shot
+  node with no `clearLoot` clears silently.
+- **Neither `'salvage'` nor `clear` has a bespoke player strip** — both map to the `gather`
+  (forage/rummage/dismantle) motion via `harvestAnimMotion` (`systems/nodeDefs.ts`), the reskin-stand-in
+  pattern chop/mine/punch already use. Swap in a real strip by editing that one mapper.
 
 > **Sourcing / generating new art?** The tileset candidates weighed up, the AI-gen service trials
 > (Retro Diffusion / PixelLab), the Gemini bespoke-asset pipeline, and **`style_match.py`** (snaps

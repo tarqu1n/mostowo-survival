@@ -6,6 +6,39 @@ Part of the [decision log index](../DECISIONS.md). Newest first.
 
 ---
 
+## 2026-07-23 — [DECIDED] Salvage node lifecycle (plan 047): oneShot no-regrow node, generic `clear` order, timed actions with node-persistent progress, shake-as-looping-tween
+
+The wrecked-tent (`salvagedTent`) became a two-stage **salvage → clear** lifecycle (plan 047, post-MVP
+scavenge content reinforcing the base-building + survival pillars — "clear the wrecks to reclaim
+buildable ground"). Full detail in [plan 047](../../plans/047-salvage-node-lifecycle.md); the settled
+calls:
+
+- **`oneShot` no-regrow node, ruin keeps blocking.** A new optional `ResourceNodeDef.oneShot` flag makes
+  a node **never regrow** (the regrow `delayedCall` is guarded on `!oneShot`), and a dead one-shot ruin
+  **keeps occupying/blocking its tile** (`hasBlockingNode` now counts `alive || oneShot`) — reversing the
+  usual "a depleted node frees its tile". Chosen so "clear the area to build" is a meaningful, present
+  obstacle rather than a vanished stump. Generic, but only the tent uses it in shipped data.
+- **Salvage is a *timed* action, not a single hit.** ~20s (`SALVAGE_MS`), modelled on the `build`
+  progress-accumulator (`runHarvest` sums `progressMs` for `oneShot`+`loot` nodes, fells once at the
+  threshold). Rolls the existing `loot` table once and leaves the ruin.
+- **Generic `clear` order kind, player-only.** A new `clear` Action-kind valid on *any* depleted
+  `oneShot` ruin (not tent-specific), ~40s (`CLEAR_MS`, `beginClear`/`runClear` mirroring
+  `build`+`deconstruct`): rolls an optional per-def `clearLoot` scrap table (reuses `systems/loot.ts`;
+  no `clearLoot` ⇒ clears silently), then `removeNode`s the node and frees the tile. **No NPC-companion
+  wiring** (player-only for now).
+- **Progress persists on the node across cancel.** The accumulator lives on `TreeNode.progressMs` and is
+  **not** reset by `beginCurrent`, so cancelling/re-queuing a salvage or clear **resumes** where it left
+  off (reset only on stage completion). The critique flagged this as the costliest/lowest-value element
+  and suggested a per-order reset like `chopElapsed`; **owner confirmed keeping the persistent behaviour.**
+- **In-progress feedback: shake-as-looping-tween + an HP-bar-style progress bar.** The continuous node
+  shake is a `repeat:-1` NodeFxManager tween (constant-amplitude jitter), **not** a frame-loop shader;
+  the progress bar mirrors the enemy HP-bar renderer (a pooled `{bg,fg}` pair above the node). Critical
+  teardown call: a toggle-cancel routes through `beginCurrent`, **not** `completeCurrent`, so a **single
+  blanket `stopAllShakes`+`hideAllActionProgress` at the top of `beginCurrent`** is the guaranteed
+  cleanup chokepoint (relying on the runner alone would leak an infinite tween + a floating bar).
+- **No bespoke player anim.** Both `salvage` and `clear` reuse the `gather` (forage/rummage/dismantle)
+  motion via `harvestAnimMotion`, the reskin-stand-in pattern chop/mine/punch already use.
+
 ## 2026-07-21 — [DECIDED] NPC companion (plan 042): separate baseSupply, repair-consumes-supply, mobs-aggro-NPC downed then auto-revive-at-dawn, Rogue sprite, dev-spawn-only, full scope
 
 The MVP NPC (plan 042, ROADMAP Step 5) settled several calls; full detail in
