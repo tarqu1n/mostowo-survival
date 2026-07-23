@@ -252,26 +252,29 @@ wall/gate/trap render steps read paths + frames from.
   — `Lightning`, `Barrel` (+`Boom`), and `Barricades/Archer` (turret + its `Arrow` projectile). Not
   wired by plan 037; only the spike trap ships now.
 
-### Savage action — destroyed tents (placeholder art + loot table)
+### Savage action — destroyed tents (Gemini art + loot table)
 
-Three **wrecked-tent** node skins (roughly a 6-person tent, ~3×2 tiles) for the **savage** action —
-scavenging a collapsed tent for items from a predefined set instead of a single fixed yield.
+**Wrecked-tent** node skins (a ~6-person tent) for the **savage** action — scavenging a collapsed tent
+for items from a predefined set instead of a single fixed yield.
 
 - **Art is Gemini-generated** (`scripts/gen-tents.py`), image-to-image, since no pack ships tent art.
-  **9 skins = 3 orientations × 3 realistic weathered colours** (cream / light-blue / green / grey — the
-  game is TOP-DOWN so all use the pack's high top-down oblique angle):
-  `tent_wreck_{1,2,3}` (diagonal), `tent_front_{1,2,3}` (front / entrance-to-camera),
-  `tent_side_{1,2,3}` (broadside / ridge horizontal), each `+ _searched` (the depleted/ransacked swap,
-  derived from the live art by desaturate+darken). Model: **`gemini-3-pro-image` ("Nano Banana Pro")**
-  by default (`--model` overrides; `gemini-3.1-flash-image` / `gemini-2.5-flash-image` also work —
-  Imagen 4 is text-only so it can't take our references). The technique (docs/AI-SPRITE-PIPELINE.md —
-  a real reference holds orientation + style on-model): **diagonal + front** use an isolated pack
-  **roof chevron** from pixel-crawler `Buildings/Roofs.png`; **side** uses a real pack **broadside
-  roof** (the back building's horizontal-ridge roof in fantasy-tileset `House_Hay_2.png`) — that one
-  fought the hardest, because the chevron reads front/diagonal and the model's tent prior is diagonal,
-  so text + a hand-drawn silhouette weren't enough; a genuine broadside roof reference was. Regenerate:
-  export `GEMINI_API_KEY` (guppi, over Tailscale — see below), `python3 scripts/gen-tents.py`
-  (`--model` / `--dry-run` / `--reprocess` / `--only ID`), then `npm run assets:catalog`. The two salvage **item icons** (`icons/cloth.png`,
+  **17 skins across 3 orientations** in realistic weathered colours (cream / light-blue / green / grey /
+  khaki — the game is TOP-DOWN, so all use the pack's high top-down oblique angle):
+  `tent_wreck_{1..7}` (diagonal, 3/4), `tent_front_{1..6}` (front / entrance-to-camera),
+  `tent_side_{1..4}` (broadside / ridge horizontal), each `+ _searched` (interim depleted swap, derived
+  from the live art by desaturate+darken — a proper ruined "harvested" sprite per tent is the next
+  step). Model: **`gemini-3-pro-image` ("Nano Banana Pro")** by default (`--model` overrides;
+  `gemini-3.1-flash-image` / `gemini-2.5-flash-image` also work — Imagen 4 is text-only so it can't
+  take our references). Full reusable playbook (references, the top-down/side gotcha, palette + outline
+  processing): **[AI-SPRITE-PIPELINE.md](AI-SPRITE-PIPELINE.md) → "Static world-prop sprites"**. In
+  short: **diagonal + front** anchor on an isolated pack **roof chevron** (pixel-crawler
+  `Buildings/Roofs.png`); **side** anchors on a real pack **broadside roof** (the back building's
+  horizontal-ridge roof in fantasy-tileset `House_Hay_2.png`) — the one that fought hardest, since the
+  chevron and the model's tent prior both pull to diagonal. Post-process = **10-colour median-cut
+  flatten and a crisp dark silhouette outline** (matches the pack's ~7–11-colour flat props); side tents bake a
+  bit wider (`SIDE_W` 80px) since they render low. Regenerate: export `GEMINI_API_KEY` (guppi, over
+  Tailscale — see below), `python3 scripts/gen-tents.py` (`--model` / `--dry-run` / `--reprocess` /
+  `--only ID`), then `npm run assets:catalog`. The two salvage **item icons** (`icons/cloth.png`,
   `icons/canned_food.png`) are still the hand-baked placeholders from `scripts/tent-art.mjs`.
   > **Getting the Gemini key from a cloud session:** guppi is Matt's **non-prod home server** and the
   > key lives in `guppi/house-helper/.env`, reachable over Tailscale with the session's own
@@ -279,8 +282,9 @@ scavenging a collapsed tent for items from a predefined set instead of a single 
   > [MOBILE-EDITOR-ACCESS.md](MOBILE-EDITOR-ACCESS.md#claude-getting-a-shell-on-guppi--working-on-the-build-there).
   > Keep the key in-memory only; never commit/echo it.
 - **Node def:** `savagedTent` in `src/data/maps/nodes.json` — `maxHp:1`, `blocksPath:true`,
-  `harvestAnim:'savage'`, the 9 skins above (each with a `_searched` depleted swap), regrows like a
-  rock (10 min). Six instances (all 3 orientations) placed near the camp in `the-moon.map.json`.
+  `harvestAnim:'savage'`, the 17 skins above (each with a `_searched` depleted swap), regrows like a
+  rock (10 min) **for now** (the one-time-harvest + "clear the area" mechanic is the next step). Six
+  instances (all 3 orientations) placed near the camp in `the-moon.map.json`.
 - **Loot mechanic (the actually-new bit):** a node def may carry a `loot` table
   (`ResourceNodeDef.loot`, validated by `parseLootTable` in `systems/nodeDefs.ts`) — `rolls` weighted
   draws from a `drops` set, each a `[min,max]` quantity. When present, `ResourceNodeManager.chop`

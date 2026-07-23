@@ -123,16 +123,23 @@ ORIENT = {
 # id -> (orientation key, colour/material clause). Realistic weathered tent colours only:
 # cream/off-white, light blue, green, grey (owner steer). >=3 per angle (owner steer).
 VARIANTS = {
-    # diagonal (3/4)
+    # diagonal (3/4). wreck_4..7 are owner picks from a candidate batch (#4/#5/#6/#9).
     "tent_wreck_1": ("diagonal", "muted olive / forest-green weathered canvas"),
     "tent_wreck_2": ("diagonal", "faded light dusty-blue canvas"),
     "tent_wreck_3": ("diagonal", "weathered grey canvas"),
-    # front (end-on, entrance faces camera)
+    "tent_wreck_4": ("diagonal", "dirty cream / off-white canvas"),
+    "tent_wreck_5": ("diagonal", "dark forest-green canvas"),
+    "tent_wreck_6": ("diagonal", "dirty khaki / tan canvas"),
+    "tent_wreck_7": ("diagonal", "pale stone-grey canvas"),
+    # front (end-on, entrance faces camera). front_3..6 are owner picks (#1/#3/#4/#7);
+    # the original weak cream front_3 was replaced.
     "tent_front_1": ("front", "faded light dusty-blue canvas"),
     "tent_front_2": ("front", "weathered grey / stone-grey canvas"),
-    "tent_front_3": ("front", "dirty cream / off-white canvas"),
-    # side (broadside, ridge horizontal) — side_2/3/4 are owner picks from a candidate batch
-    # (#1/#4/#6); their raws are the source of truth in scripts/.gen-icons/raw/.
+    "tent_front_3": ("front", "muted forest-green canvas"),
+    "tent_front_4": ("front", "weathered grey canvas"),
+    "tent_front_5": ("front", "dirty cream / off-white canvas"),
+    "tent_front_6": ("front", "steel blue-grey canvas"),
+    # side (broadside, ridge horizontal) — side_2/3/4 are owner picks (#1/#4/#6).
     "tent_side_1": ("side", "dirty cream / off-white canvas"),
     "tent_side_2": ("side", "muted forest-green canvas"),
     "tent_side_3": ("side", "muted green canvas"),
@@ -170,7 +177,15 @@ def side_ref_png() -> bytes:
 # Optional per-id collapse flavour so same-orientation tents don't look like clones (owner: "different
 # looking"). Appended to the prompt; empty/absent ids just use the base DESTROYED description.
 FLAVOUR = {
-    # side_2/3/4 mirror the chosen candidate combos (#1/#4/#6) so a regen lands near the picks.
+    # Each mirrors its chosen candidate combo so a regen lands near the pick.
+    "tent_wreck_4": "caved in at the peak with a big rip down the middle",
+    "tent_wreck_5": "half collapsed, one whole end flattened to the ground",
+    "tent_wreck_6": "twisted, canvas billowing loose off the bent frame",
+    "tent_wreck_7": "slumped forward with broken poles poking through the tears",
+    "tent_front_3": "symmetric A-frame with the entrance torn wide open",
+    "tent_front_4": "the ridge sagging and the door flaps hanging",
+    "tent_front_5": "a big vertical rip down the front, poles bent",
+    "tent_front_6": "symmetric but shredded, holes torn across both panels",
     "tent_side_2": "one end caved flat to the ground, the other end a lopsided peak, ridge pole snapped in two",
     "tent_side_3": "flattened almost to the ground — just low humps of canvas and splayed guy-lines",
     "tent_side_4": "front wall collapsed forward, canvas draped over the entrance, one pole still upright at an angle",
@@ -255,7 +270,13 @@ def quantise(img: Image.Image, colours: int) -> Image.Image:
     rgb = img.convert("RGB").quantize(colors=colours, method=Image.MEDIANCUT).convert("RGB")
     r, g, b = rgb.split()
     a = img.split()[3].point(lambda v: 255 if v > 110 else 0)  # hard alpha (crisp pixel edge)
-    return Image.merge("RGBA", (r, g, b, a))
+    out = np.asarray(Image.merge("RGBA", (r, g, b, a))).copy()
+    # Defensive: median-cut can mint a magenta-ish tone from bg pixels that blended into a dark
+    # interior edge (a stray fleck near the entrance shadow). No tent material is magenta, so recolour
+    # any such opaque pixel to the dark outline tone.
+    rr, gg, bb, aa = out[:, :, 0], out[:, :, 1], out[:, :, 2], out[:, :, 3]
+    out[(rr > 170) & (bb > 170) & (gg < 100) & (aa > 0)] = OUTLINE
+    return Image.fromarray(out, "RGBA")
 
 
 def outline(img: Image.Image) -> Image.Image:

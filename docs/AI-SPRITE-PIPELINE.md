@@ -201,6 +201,55 @@ that the rogue didn't:
 **Meta:** the generation is the lever, the processing is downstream. Two knobs did the work —
 prompt the prop into every frame, and scope to the facings the model draws well.
 
+## Static world-prop sprites (the destroyed tents) — a reusable playbook
+
+Third use of the pipeline, and the first for **static world props** (not character animation): the
+destroyed-tent set for the savage action — `scripts/gen-tents.py`, 17 sprites across 3 orientations.
+Single-frame, so no strip/anim work; the hard parts were **orientation** and **matching the pack's
+flat palette**. What generalises to any new prop:
+
+- **Anchor orientation + camera with a REAL pack sprite, not text and not a hand-drawn guide.** The
+  game is top-down oblique; text alone ("top-down") and a hand-drawn grey silhouette both failed —
+  the model's prior for the object wins. What worked: feed an **isolated pack sprite already in the
+  target orientation** as the image-to-image reference. For the tents: a **roof chevron** (from
+  pixel-crawler `Buildings/Roofs.png`) for diagonal/front; a **broadside roof** (the back building's
+  horizontal-ridge roof in fantasy-tileset `House_Hay_2.png`) for the side/broadside view. The
+  broadside was the stubborn one — a diagonal-ish anchor + the model's prior both pull to 3/4, so the
+  reference has to *be* the orientation you want.
+- **"Side-on" ≠ "eye-level".** In a top-down game a broadside prop is still seen from above (you look
+  DOWN onto the long roof slope), not a flat elevation. Prompting a flat side view gives a squashed,
+  deformed strip. Keep the top-down camera; only the object's *rotation* changes between orientations.
+- **Objective orientation check** (cheap, catches self-deception): on the processed alpha, compute
+  **left-right symmetry** `(mask & mask[:, ::-1]).sum() / mask.sum()` and **width/height**. Front ≈
+  symmetric + roughly square (sym ~0.98, w/h ~1); side ≈ symmetric + wide (sym ~0.95, w/h ≳1.6);
+  diagonal ≈ asymmetric (sym ~0.75). Don't eyeball-classify — measure.
+- **Match the pack palette by COLOUR COUNT, not by snapping.** Gen art comes back painterly: our raw
+  tents had ~21 colours vs the pack's ~7–11 (tree 11, rocks 7). The fix is a **median-cut flatten to
+  ~10 colours** (`QUANTISE_COLOURS`), which bands the smooth shading into flat regions while keeping
+  each sprite's OWN hue. **Do NOT reach for `style_match.py` here** — it snaps onto the pack's
+  wood/green palette, which is right for wood props but turns a blue/cream/grey tent brown. Snapping
+  is for single-material objects; multi-colour sets just need flattening.
+- **Re-assert a crisp outline after the downscale.** A LANCZOS 1024→64px downscale leaves soft,
+  anti-aliased edges that read as "not pixel art" even at the right colour count. A 1px **silhouette
+  outline pass** (every opaque pixel bordering transparency → a fixed dark tone) hardens the edge to
+  match the pack's dark-outlined props. This + the flatten is what makes gen art sit next to hand-drawn
+  pixel art. (`outline()` in `gen-tents.py`.) A defensive magenta-kill after quantise removes stray
+  key flecks the median-cut can mint near dark interiors.
+- **Per-orientation sizing.** Bake to a target width and render at scale 1 (16px tiles). A ~6-person
+  tent ≈ 64px (4 tiles); broadside tents render low, so they bake wider (`SIDE_W` 80px) to keep
+  presence. Always check the baked size against the real props (a tree is 37×76, the player body ~30px)
+  — it's easy to bake something 2× too big.
+- **Batch + human-pick for the ones that matter.** For a varied set, generate ~10 candidates (vary
+  colour + a per-item collapse "flavour" clause) into a gitignored `*_candidates/` dir with a numbered
+  contact sheet, let the owner pick, then process only the chosen raws into the pack (`--reprocess`
+  reads saved raws — no re-spend). Stochastic models miss ~1 in 3 on a hard orientation; picking beats
+  praying. **Show the reference AND the output to the owner before committing** — a bad reference you
+  didn't verify wastes a whole batch (learned the hard way with the silhouette guide).
+- **Reproducibility:** the committed sprite is downstream of a saved raw; `--reprocess` re-bakes all
+  sprites from `scripts/.gen-icons/raw/*.png` at the current settings (free), so palette/outline/size
+  tuning never needs a regeneration. Owner picks live in `VARIANTS` + `FLAVOUR` so a regen lands near
+  them.
+
 ## Prior art & references (how this is done in the wild)
 
 **Practical guides / tools** — corroborate our choices (image-to-image for identity, no
