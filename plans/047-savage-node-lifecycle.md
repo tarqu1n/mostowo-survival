@@ -29,7 +29,9 @@ Owner decisions (this session):
   (e.g. cloth 1–2, wood 1). A one-shot node with no `clearLoot` clears silently.
 - **Progress persists:** the accumulated action time is stored **on the node** and survives
   cancel/re-queue (resuming continues where it left off). It resets only when a stage completes
-  (savage→ruin resets it for the clear stage; clear removes the node).
+  (savage→ruin resets it for the clear stage; clear removes the node). *(The critique flagged this as
+  the costliest/lowest-value element and suggested resetting per-order like `chopElapsed`; owner
+  confirmed keeping the persistent behaviour.)*
 - **Generic clear, player-only:** `clear` is a new order kind valid on *any* depleted `oneShot`
   node, not just the tent. No NPC-companion wiring.
 - **Ruined husk keeps blocking + is clickable until cleared:** reverses today's behaviour where a
@@ -100,12 +102,13 @@ Key files/patterns to mirror (from research):
     assertions — the `dedupeOnEnqueue===false` set stays `['build','move']` (clear is a dedupe kind),
     and the highlight-classification loop (L57-63) must include `clear → 'tree'`. Add a
     `toggleOrder`/`isOrderQueued` case for `clear` mirroring `harvest`.
-  - Side effects: `orderBeginners`/`orderRunners` in GameScene are `Record<Action['kind'], …>` — once
-    `clear` is in the union, TypeScript will require entries there; those are added in Step 5, so this
-    step alone will leave a **type error in GameScene until Step 5 lands**. Sequence 2 before 5;
-    don't ship 2 alone. (Acceptable within a plan run; note for the executor.)
+  - Side effects: `orderBeginners`/`orderRunners` in GameScene are **optional** mapped types
+    (`{ [K in Action['kind']]?: … }`), so adding a union variant does NOT force entries there — Step 2
+    should fully typecheck on its own (GameScene included), and the runtime dispatch simply has no
+    `clear` handler until Step 5 (a `clear` order would no-op, but nothing enqueues one until Step 4).
+    So Step 2 is independently shippable; no "type error until Step 5" caveat applies.
   - Docs: none this step.
-  - Done when: `orders.test.ts` green; the union + registry compile in isolation (systems typecheck).
+  - Done when: `npm run check` green (full typecheck, not just systems); `orders.test.ts` green.
 
 - [ ] **Step 3: no-regrow + ruin stays blocking + node removal (`ResourceNodeManager`)** `[inline]`
   - `src/scenes/world/ResourceNodeManager.ts`:
@@ -135,7 +138,10 @@ Key files/patterns to mirror (from research):
   - `src/scenes/GameScene.ts` `onTap` (L707-722): add `clear` to the kinds that `enqueue` (alongside
     `harvest|refuel|rearm`) so a tap on a ruin queues the clear.
   - Side effects: depth-ordered raycast unchanged; ensure a ruin under a live node can't both match.
-    The queue-glow for a `clear` target is handled in Step 6.
+    The queue-glow for a `clear` target is handled in Step 7. Inspect side effect (critique #6):
+    making dead one-shot ruins pass `pickSpriteAt` also makes them **inspectable** (`inspectAt`'s
+    `tree` branch → `treeStats`) — spot-check that `treeStats` renders sanely for a depleted node
+    (e.g. shows the ruin as cleared/0-hp rather than garbage); likely harmless/desirable.
   - Docs: none this step.
   - Done when: tapping a live tent enqueues `harvest`; tapping the ruin enqueues `clear` (assert via
     a scenario `order`/`debugState`, or manual).
@@ -161,9 +167,13 @@ Key files/patterns to mirror (from research):
       `completeCurrent()`. Register in `orderRunners`.
     - `enqueue` (L1276-1286) already handles a `dedupeOnEnqueue` kind generically — `clear` toggles
       off on re-tap (progress persists on the node, so re-issuing resumes).
-  - Side effects: `beginCurrent` resets `chopElapsed`/path but must NOT reset `tree.progressMs`.
-    Bag-full / unreachable aborts should mirror `beginHarvest`. Confirm the savage still credits loot
-    exactly once (single `chop` at completion, `maxHp:1`).
+  - Side effects: `beginCurrent` resets `chopElapsed`/path (and now runs the Step 6 shake/bar
+    teardown) but must NOT reset `tree.progressMs`. Bag-full / unreachable aborts should mirror
+    `beginHarvest`. Confirm the savage still credits loot exactly once (single `chop` at completion,
+    `maxHp:1`). Bag-full gate (critique #4): `beginHarvest` only checks `canAccept(yieldItemId, 1)`,
+    but savage rolls the whole `loot` table (2 rolls) — after a 20s wait a nearly-full bag could
+    silently drop most of it. Either loosen the gate to a fuller pre-check for savage nodes, or
+    explicitly accept the overflow-drop (document which); do not leave it unconsidered.
   - Docs: none this step.
   - Done when: savaging takes ~20s (progress persists across cancel) then leaves a ruin; clearing
     takes ~40s, yields the scrap, removes the node, frees the tile; trees/rocks/bushes unchanged.
@@ -186,14 +196,21 @@ Key files/patterns to mirror (from research):
     consistency).
   - **Teardown:** extend `NodeFxManager.reset()`/`destroy()`/`armShutdown()` to stop/destroy both new
     Maps (shake tweens + progress-bar pairs) — never `sprite.destroy()` on the shutdown path.
-  - **Wiring (Step 5 runners):** on arrival, `startShake`; each frame while accumulating, call
-    `showActionProgress(sprite, tree.progressMs / duration)`; on `completeCurrent`/cancel and at
-    stage completion, `stopShake` + `hideActionProgress`. Route through narrow deps like the existing
-    `playChopFx` (GameScene mediates; fx stays in `scenes/fx`).
-  - Side effects: the queued-order glow halo mirrors the sprite transform for free. Ensure EVERY exit
-    path (finish, cancel, walk-away, node removed) stops the shake and hides the bar — no orphan
-    looping tween or floating bar. The bar must sit above the (tall) node art — position from the
-    sprite's display top, not a fixed offset.
+  - **Wiring + the cancel-teardown (critique #1, IMPORTANT):** a toggle-cancel (re-tapping a queued
+    action) routes through `toggleOrder` → `beginCurrent`, **NOT** `completeCurrent` — so relying on
+    the runner/`completeCurrent` to stop the shake would leak an infinite `repeat:-1` tween writing
+    the node transform forever + a floating bar. Fix: add a **single blanket teardown at the TOP of
+    `beginCurrent`** — `nodeFx.stopAllShakes()` + `nodeFx.hideAllActionProgress()` (add these
+    clear-everything helpers; safe because only one player action runs at a time). Then on arrival a
+    runner calls `startShake`; each frame while accumulating, `showActionProgress(sprite,
+    tree.progressMs / duration)`; on stage completion (`completeCurrent`) also stop/hide. Route
+    through narrow deps like the existing `playChopFx` (GameScene mediates; fx stays in `scenes/fx`).
+    Do NOT depend on the runner alone to clean up on cancel — `beginCurrent` is the one guaranteed
+    chokepoint for both cancel and switching to another order.
+  - Side effects: the queued-order glow halo mirrors the sprite transform for free. With the
+    `beginCurrent` blanket teardown, every exit path (finish, cancel, walk-away, switch order, node
+    removed) is covered. The bar must sit above the (tall) node art — position from the sprite's
+    display top, not a fixed offset.
   - Docs: RENDERING.md — one terse line that the node shake is a looping tween + the action progress
     bar mirrors the enemy HP-bar renderer (no frame-loop shader).
   - Done when: during savage/clear the node shakes and a progress bar above it fills smoothly to full
@@ -235,3 +252,23 @@ Key files/patterns to mirror (from research):
 - Applying `oneShot`/`clear` to any node other than `savagedTent` in shipped data (the mechanic is
   generic, but only the tent uses it this pass).
 - Changing the loot economy/balance beyond adding the small `clearLoot`.
+
+## Critique
+
+> Fresh-eyes review (pre-execution). Verdict: a well-researched, pattern-faithful plan with no
+> blockers; the one real risk is teardown of the new looping shake/progress-bar on a toggle-cancel,
+> plus a scope question on persistent progress — proceed, fixing these during execution.
+>
+> Resolutions folded into the steps above: **#1** — blanket shake/bar teardown at the top of
+> `beginCurrent` (Step 6). **#2** — owner confirmed keeping persistent progress. **#3** — corrected
+> (optional mapped types; Step 2 typechecks standalone). **#4/#6** — noted in Steps 5/4.
+
+|#|Finding|Lens|Severity|Suggested action|
+|-|-------|----|--------|----------------|
+|1|Looping shake + progress bar have no reliable stop on a toggle-cancel (cancel routes through `beginCurrent`, not `completeCurrent`) → orphan infinite tween + floating bar.|Gaps/risks|Medium|Blanket teardown (stop all shakes + hide all bars) at the top of `beginCurrent`. *(folded into Step 6)*|
+|2|Persistent-across-cancel progress is the highest-complexity/lowest-value element for marginal single-player benefit.|Right-sizing|Medium|Owner confirmed: keep it.|
+|3|Step 2's "TypeScript error until Step 5" note is a phantom — `orderBeginners`/`orderRunners` are optional mapped types.|Executability|Low|Corrected: Step 2 typechecks standalone; run full `npm run check`.|
+|4|`runHarvest` bag-full gate checks only `canAccept(yieldItemId,1)`, but savage rolls the whole loot table → near-full bag can drop most loot after a 20s wait.|Gaps/risks|Low|Fuller pre-check for savage, or explicitly accept. *(noted in Step 5)*|
+|5|`clear` shares the `'tree'` highlight class → needs an `a.kind` branch for the `alive‖oneShot` gate.|Cross-cutting|Low|Branch on `a.kind` in the `'tree'` case (Step 7).|
+|6|Clickable ruins become inspectable (`inspectAt`→`treeStats`) — unmentioned side effect.|Gaps/risks|Low|Spot-check `treeStats` on a depleted node. *(noted in Step 4)*|
+|7|Feature isn't on the explicit post-MVP roadmap list; net-new content scoped this session.|Roadmap fit|Low|Owner-scoped; no code concern.|
