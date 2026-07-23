@@ -252,7 +252,7 @@ export function NodeTypesTab() {
   );
 }
 
-type HarvestAnimOption = '' | 'chop' | 'gather' | 'mine';
+type HarvestAnimOption = '' | 'chop' | 'gather' | 'mine' | 'savage';
 
 interface StatsDraft {
   name: string;
@@ -449,6 +449,7 @@ function NodeStatsForm({ def, allDefs }: { def: AuthoredNodeDef; allDefs: Author
               <SelectItem value="chop">chop</SelectItem>
               <SelectItem value="gather">gather</SelectItem>
               <SelectItem value="mine">mine</SelectItem>
+              <SelectItem value="savage">savage</SelectItem>
             </SelectContent>
           </Select>
         </div>

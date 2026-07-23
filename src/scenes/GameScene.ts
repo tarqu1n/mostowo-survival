@@ -28,6 +28,7 @@ import type { MapFile, DecorObject, NodeObject, PortalObject } from '../systems/
 import { breadcrumb, setCrashContext } from '../debug/crashReporter';
 import { TaskQueue, type Action } from '../systems/tasks';
 import { ORDER_META, isOrderQueued, orderTargetId, toggleOrder } from '../systems/orders';
+import { harvestAnimMotion } from '../systems/nodeDefs';
 import { objectAsDefender } from '../systems/combat';
 import { hurtboxTiles, DEFAULT_HURTBOX } from '../systems/hurtbox';
 import type { DayPhase } from '../systems/daynight';
@@ -1318,8 +1319,9 @@ export class GameScene extends Phaser.Scene {
       this.playerChar.faceTile(tree.col, tree.row); // swing toward the node, whatever side we stood on
       // Standing at the node → updatePlayerAnim plays the matching harvest anim: a bush is foraged
       // (gather/Collect), a rock is mined (pickaxe), everything else is chopped (axe). The swing is
-      // now authored directly per def (`harvestAnim`), defaulting to chop. See ResourceNodeDef.harvestAnim.
-      this.harvestSwing = tree.def.harvestAnim ?? 'chop';
+      // now authored directly per def (`harvestAnim`), defaulting to chop; `savage` (tent wreck) reuses
+      // the gather motion via `harvestAnimMotion`. See ResourceNodeDef.harvestAnim.
+      this.harvestSwing = harvestAnimMotion(tree.def.harvestAnim);
       this.chopElapsed += delta;
       if (this.chopElapsed >= CHOP_INTERVAL_MS) {
         this.chopElapsed = 0;

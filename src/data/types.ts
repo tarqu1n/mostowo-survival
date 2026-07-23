@@ -3,6 +3,8 @@
  * (see src/data/*.ts); adding content means editing those records, not the systems.
  */
 
+import type { LootTable } from '../systems/loot';
+
 /** An inventory item. `color` is the placeholder icon/rect colour (hex number). */
 export interface ItemDef {
   id: string;
@@ -95,8 +97,17 @@ export interface ResourceNodeDef extends ObjectStats {
   blocksPath: boolean;
   /** In-place harvest animation the player plays (default `'chop'`, axe); a rock uses `'mine'`
    *  (pickaxe) and a bush `'gather'` (forage). Was previously inferred from the retired `tile` role;
-   *  now authored explicitly (plan 021 step 6). */
-  harvestAnim?: 'chop' | 'gather' | 'mine';
+   *  now authored explicitly (plan 021 step 6). `'savage'` (scavenging a tent wreck) reuses the
+   *  `gather` player/fx motion as a stand-in until a bespoke savage strip lands — see
+   *  `harvestAnimToSwing` (GameScene) and the fx-kind mapping (NodeFxManager). */
+  harvestAnim?: 'chop' | 'gather' | 'mine' | 'savage';
+  /**
+   * When present, each harvest hit rolls THIS loot table (a predefined item set) instead of
+   * yielding the fixed `yieldItemId`/`yieldPerHit` — the "savage" action (scavenge a wrecked tent).
+   * `yieldItemId`/`yieldPerHit` stay required by the schema (and remain the fallback for any hit if
+   * a future def sets both) but are ignored while `loot` is set. See `src/systems/loot.ts`.
+   */
+  loot?: LootTable;
   /** Display scale — a multiplier on the source sprite's native pixels (`1.0` = native size). The
    *  art pack is authored at the game's `TILE_SIZE`, so native scale keeps pixels crisp and
    *  preserves each skin's relative size. Resolved (defaulted to 1.0) by `parseNodeDefs`. */

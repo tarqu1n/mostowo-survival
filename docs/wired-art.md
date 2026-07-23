@@ -252,6 +252,30 @@ wall/gate/trap render steps read paths + frames from.
   — `Lightning`, `Barrel` (+`Boom`), and `Barricades/Archer` (turret + its `Arrow` projectile). Not
   wired by plan 037; only the spike trap ships now.
 
+### Savage action — destroyed tents (placeholder art + loot table)
+
+Three **wrecked-tent** node skins (roughly a 6-person tent, ~3×2 tiles) for the **savage** action —
+scavenging a collapsed tent for items from a predefined set instead of a single fixed yield.
+
+- **Art is PLACEHOLDER, hand-baked**, not from a pack (no pack ships tent art, and the Gemini
+  image-to-image pipeline's key isn't reachable from a cloud session). `scripts/tent-art.mjs` bakes
+  them with the same dependency-free PNG encoder as `scripts/placeholder-art.mjs`:
+  `mostowo-custom/Environment/Props/Static/tent_wreck_{1,2,3}.png` (live) + `_searched.png`
+  (depleted/ransacked) + the two salvage item icons `icons/cloth.png`, `icons/canned_food.png`.
+  **Regenerate the real sprites through the Gemini pipeline later** (docs/AI-SPRITE-PIPELINE.md); until
+  then re-run `node scripts/tent-art.mjs`, then `npm run assets:catalog` so the catalog picks them up.
+- **Node def:** `savagedTent` in `src/data/maps/nodes.json` — `maxHp:1`, `blocksPath:true`,
+  `harvestAnim:'savage'`, three skins (green ridge / blue dome / scorched), each with a `_searched`
+  depleted swap, regrows like a rock (10 min). Placed near the camp in `the-moon.map.json`.
+- **Loot mechanic (the actually-new bit):** a node def may carry a `loot` table
+  (`ResourceNodeDef.loot`, validated by `parseLootTable` in `systems/nodeDefs.ts`) — `rolls` weighted
+  draws from a `drops` set, each a `[min,max]` quantity. When present, `ResourceNodeManager.chop`
+  rolls it (pure `rollLoot`, `src/systems/loot.ts`) through the same yield sink instead of the fixed
+  `yieldItemId`. The tent's set: cloth / wood / berries / cannedFood.
+- **`'savage'` has no bespoke player strip yet** — `harvestAnimMotion` (`systems/nodeDefs.ts`) maps it
+  to the `gather` (forage/rummage) motion for the swing + depletion fx, the reskin-stand-in pattern
+  chop/mine/punch already use. Swap in a real savage strip by editing that one mapper.
+
 > **Sourcing / generating new art?** The tileset candidates weighed up, the AI-gen service trials
 > (Retro Diffusion / PixelLab), the Gemini bespoke-asset pipeline, and **`style_match.py`** (snaps
 > off-palette gen art onto the pack's look — reach for it whenever generated art's shape is right but

@@ -13,6 +13,7 @@
 
 import type { DecorRegion } from './mapFormat';
 import type { ResourceNodeDef } from '../data/types';
+import type { LootDrop, LootTable } from './loot';
 import { ITEMS } from '../data/items';
 
 // ---- Authored types (node defs file schema v1) ----
@@ -61,7 +62,10 @@ export interface AuthoredNodeDef {
   yieldPerHit: number;
   regrowMs: number;
   blocksPath: boolean;
-  harvestAnim?: 'chop' | 'gather' | 'mine';
+  harvestAnim?: 'chop' | 'gather' | 'mine' | 'savage';
+  /** Optional loot table — each harvest hit rolls this instead of the fixed yield (the "savage"
+   *  action). Cross-checked itemId ∈ ITEMS by `parseLootTable`. See `ResourceNodeDef.loot`. */
+  loot?: LootTable;
   color: number;
   stumpColor: number;
   /** Def-level display scale (a multiplier on the source sprite's native pixels — the pack is
@@ -84,6 +88,18 @@ export interface NodeDefsFile {
 /** `NodeSkinDef` with `weight` normalised to a concrete number (defaulted to 1 when the authored
  *  skin omits it) — see `NodeSkinDef.weight` doc. */
 export type NormalizedNodeSkinDef = Omit<NodeSkinDef, 'weight'> & { weight: number };
+
+/** The concrete in-place harvest motion a node's `harvestAnim` resolves to for the player-swing
+ *  sprite state and the depletion fx (`NodeFxManager`). `'savage'` has no bespoke strip yet, so it
+ *  reuses the `gather` (forage/rummage) motion as a stand-in — the one place that mapping lives, so
+ *  swapping in a real savage strip later is a single edit here. Undefined ⇒ the default `chop`. */
+export type HarvestMotion = 'chop' | 'gather' | 'mine';
+export function harvestAnimMotion(
+  anim: 'chop' | 'gather' | 'mine' | 'savage' | undefined,
+): HarvestMotion {
+  if (anim === undefined) return 'chop';
+  return anim === 'savage' ? 'gather' : anim;
+}
 
 /**
  * What `parseNodeDefs` actually returns per def: every `ResourceNodeDef` field (so existing
@@ -255,7 +271,49 @@ function parseStandOffsets(value: unknown, path: string): ReadonlyArray<readonly
   });
 }
 
-const HARVEST_ANIM_VALUES: ReadonlySet<string> = new Set(['chop', 'gather', 'mine']);
+const HARVEST_ANIM_VALUES: ReadonlySet<string> = new Set(['chop', 'gather', 'mine', 'savage']);
+
+const LOOT_DROP_KEYS = ['itemId', 'min', 'max', 'weight'] as const;
+
+function parseLootDrop(value: unknown, path: string): LootDrop {
+  const obj = expectRecord(value, path);
+  expectNoExtraKeys(obj, LOOT_DROP_KEYS, path);
+
+  const itemId = expectString(obj.itemId, `${path}.itemId`);
+  if (!(itemId in ITEMS)) {
+    fail(`${path}.itemId ${JSON.stringify(itemId)} is not a known item id (see src/data/items.ts)`);
+  }
+  const min = expectInt(obj.min, `${path}.min`);
+  if (min < 1) fail(`${path}.min must be >= 1 (got ${min})`);
+  const max = expectInt(obj.max, `${path}.max`);
+  if (max < min) fail(`${path}.max must be >= min (min ${min}, got ${max})`);
+
+  let weight = 1;
+  if (obj.weight !== undefined) {
+    weight = expectNumber(obj.weight, `${path}.weight`);
+    if (weight <= 0) fail(`${path}.weight must be > 0 (got ${weight})`);
+  }
+
+  return { itemId, min, max, weight };
+}
+
+const LOOT_TABLE_KEYS = ['rolls', 'drops'] as const;
+
+/** Validate a loot table: `rolls` a positive integer, `drops` a non-empty array of valid drops with
+ *  known item ids. Mirrors the strict, precise-message style of the rest of this module. */
+function parseLootTable(value: unknown, path: string): LootTable {
+  const obj = expectRecord(value, path);
+  expectNoExtraKeys(obj, LOOT_TABLE_KEYS, path);
+
+  const rolls = expectInt(obj.rolls, `${path}.rolls`);
+  if (rolls < 1) fail(`${path}.rolls must be >= 1 (got ${rolls})`);
+
+  const dropsRaw = expectArray(obj.drops, `${path}.drops`);
+  if (dropsRaw.length === 0) fail(`${path}.drops must be non-empty`);
+  const drops = dropsRaw.map((d, i) => parseLootDrop(d, `${path}.drops[${i}]`));
+
+  return { rolls, drops };
+}
 
 const AUTHORED_NODE_DEF_KEYS = [
   'id',
@@ -266,6 +324,7 @@ const AUTHORED_NODE_DEF_KEYS = [
   'regrowMs',
   'blocksPath',
   'harvestAnim',
+  'loot',
   'color',
   'stumpColor',
   'scale',
@@ -304,14 +363,18 @@ function parseAuthoredNodeDef(
 
   const blocksPath = expectBoolean(obj.blocksPath, `${path}.blocksPath`);
 
-  let harvestAnim: 'chop' | 'gather' | 'mine' | undefined;
+  let harvestAnim: 'chop' | 'gather' | 'mine' | 'savage' | undefined;
   if (obj.harvestAnim !== undefined) {
     const raw = expectString(obj.harvestAnim, `${path}.harvestAnim`);
     if (!HARVEST_ANIM_VALUES.has(raw)) {
-      fail(`${path}.harvestAnim must be 'chop', 'gather' or 'mine', got ${JSON.stringify(raw)}`);
+      fail(
+        `${path}.harvestAnim must be 'chop', 'gather', 'mine' or 'savage', got ${JSON.stringify(raw)}`,
+      );
     }
-    harvestAnim = raw as 'chop' | 'gather' | 'mine';
+    harvestAnim = raw as 'chop' | 'gather' | 'mine' | 'savage';
   }
+
+  const loot = obj.loot === undefined ? undefined : parseLootTable(obj.loot, `${path}.loot`);
 
   const color = expectInt(obj.color, `${path}.color`);
   const stumpColor = expectInt(obj.stumpColor, `${path}.stumpColor`);
@@ -347,6 +410,7 @@ function parseAuthoredNodeDef(
     regrowMs,
     blocksPath,
     ...(harvestAnim === undefined ? {} : { harvestAnim }),
+    ...(loot === undefined ? {} : { loot }),
     color,
     stumpColor,
     scale,
@@ -401,6 +465,7 @@ export function parseNodeDefs(raw: unknown): Record<string, ParsedNodeDef> {
       stumpColor: def.stumpColor,
       blocksPath: def.blocksPath,
       ...(def.harvestAnim === undefined ? {} : { harvestAnim: def.harvestAnim }),
+      ...(def.loot === undefined ? {} : { loot: def.loot }),
       scale: def.scale ?? 1,
       originX: def.originX,
       originY: def.originY,

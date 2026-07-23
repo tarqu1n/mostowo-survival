@@ -3,7 +3,12 @@ import { COLORS } from '../../config';
 import { breadcrumb } from '../../debug/crashReporter';
 import { NODES } from '../../data/nodes';
 import type { ResourceNodeDef } from '../../data/types';
-import type { ParsedNodeDef, NormalizedNodeSkinDef } from '../../systems/nodeDefs';
+import { rollLoot } from '../../systems/loot';
+import {
+  harvestAnimMotion,
+  type ParsedNodeDef,
+  type NormalizedNodeSkinDef,
+} from '../../systems/nodeDefs';
 import { tileToWorldCenter } from '../../systems/grid';
 import { parseAssetId } from '../../render/assetPaths';
 import { resolveDecorDraw } from '../../render/decorSprites';
@@ -263,7 +268,15 @@ export class ResourceNodeManager {
   ): void {
     breadcrumb('node', `chop ${tree.def.id} ${tree.id}`, { hp: tree.hp - 1, alive: tree.alive });
     tree.hp -= 1;
-    (onYield ?? this.deps.addYield)(tree.def.yieldItemId, tree.def.yieldPerHit);
+    const yieldTo = onYield ?? this.deps.addYield;
+    if (tree.def.loot) {
+      // "Savage" a wreck: this hit rolls the def's loot table (a predefined item set) instead of the
+      // fixed single yield. Each rolled stack is credited through the SAME sink, so the player bag vs
+      // companion-carry redirect (see `onYield` doc) works identically.
+      for (const drop of rollLoot(tree.def.loot)) yieldTo(drop.itemId, drop.qty);
+    } else {
+      yieldTo(tree.def.yieldItemId, tree.def.yieldPerHit);
+    }
     // Per-hit chop feedback — routed to NodeFxManager (fx lives in scenes/fx, this stays a state
     // manager). It animates only the node sprite; the queued glow halo mirrors that motion each frame
     // via syncGlowTransforms(), so the outline follows for free. We pass plain data (skin resolution
@@ -299,7 +312,7 @@ export class ResourceNodeManager {
         const live = this.resolveSkinTexture(skin.asset, skin.region);
         if (live) {
           this.deps.playFellFx({
-            kind: tree.def.harvestAnim ?? 'chop',
+            kind: harvestAnimMotion(tree.def.harvestAnim),
             texKey: live.key,
             texFrame: live.frame,
             x: tree.sprite.x,

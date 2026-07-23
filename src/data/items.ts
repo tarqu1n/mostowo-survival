@@ -16,4 +16,16 @@ export const ITEMS: Record<string, ItemDef> = {
     icon: 'berries.png',
     nutrition: 25,
   },
+  // Salvage set — scavenged from a wrecked tent via the "savage" action (loot table on the
+  // `savagedTent` node). `cloth` is a crafting/repair material (inedible); `cannedFood` is edible
+  // trail rations. Both placeholder icons are baked by `scripts/tent-art.mjs`.
+  cloth: { id: 'cloth', name: 'Cloth', color: 0xc9ba9a, maxStack: 50, icon: 'cloth.png' },
+  cannedFood: {
+    id: 'cannedFood',
+    name: 'Canned Food',
+    color: 0xb85c33,
+    maxStack: 50,
+    icon: 'canned_food.png',
+    nutrition: 40,
+  },
 };

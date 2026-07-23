@@ -46370,6 +46370,141 @@
       "origin": "self-made"
     },
     {
+      "id": "mostowo-custom/Environment/Props/Static/tent_wreck_1_searched.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_wreck_1_searched.png"
+      },
+      "w": 56,
+      "h": 44,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "1",
+        "environment",
+        "props",
+        "searched",
+        "static",
+        "tent",
+        "wreck"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_wreck_1.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_wreck_1.png"
+      },
+      "w": 56,
+      "h": 44,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "1",
+        "environment",
+        "props",
+        "static",
+        "tent",
+        "wreck"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_wreck_2_searched.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_wreck_2_searched.png"
+      },
+      "w": 56,
+      "h": 44,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "2",
+        "environment",
+        "props",
+        "searched",
+        "static",
+        "tent",
+        "wreck"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_wreck_2.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_wreck_2.png"
+      },
+      "w": 56,
+      "h": 44,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "2",
+        "environment",
+        "props",
+        "static",
+        "tent",
+        "wreck"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_wreck_3_searched.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_wreck_3_searched.png"
+      },
+      "w": 56,
+      "h": 44,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "3",
+        "environment",
+        "props",
+        "searched",
+        "static",
+        "tent",
+        "wreck"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_wreck_3.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_wreck_3.png"
+      },
+      "w": 56,
+      "h": 44,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "3",
+        "environment",
+        "props",
+        "static",
+        "tent",
+        "wreck"
+      ],
+      "origin": "self-made"
+    },
+    {
       "id": "mostowo-custom/Environment/Tilesets/water_diagonal.png",
       "pack": "mostowo-custom",
       "type": "tile",
@@ -46447,6 +46582,30 @@
       "origin": "self-made"
     },
     {
+      "id": "pixel-crawler/_derived/player/Bow_Side-Sheet.png",
+      "pack": "pixel-crawler",
+      "type": "strip",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "_derived/player/Bow_Side-Sheet.png"
+      },
+      "w": 320,
+      "h": 64,
+      "category": "_derived/player",
+      "tags": [
+        "bow",
+        "derived",
+        "player",
+        "sheet",
+        "side"
+      ],
+      "origin": "self-made",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 5
+    },
+    {
       "id": "pixel-crawler/_derived/rock.png",
       "pack": "pixel-crawler",
       "type": "object",
@@ -46463,6 +46622,30 @@
         "rock"
       ],
       "origin": "self-made"
+    },
+    {
+      "id": "pixel-crawler/_derived/rogue/Slice_Side-Sheet.png",
+      "pack": "pixel-crawler",
+      "type": "strip",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "_derived/rogue/Slice_Side-Sheet.png"
+      },
+      "w": 336,
+      "h": 56,
+      "category": "_derived/rogue",
+      "tags": [
+        "derived",
+        "rogue",
+        "sheet",
+        "side",
+        "slice"
+      ],
+      "origin": "self-made",
+      "frameWidth": 56,
+      "frameHeight": 56,
+      "frames": 6
     },
     {
       "id": "pixel-crawler/_derived/tree_pine.png",

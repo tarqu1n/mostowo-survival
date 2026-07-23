@@ -68,6 +68,28 @@ describe('NODES', () => {
     expect(NODES.rock.id).toBe('rock');
     expect(NODES.rock.yieldItemId).toBe('stone');
   });
+
+  it('every loot-table drop references a real item, with a sane range/weight', () => {
+    for (const node of Object.values(NODES)) {
+      if (!node.loot) continue;
+      expect(node.loot.rolls).toBeGreaterThanOrEqual(1);
+      expect(node.loot.drops.length).toBeGreaterThan(0);
+      for (const drop of node.loot.drops) {
+        expect(ITEMS[drop.itemId]).toBeDefined();
+        expect(drop.min).toBeGreaterThanOrEqual(1);
+        expect(drop.max).toBeGreaterThanOrEqual(drop.min);
+        expect(drop.weight).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('savagedTent is a savage-action node with a loot table (not a fixed single yield)', () => {
+    const tent = NODES.savagedTent;
+    expect(tent).toBeDefined();
+    expect(tent.harvestAnim).toBe('savage');
+    expect(tent.loot).toBeDefined();
+    expect(tent.skins).toHaveLength(3); // 3 wreck variations
+  });
 });
 
 describe('BUILDABLES', () => {

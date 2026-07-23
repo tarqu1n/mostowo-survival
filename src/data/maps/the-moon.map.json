@@ -4233,6 +4233,30 @@
         "w": 16,
         "h": 16
       }
+    },
+    {
+      "id": "node_tent_1",
+      "kind": "node",
+      "ref": "savagedTent",
+      "col": 117,
+      "row": 139,
+      "skin": "default"
+    },
+    {
+      "id": "node_tent_2",
+      "kind": "node",
+      "ref": "savagedTent",
+      "col": 121,
+      "row": 139,
+      "skin": "blue"
+    },
+    {
+      "id": "node_tent_3",
+      "kind": "node",
+      "ref": "savagedTent",
+      "col": 125,
+      "row": 139,
+      "skin": "scorched"
     }
   ]
 }

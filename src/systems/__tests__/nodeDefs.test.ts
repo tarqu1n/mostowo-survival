@@ -26,6 +26,7 @@ interface RawDefFixture {
   regrowMs: number;
   blocksPath: boolean;
   harvestAnim?: string;
+  loot?: unknown;
   color: number;
   stumpColor: number;
   scale?: number;
@@ -258,7 +259,9 @@ describe('parseNodeDefs', () => {
     const raw = withRaw((r) => {
       r.defs[0].harvestAnim = 'smash';
     });
-    expect(() => parseNodeDefs(raw)).toThrow(/harvestAnim must be 'chop', 'gather' or 'mine'/);
+    expect(() => parseNodeDefs(raw)).toThrow(
+      /harvestAnim must be 'chop', 'gather', 'mine' or 'savage'/,
+    );
   });
 
   it("accepts the 'mine' harvestAnim (rock's pickaxe swing, plan 021 step 6)", () => {
@@ -306,5 +309,78 @@ describe('parseNodeDefs', () => {
   it('type-checks NodeDefsFile as the expected input shape', () => {
     const file: NodeDefsFile = validRaw() as unknown as NodeDefsFile;
     expect(() => parseNodeDefs(file)).not.toThrow();
+  });
+
+  // ---- Savage action: harvestAnim + loot table (predefined item set) ----
+
+  it("accepts the 'savage' harvestAnim (tent-wreck scavenge)", () => {
+    const raw = withRaw((r) => {
+      r.defs[0].harvestAnim = 'savage';
+    });
+    expect(parseNodeDefs(raw).tree.harvestAnim).toBe('savage');
+  });
+
+  it('parses a valid loot table through to the def, defaulting a drop weight to 1', () => {
+    const raw = withRaw((r) => {
+      r.defs[0].loot = {
+        rolls: 2,
+        drops: [
+          { itemId: 'wood', min: 1, max: 3, weight: 2 },
+          { itemId: 'stone', min: 1, max: 1 }, // weight omitted -> defaults to 1
+        ],
+      };
+    });
+    const { loot } = parseNodeDefs(raw).tree;
+    expect(loot).toEqual({
+      rolls: 2,
+      drops: [
+        { itemId: 'wood', min: 1, max: 3, weight: 2 },
+        { itemId: 'stone', min: 1, max: 1, weight: 1 },
+      ],
+    });
+  });
+
+  it('leaves loot undefined when the def omits it', () => {
+    expect(parseNodeDefs(validRaw()).tree.loot).toBeUndefined();
+  });
+
+  it('rejects a loot drop naming an unknown item id', () => {
+    const raw = withRaw((r) => {
+      r.defs[0].loot = { rolls: 1, drops: [{ itemId: 'unobtainium', min: 1, max: 1, weight: 1 }] };
+    });
+    expect(() => parseNodeDefs(raw)).toThrow(
+      /loot\.drops\[0\]\.itemId "unobtainium" is not a known/,
+    );
+  });
+
+  it('rejects a loot table with no drops', () => {
+    const raw = withRaw((r) => {
+      r.defs[0].loot = { rolls: 1, drops: [] };
+    });
+    expect(() => parseNodeDefs(raw)).toThrow(/loot\.drops must be non-empty/);
+  });
+
+  it('rejects rolls < 1', () => {
+    const raw = withRaw((r) => {
+      r.defs[0].loot = { rolls: 0, drops: [{ itemId: 'wood', min: 1, max: 1, weight: 1 }] };
+    });
+    expect(() => parseNodeDefs(raw)).toThrow(/loot\.rolls must be >= 1/);
+  });
+
+  it('rejects a drop with max < min', () => {
+    const raw = withRaw((r) => {
+      r.defs[0].loot = { rolls: 1, drops: [{ itemId: 'wood', min: 3, max: 1, weight: 1 }] };
+    });
+    expect(() => parseNodeDefs(raw)).toThrow(/loot\.drops\[0\]\.max must be >= min/);
+  });
+
+  it('rejects an unknown key on a loot drop', () => {
+    const raw = withRaw((r) => {
+      r.defs[0].loot = {
+        rolls: 1,
+        drops: [{ itemId: 'wood', min: 1, max: 1, weight: 1, chance: 0.5 }],
+      };
+    });
+    expect(() => parseNodeDefs(raw)).toThrow(/loot\.drops\[0\] has unknown key "chance"/);
   });
 });
