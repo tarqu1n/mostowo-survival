@@ -1,9 +1,9 @@
 // Boot canary (plan 007 Tier 3). The old ~400-line linear playthrough was retired — its ~35
 // assertions now live in the deterministic unit tests (`npm test`) and Playwright scenarios
 // (`npm run e2e`), which don't race real-time walks/chops. This keeps only the one thing those
-// tiers can't cheaply give: proof the real production bundle BOOTS end-to-end, reaches the Game +
-// UI scenes, renders (compiling every WebGL shader, running the queued-glow bake), and logs ZERO
-// console/page errors. No gameplay, no timing.
+// tiers can't cheaply give: proof the real production bundle BOOTS end-to-end, reaches the Game scene
+// with the DOM/React HUD overlay mounted over it, renders (compiling every WebGL shader, running the
+// queued-glow bake), and logs ZERO console/page errors. No gameplay, no timing.
 //
 // Run against the production preview build:  npm run preview  (then)  npm run smoke
 import { execSync } from 'node:child_process';
@@ -68,12 +68,12 @@ else {
 }
 if (gameActive) ok('Game scene active');
 else fail('Game scene never became active');
+// The HUD is a DOM/React overlay (plan 046), not a Phaser scene — assert it mounted by waiting for the
+// command bar, which ActionLayer renders once the Game scene is live over the canvas.
 await page
-  .waitForFunction(() => window.game.scene.getScene('UI')?.scene.isActive(), null, {
-    timeout: 5000,
-  })
-  .then(() => ok('UI scene active'))
-  .catch(() => fail('UI scene never became active'));
+  .waitForSelector('[data-testid="hud-command-bar"]', { timeout: 5000 })
+  .then(() => ok('DOM HUD mounted (command bar present)'))
+  .catch(() => fail('DOM HUD never mounted'));
 
 // Let a few frames render so any first-use shader compile / draw error surfaces before we assert.
 await page.waitForFunction(

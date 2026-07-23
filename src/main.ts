@@ -5,7 +5,6 @@ import { BootScene } from './scenes/BootScene';
 import { PreloadScene } from './scenes/PreloadScene';
 import { MainMenuScene } from './scenes/MainMenuScene';
 import { GameScene } from './scenes/GameScene';
-import { UIScene } from './scenes/UIScene';
 import { mountHud } from './hud/main';
 
 // Install FIRST, before the game boots, so it catches boot/preload errors too. On-device overlay for
@@ -37,7 +36,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  scene: [BootScene, PreloadScene, MainMenuScene, GameScene, UIScene],
+  scene: [BootScene, PreloadScene, MainMenuScene, GameScene],
 };
 
 // Expose the game instance for debugging + headless smoke tests (harmless in a solo browser game).

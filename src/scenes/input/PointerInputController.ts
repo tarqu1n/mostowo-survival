@@ -21,9 +21,6 @@ import type { GameScene } from '../GameScene';
  * pinch vs long-press, plus the zoom/follow camera state those gestures drive).
  */
 export interface PointerInputDeps {
-  /** HUD hit-test in design-space px (already RENDER_SCALE-divided) — world input is ignored over
-   *  the HUD on both press and release. */
-  hudHitTest(x: number, y: number): boolean;
   /** The live player sprite — camera follow/center targets it. */
   getPlayerSprite(): CharacterSprite;
   /** True while build-mode placement owns the pointer (ghost tracking + place/enqueue). */
@@ -67,7 +64,6 @@ export class PointerInputController {
 
   // --- Gesture state ---------------------------------------------------------
   private downScreen = new Phaser.Math.Vector2(); // pointerdown position in screen/base-canvas px
-  private downOnUI = false;
   private sawPointerDown = false; // this controller observed the press; guards against a leaked pointerup (see onPointerUp)
   private pressStart = 0; // scene-clock time of the current pointer press (for hold detection)
   private queuePainting = false; // once a hold crosses LONGPRESS_MS, dragging paints queue orders
@@ -102,12 +98,13 @@ export class PointerInputController {
   }
 
   // --- Input gate ------------------------------------------------------------
-
-  /** HUD hit-test in design space. Raw pointer coords live in the device-scaled backing store, but
-   * the HUD is authored in BASE_WIDTH×BASE_HEIGHT units — divide by RENDER_SCALE to line them up. */
-  private pointerOnHud(pointer: Phaser.Input.Pointer): boolean {
-    return this.deps.hudHitTest(pointer.x / RENDER_SCALE, pointer.y / RENDER_SCALE);
-  }
+  //
+  // The HUD is a DOM overlay (plan 046): its interactive controls set `pointer-events: auto`, so a
+  // press on a control is consumed by the DOM and never reaches this Phaser canvas — while empty HUD
+  // space (`pointer-events: none`) falls through to here. That capture replaces the old Phaser
+  // `hudHitTest`/`downOnUI` gate (retired at Step 13); every pointer this controller sees is therefore
+  // already a genuine world press. The one HUD→world coupling left is the `movepadHeld` registry flag
+  // (below), which the DOM movepad sets while dragging so other pointers stay inert mid-drive.
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
     if (this.activePointerCount() >= 2) {
@@ -120,8 +117,6 @@ export class PointerInputController {
       return;
     }
     this.sawPointerDown = true; // a genuine press this controller owns — its paired pointerup may now resolve
-    this.downOnUI = this.pointerOnHud(pointer);
-    if (this.downOnUI) return; // HUD owns this tap
     this.downScreen.set(pointer.x, pointer.y);
     this.lastPanX = pointer.x;
     this.lastPanY = pointer.y;
@@ -143,28 +138,28 @@ export class PointerInputController {
       return;
     }
     if (this.deps.isBuildMode()) {
-      if (!this.pointerOnHud(pointer)) this.deps.onBuildMove(pointer);
+      this.deps.onBuildMove(pointer);
       return;
     }
-    // Combat mode: the movepad (tracked independently in UIScene) owns all dragging. A world drag
-    // must never fall through to the camera-pan below — steering the movepad drags the thumb off the
-    // small pad, and without this gate that off-pad travel panned the world and broke the follow-lock,
-    // yanking the camera around whenever the player changed direction.
+    // Combat mode: the DOM movepad owns all dragging. A world drag must never fall through to the
+    // camera-pan below — steering the movepad drags the thumb off the small pad, and without this gate
+    // that off-pad travel panned the world and broke the follow-lock, yanking the camera around
+    // whenever the player changed direction.
     //
     // This (and the tap dispatch in onPointerUp) stays gated on raw `mode === 'combat'`, NOT the
     // combatActive auto-surface (plan 035a Step 3, critique #2): the chosen precedence is "movepad
     // drives, taps still queue orders", so command-mode pan/queue-paint/tap-to-move must stay live
-    // while controls auto-surface. The movepad itself is still safe there — a press ON the pad sets
-    // `downOnUI` (it's a hudElement), which the check just below swallows — so command-mode + auto-
-    // surface never yields a dead movepad NOR a hijacked camera. Only the drive + onCombatMove gate in
-    // GameScene rebase onto combatActive (see GameScene.movepadDrives).
+    // while controls auto-surface. The movepad itself is still safe there — it is a DOM control that
+    // consumes its own presses (they never reach this canvas) — so command-mode + auto-surface never
+    // yields a dead movepad NOR a hijacked camera. Only the drive + onCombatMove gate in GameScene
+    // rebase onto combatActive (see GameScene.movepadDrives).
     if (this.deps.getMode() === 'combat') return;
     // While the movepad is held (driving with the other thumb), the map is inert for any other
     // pointer — no queue-paint, no pan — until the pad is released. The pinch guard alone can't cover
     // this: BootScene registers 3 touch pointers but activePointerCount() only sees pointer1/2, so a
     // movepad finger on pointer3 slips the count and a map finger paints a path mid-drive (playtest bug).
     if (this.deps.isMovepadHeld()) return;
-    if (!pointer.isDown || this.downOnUI || this.pointerOnHud(pointer)) return;
+    if (!pointer.isDown) return;
 
     // Command-mode-only: queue-painting (long-press-drag) issues tap-to-pathfind orders, which
     // would fight Combat mode's direct movepad control and has no meaning in Inspect mode.
@@ -211,7 +206,7 @@ export class PointerInputController {
     // (Reset so a second leaked release also no-ops.)
     if (!this.sawPointerDown) return;
     this.sawPointerDown = false;
-    if (this.deps.isBuildMode() || this.downOnUI || this.pointerOnHud(pointer)) return;
+    if (this.deps.isBuildMode()) return;
     // Movepad held → this release is a stray second-finger tap while driving; swallow it so it can't
     // issue a move/queue order (mirrors the onPointerMove gate above).
     if (this.deps.isMovepadHeld()) return;
@@ -270,7 +265,7 @@ export class PointerInputController {
   }
 
   /** Apply + persist a zoom level, clamped to [MIN_ZOOM, MAX_ZOOM]. Also mirrored onto the
-   * registry (for UIScene's initial readout — see UIScene.create) and broadcast for live updates. */
+   * registry (for the HUD's initial zoom readout) and broadcast for live updates. */
   setZoom(z: number): void {
     // Snap to an integer level: pixel-art sprites only stay crisp at integer camera scale (see
     // config.ts ZOOM_STEP). This gates *every* zoom source — buttons, pinch, restored preference.
@@ -295,8 +290,8 @@ export class PointerInputController {
 
   // --- Camera pan / follow-lock -----------------------------------------------
 
-  /** Engage/disengage camera auto-follow. Mirrored onto the registry (UIScene's initial button
-   * colour) and broadcast for live updates, matching the zoom-state pattern above. */
+  /** Engage/disengage camera auto-follow. Mirrored onto the registry (the HUD's initial follow-button
+   * state) and broadcast for live updates, matching the zoom-state pattern above. */
   setFollowing(on: boolean): void {
     if (this.following === on) return;
     this.following = on;

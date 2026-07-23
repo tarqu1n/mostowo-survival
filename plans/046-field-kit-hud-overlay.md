@@ -480,7 +480,7 @@ crispness proven at the Step 1 gate before any component is built on top.
     "Repair"→`npc:assignDayRole=repair`, "Guard here"→`npc:beginPlaceGuard`, mode-change clears
     inspect, DevMenu FORCE WAVE→`debug:forceWave`).
 
-- [ ] **Step 13: Cutover — remove UIScene + retire the hudHitTest input path** `[inline]`
+- [x] **Step 13: Cutover — remove UIScene + retire the hudHitTest input path** `[inline]`
   - Remove `UIScene` from the scene list in `src/main.ts`; remove the GameScene-side wiring
     that references it — the `this.ui` field and any `scene.launch('UI')`/`scene.get('UI')`
     calls (`GameScene.ts`) — then delete `src/scenes/UIScene.ts` + `src/scenes/hud/*` (now
@@ -498,6 +498,29 @@ crispness proven at the Step 1 gate before any component is built on top.
   - Docs: none (docs land in Step 14).
   - Done when: no `UIScene` in the scene list, no dead Phaser HUD code, full e2e suite +
     smoke green, and manual play shows the complete DOM HUD with world gestures intact.
+  - Outcome: `src/main.ts` — dropped the `UIScene` import + removed it from the scene list.
+    `src/scenes/GameScene.ts` — removed the `UIScene` import + `this.ui` field, the `hudHitTest`
+    dep from the `PointerInputController` deps-closure, and the `scene.launch('UI')`/`scene.get`
+    wiring in `buildWorld` (the four state re-emits — `mode:changed`/`combat:activeChanged`/
+    `demolish:modeChanged`/`supply:changed` — STAY: the page-level HUD bridge re-syncs from them
+    on each restart); also simplified `openNpcMenu` to drop the now-ignored `x`/`y` popover-anchor
+    payload (removing the last `RENDER_SCALE` use here) and refreshed the stale `UIScene` comment
+    references throughout to "the HUD". `src/scenes/input/PointerInputController.ts` — retired the
+    `hudHitTest` dep, `pointerOnHud`, and the `downOnUI` field + all its gate checks; taps are now
+    gated purely by DOM `pointer-events` (the `movepadHeld` registry flag stays). `src/config.ts`
+    — deleted `HOTBAR_SLOTS` (its only consumer was the deleted InventoryWidget); **kept
+    `INVENTORY_SLOTS`** (still the real `Inventory` capacity in GameScene + used by
+    `block-full.spec.ts` — verified, so NOT dead). Deleted `src/scenes/UIScene.ts`,
+    `src/scenes/hud/*` (11 files), and the whole Phaser UI kit `src/ui/*` (6 files — verified its
+    only importers were the deleted `scenes/hud/*`). `scripts/smoke.mjs` — swapped the retired
+    "UI scene active" assertion for a "DOM HUD mounted (command bar present)" check. No
+    `refactor-tripwire`/`__test` changes needed (the tripwire asserts `debugState()`, not the
+    HUD; no spec had an executable `UIScene` reference — only historical comments). Verified:
+    typecheck + lint (0 errors) + build + smoke + the input-critical/structure e2e set
+    (`refactor-tripwire`, `gestures`, `follow`, `build`, `combat`, `zoom`, `mode` — 28 passed) +
+    a one-off headless gating check (5/5: full HUD renders, no Phaser `UI` scene, command-bar tap
+    intercepts, empty HUD space falls through to the CANVAS). Full e2e suite deferred to Step 14
+    per the plan's end-of-plan verification.
 
 - [ ] **Step 14: DOM e2e coverage + docs** `[inline]`
   - Add `tests/e2e/hud-*.spec.ts` (Playwright DOM-driven) for meters, day/night, hotbar pin,

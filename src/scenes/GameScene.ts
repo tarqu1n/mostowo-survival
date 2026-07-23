@@ -14,7 +14,6 @@ import {
   INVENTORY_SLOTS,
   DEFAULT_MAX_STACK,
   PLAYER_LIGHT_RADIUS,
-  RENDER_SCALE,
 } from '../config';
 import { ITEMS } from '../data/items';
 import { BUILDABLES } from '../data/buildables';
@@ -32,7 +31,6 @@ import { ORDER_META, isOrderQueued, orderTargetId, toggleOrder } from '../system
 import { objectAsDefender } from '../systems/combat';
 import { hurtboxTiles, DEFAULT_HURTBOX } from '../systems/hurtbox';
 import type { DayPhase } from '../systems/daynight';
-import type { UIScene } from './UIScene';
 import type { GameTestApi } from '../entities/testTypes';
 import type { CharacterSprite } from '../entities/Character';
 import { PlayerCharacter } from '../entities/PlayerCharacter';
@@ -106,14 +104,14 @@ export class GameScene extends Phaser.Scene {
 
   // Input mode: Command (default tap-to-pathfind, unchanged), Combat (movepad drives the player
   // directly, bypassing the pathfinder), Inspect (tap shows a stats panel — Step 7). Mutually
-  // exclusive; UIScene mirrors this for HUD highlighting/visibility via 'mode:changed'.
+  // exclusive; the DOM HUD mirrors this for highlighting/visibility via 'mode:changed'.
   private mode: 'command' | 'combat' | 'inspect' = 'command';
 
   // Demolish mode (plan 037 chunk 2b): while on, a command-mode tap on a finished wall enqueues a
   // `deconstruct` worker order for it (walk adjacent → remove + partial refund). Layered on command
   // mode (like build mode, it's not one of the three `mode` values) and MUTUALLY EXCLUSIVE with build
   // mode — turning either on turns the other off. Non-destructive: toggling it never cancelAll()s the
-  // queue (mirrors build mode). UIScene mirrors it via `demolish:modeChanged` for the DEMOLISH button.
+  // queue (mirrors build mode). The DOM HUD mirrors it via `demolish:modeChanged` for the DEMOLISH button.
   private demolishMode = false;
 
   // Guard-point placement (plan 042 Step 9): armed by the companion assignment menu's "Guard here"
@@ -124,7 +122,7 @@ export class GameScene extends Phaser.Scene {
 
   // Auto-surface combat controls (plan 035a Step 3): recomputed every frame (updateCombatActive) —
   // true while a live enemy is within COMBAT_ACTIVE_RADIUS_TILES of the player OR it's night. Drives
-  // whether the movepad is authoritative (movepadDrives) and whether UIScene reveals the fighting HUD
+  // whether the movepad is authoritative (movepadDrives) and whether the DOM HUD reveals the fighting
   // (emitted as `combat:activeChanged`). Independent of `mode`: it never flips `mode` to 'combat'
   // (that cancelAll()s the task queue), so command-mode taps keep queuing orders while it's true.
   private combatActive = false;
@@ -236,7 +234,6 @@ export class GameScene extends Phaser.Scene {
   // PointerInputController (whose deps read `this.scenePicker`).
   private scenePicker!: ScenePicker;
 
-  private ui!: UIScene;
   // Pointer gestures (tap/long-press-paint/pan/pinch) + the camera they drive (zoom, follow-lock) —
   // see src/scenes/input/PointerInputController.ts (plan 013 Step 5). Constructed fresh in create()
   // (it wires its own input.on(...) listeners there and tears them down on SHUTDOWN itself), so unlike
@@ -318,7 +315,7 @@ export class GameScene extends Phaser.Scene {
     this.chopElapsed = 0;
     this.harvestSwing = null;
     this.combatMoveVec = { dx: 0, dy: 0 };
-    this.combatActive = false; // recomputed on the first update() tick; UIScene resynced in buildWorld
+    this.combatActive = false; // recomputed on the first update() tick; HUD resynced in buildWorld
     // The bow's auto-target lives on CombatController now (reconstructed fresh in buildWorld, so a
     // death-restart starts with no target); its FX highlight is cleared via fx.resetCombatFx below.
     // Combat-FX state — (re-)arm the SHUTDOWN flush (see CombatFxManager.armShutdown) then clear so a
@@ -332,7 +329,7 @@ export class GameScene extends Phaser.Scene {
     this.nodeFx.armShutdown();
     this.nodeFx.reset();
     this.mode = 'command';
-    this.demolishMode = false; // a death-restart starts clear of demolish mode (UIScene resynced in buildWorld)
+    this.demolishMode = false; // a death-restart starts clear of demolish mode (HUD resynced in buildWorld)
     this.placingGuardPoint = false; // …and clear of any half-armed guard-point placement (plan 042 Step 9)
     // baseSupply is (re)constructed fresh in buildWorld (like the shared Inventory), so a death-restart
     // starts with an empty pool without an explicit reset here — see plan 042 Step 3.
@@ -342,11 +339,10 @@ export class GameScene extends Phaser.Scene {
    * Build this (re)start's world from the authored start map (plan 018): baked tile layers + decor,
    * shared inventory, resource nodes hydrated from `node` objects + the (still procedural) first enemy
    * pack, player + enemy animations, the player character spawned at `SPAWN_TILE`, the
-   * build/queue-glow/pointer managers, the camera + fog-of-war + night overlay sized to the map, and
-   * the HUD overlay scene. Order matters in a couple of
-   * places (called out inline): the player must exist before BuildManager's collider, and both
-   * managers before UIScene launch (hudHitTest closes over `this.ui`, assigned at the very end, but
-   * that's only read from a later pointer event, never during this method).
+   * build/queue-glow/pointer managers, and the camera + fog-of-war + night overlay sized to the map.
+   * Order matters in one place (called out inline): the player must exist before BuildManager's
+   * collider. The HUD is the page-level DOM overlay (plan 046) — not a scene launched here — so the
+   * tail only re-emits current state onto the bus for its bridge to re-sync.
    */
   private buildWorld(): void {
     // Authored start map — loaded + its textures made resident in PreloadScene (plan 018 A10). Global
@@ -364,7 +360,7 @@ export class GameScene extends Phaser.Scene {
     // Tile layers baked from the authored palette/cells (plan 018 A4). Honours per-layer `overhead` depth.
     drawMapLayers(this, map, originPx);
 
-    // Shared character inventory — stored in the registry so the UIScene reads the same instance.
+    // Shared character inventory — stored in the registry so the HUD reads the same instance.
     this.inv = new Inventory({
       capacity: INVENTORY_SLOTS,
       maxStackOf: (id) => ITEMS[id]?.maxStack ?? DEFAULT_MAX_STACK,
@@ -372,7 +368,7 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('inventory', this.inv);
 
     // Shared base-supply pool (plan 042 Step 3) — fresh each (re)start (so a death-restart starts
-    // empty). Bridge its 'change' to a `supply:changed` game event so the HUD (UIScene) reflects
+    // empty). Bridge its 'change' to a `supply:changed` game event so the HUD reflects
     // deposits/withdrawals/seeding, mirroring how CampfireBehavior feeds the fire bar via `fire:changed`.
     this.baseSupply = new BaseSupply();
     this.baseSupply.on('change', (snap: { wood: number; rock: number }) =>
@@ -655,12 +651,11 @@ export class GameScene extends Phaser.Scene {
     });
 
     // Gesture + camera controller (plan 013 Step 5) — constructed fresh each (re)start; wires its own
-    // pointer listeners and tears them down on SHUTDOWN itself (see the class doc). hudHitTest closes
-    // over `this.ui`, assigned further below once UIScene is launched — safe, since no pointer event
-    // can fire before create() returns. Build placement and mode dispatch are NOT gesture mechanics —
-    // they route back through these deps callbacks (see PointerInputDeps).
+    // pointer listeners and tears them down on SHUTDOWN itself (see the class doc). Since plan 046 Step
+    // 13 the DOM HUD gates its own taps via `pointer-events` (a press on a control never reaches this
+    // canvas), so there is no HUD hit-test dep any more. Build placement and mode dispatch are NOT
+    // gesture mechanics — they route back through these deps callbacks (see PointerInputDeps).
     this.pointerInput = new PointerInputController(this, {
-      hudHitTest: (x, y) => this.ui.hudHitTest(x, y),
       getPlayerSprite: () => this.player,
       isBuildMode: () => this.buildManager.buildMode,
       onBuildDown: (pointer) => {
@@ -779,25 +774,23 @@ export class GameScene extends Phaser.Scene {
       }),
     });
 
-    // HUD overlay runs alongside this scene; grab its instance for the UI-tap guard. UIScene
-    // itself isn't restarted on a death-restart (only 'Game' is), so re-emit mode:changed here to
-    // resync its mode-toggle/movepad visuals in case death happened mid-Combat/Inspect mode.
-    this.scene.launch('UI');
-    this.ui = this.scene.get('UI') as UIScene;
+    // The DOM/React HUD overlay (plan 046) is page-level and persists across a death-restart (only
+    // 'Game' restarts), so on every (re)start re-emit the current state onto the bus — the HUD bridge
+    // re-syncs its store from these rather than being torn down (see src/hud/bridge.ts "Lifecycle").
+    // mode:changed resyncs the mode-toggle/movepad morph in case death happened mid-Combat/Inspect.
     this.game.events.emit('mode:changed', this.mode);
-    // Resync UIScene's auto-surface visibility to this (re)start's reset value (false). UIScene
-    // survives a death-restart (only 'Game' restarts), so a stale `true` from the prior run would
-    // otherwise leave the fighting HUD showing; update() re-emits on the first frame if it flips true.
+    // Auto-surface visibility: a stale `true` from the prior run would otherwise leave the fighting HUD
+    // showing; update() re-emits on the first frame if it flips true again.
     this.game.events.emit('combat:activeChanged', this.combatActive);
-    // Same resync for demolish mode — UIScene survives a death-restart, so re-emit the reset value
-    // (false) so its DEMOLISH button/hint don't linger toggled from the prior run (plan 037 2b).
+    // Demolish mode: re-emit the reset value (false) so the DEMOLISH button/hint don't linger toggled
+    // from the prior run (plan 037 2b).
     this.game.events.emit('demolish:modeChanged', this.demolishMode);
-    // Seed the base-supply HUD readout with this (re)start's pool (fresh = 0/0). UIScene survives a
-    // death-restart, so re-emit the current counts so its readout reflects this run (plan 042 Step 3).
+    // Seed the base-supply readout with this (re)start's pool (fresh = 0/0) so it reflects this run
+    // (plan 042 Step 3).
     this.game.events.emit('supply:changed', this.baseSupply.snapshot());
   }
 
-  /** Wire every `game.events` scene↔UIScene listener + its matching SHUTDOWN teardown (the same 12
+  /** Wire every `game.events` scene↔HUD listener + its matching SHUTDOWN teardown (the same 12
    *  listeners create() always registered — build/zoom/camera route to the managers that now own
    *  those methods), then push the first queue-highlight refresh. */
   private wireBus(): void {
@@ -831,7 +824,7 @@ export class GameScene extends Phaser.Scene {
       ['needs:eat', this.survivalClock.onNeedsEat, this.survivalClock],
       ['combat:move', this.onCombatMove, this],
       ['combat:moveEnd', this.onCombatMoveEnd, this],
-      // Companion assignment menu (plan 042 Step 9) — UIScene's popover buttons route back here through
+      // Companion assignment menu (plan 042 Step 9) — the DOM HUD's companion menu routes back here through
       // the same shared setters the `__test` seams call; "Guard here" arms the place-point mode.
       ['npc:assignDayRole', this.setNpcDayRole, this],
       ['npc:assignNightPosture', this.setNpcNightPosture, this],
@@ -1496,7 +1489,7 @@ export class GameScene extends Phaser.Scene {
     if (npc && !npc.downed) this.fx.flashHit(npc.sprite);
   }
 
-  /** Switch input mode (mutually exclusive) and notify UIScene to update its HUD accordingly. */
+  /** Switch input mode (mutually exclusive) and notify the HUD to update accordingly. */
   private setMode(next: 'command' | 'combat' | 'inspect'): void {
     if (this.mode === next) return;
     this.mode = next;
@@ -1513,18 +1506,18 @@ export class GameScene extends Phaser.Scene {
     this.setMode(this.mode === 'inspect' ? 'command' : 'inspect');
   }
 
-  /** Palette picked a buildable (UIScene `build:select`): route to BuildManager, which remembers the
+  /** Palette picked a buildable (the HUD's `build:select`): route to BuildManager, which remembers the
    *  selection and enters build mode. */
   private onBuildSelect({ id }: { id: string }): void {
     this.buildManager.select(id);
   }
 
-  /** Toggle demolish mode (plan 037 2b) — UIScene DEMOLISH button / ESC via `demolish:toggle`. */
+  /** Toggle demolish mode (plan 037 2b) — the HUD DEMOLISH button / ESC via `demolish:toggle`. */
   private onDemolishToggle(): void {
     this.setDemolishMode(!this.demolishMode);
   }
 
-  /** Set demolish mode + notify UIScene (`demolish:modeChanged`). Turning it ON exits build mode (the
+  /** Set demolish mode + notify the HUD (`demolish:modeChanged`). Turning it ON exits build mode (the
    *  two are mutually exclusive — a base-building session is either placing or unbuilding, never both).
    *  Deliberately does NOT cancelAll() (mirrors build mode's non-destructive toggle): entering demolish
    *  leaves any in-flight worker order running until you actually mark a wall. */
@@ -1579,17 +1572,11 @@ export class GameScene extends Phaser.Scene {
     this.placingGuardPoint = false;
   }
 
-  /** A tap on the companion opened its assignment menu: hand UIScene the NPC's current role/posture
-   *  (to highlight the live rows) plus its on-screen position in design space — the world sprite point
-   *  mapped through the main camera (`worldView` origin × zoom) and down by RENDER_SCALE, since the
-   *  HUD is authored in un-zoomed BASE_WIDTH×BASE_HEIGHT units. UIScene clamps it on screen. */
+  /** A tap on the companion opened its assignment menu: hand the HUD the NPC's current role/posture so
+   *  it can highlight the live rows. (The legacy Phaser popover was anchored to the sprite's on-screen
+   *  point; the DOM HUD is a bottom sheet, so that x/y payload was dropped at plan 046 Step 13.) */
   private openNpcMenu(npc: NpcCharacter): void {
-    const cam = this.cameras.main;
-    const x = ((npc.sprite.x - cam.worldView.x) * cam.zoom) / RENDER_SCALE;
-    const y = ((npc.sprite.y - cam.worldView.y) * cam.zoom) / RENDER_SCALE;
     this.game.events.emit('npc:menuOpen', {
-      x,
-      y,
       dayRole: npc.dayRole,
       nightPosture: npc.nightPosture,
     });
@@ -1604,7 +1591,7 @@ export class GameScene extends Phaser.Scene {
     return this.mode === 'combat' || this.combatActive;
   }
 
-  /** Recompute {@link combatActive} and emit `combat:activeChanged` only when it flips (UIScene
+  /** Recompute {@link combatActive} and emit `combat:activeChanged` only when it flips (the HUD
    *  shows/hides the fighting HUD on it). Engages when a live enemy is within COMBAT_ACTIVE_RADIUS_TILES
    *  (Chebyshev) OR it's night; retracts only past the wider hysteresis radius (see below) to stop
    *  boundary flicker. Deliberately does NOT call setMode('combat') (that cancelAll()s the queue). */
