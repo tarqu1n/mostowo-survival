@@ -9,6 +9,8 @@ import {
   CAMPFIRE_FEED_INTERVAL_MS,
   LONGPRESS_MS,
   BUILD_MS,
+  SALVAGE_MS,
+  CLEAR_MS,
   COMBAT_ACTIVE_RADIUS_TILES,
   COMBAT_ACTIVE_HYSTERESIS_TILES,
   INVENTORY_SLOTS,
@@ -29,6 +31,7 @@ import { breadcrumb, setCrashContext } from '../debug/crashReporter';
 import { TaskQueue, type Action } from '../systems/tasks';
 import { ORDER_META, isOrderQueued, orderTargetId, toggleOrder } from '../systems/orders';
 import { harvestAnimMotion } from '../systems/nodeDefs';
+import { rollLoot } from '../systems/loot';
 import { objectAsDefender } from '../systems/combat';
 import { hurtboxTiles, DEFAULT_HURTBOX } from '../systems/hurtbox';
 import type { DayPhase } from '../systems/daynight';
@@ -1142,6 +1145,7 @@ export class GameScene extends Phaser.Scene {
     refuel: (a, delta) => this.runRefuel(a, delta),
     deconstruct: (a) => this.runDeconstruct(a),
     rearm: (a) => this.runRearm(a),
+    clear: (a, delta) => this.runClear(a, delta),
   };
 
   /**
@@ -1162,6 +1166,7 @@ export class GameScene extends Phaser.Scene {
     deconstruct: (a) => this.beginDeconstruct(a),
     rearm: (a) => this.beginRearm(a),
     build: (a) => this.beginBuild(a),
+    clear: (a) => this.beginClear(a),
   };
 
   private beginHarvest(a: Extract<Action, { kind: 'harvest' }>): void {
@@ -1238,6 +1243,26 @@ export class GameScene extends Phaser.Scene {
     if (!stand || !this.pathTo(stand)) this.completeCurrent();
   }
 
+  private beginClear(a: Extract<Action, { kind: 'clear' }>): void {
+    const tree = this.resourceNodeManager.treeById(a.treeId);
+    // Clearable only if it's still a present, depleted `oneShot` ruin (the salvage husk). Gone /
+    // somehow alive / not a one-shot node → drop the order.
+    if (!tree || tree.alive || !tree.def.oneShot) return this.completeCurrent();
+    const target = { col: tree.col, row: tree.row };
+    // Prefer the node's own stand tiles (the tall tent is base-anchored, like harvesting it); fall
+    // back to any adjacent tile if those are walled off. The ruin blocks its own tile (hasBlockingNode),
+    // so the worker always stands adjacent — never on it.
+    const stand =
+      reachableAdjacent(
+        this.playerChar.tile(),
+        target,
+        this.isBlocked,
+        this.gridDims,
+        tree.def.standOffsets,
+      ) ?? reachableAdjacent(this.playerChar.tile(), target, this.isBlocked, this.gridDims);
+    if (!stand || !this.pathTo(stand)) this.completeCurrent();
+  }
+
   private beginBuild(a: Extract<Action, { kind: 'build' }>): void {
     const site = this.buildManager.siteById(a.siteId);
     if (!site || site.done) return this.completeCurrent();
@@ -1269,7 +1294,7 @@ export class GameScene extends Phaser.Scene {
    * Append an order; if the worker was idle, start it. Tapping a target that already has an order of
    * the same kind toggles it back off instead of duplicating it (the toggle/queue behaviour, now
    * generic over `orderTargetId` — see systems/orders.ts). Only the kinds flagged `dedupeOnEnqueue`
-   * toggle (harvest/refuel/deconstruct/rearm); `build`/`move` always append. Toggling off re-queues at
+   * toggle (harvest/refuel/deconstruct/rearm/clear); `build`/`move` always append. Toggling off re-queues at
    * the END on a later tap (a fresh append); if the live order is cancelled, {@link beginCurrent}
    * advances to the next (or goes idle) so the worker stops working a target you un-queued. The rearm
    * de-dupe also stops the dawn auto-enqueue from queuing a trap twice (plan 040).
@@ -1323,6 +1348,23 @@ export class GameScene extends Phaser.Scene {
       // now authored directly per def (`harvestAnim`), defaulting to chop; `salvage` (tent wreck) reuses
       // the gather motion via `harvestAnimMotion`. See ResourceNodeDef.harvestAnim.
       this.harvestSwing = harvestAnimMotion(tree.def.harvestAnim);
+      // Timed SALVAGE (plan 047): a `oneShot` loot node (the tent wreck) is ONE long timed action, not
+      // a per-hit chop. Accumulate real-time on the NODE — so cancelling (re-tap / walk away) keeps the
+      // progress and re-queuing resumes — and fell it exactly ONCE at SALVAGE_MS. Loot semantics are
+      // unchanged from the old single-hit salvage: `chop` rolls the whole `loot` table and `inv.add`
+      // clamps, so a near-full bag drops the overflow exactly as before (critique #4 — accepted, not
+      // re-gated). The hit-cadence path below is untouched for trees/rocks/bushes.
+      if (tree.def.oneShot && tree.def.loot) {
+        // Step 6 wires the continuous shake + progress bar here (driven off tree.progressMs / SALVAGE_MS).
+        tree.progressMs += delta;
+        if (tree.progressMs >= SALVAGE_MS) {
+          // faceTile above set lastFacing FROM the player TO the node, so the fell lean is +lastFacing.
+          this.resourceNodeManager.chop(tree, this.playerChar.lastFacing); // rolls loot + depletes; no regrow (oneShot)
+          tree.progressMs = 0; // reset the accumulator for the later CLEAR stage
+          this.completeCurrent();
+        }
+        return;
+      }
       this.chopElapsed += delta;
       if (this.chopElapsed >= CHOP_INTERVAL_MS) {
         this.chopElapsed = 0;
@@ -1414,6 +1456,34 @@ export class GameScene extends Phaser.Scene {
       this.playerChar.faceTile(t.col, t.row); // face the trap as it's reset
       this.trap.rearm(a.trapId); // re-prime it (worker-time only, no resource — decision #6)
       this.completeCurrent();
+    }
+  }
+
+  /**
+   * Clear a salvaged wreck's ruined husk (plan 047): walk to the stand tile (set in beginCurrent),
+   * then dismantle it over CLEAR_MS — an even longer timed action than the salvage that preceded it.
+   * A timed progress-accumulator like {@link runBuild}/the salvage branch of {@link runHarvest} (the
+   * `progressMs` lives on the node, so cancel/re-queue resumes), completing like {@link runDeconstruct}
+   * on a *condition*: at CLEAR_MS roll the optional `clearLoot` scrap into the bag, remove the node
+   * (frees its tile + repaths), and END the order. If the ruin vanished before arrival (scenario reset),
+   * drop the order rather than stall — mirrors runDeconstruct's gone-target guard.
+   */
+  private runClear(a: Extract<Action, { kind: 'clear' }>, delta: number): void {
+    const tree = this.resourceNodeManager.treeById(a.treeId);
+    if (!tree || tree.alive || !tree.def.oneShot) return this.completeCurrent(); // gone / regrew / not a ruin
+    if (this.playerChar.advancePath()) {
+      this.player.body.setVelocity(0, 0);
+      this.playerChar.faceTile(tree.col, tree.row); // face the husk as it comes apart
+      this.harvestSwing = 'gather'; // dismantle reads as the rummage/gather motion (reskin stand-in)
+      // Step 6 wires the continuous shake + progress bar here (driven off tree.progressMs / CLEAR_MS).
+      tree.progressMs += delta;
+      if (tree.progressMs >= CLEAR_MS) {
+        // A little scrap for the effort (cloth/wood) — a one-shot node with no clearLoot clears silently.
+        if (tree.def.clearLoot)
+          for (const drop of rollLoot(tree.def.clearLoot)) this.inv.add(drop.itemId, drop.qty);
+        this.resourceNodeManager.removeNode(a.treeId); // destroy + free the tile + repath
+        this.completeCurrent(); // condition-terminate: the ruin is gone
+      }
     }
   }
 

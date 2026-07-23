@@ -107,6 +107,15 @@ export const LONGPRESS_MS = 350;
 export const BUILD_MS = 2500;
 
 /**
+ * On-site work time (ms) for the two-stage salvage lifecycle of a `oneShot` wreck node (plan 047).
+ * `SALVAGE_MS` is the long timed action that rummages a wrecked tent for its loot and leaves a ruined
+ * husk; `CLEAR_MS` is the even longer action that dismantles the husk to free its tile. Both are timed
+ * progress-accumulators (like `BUILD_MS`), not hit cadences; generic constants (no per-def override).
+ */
+export const SALVAGE_MS = 20000;
+export const CLEAR_MS = 40000;
+
+/**
  * Deconstruct refund (plan 037 chunk 2b, decision #6). Unbuilding a finished wall via a worker
  * deconstruct order credits back this fraction of its buildable `cost`, floored per resource (the
  * wall's `{ wood: 2 }` → 1 wood back). A partial refund so demolish-and-rebuild churn isn't free, but

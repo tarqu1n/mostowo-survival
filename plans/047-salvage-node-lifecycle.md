@@ -150,7 +150,8 @@ Key files/patterns to mirror (from research):
   - Done when: tapping a live tent enqueues `harvest`; tapping the ruin enqueues `clear` (assert via
     a scenario `order`/`debugState`, or manual).
 
-- [ ] **Step 5: timed salvage + `clear` execution (durations, persistent progress, scrap, removal)** `[inline]`
+- [x] **Step 5: timed salvage + `clear` execution (durations, persistent progress, scrap, removal)** `[inline]`
+  - Outcome: `src/config.ts` — added `SALVAGE_MS=20000`, `CLEAR_MS=40000`. `src/scenes/GameScene.ts` — imported both + `rollLoot`; `runHarvest` branches `oneShot && loot` nodes onto a `tree.progressMs += delta` accumulator that fells ONCE at `SALVAGE_MS` (resets progress to 0 for the clear stage), hit-cadence path unchanged for trees/rocks/bushes; added `beginClear` (stand-adjacent, standOffsets, aborts if gone/alive/not-oneShot) + `runClear` (progress to `CLEAR_MS` → roll `clearLoot` into `inv` → `removeNode` → complete); registered `clear` in `orderBeginners`/`orderRunners`; updated the `enqueue` dedupe-kinds comment. Critique #4: overflow-drop on a near-full bag is **unchanged from the old single-hit salvage** (salvagedTent is maxHp:1, so `chop` already rolls the full `loot` table behind the `canAccept(cloth,1)` gate) — only the *timing* changed; documented, not re-gated. `progressMs` never reset in `beginCurrent`, so cancel/re-queue resumes. Shake/progress-bar fx are marked `// Step 6 wires …` (not yet present → no leak). Typecheck clean, 962 unit tests green; ~20s/~40s lifecycle asserted via scenario in Step 8.
   - `src/config.ts`: add `SAVAGE_MS = 20000`, `CLEAR_MS = 40000` near `BUILD_MS` (L107).
   - `src/scenes/GameScene.ts`:
     - **Timed salvage:** in `runHarvest` (L1307-1333), when the target node is a long/timed harvest
