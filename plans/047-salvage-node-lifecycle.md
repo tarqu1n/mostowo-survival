@@ -1,6 +1,6 @@
 # Salvage Node Lifecycle
 
-> Status: in review
+> Status: deployed
 
 ## Summary
 
