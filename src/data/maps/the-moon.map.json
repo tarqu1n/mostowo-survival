@@ -4248,7 +4248,7 @@
       "ref": "savagedTent",
       "col": 121,
       "row": 139,
-      "skin": "blue"
+      "skin": "front_blue"
     },
     {
       "id": "node_tent_3",
@@ -4256,7 +4256,31 @@
       "ref": "savagedTent",
       "col": 125,
       "row": 139,
-      "skin": "scorched"
+      "skin": "side_cream"
+    },
+    {
+      "id": "node_tent_4",
+      "kind": "node",
+      "ref": "savagedTent",
+      "col": 117,
+      "row": 144,
+      "skin": "diag_grey"
+    },
+    {
+      "id": "node_tent_5",
+      "kind": "node",
+      "ref": "savagedTent",
+      "col": 122,
+      "row": 144,
+      "skin": "front_cream"
+    },
+    {
+      "id": "node_tent_6",
+      "kind": "node",
+      "ref": "savagedTent",
+      "col": 127,
+      "row": 144,
+      "skin": "side_green"
     }
   ]
 }

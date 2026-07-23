@@ -88,7 +88,7 @@ describe('NODES', () => {
     expect(tent).toBeDefined();
     expect(tent.harvestAnim).toBe('savage');
     expect(tent.loot).toBeDefined();
-    expect(tent.skins).toHaveLength(3); // 3 wreck variations
+    expect(tent.skins).toHaveLength(9); // 3 orientations (diagonal/front/side) × 3 colours
   });
 });
 

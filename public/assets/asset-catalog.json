@@ -46370,6 +46370,276 @@
       "origin": "self-made"
     },
     {
+      "id": "mostowo-custom/Environment/Props/Static/tent_front_1_searched.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_front_1_searched.png"
+      },
+      "w": 64,
+      "h": 51,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "1",
+        "environment",
+        "front",
+        "props",
+        "searched",
+        "static",
+        "tent"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_front_1.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_front_1.png"
+      },
+      "w": 64,
+      "h": 51,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "1",
+        "environment",
+        "front",
+        "props",
+        "static",
+        "tent"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_front_2_searched.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_front_2_searched.png"
+      },
+      "w": 64,
+      "h": 63,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "2",
+        "environment",
+        "front",
+        "props",
+        "searched",
+        "static",
+        "tent"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_front_2.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_front_2.png"
+      },
+      "w": 64,
+      "h": 63,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "2",
+        "environment",
+        "front",
+        "props",
+        "static",
+        "tent"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_front_3_searched.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_front_3_searched.png"
+      },
+      "w": 64,
+      "h": 55,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "3",
+        "environment",
+        "front",
+        "props",
+        "searched",
+        "static",
+        "tent"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_front_3.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_front_3.png"
+      },
+      "w": 64,
+      "h": 55,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "3",
+        "environment",
+        "front",
+        "props",
+        "static",
+        "tent"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_side_1_searched.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_side_1_searched.png"
+      },
+      "w": 64,
+      "h": 45,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "1",
+        "environment",
+        "props",
+        "searched",
+        "side",
+        "static",
+        "tent"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_side_1.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_side_1.png"
+      },
+      "w": 64,
+      "h": 45,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "1",
+        "environment",
+        "props",
+        "side",
+        "static",
+        "tent"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_side_2_searched.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_side_2_searched.png"
+      },
+      "w": 64,
+      "h": 39,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "2",
+        "environment",
+        "props",
+        "searched",
+        "side",
+        "static",
+        "tent"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_side_2.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_side_2.png"
+      },
+      "w": 64,
+      "h": 39,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "2",
+        "environment",
+        "props",
+        "side",
+        "static",
+        "tent"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_side_3_searched.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_side_3_searched.png"
+      },
+      "w": 64,
+      "h": 42,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "3",
+        "environment",
+        "props",
+        "searched",
+        "side",
+        "static",
+        "tent"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_side_3.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_side_3.png"
+      },
+      "w": 64,
+      "h": 42,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "3",
+        "environment",
+        "props",
+        "side",
+        "static",
+        "tent"
+      ],
+      "origin": "self-made"
+    },
+    {
       "id": "mostowo-custom/Environment/Props/Static/tent_wreck_1_searched.png",
       "pack": "mostowo-custom",
       "type": "object",
@@ -46378,8 +46648,8 @@
         "kind": "image",
         "path": "Environment/Props/Static/tent_wreck_1_searched.png"
       },
-      "w": 56,
-      "h": 44,
+      "w": 64,
+      "h": 54,
       "category": "Environment/Props/Static",
       "tags": [
         "1",
@@ -46401,8 +46671,8 @@
         "kind": "image",
         "path": "Environment/Props/Static/tent_wreck_1.png"
       },
-      "w": 56,
-      "h": 44,
+      "w": 64,
+      "h": 54,
       "category": "Environment/Props/Static",
       "tags": [
         "1",
@@ -46423,8 +46693,8 @@
         "kind": "image",
         "path": "Environment/Props/Static/tent_wreck_2_searched.png"
       },
-      "w": 56,
-      "h": 44,
+      "w": 64,
+      "h": 51,
       "category": "Environment/Props/Static",
       "tags": [
         "2",
@@ -46446,8 +46716,8 @@
         "kind": "image",
         "path": "Environment/Props/Static/tent_wreck_2.png"
       },
-      "w": 56,
-      "h": 44,
+      "w": 64,
+      "h": 51,
       "category": "Environment/Props/Static",
       "tags": [
         "2",
@@ -46468,8 +46738,8 @@
         "kind": "image",
         "path": "Environment/Props/Static/tent_wreck_3_searched.png"
       },
-      "w": 56,
-      "h": 44,
+      "w": 64,
+      "h": 49,
       "category": "Environment/Props/Static",
       "tags": [
         "3",
@@ -46491,8 +46761,8 @@
         "kind": "image",
         "path": "Environment/Props/Static/tent_wreck_3.png"
       },
-      "w": 56,
-      "h": 44,
+      "w": 64,
+      "h": 49,
       "category": "Environment/Props/Static",
       "tags": [
         "3",

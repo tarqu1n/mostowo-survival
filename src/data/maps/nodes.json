@@ -357,7 +357,7 @@
       "skins": [
         {
           "id": "default",
-          "name": "Ridge Tent (green)",
+          "name": "Diagonal — green",
           "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_1.png",
           "weight": 1,
           "depleted": {
@@ -365,8 +365,8 @@
           }
         },
         {
-          "id": "blue",
-          "name": "Dome Tent (blue)",
+          "id": "diag_blue",
+          "name": "Diagonal — light blue",
           "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_2.png",
           "weight": 1,
           "depleted": {
@@ -374,12 +374,66 @@
           }
         },
         {
-          "id": "scorched",
-          "name": "Scorched Tent (red)",
+          "id": "diag_grey",
+          "name": "Diagonal — grey",
           "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_3.png",
           "weight": 1,
           "depleted": {
             "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_3_searched.png"
+          }
+        },
+        {
+          "id": "front_blue",
+          "name": "Front — light blue",
+          "asset": "mostowo-custom/Environment/Props/Static/tent_front_1.png",
+          "weight": 1,
+          "depleted": {
+            "asset": "mostowo-custom/Environment/Props/Static/tent_front_1_searched.png"
+          }
+        },
+        {
+          "id": "front_grey",
+          "name": "Front — grey",
+          "asset": "mostowo-custom/Environment/Props/Static/tent_front_2.png",
+          "weight": 1,
+          "depleted": {
+            "asset": "mostowo-custom/Environment/Props/Static/tent_front_2_searched.png"
+          }
+        },
+        {
+          "id": "front_cream",
+          "name": "Front — cream",
+          "asset": "mostowo-custom/Environment/Props/Static/tent_front_3.png",
+          "weight": 1,
+          "depleted": {
+            "asset": "mostowo-custom/Environment/Props/Static/tent_front_3_searched.png"
+          }
+        },
+        {
+          "id": "side_cream",
+          "name": "Side — cream",
+          "asset": "mostowo-custom/Environment/Props/Static/tent_side_1.png",
+          "weight": 1,
+          "depleted": {
+            "asset": "mostowo-custom/Environment/Props/Static/tent_side_1_searched.png"
+          }
+        },
+        {
+          "id": "side_green",
+          "name": "Side — green",
+          "asset": "mostowo-custom/Environment/Props/Static/tent_side_2.png",
+          "weight": 1,
+          "depleted": {
+            "asset": "mostowo-custom/Environment/Props/Static/tent_side_2_searched.png"
+          }
+        },
+        {
+          "id": "side_blue",
+          "name": "Side — light blue",
+          "asset": "mostowo-custom/Environment/Props/Static/tent_side_3.png",
+          "weight": 1,
+          "depleted": {
+            "asset": "mostowo-custom/Environment/Props/Static/tent_side_3_searched.png"
           }
         }
       ]

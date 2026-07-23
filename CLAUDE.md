@@ -13,6 +13,17 @@ Worked on from **whatever device is to hand** (often on a phone, mid-journey, ac
 sessions). So **every reusable decision, preference, or workflow goes in the repo**, never only in
 chat — if a future session would waste time rediscovering it, write it down here or in a linked doc.
 
+## Home server: guppi (non-prod)
+
+**guppi is Matt's personal, NON-PRODUCTION home server** (the Beelink in the `guppi` repo) — safe to
+connect to. A Claude Code **cloud session CAN reach it over Tailscale** using the `TAILSCALE_KEY` +
+`GUPPI_PASSWORD` env vars it already carries (SSH login user is `guppi`, not `matt`) — do **not** say
+guppi is unreachable from a sandbox. This is how the **Gemini image-gen key**
+(`guppi/house-helper/.env`) is fetched for the item-icon + sprite pipelines. Verified end-to-end
+recipe (install tailscale → userspace networking + SOCKS5 → `gssh`):
+**[docs/MOBILE-EDITOR-ACCESS.md](docs/MOBILE-EDITOR-ACCESS.md#claude-getting-a-shell-on-guppi--working-on-the-build-there)**.
+Keep any fetched key in-memory only; never commit or echo it.
+
 ## Build workflow (Hermes dev skills)
 
 Build using the **Hermes dev skills** (from the `hermes-ai-tooling` repo): `plan-feature` →

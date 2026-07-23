@@ -257,16 +257,27 @@ wall/gate/trap render steps read paths + frames from.
 Three **wrecked-tent** node skins (roughly a 6-person tent, ~3×2 tiles) for the **savage** action —
 scavenging a collapsed tent for items from a predefined set instead of a single fixed yield.
 
-- **Art is PLACEHOLDER, hand-baked**, not from a pack (no pack ships tent art, and the Gemini
-  image-to-image pipeline's key isn't reachable from a cloud session). `scripts/tent-art.mjs` bakes
-  them with the same dependency-free PNG encoder as `scripts/placeholder-art.mjs`:
-  `mostowo-custom/Environment/Props/Static/tent_wreck_{1,2,3}.png` (live) + `_searched.png`
-  (depleted/ransacked) + the two salvage item icons `icons/cloth.png`, `icons/canned_food.png`.
-  **Regenerate the real sprites through the Gemini pipeline later** (docs/AI-SPRITE-PIPELINE.md); until
-  then re-run `node scripts/tent-art.mjs`, then `npm run assets:catalog` so the catalog picks them up.
+- **Art is Gemini-generated** (`scripts/gen-tents.py`), image-to-image, since no pack ships tent art.
+  **9 skins = 3 orientations × 3 realistic weathered colours** (cream / light-blue / green / grey — the
+  game is TOP-DOWN so all use the pack's high top-down oblique angle):
+  `tent_wreck_{1,2,3}` (diagonal), `tent_front_{1,2,3}` (front / entrance-to-camera),
+  `tent_side_{1,2,3}` (broadside / ridge horizontal), each `+ _searched` (the depleted/ransacked swap,
+  derived from the live art by desaturate+darken). The technique (docs/AI-SPRITE-PIPELINE.md — the
+  reference holds it on-model): an isolated pack **roof chevron** from `Buildings/Roofs.png` anchors
+  the top-down camera + flat pixel-art style; `side` additionally gets a plain grey **broadside
+  silhouette** as a pose-guide, because the diagonal roof + the model's diagonal tent prior otherwise
+  snap every `side` prompt back to 3/4. Regenerate: export `GEMINI_API_KEY` (guppi, over Tailscale —
+  see below), `python3 scripts/gen-tents.py` (`--dry-run` / `--reprocess` / `--only ID` available),
+  then `npm run assets:catalog`. The two salvage **item icons** (`icons/cloth.png`,
+  `icons/canned_food.png`) are still the hand-baked placeholders from `scripts/tent-art.mjs`.
+  > **Getting the Gemini key from a cloud session:** guppi is Matt's **non-prod home server** and the
+  > key lives in `guppi/house-helper/.env`, reachable over Tailscale with the session's own
+  > `TAILSCALE_KEY`/`GUPPI_PASSWORD` — follow the verified recipe in
+  > [MOBILE-EDITOR-ACCESS.md](MOBILE-EDITOR-ACCESS.md#claude-getting-a-shell-on-guppi--working-on-the-build-there).
+  > Keep the key in-memory only; never commit/echo it.
 - **Node def:** `savagedTent` in `src/data/maps/nodes.json` — `maxHp:1`, `blocksPath:true`,
-  `harvestAnim:'savage'`, three skins (green ridge / blue dome / scorched), each with a `_searched`
-  depleted swap, regrows like a rock (10 min). Placed near the camp in `the-moon.map.json`.
+  `harvestAnim:'savage'`, the 9 skins above (each with a `_searched` depleted swap), regrows like a
+  rock (10 min). Six instances (all 3 orientations) placed near the camp in `the-moon.map.json`.
 - **Loot mechanic (the actually-new bit):** a node def may carry a `loot` table
   (`ResourceNodeDef.loot`, validated by `parseLootTable` in `systems/nodeDefs.ts`) — `rolls` weighted
   draws from a `drops` set, each a `[min,max]` quantity. When present, `ResourceNodeManager.chop`
