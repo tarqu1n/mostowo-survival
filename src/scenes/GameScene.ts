@@ -1451,7 +1451,13 @@ export class GameScene extends Phaser.Scene {
    *  world position, fed into SurvivalClock's night light-layer erase list so the player is never fully
    *  blind at full-dark night. RENDER only: it is NOT in the base-claim path (fires-only, decision #7). */
   private playerLight(): { x: number; y: number; radius: number } {
-    return { x: this.player.x, y: this.player.y, radius: PLAYER_LIGHT_RADIUS };
+    // Emit from the sprite's visual CENTRE, not its feet. `this.player.y` sits at the sprite origin
+    // (originY ~0.78 ≈ the feet row), so a disc centred there pools the small glow at the feet and
+    // leaves the body in the dark. Shift up from the origin to the frame's vertical centre (0.5) so the
+    // glow lights the character. x is unaffected (originX 0.5 is already centred).
+    const s = this.player;
+    const centerY = s.y - (s.originY - 0.5) * s.displayHeight;
+    return { x: s.x, y: centerY, radius: PLAYER_LIGHT_RADIUS };
   }
 
   private litHearth(): { id: string; tile: Cell; pos: { x: number; y: number } } | null {
