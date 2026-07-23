@@ -134,3 +134,31 @@ test('a stackable hotbar item shows its live count and a tap eats one, decrement
   await expect(hotbar.getByTestId('hud-hotbar-count')).toHaveText('2'); // still 2 — blocked
   expect(await held(page, 'berries')).toBe(2);
 });
+
+test('a resource slot with no action (wood) neither fires nor pops when tapped', async ({
+  page,
+}) => {
+  await startGame(page);
+  await applyScenario(page, { player: [10, 10], inventory: { wood: 5 } });
+  await captureInbound(page);
+
+  // Pin wood to the bar (same long-press gesture, hover to settle the slide first).
+  await page.getByRole('button', { name: 'Pack', exact: true }).click();
+  const entry = page.getByRole('dialog').getByRole('button', { name: 'Wood' });
+  await entry.hover();
+  const box = (await entry.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(600);
+  await page.mouse.up();
+  await page.keyboard.press('Escape');
+
+  const wood = page.getByTestId('hud-hotbar').getByRole('button', { name: /Wood/ });
+  await expect(wood).toHaveCount(1);
+
+  // Wood has no use action, so a tap fires nothing AND plays no "pop" (no WAAPI animation on the slot).
+  await wood.click();
+  expect(await captured(page, 'needs:eat')).toBeNull();
+  expect(await captured(page, 'build:select')).toBeNull();
+  expect(await wood.evaluate((el) => el.getAnimations().length)).toBe(0);
+});

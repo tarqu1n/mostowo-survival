@@ -39,7 +39,15 @@ export function Hotbar({ className }: { className?: string }) {
   );
 }
 
-/** Fire the tap action for a filled slot (see the component doc for the per-kind mapping). */
+/** Whether tapping this slot actually does something: a buildable selects it for placement, an edible
+ *  eats it. A plain resource (wood/stone) or a not-yet-usable item (weapons — no equip system) has NO
+ *  action, so it must neither fire nor give the tap "pop" (see SlotButton). */
+function slotHasAction(slot: NonNullable<HotbarSlot>): boolean {
+  return slot.kind === 'buildable' || ITEMS[slot.id]?.nutrition != null;
+}
+
+/** Fire the tap action for a filled slot (see the component doc for the per-kind mapping). Only ever
+ *  called for slots where {@link slotHasAction} is true. */
 function activate(slot: NonNullable<HotbarSlot>): void {
   const bridge = hudBridge();
   if (!bridge) return;
@@ -50,9 +58,7 @@ function activate(slot: NonNullable<HotbarSlot>): void {
   const def = ITEMS[slot.id];
   if (def?.nutrition != null) {
     bridge.emit({ type: 'needs:eat', payload: { itemId: slot.id } });
-    return;
   }
-  // Weapon / other item: equipment system is deferred (plan 046), so "use" is a no-op placeholder.
 }
 
 /** Absolute URL of an item icon (mirrors PreloadScene's `assets/icons/<file>` load path). */
@@ -115,6 +121,7 @@ function SlotButton({ slot }: { slot: HotbarSlot }) {
     clearTimer();
     if (longPressed.current) return; // held long enough to be a long-press → don't fire the tap
     if (!slot || onCooldown) return; // no slot, or a food slot still cooling down → ignore the tap
+    if (!slotHasAction(slot)) return; // no action (e.g. wood/stone) → no pop, nothing to fire
     // Pop under the finger — immediate tactile ack of the use, restarts cleanly on rapid taps.
     btnRef.current?.animate(
       [{ transform: 'scale(1)' }, { transform: 'scale(0.82)' }, { transform: 'scale(1)' }],
