@@ -1,3 +1,4 @@
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useHudStore } from '../store';
 import { hudBridge } from '../hooks/useBridge';
 import type { InboundEvent } from '../bridge';
@@ -40,6 +41,22 @@ interface CommandBarProps {
 /** Send an inbound (HUD→world) event, if the bridge is live. */
 function emit(event: InboundEvent): void {
   hudBridge()?.emit(event);
+}
+
+/**
+ * Fire an inbound event on POINTER-DOWN rather than click — the fix for "the attack buttons don't
+ * work while holding the movepad". A browser only synthesizes a `click` for the PRIMARY pointer (the
+ * first finger down); while the movepad holds that primary pointer, a second finger tapping Attack/Bow
+ * is a non-primary pointer and never generates a `click`, so an `onClick` handler is silently dropped.
+ * `pointerdown` IS delivered for every pointer, so the combat buttons must key off it to stay live
+ * during a movepad hold. `preventDefault` stops the button stealing focus / emitting a redundant
+ * synthesized click. (Press-to-fire also just feels more responsive for a combat action.)
+ */
+function onPress(event: InboundEvent) {
+  return (e: ReactPointerEvent) => {
+    e.preventDefault();
+    emit(event);
+  };
 }
 
 export function CommandBar({
@@ -186,17 +203,19 @@ export function CommandBar({
         <div className="flex items-center justify-between">
           <Movepad size={60} onHeldChange={onMoveHeldChange} />
           <div className="flex items-center gap-2">
+            {/* Pointer-down, not click: these must fire as a non-primary pointer while the movepad
+                holds the primary one — see onPress. */}
             <Button
               variant="secondary"
               className="size-11 rounded-full p-0"
-              onClick={() => emit({ type: 'combat:bow' })}
+              onPointerDown={onPress({ type: 'combat:bow' })}
             >
               Bow
             </Button>
             <Button
               variant="destructive"
               className="size-14 rounded-full p-0 text-base"
-              onClick={() => emit({ type: 'combat:attack' })}
+              onPointerDown={onPress({ type: 'combat:attack' })}
             >
               Attack
             </Button>
