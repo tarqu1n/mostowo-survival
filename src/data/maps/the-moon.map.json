@@ -4232,7 +4232,7 @@
       "kind": "node",
       "ref": "salvagedTent",
       "col": 115,
-      "row": 125,
+      "row": 124,
       "skin": "side_cream"
     },
     {
@@ -4255,8 +4255,8 @@
       "id": "node_tent_6",
       "kind": "node",
       "ref": "salvagedTent",
-      "col": 114,
-      "row": 127,
+      "col": 115,
+      "row": 126,
       "skin": "side_khaki"
     },
     {
@@ -4337,6 +4337,31 @@
       "col": 113,
       "row": 136,
       "rotation": 348.60482127090336
+    },
+    {
+      "id": "node_0052",
+      "kind": "node",
+      "ref": "tree",
+      "col": 113,
+      "row": 130,
+      "skin": "skin_2"
+    },
+    {
+      "id": "node_0053",
+      "kind": "node",
+      "ref": "tree",
+      "col": 115,
+      "row": 129,
+      "skin": "skin_7"
+    },
+    {
+      "id": "node_0054",
+      "kind": "node",
+      "ref": "tree",
+      "col": 114,
+      "row": 128,
+      "skin": "skin_7",
+      "rotation": 350
     }
   ]
 }
