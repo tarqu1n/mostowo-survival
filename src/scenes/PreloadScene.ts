@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BASE_WIDTH, BASE_HEIGHT, COLORS, TILE_SIZE, START_MAP_ID } from '../config';
+import { BASE_WIDTH, BASE_HEIGHT, COLORS, TILE_SIZE, START_MAP_ID, RENDER_SCALE } from '../config';
 import {
   ACTIVE_TILESET,
   sheetKey,
@@ -47,6 +47,15 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   preload(): void {
+    // The backing store is BASE×RENDER_SCALE (device-density render — see config RENDER_SCALE), so zoom
+    // this scene's camera by that factor and recentre on the design-space centre. Without this the bar,
+    // authored in BASE_WIDTH×BASE_HEIGHT units, renders at zoom 1 and shows up tiny in the top-left.
+    // Same block MainMenuScene/UIScene run (no-op at RENDER_SCALE 1).
+    if (RENDER_SCALE !== 1) {
+      this.cameras.main.setZoom(RENDER_SCALE);
+      this.cameras.main.centerOn(BASE_WIDTH / 2, BASE_HEIGHT / 2);
+    }
+
     const barWidth = BASE_WIDTH * 0.6;
     const barX = (BASE_WIDTH - barWidth) / 2;
     const barY = BASE_HEIGHT / 2;
