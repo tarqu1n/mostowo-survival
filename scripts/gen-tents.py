@@ -224,12 +224,13 @@ def images_for(orient: str) -> list[bytes]:
 # clobber). PROMPT IS STILL BEING DIALED IN — see docs/AI-SPRITE-PIPELINE.md.
 RUIN = (
     "The attached image is a wrecked {colour} 6-person camping tent (flat pixel-art game prop, high "
-    "top-down angle). Redraw this SAME tent now COMPLETELY DESTROYED and abandoned — collapsed flat "
-    "into a low heap: the canvas ripped to shreds and pooled/draped on the ground, the poles snapped "
-    "and scattered, the structure caved in so it barely reads as a tent — just a ruined pile of torn "
-    "fabric and broken sticks. KEEP the same {colour} canvas colour, the same high top-down angle, and "
-    "roughly the same footprint/position (so it can replace the standing wreck in place), but MUCH "
-    "flatter and lower to the ground. {style} {bg}"
+    "top-down angle). Redraw this SAME tent now UTTERLY DESTROYED — no standing structure left at all: "
+    "the whole tent has collapsed FLAT to the ground, the poles fully snapped and scattered, the canvas "
+    "torn to shreds and lying in a flat crumpled tarp spread across the dirt with gaping holes. It "
+    "should barely read as a tent — a flattened ruin of fabric and broken sticks, hardly rising off "
+    "the ground. NO upright peak, NO recognisable roof — think a deflated, flattened wreck seen from "
+    "above. KEEP the same {colour} canvas colour, the same high top-down angle, and roughly the same "
+    "footprint/position so it can replace the standing wreck in place. {style} {bg}"
 )
 
 
