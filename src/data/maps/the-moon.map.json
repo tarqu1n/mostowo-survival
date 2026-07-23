@@ -3688,7 +3688,8 @@
       "ref": "tree",
       "col": 110,
       "row": 139,
-      "skin": "skin_3"
+      "skin": "skin_3",
+      "rotation": 5
     },
     {
       "id": "node_0036",
