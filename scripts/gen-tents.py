@@ -59,7 +59,15 @@ SIDE_ROOF = ROOT / "public/assets/tilesets/fantasy-tileset/Buildings/House_Hay_2
 SIDE_ROOF_BBOX = (3, 2, 82, 52)
 
 TARGET_W = 64  # live sprite width in px (a ~6-person tent ≈ 4 tiles); height follows aspect
-QUANTISE_COLOURS = 24
+SIDE_W = 80    # side/broadside tents render low, so they're baked a bit wider (owner steer)
+QUANTISE_COLOURS = 10  # flatten to ~pack colour-count (tree=11, rocks=7) — was 24, read too painterly
+# Silhouette outline tone — the pack outlines props in a dark near-black; re-asserting a crisp 1px
+# rim after the (soft) downscale is what makes the gen read as flat pixel art, not painterly.
+OUTLINE = (24, 18, 14, 255)
+
+
+def target_width(orient: str) -> int:
+    return SIDE_W if orient == "side" else TARGET_W
 
 # NB: top-down oblique, NOT the "slight three-quarter" of the item icons — the reference roof
 # carries the angle; the text just has to stop the model reverting to a flat side elevation.
@@ -123,10 +131,12 @@ VARIANTS = {
     "tent_front_1": ("front", "faded light dusty-blue canvas"),
     "tent_front_2": ("front", "weathered grey / stone-grey canvas"),
     "tent_front_3": ("front", "dirty cream / off-white canvas"),
-    # side (broadside, ridge horizontal)
+    # side (broadside, ridge horizontal) — side_2/3/4 are owner picks from a candidate batch
+    # (#1/#4/#6); their raws are the source of truth in scripts/.gen-icons/raw/.
     "tent_side_1": ("side", "dirty cream / off-white canvas"),
-    "tent_side_2": ("side", "muted green canvas"),
-    "tent_side_3": ("side", "faded light dusty-blue canvas"),
+    "tent_side_2": ("side", "muted forest-green canvas"),
+    "tent_side_3": ("side", "muted green canvas"),
+    "tent_side_4": ("side", "dirty khaki / tan canvas"),
 }
 
 
@@ -160,10 +170,10 @@ def side_ref_png() -> bytes:
 # Optional per-id collapse flavour so same-orientation tents don't look like clones (owner: "different
 # looking"). Appended to the prompt; empty/absent ids just use the base DESTROYED description.
 FLAVOUR = {
-    "tent_side_2": "This one has TOTALLY caved in at one end — that end collapsed flat to the ground "
-                   "while the other end still holds a lopsided peak; the ridge pole is snapped in two.",
-    "tent_side_3": "This one has slumped and twisted sideways — the canvas has pooled and folded in "
-                   "big sagging drapes, most poles are broken stubs, one corner peeled right back.",
+    # side_2/3/4 mirror the chosen candidate combos (#1/#4/#6) so a regen lands near the picks.
+    "tent_side_2": "one end caved flat to the ground, the other end a lopsided peak, ridge pole snapped in two",
+    "tent_side_3": "flattened almost to the ground — just low humps of canvas and splayed guy-lines",
+    "tent_side_4": "front wall collapsed forward, canvas draped over the entrance, one pole still upright at an angle",
 }
 
 
@@ -248,12 +258,29 @@ def quantise(img: Image.Image, colours: int) -> Image.Image:
     return Image.merge("RGBA", (r, g, b, a))
 
 
-def to_sprite(raw_png: Path) -> Image.Image:
+def outline(img: Image.Image) -> Image.Image:
+    """Re-assert a crisp 1px dark rim on the silhouette (pack convention). Every opaque pixel that
+    borders transparency (or the image edge) is set to OUTLINE — this hardens the soft downscaled
+    edge so the sprite reads as flat pixel art, matching the pack's dark-outlined props."""
+    a = np.asarray(img.convert("RGBA")).copy()
+    op = a[:, :, 3] > 110
+    edge = np.zeros_like(op)
+    edge[:-1, :] |= op[:-1, :] & ~op[1:, :]
+    edge[1:, :] |= op[1:, :] & ~op[:-1, :]
+    edge[:, :-1] |= op[:, :-1] & ~op[:, 1:]
+    edge[:, 1:] |= op[:, 1:] & ~op[:, :-1]
+    # opaque pixels sitting on the image border are silhouette too
+    edge[0, :] |= op[0, :]; edge[-1, :] |= op[-1, :]; edge[:, 0] |= op[:, 0]; edge[:, -1] |= op[:, -1]
+    a[edge] = OUTLINE
+    return Image.fromarray(a, "RGBA")
+
+
+def to_sprite(raw_png: Path, width: int = TARGET_W) -> Image.Image:
     img = key_out(Image.open(raw_png))
     img = crop_content(img)
-    h = max(1, round(img.height * (TARGET_W / img.width)))
-    img = img.resize((TARGET_W, h), Image.LANCZOS)
-    return quantise(img, QUANTISE_COLOURS)
+    h = max(1, round(img.height * (width / img.width)))
+    img = img.resize((width, h), Image.LANCZOS)
+    return outline(quantise(img, QUANTISE_COLOURS))
 
 
 def searched_variant(live: Image.Image) -> Image.Image:
@@ -298,7 +325,7 @@ def main() -> None:
             if not raw_png.exists():
                 print(f"  skip {tid}: no saved raw at {raw_png.relative_to(ROOT)}")
                 continue
-            live = to_sprite(raw_png)
+            live = to_sprite(raw_png, target_width(VARIANTS[tid][0]))
             live.save(PACK / f"{tid}.png")
             searched_variant(live).save(PACK / f"{tid}_searched.png")
             print(f"  reprocessed {tid} -> {live.width}x{live.height}")
@@ -318,7 +345,7 @@ def main() -> None:
         print(f"  raw -> {raw_png.relative_to(ROOT)}")
         if args.raw_only:
             continue
-        live = to_sprite(raw_png)
+        live = to_sprite(raw_png, target_width(orient))
         live.save(PACK / f"{tid}.png")
         searched_variant(live).save(PACK / f"{tid}_searched.png")
         print(f"  -> {tid}.png + {tid}_searched.png ({live.width}x{live.height})")

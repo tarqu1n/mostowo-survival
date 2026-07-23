@@ -88,7 +88,7 @@ describe('NODES', () => {
     expect(tent).toBeDefined();
     expect(tent.harvestAnim).toBe('savage');
     expect(tent.loot).toBeDefined();
-    expect(tent.skins).toHaveLength(9); // 3 orientations (diagonal/front/side) × 3 colours
+    expect(tent.skins).toHaveLength(10); // 3 diagonal + 3 front + 4 side
   });
 });
 

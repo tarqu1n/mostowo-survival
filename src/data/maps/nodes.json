@@ -428,12 +428,21 @@
           }
         },
         {
-          "id": "side_blue",
-          "name": "Side — light blue",
+          "id": "side_green_flat",
+          "name": "Side — green (flattened)",
           "asset": "mostowo-custom/Environment/Props/Static/tent_side_3.png",
           "weight": 1,
           "depleted": {
             "asset": "mostowo-custom/Environment/Props/Static/tent_side_3_searched.png"
+          }
+        },
+        {
+          "id": "side_khaki",
+          "name": "Side — khaki",
+          "asset": "mostowo-custom/Environment/Props/Static/tent_side_4.png",
+          "weight": 1,
+          "depleted": {
+            "asset": "mostowo-custom/Environment/Props/Static/tent_side_4_searched.png"
           }
         }
       ]

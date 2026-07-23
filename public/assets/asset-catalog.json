@@ -46513,8 +46513,8 @@
         "kind": "image",
         "path": "Environment/Props/Static/tent_side_1_searched.png"
       },
-      "w": 64,
-      "h": 39,
+      "w": 80,
+      "h": 49,
       "category": "Environment/Props/Static",
       "tags": [
         "1",
@@ -46536,8 +46536,8 @@
         "kind": "image",
         "path": "Environment/Props/Static/tent_side_1.png"
       },
-      "w": 64,
-      "h": 39,
+      "w": 80,
+      "h": 49,
       "category": "Environment/Props/Static",
       "tags": [
         "1",
@@ -46558,8 +46558,8 @@
         "kind": "image",
         "path": "Environment/Props/Static/tent_side_2_searched.png"
       },
-      "w": 64,
-      "h": 28,
+      "w": 80,
+      "h": 39,
       "category": "Environment/Props/Static",
       "tags": [
         "2",
@@ -46581,8 +46581,8 @@
         "kind": "image",
         "path": "Environment/Props/Static/tent_side_2.png"
       },
-      "w": 64,
-      "h": 28,
+      "w": 80,
+      "h": 39,
       "category": "Environment/Props/Static",
       "tags": [
         "2",
@@ -46603,8 +46603,8 @@
         "kind": "image",
         "path": "Environment/Props/Static/tent_side_3_searched.png"
       },
-      "w": 64,
-      "h": 27,
+      "w": 80,
+      "h": 39,
       "category": "Environment/Props/Static",
       "tags": [
         "3",
@@ -46626,11 +46626,56 @@
         "kind": "image",
         "path": "Environment/Props/Static/tent_side_3.png"
       },
-      "w": 64,
-      "h": 27,
+      "w": 80,
+      "h": 39,
       "category": "Environment/Props/Static",
       "tags": [
         "3",
+        "environment",
+        "props",
+        "side",
+        "static",
+        "tent"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_side_4_searched.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_side_4_searched.png"
+      },
+      "w": 80,
+      "h": 39,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "4",
+        "environment",
+        "props",
+        "searched",
+        "side",
+        "static",
+        "tent"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_side_4.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_side_4.png"
+      },
+      "w": 80,
+      "h": 39,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "4",
         "environment",
         "props",
         "side",
