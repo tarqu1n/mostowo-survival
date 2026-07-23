@@ -9,20 +9,22 @@ three orientations, >=3 each: diagonal (3/4), front (end-on, entrance to camera)
 
 Why image-to-image (docs/AI-SPRITE-PIPELINE.md — the reference is what holds the output
 on-model): an isolated pack ROOF chevron (Roofs.png) anchors the top-down camera + flat
-pixel-art style. 'side' additionally gets a plain grey broadside SILHOUETTE as an orientation
-guide (the pose-guider trick) because the diagonal roof + the model's diagonal tent prior
-otherwise snap every 'side' prompt back to 3/4 — text alone won't hold a broadside.
+pixel-art style for diagonal/front; 'side' anchors on a real pack BROADSIDE roof (the
+horizontal-ridge back-roof of fantasy-tileset House_Hay_2.png) because the diagonal chevron +
+the model's diagonal tent prior otherwise snap every 'side' prompt back to 3/4.
 
 Pipeline per tent:  build reference(s)  ->  POST (references + prompt)  ->  raw ~1024px PNG to
 scripts/.gen-icons/raw/ (gitignored)  ->  key out the flat magenta bg (+ nuke residual magenta)
-->  crop to content  ->  downscale hard to TARGET_W  ->  palette quantise  ->  write the live
-PNG; the `_searched` depleted swap is derived from the live art (desaturate + darken) so it
-stays on-model without a second generation.
+->  crop to content  ->  downscale hard to TARGET_W (SIDE_W for broadside)  ->  quantise to
+QUANTISE_COLOURS  ->  crisp silhouette outline  ->  write the live PNG. The depleted/harvested
+swap is a separate `<id>_ruined.png` built by --ruined (image-to-image from the live sprite —
+a fully-collapsed version); it is NOT derived here, so --reprocess never clobbers it.
 
 Endpoint/auth/model are the locked ones (docs/gemini-pipeline.md). Needs GEMINI_API_KEY in
 env (guppi/house-helper/.env, reachable over Tailscale — see MOBILE-EDITOR-ACCESS.md).
 --dry-run composes prompts + writes references only (no key, no spend); --reprocess re-runs
-post-processing on the saved raws (no key, no spend); --only ID does one variant.
+post-processing on the saved live raws (no key, no spend); --ruined builds the destroyed state;
+--only ID does one variant.
 """
 import argparse
 import base64
@@ -34,7 +36,7 @@ import urllib.request
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageEnhance
+from PIL import Image, ImageDraw
 
 ENDPOINT_TMPL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 # Image-to-image capable models on the key (verified via the models list endpoint):
@@ -308,7 +310,10 @@ def quantise(img: Image.Image, colours: int) -> Image.Image:
     # interior edge (a stray fleck near the entrance shadow). No tent material is magenta, so recolour
     # any such opaque pixel to the dark outline tone.
     rr, gg, bb, aa = out[:, :, 0], out[:, :, 1], out[:, :, 2], out[:, :, 3]
-    out[(rr > 170) & (bb > 170) & (gg < 100) & (aa > 0)] = OUTLINE
+    # magenta/purple = both R and B elevated and roughly equal, with G low. No tent material fits this
+    # (blues have b>r, khaki/cream have high g), so the threshold can be generous without eating hues.
+    magenta = (rr > 110) & (bb > 110) & (gg < 90) & (np.abs(rr - bb) < 70) & (aa > 0)
+    out[magenta] = OUTLINE
     return Image.fromarray(out, "RGBA")
 
 
@@ -337,15 +342,6 @@ def to_sprite(raw_png: Path, width: int = TARGET_W) -> Image.Image:
     return outline(quantise(img, QUANTISE_COLOURS))
 
 
-def searched_variant(live: Image.Image) -> Image.Image:
-    """Derive the depleted 'searched' look from the live art: desaturate + darken so it
-    reads as picked-over, staying perfectly on-model with the live tent."""
-    rgb = ImageEnhance.Color(live.convert("RGBA")).enhance(0.35)
-    rgb = ImageEnhance.Brightness(rgb).enhance(0.62)
-    r, g, b, _ = rgb.split()
-    return Image.merge("RGBA", (r, g, b, live.split()[3]))
-
-
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--only", metavar="ID", help="generate just this one tent id")
@@ -355,8 +351,11 @@ def main() -> None:
     ap.add_argument("--reprocess", action="store_true",
                     help="re-run post-processing on the saved raw PNGs only (no API call, no spend)")
     ap.add_argument("--ruined", action="store_true",
-                    help="generate the fully-DESTROYED '<id>_ruined.png' from each LIVE sprite "
-                         "(image-to-image); the savaged/harvested depleted state")
+                    help="build the fully-DESTROYED '<id>_ruined.png' from each LIVE sprite "
+                         "(image-to-image); the savaged/harvested depleted state. Reprocesses a saved "
+                         "'<id>_ruined_raw.png' if present (no re-spend); else generates one")
+    ap.add_argument("--regen", action="store_true",
+                    help="with --ruined: force a fresh generation even if a saved raw exists")
     ap.add_argument("--model", default=DEFAULT_MODEL,
                     help=f"Gemini image model (default {DEFAULT_MODEL}; image-to-image capable ids: "
                          "gemini-3-pro-image, gemini-3.1-flash-image, gemini-2.5-flash-image)")
@@ -384,7 +383,6 @@ def main() -> None:
                 continue
             live = to_sprite(raw_png, target_width(VARIANTS[tid][0]))
             live.save(PACK / f"{tid}.png")
-            searched_variant(live).save(PACK / f"{tid}_searched.png")
             print(f"  reprocessed {tid} -> {live.width}x{live.height}")
         return
 
@@ -395,10 +393,13 @@ def main() -> None:
     if args.ruined:
         for tid in ids:
             orient, colour = VARIANTS[tid]
-            print(f"\n=== {tid} RUINED ({orient}) ===")
-            raw = gemini_image(compose_ruin(colour), [ruin_ref_png(tid)], key, args.model)
             raw_png = RAW / f"{tid}_ruined_raw.png"
-            raw_png.write_bytes(raw)
+            # Reprocess a saved raw (no re-spend, preserves an already-approved ruin); else generate.
+            if raw_png.exists() and not args.regen:
+                print(f"\n=== {tid} RUINED ({orient}) — reprocess saved raw ===")
+            else:
+                print(f"\n=== {tid} RUINED ({orient}) — generate ===")
+                raw_png.write_bytes(gemini_image(compose_ruin(colour), [ruin_ref_png(tid)], key, args.model))
             live = to_sprite(raw_png, target_width(orient))
             live.save(PACK / f"{tid}_ruined.png")
             print(f"  -> {tid}_ruined.png ({live.width}x{live.height})")
@@ -416,8 +417,7 @@ def main() -> None:
             continue
         live = to_sprite(raw_png, target_width(orient))
         live.save(PACK / f"{tid}.png")
-        searched_variant(live).save(PACK / f"{tid}_searched.png")
-        print(f"  -> {tid}.png + {tid}_searched.png ({live.width}x{live.height})")
+        print(f"  -> {tid}.png ({live.width}x{live.height}) — run --ruined for the depleted state")
 
 
 if __name__ == "__main__":

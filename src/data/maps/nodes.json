@@ -361,7 +361,7 @@
           "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_1.png",
           "weight": 1,
           "depleted": {
-            "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_1_searched.png"
+            "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_1_ruined.png"
           }
         },
         {
@@ -370,7 +370,7 @@
           "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_2.png",
           "weight": 1,
           "depleted": {
-            "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_2_searched.png"
+            "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_2_ruined.png"
           }
         },
         {
@@ -379,7 +379,7 @@
           "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_3.png",
           "weight": 1,
           "depleted": {
-            "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_3_searched.png"
+            "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_3_ruined.png"
           }
         },
         {
@@ -388,7 +388,7 @@
           "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_4.png",
           "weight": 1,
           "depleted": {
-            "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_4_searched.png"
+            "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_4_ruined.png"
           }
         },
         {
@@ -397,7 +397,7 @@
           "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_5.png",
           "weight": 1,
           "depleted": {
-            "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_5_searched.png"
+            "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_5_ruined.png"
           }
         },
         {
@@ -406,7 +406,7 @@
           "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_6.png",
           "weight": 1,
           "depleted": {
-            "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_6_searched.png"
+            "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_6_ruined.png"
           }
         },
         {
@@ -415,7 +415,7 @@
           "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_7.png",
           "weight": 1,
           "depleted": {
-            "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_7_searched.png"
+            "asset": "mostowo-custom/Environment/Props/Static/tent_wreck_7_ruined.png"
           }
         },
         {
@@ -424,7 +424,7 @@
           "asset": "mostowo-custom/Environment/Props/Static/tent_front_1.png",
           "weight": 1,
           "depleted": {
-            "asset": "mostowo-custom/Environment/Props/Static/tent_front_1_searched.png"
+            "asset": "mostowo-custom/Environment/Props/Static/tent_front_1_ruined.png"
           }
         },
         {
@@ -433,7 +433,7 @@
           "asset": "mostowo-custom/Environment/Props/Static/tent_front_2.png",
           "weight": 1,
           "depleted": {
-            "asset": "mostowo-custom/Environment/Props/Static/tent_front_2_searched.png"
+            "asset": "mostowo-custom/Environment/Props/Static/tent_front_2_ruined.png"
           }
         },
         {
@@ -442,7 +442,7 @@
           "asset": "mostowo-custom/Environment/Props/Static/tent_front_3.png",
           "weight": 1,
           "depleted": {
-            "asset": "mostowo-custom/Environment/Props/Static/tent_front_3_searched.png"
+            "asset": "mostowo-custom/Environment/Props/Static/tent_front_3_ruined.png"
           }
         },
         {
@@ -451,7 +451,7 @@
           "asset": "mostowo-custom/Environment/Props/Static/tent_front_4.png",
           "weight": 1,
           "depleted": {
-            "asset": "mostowo-custom/Environment/Props/Static/tent_front_4_searched.png"
+            "asset": "mostowo-custom/Environment/Props/Static/tent_front_4_ruined.png"
           }
         },
         {
@@ -460,7 +460,7 @@
           "asset": "mostowo-custom/Environment/Props/Static/tent_front_5.png",
           "weight": 1,
           "depleted": {
-            "asset": "mostowo-custom/Environment/Props/Static/tent_front_5_searched.png"
+            "asset": "mostowo-custom/Environment/Props/Static/tent_front_5_ruined.png"
           }
         },
         {
@@ -469,7 +469,7 @@
           "asset": "mostowo-custom/Environment/Props/Static/tent_front_6.png",
           "weight": 1,
           "depleted": {
-            "asset": "mostowo-custom/Environment/Props/Static/tent_front_6_searched.png"
+            "asset": "mostowo-custom/Environment/Props/Static/tent_front_6_ruined.png"
           }
         },
         {
@@ -478,7 +478,7 @@
           "asset": "mostowo-custom/Environment/Props/Static/tent_side_1.png",
           "weight": 1,
           "depleted": {
-            "asset": "mostowo-custom/Environment/Props/Static/tent_side_1_searched.png"
+            "asset": "mostowo-custom/Environment/Props/Static/tent_side_1_ruined.png"
           }
         },
         {
@@ -487,7 +487,7 @@
           "asset": "mostowo-custom/Environment/Props/Static/tent_side_2.png",
           "weight": 1,
           "depleted": {
-            "asset": "mostowo-custom/Environment/Props/Static/tent_side_2_searched.png"
+            "asset": "mostowo-custom/Environment/Props/Static/tent_side_2_ruined.png"
           }
         },
         {
@@ -496,7 +496,7 @@
           "asset": "mostowo-custom/Environment/Props/Static/tent_side_3.png",
           "weight": 1,
           "depleted": {
-            "asset": "mostowo-custom/Environment/Props/Static/tent_side_3_searched.png"
+            "asset": "mostowo-custom/Environment/Props/Static/tent_side_3_ruined.png"
           }
         },
         {
@@ -505,7 +505,7 @@
           "asset": "mostowo-custom/Environment/Props/Static/tent_side_4.png",
           "weight": 1,
           "depleted": {
-            "asset": "mostowo-custom/Environment/Props/Static/tent_side_4_searched.png"
+            "asset": "mostowo-custom/Environment/Props/Static/tent_side_4_ruined.png"
           }
         }
       ]
