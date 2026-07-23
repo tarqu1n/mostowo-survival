@@ -162,3 +162,26 @@
 .hud-fed-float {
   animation: hud-fed-float 900ms ease-out forwards;
 }
+
+/* Eat cooldown sweep over a hotbar food slot: a dark conic wedge that shrinks from a full circle to
+ * nothing as the cooldown elapses (the classic ability-cooldown clock wipe). The wedge angle animates
+ * via a registered custom property (plain @keyframes can't tween a conic-gradient angle); the animation
+ * duration is set inline to the cooldown length. Degrades gracefully where @property is unsupported —
+ * the wedge just holds full then clears when React unmounts it. */
+@property --hud-cd-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 360deg;
+}
+@keyframes hud-cooldown-sweep {
+  from {
+    --hud-cd-angle: 360deg;
+  }
+  to {
+    --hud-cd-angle: 0deg;
+  }
+}
+.hud-cooldown {
+  background: conic-gradient(rgba(0, 0, 0, 0.6) var(--hud-cd-angle), transparent 0deg);
+  animation: hud-cooldown-sweep linear forwards;
+}

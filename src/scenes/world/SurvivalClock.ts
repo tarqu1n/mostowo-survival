@@ -12,6 +12,7 @@ import {
   STARVE_DAMAGE,
   STARVE_DAMAGE_INTERVAL_MS,
   TIME_PROGRESS_EMIT_MS,
+  EAT_COOLDOWN_MS,
 } from '../../config';
 import { bakeLightBrush } from '../../render/lightTexture';
 import { ITEMS } from '../../data/items';
@@ -99,6 +100,10 @@ export class SurvivalClock {
   dayCount = 1;
   hunger = HUNGER_MAX;
   starveElapsed = 0;
+  /** Scene-clock time until which eating is on cooldown — a further eat before this is rejected (the
+   *  anti-spam gate, {@link EAT_COOLDOWN_MS}). Fresh per scene (rebuilt each buildWorld), so a restart
+   *  clears it. Mirrors the `meleeReadyAt`/`bowReadyAt` cooldown idiom on PlayerCharacter. */
+  eatReadyAt = 0;
 
   /** Accumulator for the throttled `time:progress` HUD tick (see {@link tick}). Emits at most every
    *  `TIME_PROGRESS_EMIT_MS` of game time so the day/night dial sweeps without a per-frame event. */
@@ -287,15 +292,27 @@ export class SurvivalClock {
    */
   eat(itemId: string): boolean {
     const def = ITEMS[itemId];
-    if (def?.nutrition == null || !this.deps.canAfford({ [itemId]: 1 })) return false;
+    // Cooldown gate BEFORE the spend, so a rejected (too-soon) eat never consumes an item — mirrors the
+    // melee/bow readiness gate. The HUD greys the food slot for the same window, but this is the authority.
+    if (
+      def?.nutrition == null ||
+      this.scene.time.now < this.eatReadyAt ||
+      !this.deps.canAfford({ [itemId]: 1 })
+    )
+      return false;
     this.deps.spend({ [itemId]: 1 });
+    this.eatReadyAt = this.scene.time.now + EAT_COOLDOWN_MS;
     const before = this.hunger;
     this.hunger = feed(this.hunger, def.nutrition, HUNGER_MAX);
     this.scene.registry.set('hunger', this.hunger);
     this.scene.game.events.emit('hunger:changed', { hunger: this.hunger, max: HUNGER_MAX });
     // Feedback pulse for the HUD (the "you ate something" indicator on the hunger meter). Carries the
-    // ACTUAL hunger gained (capped at HUNGER_MAX), so eating near-full honestly shows the smaller gain.
-    this.scene.game.events.emit('needs:fed', { amount: Math.round(this.hunger - before) });
+    // ACTUAL hunger gained (capped at HUNGER_MAX), so eating near-full honestly shows the smaller gain,
+    // plus the cooldown window so the HUD can run the shrinking sweep over the food slot.
+    this.scene.game.events.emit('needs:fed', {
+      amount: Math.round(this.hunger - before),
+      cooldownMs: EAT_COOLDOWN_MS,
+    });
     return true;
   }
 

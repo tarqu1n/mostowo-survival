@@ -112,6 +112,13 @@ export interface HudState {
   fedNonce: number;
   /** Hunger points gained on the most recent eat (paired with {@link fedNonce}). */
   fedAmount: number;
+  /** Whether an eat cooldown is currently running (from `needs:fed`'s `cooldownMs`). While true the
+   *  hotbar greys food slots with a shrinking sweep and ignores taps on them (the game enforces it too). */
+  eatCooldownActive: boolean;
+  /** The active cooldown's total length (ms) — the sweep animation's duration. */
+  eatCooldownMs: number;
+  /** Monotonic counter bumped when a cooldown STARTS — keys the sweep overlay so each eat replays it. */
+  eatCooldownNonce: number;
 }
 
 /** Imperative setters the bridge calls; grouped so components never mutate state directly. */
@@ -153,6 +160,12 @@ export interface HudActions {
   /** Bump the feed pulse (from `needs:fed`) with the hunger gained — replays the hunger meter's "+N"
    *  eat indicator. */
   pulseFed(amount: number): void;
+  /** Start the eat cooldown (sets active + duration, bumps the nonce). The bridge schedules the paired
+   *  {@link endEatCooldown} after `ms`. */
+  beginEatCooldown(ms: number): void;
+  /** End the eat cooldown IF `nonce` is still the current one (a stale timer from a superseded cooldown
+   *  is ignored). */
+  endEatCooldown(nonce: number): void;
 }
 
 /** Initial state — sane defaults so the HUD renders before the first event lands. HP seeds to the
@@ -187,6 +200,9 @@ const initialState: HudState = {
   sceneActive: false, // hidden until GameScene.create() flips the registry flag (see bridge)
   fedNonce: 0,
   fedAmount: 0,
+  eatCooldownActive: false,
+  eatCooldownMs: 0,
+  eatCooldownNonce: 0,
 };
 
 export const useHudStore = create<HudState & HudActions>()(
@@ -231,5 +247,13 @@ export const useHudStore = create<HudState & HudActions>()(
     setZoom: (zoom) => set({ zoom }),
     setSceneActive: (sceneActive) => set({ sceneActive }),
     pulseFed: (amount) => set((s) => ({ fedNonce: s.fedNonce + 1, fedAmount: amount })),
+    beginEatCooldown: (ms) =>
+      set((s) => ({
+        eatCooldownActive: true,
+        eatCooldownMs: ms,
+        eatCooldownNonce: s.eatCooldownNonce + 1,
+      })),
+    endEatCooldown: (nonce) =>
+      set((s) => (s.eatCooldownNonce === nonce ? { eatCooldownActive: false } : s)),
   })),
 );

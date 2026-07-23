@@ -126,4 +126,11 @@ test('a stackable hotbar item shows its live count and a tap eats one, decrement
   // Eating shows the visual feedback cue: a "+N" floats up from the hunger meter (seeded hunger 20 +
   // berries' 25 nutrition = a +25 gain).
   await expect(page.getByTestId('hud-fed-float')).toHaveText('+25');
+
+  // Eating starts the shared 5s cooldown: a shrinking sweep appears over the food slot and further
+  // taps are ignored until it elapses (the game enforces the same, so no berry is wasted).
+  await expect(hotbar.getByTestId('hud-hotbar-cooldown')).toBeVisible();
+  await berries.click(); // spam-tap mid-cooldown
+  await expect(hotbar.getByTestId('hud-hotbar-count')).toHaveText('2'); // still 2 — blocked
+  expect(await held(page, 'berries')).toBe(2);
 });

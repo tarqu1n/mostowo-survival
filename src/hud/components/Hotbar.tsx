@@ -71,13 +71,26 @@ function useSlotCount(slot: HotbarSlot): number | null {
   });
 }
 
+/** True iff this slot holds an edible item (drives the eat cooldown sweep + tap gate). */
+function isEdibleSlot(slot: HotbarSlot): boolean {
+  return !!slot && slot.kind === 'item' && ITEMS[slot.id]?.nutrition != null;
+}
+
 /** One hotbar slot. Empty → a dimmed, inert cell; filled → tap-to-use with a long-press guard. A
- *  stackable item also shows its live count (bottom-right) and dims when the stack is depleted. */
+ *  stackable item also shows its live count (bottom-right) and dims when the stack is depleted. A valid
+ *  tap gives a quick scale "pop" under the finger; an edible on the shared eat cooldown greys out under
+ *  a shrinking sweep and ignores taps for the window (the game enforces the same, see SurvivalClock). */
 function SlotButton({ slot }: { slot: HotbarSlot }) {
   const count = useSlotCount(slot);
   const depleted = count === 0; // stackable item with none left (null count → not a counted slot)
+  const cooldownActive = useHudStore((s) => s.eatCooldownActive);
+  const cooldownMs = useHudStore((s) => s.eatCooldownMs);
+  const cooldownNonce = useHudStore((s) => s.eatCooldownNonce);
+  const edible = isEdibleSlot(slot);
+  const onCooldown = edible && cooldownActive; // this slot is a food slot mid-cooldown → inert
   const timer = useRef<number | null>(null);
   const longPressed = useRef(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   const clearTimer = (): void => {
     if (timer.current !== null) {
@@ -101,11 +114,18 @@ function SlotButton({ slot }: { slot: HotbarSlot }) {
   const onPointerUp = (): void => {
     clearTimer();
     if (longPressed.current) return; // held long enough to be a long-press → don't fire the tap
-    if (slot) activate(slot);
+    if (!slot || onCooldown) return; // no slot, or a food slot still cooling down → ignore the tap
+    // Pop under the finger — immediate tactile ack of the use, restarts cleanly on rapid taps.
+    btnRef.current?.animate(
+      [{ transform: 'scale(1)' }, { transform: 'scale(0.82)' }, { transform: 'scale(1)' }],
+      { duration: 200, easing: 'ease-out' },
+    );
+    activate(slot);
   };
 
   return (
     <button
+      ref={btnRef}
       type="button"
       disabled={!slot}
       onPointerDown={onPointerDown}
@@ -128,6 +148,16 @@ function SlotButton({ slot }: { slot: HotbarSlot }) {
         >
           {count}
         </span>
+      )}
+      {/* Eat cooldown: a dark conic wedge over the slot that shrinks as the window elapses (keyed on the
+          nonce so each eat replays it). Only on food slots, and only while the shared cooldown runs. */}
+      {onCooldown && (
+        <span
+          key={cooldownNonce}
+          data-testid="hud-hotbar-cooldown"
+          className="hud-cooldown pointer-events-none absolute inset-0 rounded-lg"
+          style={{ animationDuration: `${cooldownMs}ms` }}
+        />
       )}
     </button>
   );

@@ -125,6 +125,8 @@ export interface Bridge {
 export function initBridge(bus: EventBus, registry: Registry): Bridge {
   const store = useHudStore.getState();
   const unsubs: Array<() => void> = [];
+  // Pending eat-cooldown clear timer (see the `needs:fed` handler); cleared on dispose.
+  let eatCooldownTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Register a typed handler on the bus and record its matching teardown. */
   const on = <T>(event: string, fn: (payload: T) => void): void => {
@@ -137,8 +139,21 @@ export function initBridge(bus: EventBus, registry: Registry): Bridge {
   on<HpPayload>('player:hpChanged', (p) => store.setHp(p.hp, p.maxHp));
   on('player:hit', () => store.pulseHit());
   on<HungerPayload>('hunger:changed', (p) => store.setHunger(p.hunger, p.max));
-  // Eat feedback: the hunger meter replays a "+N" pulse (the "you ate something" indicator).
-  on<{ amount: number }>('needs:fed', (p) => store.pulseFed(p.amount));
+  // Eat feedback: the hunger meter replays a "+N" pulse, and (if the eat started a cooldown) the hotbar
+  // runs a shrinking sweep over food slots for `cooldownMs`. A `setTimeout` clears the flag when it
+  // elapses; the endEatCooldown nonce guard ignores a stale timer from a superseded cooldown.
+  on<{ amount: number; cooldownMs?: number }>('needs:fed', (p) => {
+    store.pulseFed(p.amount);
+    const ms = p.cooldownMs ?? 0;
+    if (ms <= 0) return;
+    store.beginEatCooldown(ms);
+    const nonce = useHudStore.getState().eatCooldownNonce;
+    if (eatCooldownTimer !== null) clearTimeout(eatCooldownTimer);
+    eatCooldownTimer = setTimeout(() => {
+      eatCooldownTimer = null;
+      useHudStore.getState().endEatCooldown(nonce);
+    }, ms);
+  });
   on<FirePayload>('fire:changed', (p) =>
     store.setFire(p ? { fuel: p.fuel, maxFuel: p.maxFuel, lit: p.lit } : null),
   );
@@ -238,6 +253,8 @@ export function initBridge(bus: EventBus, registry: Registry): Bridge {
     dispose(): void {
       if (disposed) return;
       disposed = true;
+      if (eatCooldownTimer !== null) clearTimeout(eatCooldownTimer);
+      eatCooldownTimer = null;
       for (const off of unsubs) off();
       unsubs.length = 0;
     },

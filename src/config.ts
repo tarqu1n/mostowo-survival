@@ -474,6 +474,13 @@ export const STARVE_DAMAGE_INTERVAL_MS = 2_000;
 export const HUNGER_LOW_FRACTION = 0.2;
 export const HUNGER_VIGNETTE_COLOR = 0xe0b020;
 export const HUNGER_VIGNETTE_MAX_ALPHA = 0.5;
+/**
+ * Minimum gap between eats (ms). Eating any food starts this cooldown; a further eat is rejected until
+ * it elapses, so you can't chug a whole stack in one frame (both a balance guard and the anti-spam the
+ * HUD surfaces as a shrinking sweep over the food slot). Enforced in SurvivalClock.eat() (authoritative,
+ * so it holds for the hotbar AND the pack drawer); the HUD mirrors the window for the overlay + tap gate.
+ */
+export const EAT_COOLDOWN_MS = 5_000;
 
 /**
  * Dev toggle — starvation reduces HP (via SurvivalClock) only when true. Default on for the MVP

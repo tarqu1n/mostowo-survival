@@ -61,7 +61,7 @@ const init = () => initBridge(bus as unknown as EventBus, registry);
 
 describe('outbound event → store mapping', () => {
   it('maps every outbound world→HUD event onto the store', () => {
-    init();
+    const bridge = init();
 
     bus.emit('player:hpChanged', { hp: 7, maxHp: 10 });
     expect(s().hp).toBe(7);
@@ -80,6 +80,13 @@ describe('outbound event → store mapping', () => {
     bus.emit('needs:fed', { amount: 25 });
     expect(s().fedNonce).toBe(fedBefore + 1);
     expect(s().fedAmount).toBe(25);
+
+    // A `cooldownMs` on the eat starts the hotbar's cooldown sweep (active + duration + nonce bump).
+    const cdBefore = s().eatCooldownNonce;
+    bus.emit('needs:fed', { amount: 10, cooldownMs: 5000 });
+    expect(s().eatCooldownActive).toBe(true);
+    expect(s().eatCooldownMs).toBe(5000);
+    expect(s().eatCooldownNonce).toBe(cdBefore + 1);
 
     bus.emit('fire:changed', { fuel: 30, maxFuel: 60, lit: true });
     expect(s().fire).toEqual({ fuel: 30, maxFuel: 60, lit: true });
@@ -139,6 +146,8 @@ describe('outbound event → store mapping', () => {
 
     bus.emit('camera:followChanged', false);
     expect(s().following).toBe(false);
+
+    bridge.dispose(); // clears the pending eat-cooldown timer scheduled by the needs:fed emit above
   });
 });
 
