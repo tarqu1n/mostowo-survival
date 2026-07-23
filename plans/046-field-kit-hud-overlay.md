@@ -449,7 +449,7 @@ crispness proven at the Step 1 gate before any component is built on top.
   - Done when: eat from pack/status, build-select from the catalog, pin an item and see it on
     the hotbar (surviving reload), and open/close drawers by swipe — all verified.
 
-- [ ] **Step 12: Integrate inspect + companion + dev; retire InspectPanel/NpcAssignMenu/
+- [x] **Step 12: Integrate inspect + companion + dev; retire InspectPanel/NpcAssignMenu/
   DevMenu** `[inline]`
   - Compose `InspectCard`, `CompanionMenu`, `DevMenu` into `GameHud`; wire `inspect:show`/
     `inspect:hide`, `npc:menuOpen` + `npc:*`, `debug:*`. Remove `InspectPanel`,
@@ -460,6 +460,25 @@ crispness proven at the Step 1 gate before any component is built on top.
   - Docs: none.
   - Done when: inspect an enemy/tree/structure, assign companion Day/Night postures + place a
     guard point, and use dev spawn/time/wave — all verified.
+  - Outcome: touched `src/hud/store.ts` (new `companionMenu` state + `openCompanionMenu`/
+    `closeCompanionMenu` actions; `import type` for NPC role/posture — erased, no Phaser
+    coupling), `src/hud/bridge.ts` (subscribe outbound `npc:menuOpen` → `openCompanionMenu`;
+    extend `mode:changed` to clear inspect when leaving inspect mode — the DOM port of the
+    retired `UIScene.onModeChanged`, since GameScene's `setMode` emits only `mode:changed`,
+    never `inspect:hide`), `src/hud/GameHud.tsx` (new `Overlays` sub-component composing
+    `InspectCard`/`CompanionMenu`/`DevMenu` into `.hud-safe`; companion `onClose` is
+    close-only — must NOT emit `npc:cancelPlaceGuard` or "Guard here" would disarm its own
+    just-armed placement), and `src/scenes/UIScene.ts` (removed all three widgets + their bus
+    wiring + `onModeChanged`/`onTimeChanged`; `onEscape` simplified to the guard-cancel;
+    `hudHitTest`/`hudElements` now empty but kept for the Step 13 retirement). `CompanionMenu`
+    ignores `npc:menuOpen`'s `x`/`y` (bottom sheet, not the legacy anchored popover). The three
+    Phaser widget `.ts` files stay on disk for the Step 13 sweep (matches Steps 9–11). No e2e
+    rewrite needed — the `inspect`/`companion`/`mode` specs are bus/event-driven, not
+    widget-driven. Verified: typecheck + lint (0 errors) + build (DevMenu strings dead-code-
+    eliminated from prod; "Assign companion" ships) + smoke + `inspect`/`companion`/`mode` e2e
+    (19 passed) + a one-off headless DOM check (10/10: cards open on their events,
+    "Repair"→`npc:assignDayRole=repair`, "Guard here"→`npc:beginPlaceGuard`, mode-change clears
+    inspect, DevMenu FORCE WAVE→`debug:forceWave`).
 
 - [ ] **Step 13: Cutover — remove UIScene + retire the hudHitTest input path** `[inline]`
   - Remove `UIScene` from the scene list in `src/main.ts`; remove the GameScene-side wiring

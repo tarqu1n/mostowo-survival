@@ -3,6 +3,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { PLAYER_MAX_HP, HUNGER_MAX } from '@/config';
 import { BUILDABLES } from '@/data/buildables';
 import type { CombatantStats, InspectableStats } from '@/data/types';
+import type { NpcDayRole, NpcNightPosture } from '@/entities/NpcCharacter';
 
 /**
  * The DOM/React HUD's single source of truth (plan 046 Step 3). A Zustand store that mirrors the
@@ -51,6 +52,17 @@ export interface WaveInfo {
 
 export type HudMode = 'command' | 'combat' | 'inspect';
 
+/** Companion-menu readout (plan 046 Step 12). The DOM `CompanionMenu` is a bottom sheet, not the
+ *  legacy anchored popover, so it drops `npc:menuOpen`'s `x`/`y` and keeps only what it renders: the
+ *  open flag plus the companion's live `dayRole`/`nightPosture` (to highlight the active rows). Held
+ *  in the store — rather than as component props off a raw event — so the bridge (the sole owner of
+ *  the bus) opens it and the sheet's own dismiss closes it, matching how inspect mirrors the store. */
+export interface CompanionMenuState {
+  readonly open: boolean;
+  readonly dayRole: NpcDayRole;
+  readonly nightPosture: NpcNightPosture;
+}
+
 /** Live HUD state, one-way mirror of the game. */
 export interface HudState {
   hp: number;
@@ -74,6 +86,9 @@ export interface HudState {
   demolishMode: boolean;
   combatActive: boolean;
   inspectTarget: InspectableStats | null;
+  /** Companion assignment menu state (plan 046 Step 12) — opened by the `npc:menuOpen` game event
+   *  (fired when the player taps the ally), closed by the sheet's own dismiss. */
+  companionMenu: CompanionMenuState;
   /** The player's combat stat bag (armour/speed/strength/…), surfaced by GameScene on the registry
    *  (`playerStats`). Static per run; `null` until the bridge reads it. Feeds the Status drawer's stat
    *  rows (plan 046 Step 11 — the DOM replacement for the legacy WellbeingPanel stats). */
@@ -104,6 +119,10 @@ export interface HudActions {
   setDemolishMode(on: boolean): void;
   setCombatActive(on: boolean): void;
   setInspect(target: InspectableStats | null): void;
+  /** Open the companion menu with the ally's live role/posture (from `npc:menuOpen`). */
+  openCompanionMenu(dayRole: NpcDayRole, nightPosture: NpcNightPosture): void;
+  /** Close the companion menu (the sheet's dismiss); leaves the last role/posture in place. */
+  closeCompanionMenu(): void;
   setPlayerStats(stats: CombatantStats | null): void;
   setInventory(inventory: Record<string, number>): void;
   setHotbar(hotbar: HotbarSlot[]): void;
@@ -137,6 +156,8 @@ const initialState: HudState = {
   demolishMode: false,
   combatActive: false,
   inspectTarget: null,
+  // Defaults mirror NpcCharacter's initial dayRole/nightPosture; overwritten each time the menu opens.
+  companionMenu: { open: false, dayRole: 'gather', nightPosture: 'follow' },
   playerStats: null,
   inventory: {},
   hotbar: new Array<HotbarSlot>(HOTBAR_SLOTS).fill(null),
@@ -167,6 +188,9 @@ export const useHudStore = create<HudState & HudActions>()(
     setDemolishMode: (demolishMode) => set({ demolishMode }),
     setCombatActive: (combatActive) => set({ combatActive }),
     setInspect: (inspectTarget) => set({ inspectTarget }),
+    openCompanionMenu: (dayRole, nightPosture) =>
+      set({ companionMenu: { open: true, dayRole, nightPosture } }),
+    closeCompanionMenu: () => set((s) => ({ companionMenu: { ...s.companionMenu, open: false } })),
     setPlayerStats: (playerStats) => set({ playerStats }),
     setInventory: (inventory) => set({ inventory }),
     setHotbar: (hotbar) => set({ hotbar }),

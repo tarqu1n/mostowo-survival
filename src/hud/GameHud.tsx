@@ -22,6 +22,9 @@ import type { CommandBarMode } from './components/CommandBar';
 import { BuildCatalog } from './components/BuildCatalog';
 import { PackDrawer } from './components/PackDrawer';
 import { StatusDrawer } from './components/StatusDrawer';
+import { InspectCard } from './components/InspectCard';
+import { CompanionMenu } from './components/CompanionMenu';
+import { DevMenu } from './components/DevMenu';
 
 /** `0xRRGGBB` (config colour) → a CSS hex string. The vignette configs are shared with the (now
  *  retired) Phaser bake, which stored them as numbers. */
@@ -39,7 +42,9 @@ const cssHex = (n: number): string => `#${n.toString(16).padStart(6, '0')}`;
  *    360×640 design units (same space Phaser draws in).
  *  - `.hud-safe` — an inset sublayer carrying `env(safe-area-inset-*)` for interactive clusters.
  *    Holds the top cluster (Step 9): MeterBars (top-left), DayNightDial (top-centre), ResourceChips
- *    (top-right). Each self-positions absolutely, so they only need a positioned ancestor.
+ *    (top-right); the bottom `ActionLayer` (hotbar + command bar + drawers, Steps 10–11); and the
+ *    `Overlays` (inspect / companion / dev, Step 12). Each self-positions, needing only a positioned
+ *    ancestor (the sheet-based overlays portal out to the body regardless).
  */
 export function GameHud() {
   useBridge();
@@ -81,6 +86,7 @@ export function GameHud() {
           <DayNightDial />
           <ResourceChips />
           <ActionLayer />
+          <Overlays />
         </div>
       </div>
     </div>
@@ -130,6 +136,41 @@ function ActionLayer() {
       <PackDrawer open={openDrawer === 'pack'} onOpenChange={toggle('pack')} />
       <StatusDrawer open={openDrawer === 'status'} onOpenChange={toggle('status')} />
     </div>
+  );
+}
+
+/**
+ * Deep overlays (plan 046 Step 12) — the DOM replacements for the last three Phaser HUD widgets,
+ * grouped here since none belong to the persistent top/action clusters:
+ *  - `InspectCard` — a pure mirror of `store.inspectTarget` (open iff non-null); its own dismiss emits
+ *    `inspect:hide`, which the bridge clears back into the store, so no local open flag can drift.
+ *  - `CompanionMenu` — opened by the `npc:menuOpen` game event (held in the store's `companionMenu`,
+ *    wired in the bridge); each row emits the same `npc:*` bus event the legacy popover fired, and
+ *    "Guard here" arms the one-tap `npc:beginPlaceGuard` place-the-point flow (unchanged in GameScene).
+ *  - `DevMenu` — whole render gated on `import.meta.env.DEV`, dead-code-eliminated from prod builds.
+ *
+ * `InspectCard`/`CompanionMenu` are Radix sheets that portal to `document.body` (viewport-fixed, not
+ * design-scaled); `DevMenu` self-positions bottom-right inside this design-space layer. All three own
+ * their own pointer-events, so the click-through HUD root does not gate them.
+ */
+function Overlays() {
+  const menu = useHudStore((s) => s.companionMenu);
+  const closeCompanionMenu = useHudStore((s) => s.closeCompanionMenu);
+
+  return (
+    <>
+      <InspectCard />
+      <CompanionMenu
+        open={menu.open}
+        dayRole={menu.dayRole}
+        nightPosture={menu.nightPosture}
+        // Dismiss only closes the sheet — it must NOT emit `npc:cancelPlaceGuard`, or picking "Guard
+        // here" (which arms placement, then calls onClose) would immediately disarm itself. The ESC
+        // guard-cancel stays in UIScene until the Step 13 cutover.
+        onClose={closeCompanionMenu}
+      />
+      <DevMenu />
+    </>
   );
 }
 

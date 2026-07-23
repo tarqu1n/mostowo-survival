@@ -145,13 +145,24 @@ export function initBridge(bus: EventBus, registry: Registry): Bridge {
   on<TasksPayload>('tasks:changed', (p) =>
     store.setTasks({ current: p.current, pending: p.pending }),
   );
-  on<HudMode>('mode:changed', (m) => store.setMode(m));
+  on<HudMode>('mode:changed', (m) => {
+    store.setMode(m);
+    // Leaving inspect mode clears any shown card — the DOM port of the retired UIScene.onModeChanged
+    // (GameScene's setMode emits only `mode:changed`, never `inspect:hide`, so the HUD owns this).
+    if (m !== 'inspect') store.setInspect(null);
+  });
   on<boolean>('build:modeChanged', (on) => store.setBuildMode(on));
   on<BuildSelectPayload>('build:select', (p) => store.setSelection(p.id));
   on<boolean>('demolish:modeChanged', (on) => store.setDemolishMode(on));
   on<boolean>('combat:activeChanged', (on) => store.setCombatActive(on));
   on<InspectableStats>('inspect:show', (stats) => store.setInspect(stats));
   on('inspect:hide', () => store.setInspect(null));
+  // A tap on the companion opens its assignment menu (plan 042 → 046 Step 12). The payload carries the
+  // sprite's on-screen `x`/`y` for the legacy anchored popover; the DOM menu is a bottom sheet, so it
+  // uses only the live `dayRole`/`nightPosture` to highlight the active rows.
+  on<{ dayRole: NpcDayRole; nightPosture: NpcNightPosture }>('npc:menuOpen', (p) =>
+    store.openCompanionMenu(p.dayRole, p.nightPosture),
+  );
   on<number>('zoom:changed', (z) => store.setZoom(z));
   on<boolean>('camera:followChanged', (on) => store.setFollowing(on));
 
