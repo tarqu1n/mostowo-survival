@@ -76,7 +76,11 @@ export class TaskGlowRenderer {
       switch (ORDER_META[a.kind].highlight) {
         case 'tree': {
           const tree = id ? this.deps.treeById(id) : undefined;
-          if (tree?.alive) {
+          // `harvest` glows a live node only; a `clear` order also glows a dead one-shot ruin
+          // (plan 047) — the husk stays present/tappable/tile-occupying until cleared, so its
+          // queued order shows the same silhouette halo a live harvest target does.
+          const glows = a.kind === 'clear' ? tree?.alive || tree?.def.oneShot : tree?.alive;
+          if (tree && glows) {
             this.addTreeGlow(tree, tree.id === headId);
             this.outlinedTreeIds.add(tree.id);
           }
