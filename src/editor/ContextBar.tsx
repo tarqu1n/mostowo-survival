@@ -441,27 +441,28 @@ export function SelectionBar() {
     // Sits above the ContextBar (which owns the bottom safe-area inset), so no bottom inset padding here.
     <div className="flex items-center gap-1.5 overflow-x-auto border-t border-surface bg-raised/95 px-2 py-1.5 backdrop-blur">
       {/* 4-way nudge (mirrors the arrow-key nudge) + a step toggle so touch gets BOTH the whole-tile
-          snap and 1px fine positioning (the phone stand-in for plain-arrow vs Shift+arrow). */}
+          snap and 1px fine positioning (the phone stand-in for plain-arrow vs Shift+arrow). The step
+          toggle is a DECOR-only refinement — nodes/portals are tile-addressed (col/row, no sub-tile
+          position), so for a selection with no decor it's hidden entirely rather than shown disabled:
+          a greyed control stuck on "1 tile" reads as a broken picker (phone feedback). The arrows
+          then just move whole tiles, the only meaningful step for that selection. */}
       <div className={groupClass}>
-        <Button
-          variant="outline"
-          size="sm"
-          aria-label={`Nudge step: 1 ${stepWord}`}
-          aria-pressed={fine}
-          title={
-            hasDecor
-              ? `Nudge step — tap to switch (now 1 ${stepWord})`
-              : 'Nudge step (nodes move a whole tile)'
-          }
-          disabled={!hasDecor}
-          className={cn(
-            'w-14 shrink-0 font-normal tabular-nums',
-            fine && 'bg-active text-fg-bright hover:bg-active',
-          )}
-          onClick={() => setFineNudge((v) => !v)}
-        >
-          {fine ? '1 px' : '1 tile'}
-        </Button>
+        {hasDecor && (
+          <Button
+            variant="outline"
+            size="sm"
+            aria-label={`Nudge step: 1 ${stepWord}`}
+            aria-pressed={fine}
+            title={`Nudge step — tap to switch (now 1 ${stepWord})`}
+            className={cn(
+              'w-14 shrink-0 font-normal tabular-nums',
+              fine && 'bg-active text-fg-bright hover:bg-active',
+            )}
+            onClick={() => setFineNudge((v) => !v)}
+          >
+            {fine ? '1 px' : '1 tile'}
+          </Button>
+        )}
         <Button
           variant="outline"
           size="icon-lg"
