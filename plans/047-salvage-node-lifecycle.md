@@ -1,10 +1,10 @@
-# Savage Node Lifecycle
+# Salvage Node Lifecycle
 
 > Status: planned — run /execute-plan to begin.
 
 ## Summary
 
-Turn the destroyed-tent (`savagedTent`) node into a full two-stage lifecycle: **savage** it once
+Turn the destroyed-tent (`salvagedTent`) node into a full two-stage lifecycle: **salvage** it once
 (a long, ~20s timed action, tent shaking throughout) to roll its loot and leave a permanent **ruined
 husk** that still blocks its tile; then optionally **clear** the husk (an even longer ~40s action)
 to remove it, yield a little scrap, and free the tile for building/pathing. Adds a `oneShot`
@@ -20,16 +20,16 @@ this feature is purely the mechanic + fx wiring on top.
 
 Owner decisions (this session):
 
-- **Durations:** savage **20s**, clear **40s** — real-time *timed* actions (not many quick hits),
+- **Durations:** salvage **20s**, clear **40s** — real-time *timed* actions (not many quick hits),
   modelled on the existing `build` progress-accumulator (`runBuild`, `site.progress += delta`,
   `BUILD_MS`), with a continuous shake for the whole window. New config `SAVAGE_MS = 20000`,
   `CLEAR_MS = 40000` (generic; per-def override is out of scope).
 - **Clear yields a little scrap:** a small second loot payout on clear — modelled as an optional
-  per-def `clearLoot?: LootTable` (reuses `systems/loot.ts`). `savagedTent` gets a small table
+  per-def `clearLoot?: LootTable` (reuses `systems/loot.ts`). `salvagedTent` gets a small table
   (e.g. cloth 1–2, wood 1). A one-shot node with no `clearLoot` clears silently.
 - **Progress persists:** the accumulated action time is stored **on the node** and survives
   cancel/re-queue (resuming continues where it left off). It resets only when a stage completes
-  (savage→ruin resets it for the clear stage; clear removes the node). *(The critique flagged this as
+  (salvage→ruin resets it for the clear stage; clear removes the node). *(The critique flagged this as
   the costliest/lowest-value element and suggested resetting per-order like `chopElapsed`; owner
   confirmed keeping the persistent behaviour.)*
 - **Generic clear, player-only:** `clear` is a new order kind valid on *any* depleted `oneShot`
@@ -38,8 +38,8 @@ Owner decisions (this session):
   depleted node (`alive=false`) stops blocking (`hasBlockingNode` requires `alive`) and is
   unclickable (`pickSpriteAt` skips `!alive`). A dead **one-shot** node must stay a present,
   tile-occupying, tappable obstacle so "clear the area to build" is meaningful.
-- **Player anim:** both savage and clear use the `gather` (rummage/dismantle) motion — savage via
-  the existing `harvestAnim:'savage'`→`gather` map (`harvestAnimMotion`); clear maps to `gather`
+- **Player anim:** both salvage and clear use the `gather` (rummage/dismantle) motion — salvage via
+  the existing `harvestAnim:'salvage'`→`gather` map (`harvestAnimMotion`); clear maps to `gather`
   too. No new player strip (reskin-stand-in convention).
 
 Direction (CLAUDE.md / ROADMAP): MVP is complete; this is post-MVP scavenge content that reinforces
@@ -64,14 +64,14 @@ Key files/patterns to mirror (from research):
   `!t.alive` skip to change is `pickSpriteAt` `ScenePicker.ts:185`.
 - **Tile gate:** `GameScene.isBlocked` (`1069-1075`) composes `hasBlockingNode`
   (`ResourceNodeManager.ts:239-241`).
-- **Tests:** `data.test.ts` (NODES invariants + savagedTent test 86-92), `world.test.ts`
+- **Tests:** `data.test.ts` (NODES invariants + salvagedTent test 86-92), `world.test.ts`
   (placement + catalog), `nodeDefs.test.ts` (parser), `orders.test.ts` (exhaustive), e2e via
   `order(page, action)` (`tests/e2e/harness.ts:137`) + `testApi.ts` (`trees`/`treeById`/`debugState`).
 
 ## Steps
 
-- [x] **Step 1: `oneShot` + `clearLoot` node-def schema (+ savagedTent data)** `[delegate]` (parallel: A)
-  - Outcome: added `oneShot?: boolean` + `clearLoot?: LootTable` to `ResourceNodeDef` (`src/data/types.ts`), `AuthoredNodeDef` + `AUTHORED_NODE_DEF_KEYS` + `parseAuthoredNodeDef`/`parseNodeDefs` (`src/systems/nodeDefs.ts`, `oneShot` via `expectBoolean`, `clearLoot` via existing `parseLootTable`); `regrowMs` left required+`>0`. `savagedTent` in `nodes.json` gets `oneShot:true` + `clearLoot` (cloth 1–2 w2, wood 1 w1, 1 roll). Tests extended in `nodeDefs.test.ts` + `data.test.ts`. Full suite 962 green; `NODES.savagedTent.oneShot === true`.
+- [x] **Step 1: `oneShot` + `clearLoot` node-def schema (+ salvagedTent data)** `[delegate]` (parallel: A)
+  - Outcome: added `oneShot?: boolean` + `clearLoot?: LootTable` to `ResourceNodeDef` (`src/data/types.ts`), `AuthoredNodeDef` + `AUTHORED_NODE_DEF_KEYS` + `parseAuthoredNodeDef`/`parseNodeDefs` (`src/systems/nodeDefs.ts`, `oneShot` via `expectBoolean`, `clearLoot` via existing `parseLootTable`); `regrowMs` left required+`>0`. `salvagedTent` in `nodes.json` gets `oneShot:true` + `clearLoot` (cloth 1–2 w2, wood 1 w1, 1 roll). Tests extended in `nodeDefs.test.ts` + `data.test.ts`. Full suite 962 green; `NODES.salvagedTent.oneShot === true`.
   - `src/data/types.ts`: on `ResourceNodeDef` add optional `oneShot?: boolean` (no regrow — stays in
     its depleted/ruined state forever) and `clearLoot?: LootTable` (rolled when the ruin is cleared),
     documented near `regrowMs`/`loot` (~L89-110), same "required-but-ignored when set" note style as
@@ -81,18 +81,18 @@ Key files/patterns to mirror (from research):
     parse in `parseAuthoredNodeDef` (`oneShot` via a boolean check; `clearLoot` via the existing
     `parseLootTable`) and carry both into the returned record in `parseNodeDefs` (L455-475). Keep
     `regrowMs` required + `>0` (it stays validated but is ignored when `oneShot` — do NOT relax it).
-  - `src/data/maps/nodes.json`: on `savagedTent` (L335-357) add `"oneShot": true` and a small
+  - `src/data/maps/nodes.json`: on `salvagedTent` (L335-357) add `"oneShot": true` and a small
     `"clearLoot": { "rolls": 1, "drops": [ {cloth 1-2 w2}, {wood 1-1 w1} ] }`.
   - `src/systems/__tests__/nodeDefs.test.ts`: add accept cases (`oneShot:true`, a valid `clearLoot`)
     and reject cases (non-boolean `oneShot`, malformed `clearLoot`), mirroring the existing
-    savage/loot parser tests (L316-385).
-  - `src/data/__tests__/data.test.ts`: extend the `savagedTent` test (L86-92) to assert
+    salvage/loot parser tests (L316-385).
+  - `src/data/__tests__/data.test.ts`: extend the `salvagedTent` test (L86-92) to assert
     `oneShot===true` and `clearLoot` defined; keep the generic NODES invariants (incl. `regrowMs>0`
     at L60) green.
   - Side effects: none at runtime yet (flags unused until Step 2/5). Every other node omits both →
     `undefined` → unchanged.
   - Docs: none this step (covered in Step 8).
-  - Done when: `npm test` green; `parseNodeDefs` accepts the new savagedTent; `NODES.savagedTent.oneShot === true`.
+  - Done when: `npm test` green; `parseNodeDefs` accepts the new salvagedTent; `NODES.salvagedTent.oneShot === true`.
 
 - [x] **Step 2: `clear` order kind registry (pure)** `[delegate]` (parallel: A)
   - Outcome: added `{ kind: 'clear'; treeId }` to the `Action` union (`src/systems/tasks.ts`); `orderTargetId` `clear` case + `ORDER_META.clear = { highlight:'tree', dedupeOnEnqueue:true }` (`src/systems/orders.ts`); fixtures + exhaustive assertions in `orders.test.ts` (16 green). Full `tsc` clean incl. GameScene (optional mapped types, no forced beginner/runner). No runtime `clear` handler until Step 5. Pre-existing `docs/ui-overhaul/pitch.html` format-check failure is unrelated to this change.
@@ -125,20 +125,20 @@ Key files/patterns to mirror (from research):
     - Add a small `progressMs: number` field to `TreeNode` (`src/entities/types.ts`, default 0 in
       `addNode`) — the persistent per-node action accumulator (used by Step 5). Do NOT reset it in the
       harvest loop's `beginCurrent`.
-  - Side effects: `GameScene.isBlocked` now treats a savaged tent as an obstacle until cleared
+  - Side effects: `GameScene.isBlocked` now treats a salvaged tent as an obstacle until cleared
     (intended). `pickSpriteAt` still skips it until Step 4. `TreeNode` gains a field — check
     `addNode` initialises it and no serialization assumes the old shape.
   - Docs: none this step.
   - Done when: unit/boot green; savaging a `oneShot` node leaves a permanent ruin that still blocks
     (verify via `isBlocked`); `removeNode` frees the tile + repaths.
 
-- [x] **Step 4: picker — savage vs clear on the same tile** `[inline]`
-  - Outcome: `src/scenes/input/ScenePicker.ts` — `pickSpriteAt` now lets dead `oneShot` ruins through (`if (!t.alive && !t.def.oneShot) continue;`); `actionAt` branches the `tree` pick live→`harvest` vs ruin→`clear` on `t.alive`. `src/scenes/GameScene.ts` — `onTap` adds `clear` to the enqueue kinds (falls in behind current work like harvest/rearm). Inspect spot-check (critique #6): `treeStats` on a ruin returns `Tree 0/1` — sane, consistent with a live savagedTent already inspecting as "Tree". Typecheck clean, 962 unit tests green; tap→clear asserted via scenario in Step 8.
+- [x] **Step 4: picker — salvage vs clear on the same tile** `[inline]`
+  - Outcome: `src/scenes/input/ScenePicker.ts` — `pickSpriteAt` now lets dead `oneShot` ruins through (`if (!t.alive && !t.def.oneShot) continue;`); `actionAt` branches the `tree` pick live→`harvest` vs ruin→`clear` on `t.alive`. `src/scenes/GameScene.ts` — `onTap` adds `clear` to the enqueue kinds (falls in behind current work like harvest/rearm). Inspect spot-check (critique #6): `treeStats` on a ruin returns `Tree 0/1` — sane, consistent with a live salvagedTent already inspecting as "Tree". Typecheck clean, 962 unit tests green; tap→clear asserted via scenario in Step 8.
   - `src/scenes/ScenePicker.ts`: in `pickSpriteAt` (L161-212) stop skipping dead **one-shot** nodes —
     change the `if (!t.alive) continue;` (L185) to also allow `t.def.oneShot` ruins through (still
     skip regrowing dead stumps). In `actionAt` (L76-94), branch by node state, mirroring the
-    armed/spent-trap branch (L84-89): a live node → `{kind:'harvest', treeId}` (savage is just the
-    loot-harvest of the savagedTent, unchanged); a dead one-shot ruin → `{kind:'clear', treeId}`.
+    armed/spent-trap branch (L84-89): a live node → `{kind:'harvest', treeId}` (salvage is just the
+    loot-harvest of the salvagedTent, unchanged); a dead one-shot ruin → `{kind:'clear', treeId}`.
   - `src/scenes/GameScene.ts` `onTap` (L707-722): add `clear` to the kinds that `enqueue` (alongside
     `harvest|refuel|rearm`) so a tap on a ruin queues the clear.
   - Side effects: depth-ordered raycast unchanged; ensure a ruin under a live node can't both match.
@@ -150,11 +150,11 @@ Key files/patterns to mirror (from research):
   - Done when: tapping a live tent enqueues `harvest`; tapping the ruin enqueues `clear` (assert via
     a scenario `order`/`debugState`, or manual).
 
-- [ ] **Step 5: timed savage + `clear` execution (durations, persistent progress, scrap, removal)** `[inline]`
+- [ ] **Step 5: timed salvage + `clear` execution (durations, persistent progress, scrap, removal)** `[inline]`
   - `src/config.ts`: add `SAVAGE_MS = 20000`, `CLEAR_MS = 40000` near `BUILD_MS` (L107).
   - `src/scenes/GameScene.ts`:
-    - **Timed savage:** in `runHarvest` (L1307-1333), when the target node is a long/timed harvest
-      (discriminate on `tree.def.oneShot && tree.def.loot`, i.e. the savage node), replace the
+    - **Timed salvage:** in `runHarvest` (L1307-1333), when the target node is a long/timed harvest
+      (discriminate on `tree.def.oneShot && tree.def.loot`, i.e. the salvage node), replace the
       `chopElapsed >= CHOP_INTERVAL_MS` hit cadence with a progress-accumulator on the node:
       `tree.progressMs += delta`; drive the shake (Step 6) + the `gather` swing
       (`harvestAnimMotion` already gives `gather`); at `progressMs >= SAVAGE_MS` call
@@ -173,10 +173,10 @@ Key files/patterns to mirror (from research):
       off on re-tap (progress persists on the node, so re-issuing resumes).
   - Side effects: `beginCurrent` resets `chopElapsed`/path (and now runs the Step 6 shake/bar
     teardown) but must NOT reset `tree.progressMs`. Bag-full / unreachable aborts should mirror
-    `beginHarvest`. Confirm the savage still credits loot exactly once (single `chop` at completion,
+    `beginHarvest`. Confirm the salvage still credits loot exactly once (single `chop` at completion,
     `maxHp:1`). Bag-full gate (critique #4): `beginHarvest` only checks `canAccept(yieldItemId, 1)`,
-    but savage rolls the whole `loot` table (2 rolls) — after a 20s wait a nearly-full bag could
-    silently drop most of it. Either loosen the gate to a fuller pre-check for savage nodes, or
+    but salvage rolls the whole `loot` table (2 rolls) — after a 20s wait a nearly-full bag could
+    silently drop most of it. Either loosen the gate to a fuller pre-check for salvage nodes, or
     explicitly accept the overflow-drop (document which); do not leave it unconsidered.
   - Docs: none this step.
   - Done when: savaging takes ~20s (progress persists across cancel) then leaves a ruin; clearing
@@ -189,7 +189,7 @@ Key files/patterns to mirror (from research):
     L149-152 but with a fixed amplitude, no `depletion·decay`); guard `if (!sprite.active) return`;
     store in its own keyed Map (like `recoilTweens`). `stopShake` `.stop()`s it and snaps the sprite
     back to rest. New `config.ts` tunables (`NODE_SHAKE_PX`, `NODE_SHAKE_DEG`, `NODE_SHAKE_HZ`).
-  - **Progress bar** — a world-space bar above the node that fills 0→1 over the action, since savage
+  - **Progress bar** — a world-space bar above the node that fills 0→1 over the action, since salvage
     (20s) / clear (40s) are long and need a readable countdown. **Mirror the enemy HP bar**
     (`src/scenes/fx/CombatFxManager.ts` `syncEnemyHealthBars`, ~L370-420: a lazily-created `{bg, fg}`
     rectangle pair, positioned/sized each frame above the sprite, destroyed when no longer shown).
@@ -217,7 +217,7 @@ Key files/patterns to mirror (from research):
     display top, not a fixed offset.
   - Docs: RENDERING.md — one terse line that the node shake is a looping tween + the action progress
     bar mirrors the enemy HP-bar renderer (no frame-loop shader).
-  - Done when: during savage/clear the node shakes and a progress bar above it fills smoothly to full
+  - Done when: during salvage/clear the node shakes and a progress bar above it fills smoothly to full
     over the duration (and reflects persisted progress on resume); both vanish on finish/cancel; boot
     canary clean.
 
@@ -240,10 +240,10 @@ Key files/patterns to mirror (from research):
     (mirror `queuedTreeIds`), via `src/scenes/testApi.ts`.
   - Unit: if any progress/threshold logic is cleanly extractable as a pure helper, unit-test it;
     otherwise rely on the scenario + the Step 1/2 parser/registry tests.
-  - Docs (terse, high-signal): update `docs/wired-art.md` savage section (regrow→one-shot; the
-    savage/clear lifecycle + durations; clearLoot); `docs/STATUS.md` (new subsystem entry);
+  - Docs (terse, high-signal): update `docs/wired-art.md` salvage section (regrow→one-shot; the
+    salvage/clear lifecycle + durations; clearLoot); `docs/STATUS.md` (new subsystem entry);
     `docs/DECISIONS.md` + a gameplay shard note (one-shot node, generic clear, persistent progress,
-    shake-as-looping-tween). Mention the `savage`/`clear` player-anim stand-in (`gather`).
+    shake-as-looping-tween). Mention the `salvage`/`clear` player-anim stand-in (`gather`).
   - Side effects: keep `data.test.ts`/`world.test.ts`/`orders.test.ts`/`nodeDefs.test.ts` green;
     run `npm run assets:catalog` only if any asset path changed (it shouldn't).
   - Done when: `npm run check` + e2e + boot canary all green; docs updated.
@@ -251,9 +251,9 @@ Key files/patterns to mirror (from research):
 ## Out of scope
 
 - NPC-companion savaging/clearing (player-only for now; companion `repair`-style wiring deferred).
-- A bespoke `savage`/`clear` player animation strip (reuses the `gather` motion stand-in).
+- A bespoke `salvage`/`clear` player animation strip (reuses the `gather` motion stand-in).
 - Per-def override of `SAVAGE_MS`/`CLEAR_MS` (global config constants for now).
-- Applying `oneShot`/`clear` to any node other than `savagedTent` in shipped data (the mechanic is
+- Applying `oneShot`/`clear` to any node other than `salvagedTent` in shipped data (the mechanic is
   generic, but only the tent uses it this pass).
 - Changing the loot economy/balance beyond adding the small `clearLoot`.
 
@@ -272,7 +272,7 @@ Key files/patterns to mirror (from research):
 |1|Looping shake + progress bar have no reliable stop on a toggle-cancel (cancel routes through `beginCurrent`, not `completeCurrent`) → orphan infinite tween + floating bar.|Gaps/risks|Medium|Blanket teardown (stop all shakes + hide all bars) at the top of `beginCurrent`. *(folded into Step 6)*|
 |2|Persistent-across-cancel progress is the highest-complexity/lowest-value element for marginal single-player benefit.|Right-sizing|Medium|Owner confirmed: keep it.|
 |3|Step 2's "TypeScript error until Step 5" note is a phantom — `orderBeginners`/`orderRunners` are optional mapped types.|Executability|Low|Corrected: Step 2 typechecks standalone; run full `npm run check`.|
-|4|`runHarvest` bag-full gate checks only `canAccept(yieldItemId,1)`, but savage rolls the whole loot table → near-full bag can drop most loot after a 20s wait.|Gaps/risks|Low|Fuller pre-check for savage, or explicitly accept. *(noted in Step 5)*|
+|4|`runHarvest` bag-full gate checks only `canAccept(yieldItemId,1)`, but salvage rolls the whole loot table → near-full bag can drop most loot after a 20s wait.|Gaps/risks|Low|Fuller pre-check for salvage, or explicitly accept. *(noted in Step 5)*|
 |5|`clear` shares the `'tree'` highlight class → needs an `a.kind` branch for the `alive‖oneShot` gate.|Cross-cutting|Low|Branch on `a.kind` in the `'tree'` case (Step 7).|
 |6|Clickable ruins become inspectable (`inspectAt`→`treeStats`) — unmentioned side effect.|Gaps/risks|Low|Spot-check `treeStats` on a depleted node. *(noted in Step 4)*|
 |7|Feature isn't on the explicit post-MVP roadmap list; net-new content scoped this session.|Roadmap fit|Low|Owner-scoped; no code concern.|

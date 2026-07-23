@@ -189,7 +189,7 @@ export class ScenePicker {
     }
     for (const t of this.deps.trees()) {
       // A regrowing dead stump is unclickable (skipped so it can't be re-harvested mid-regrow); a
-      // permanent `oneShot` ruin (a savaged tent husk, plan 047) stays a tappable obstacle so it can
+      // permanent `oneShot` ruin (a salvaged tent husk, plan 047) stays a tappable obstacle so it can
       // be `clear`ed — let it through. `actionAt` branches live→harvest vs ruin→clear on `t.alive`.
       if (!t.alive && !t.def.oneShot) continue;
       if ((t.col === col && t.row === row) || this.alphaHit(t.sprite, x, y))

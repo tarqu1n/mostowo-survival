@@ -83,10 +83,10 @@ describe('NODES', () => {
     }
   });
 
-  it('savagedTent is a savage-action node with a loot table (not a fixed single yield)', () => {
-    const tent = NODES.savagedTent;
+  it('salvagedTent is a salvage-action node with a loot table (not a fixed single yield)', () => {
+    const tent = NODES.salvagedTent;
     expect(tent).toBeDefined();
-    expect(tent.harvestAnim).toBe('savage');
+    expect(tent.harvestAnim).toBe('salvage');
     expect(tent.loot).toBeDefined();
     expect(tent.oneShot).toBe(true); // no regrow — the ruined husk stays forever (plan 047)
     expect(tent.clearLoot).toBeDefined(); // scrap rolled once when the husk is cleared

@@ -97,13 +97,13 @@ export interface ResourceNodeDef extends ObjectStats {
   blocksPath: boolean;
   /** In-place harvest animation the player plays (default `'chop'`, axe); a rock uses `'mine'`
    *  (pickaxe) and a bush `'gather'` (forage). Was previously inferred from the retired `tile` role;
-   *  now authored explicitly (plan 021 step 6). `'savage'` (scavenging a tent wreck) reuses the
-   *  `gather` player/fx motion as a stand-in until a bespoke savage strip lands — see
+   *  now authored explicitly (plan 021 step 6). `'salvage'` (scavenging a tent wreck) reuses the
+   *  `gather` player/fx motion as a stand-in until a bespoke salvage strip lands — see
    *  `harvestAnimToSwing` (GameScene) and the fx-kind mapping (NodeFxManager). */
-  harvestAnim?: 'chop' | 'gather' | 'mine' | 'savage';
+  harvestAnim?: 'chop' | 'gather' | 'mine' | 'salvage';
   /**
    * When present, each harvest hit rolls THIS loot table (a predefined item set) instead of
-   * yielding the fixed `yieldItemId`/`yieldPerHit` — the "savage" action (scavenge a wrecked tent).
+   * yielding the fixed `yieldItemId`/`yieldPerHit` — the "salvage" action (scavenge a wrecked tent).
    * `yieldItemId`/`yieldPerHit` stay required by the schema (and remain the fallback for any hit if
    * a future def sets both) but are ignored while `loot` is set. See `src/systems/loot.ts`.
    */

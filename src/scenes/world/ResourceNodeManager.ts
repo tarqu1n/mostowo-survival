@@ -154,7 +154,7 @@ export class ResourceNodeManager {
       row,
       skin: skin.id,
       rotation, // the true rest angle — chop fx recoils/topples around it (see NodeFxManager)
-      progressMs: 0, // persistent timed-action accumulator (savage/clear, plan 047); unused by hit-based nodes
+      progressMs: 0, // persistent timed-action accumulator (salvage/clear, plan 047); unused by hit-based nodes
     });
   }
 
@@ -237,7 +237,7 @@ export class ResourceNodeManager {
 
   /** True if a *blocking* node (tree/rock) occupies (col,row) — the pathfinding/placement veto;
    *  a non-blocking bush (`def.blocksPath === false`) never blocks. A regrowing dead stump frees its
-   *  tile as before (`alive` gate), but a permanent `oneShot` ruin (a savaged tent husk, plan 047)
+   *  tile as before (`alive` gate), but a permanent `oneShot` ruin (a salvaged tent husk, plan 047)
    *  keeps blocking even while dead — you must `clear` it to reclaim the ground. */
   hasBlockingNode(col: number, row: number): boolean {
     return this.trees.some(
@@ -275,7 +275,7 @@ export class ResourceNodeManager {
     tree.hp -= 1;
     const yieldTo = onYield ?? this.deps.addYield;
     if (tree.def.loot) {
-      // "Savage" a wreck: this hit rolls the def's loot table (a predefined item set) instead of the
+      // "Salvage" a wreck: this hit rolls the def's loot table (a predefined item set) instead of the
       // fixed single yield. Each rolled stack is credited through the SAME sink, so the player bag vs
       // companion-carry redirect (see `onYield` doc) works identically.
       for (const drop of rollLoot(tree.def.loot)) yieldTo(drop.itemId, drop.qty);

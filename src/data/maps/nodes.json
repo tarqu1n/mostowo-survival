@@ -333,14 +333,14 @@
       ]
     },
     {
-      "id": "savagedTent",
+      "id": "salvagedTent",
       "name": "Wrecked Tent",
       "maxHp": 1,
       "yieldItemId": "cloth",
       "yieldPerHit": 1,
       "regrowMs": 600000,
       "blocksPath": true,
-      "harvestAnim": "savage",
+      "harvestAnim": "salvage",
       "loot": {
         "rolls": 2,
         "drops": [

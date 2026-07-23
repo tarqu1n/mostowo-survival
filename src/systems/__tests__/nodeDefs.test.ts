@@ -262,7 +262,7 @@ describe('parseNodeDefs', () => {
       r.defs[0].harvestAnim = 'smash';
     });
     expect(() => parseNodeDefs(raw)).toThrow(
-      /harvestAnim must be 'chop', 'gather', 'mine' or 'savage'/,
+      /harvestAnim must be 'chop', 'gather', 'mine' or 'salvage'/,
     );
   });
 
@@ -313,13 +313,13 @@ describe('parseNodeDefs', () => {
     expect(() => parseNodeDefs(file)).not.toThrow();
   });
 
-  // ---- Savage action: harvestAnim + loot table (predefined item set) ----
+  // ---- Salvage action: harvestAnim + loot table (predefined item set) ----
 
-  it("accepts the 'savage' harvestAnim (tent-wreck scavenge)", () => {
+  it("accepts the 'salvage' harvestAnim (tent-wreck scavenge)", () => {
     const raw = withRaw((r) => {
-      r.defs[0].harvestAnim = 'savage';
+      r.defs[0].harvestAnim = 'salvage';
     });
-    expect(parseNodeDefs(raw).tree.harvestAnim).toBe('savage');
+    expect(parseNodeDefs(raw).tree.harvestAnim).toBe('salvage');
   });
 
   it('parses a valid loot table through to the def, defaulting a drop weight to 1', () => {
@@ -386,7 +386,7 @@ describe('parseNodeDefs', () => {
     expect(() => parseNodeDefs(raw)).toThrow(/loot\.drops\[0\] has unknown key "chance"/);
   });
 
-  // ---- oneShot + clearLoot (savage-node lifecycle, plan 047) ----
+  // ---- oneShot + clearLoot (salvage-node lifecycle, plan 047) ----
 
   it('carries oneShot:true through to the def', () => {
     const raw = withRaw((r) => {

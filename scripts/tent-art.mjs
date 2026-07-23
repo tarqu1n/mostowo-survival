@@ -1,6 +1,6 @@
 /**
- * Placeholder art for the destroyed-tent "savage" nodes + their two new salvage item icons
- * (plan: savage action — scavenge a wrecked 6-person tent for a loot roll). Same self-contained
+ * Placeholder art for the destroyed-tent "salvage" nodes + their two new salvage item icons
+ * (plan: salvage action — scavenge a wrecked 6-person tent for a loot roll). Same self-contained
  * RGBA/8-bit PNG encoder as `scripts/placeholder-art.mjs` (Node `zlib` only, no image deps).
  *
  * These are hand-authored PLACEHOLDERS — the game has no tent art in any pack and the Gemini

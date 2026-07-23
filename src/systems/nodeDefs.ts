@@ -62,8 +62,8 @@ export interface AuthoredNodeDef {
   yieldPerHit: number;
   regrowMs: number;
   blocksPath: boolean;
-  harvestAnim?: 'chop' | 'gather' | 'mine' | 'savage';
-  /** Optional loot table — each harvest hit rolls this instead of the fixed yield (the "savage"
+  harvestAnim?: 'chop' | 'gather' | 'mine' | 'salvage';
+  /** Optional loot table — each harvest hit rolls this instead of the fixed yield (the "salvage"
    *  action). Cross-checked itemId ∈ ITEMS by `parseLootTable`. See `ResourceNodeDef.loot`. */
   loot?: LootTable;
   /** No-regrow flag — the node stays depleted/ruined forever once harvested (the tent husk). Ignored
@@ -96,15 +96,15 @@ export interface NodeDefsFile {
 export type NormalizedNodeSkinDef = Omit<NodeSkinDef, 'weight'> & { weight: number };
 
 /** The concrete in-place harvest motion a node's `harvestAnim` resolves to for the player-swing
- *  sprite state and the depletion fx (`NodeFxManager`). `'savage'` has no bespoke strip yet, so it
+ *  sprite state and the depletion fx (`NodeFxManager`). `'salvage'` has no bespoke strip yet, so it
  *  reuses the `gather` (forage/rummage) motion as a stand-in — the one place that mapping lives, so
- *  swapping in a real savage strip later is a single edit here. Undefined ⇒ the default `chop`. */
+ *  swapping in a real salvage strip later is a single edit here. Undefined ⇒ the default `chop`. */
 export type HarvestMotion = 'chop' | 'gather' | 'mine';
 export function harvestAnimMotion(
-  anim: 'chop' | 'gather' | 'mine' | 'savage' | undefined,
+  anim: 'chop' | 'gather' | 'mine' | 'salvage' | undefined,
 ): HarvestMotion {
   if (anim === undefined) return 'chop';
-  return anim === 'savage' ? 'gather' : anim;
+  return anim === 'salvage' ? 'gather' : anim;
 }
 
 /**
@@ -277,7 +277,7 @@ function parseStandOffsets(value: unknown, path: string): ReadonlyArray<readonly
   });
 }
 
-const HARVEST_ANIM_VALUES: ReadonlySet<string> = new Set(['chop', 'gather', 'mine', 'savage']);
+const HARVEST_ANIM_VALUES: ReadonlySet<string> = new Set(['chop', 'gather', 'mine', 'salvage']);
 
 const LOOT_DROP_KEYS = ['itemId', 'min', 'max', 'weight'] as const;
 
@@ -371,15 +371,15 @@ function parseAuthoredNodeDef(
 
   const blocksPath = expectBoolean(obj.blocksPath, `${path}.blocksPath`);
 
-  let harvestAnim: 'chop' | 'gather' | 'mine' | 'savage' | undefined;
+  let harvestAnim: 'chop' | 'gather' | 'mine' | 'salvage' | undefined;
   if (obj.harvestAnim !== undefined) {
     const raw = expectString(obj.harvestAnim, `${path}.harvestAnim`);
     if (!HARVEST_ANIM_VALUES.has(raw)) {
       fail(
-        `${path}.harvestAnim must be 'chop', 'gather', 'mine' or 'savage', got ${JSON.stringify(raw)}`,
+        `${path}.harvestAnim must be 'chop', 'gather', 'mine' or 'salvage', got ${JSON.stringify(raw)}`,
       );
     }
-    harvestAnim = raw as 'chop' | 'gather' | 'mine' | 'savage';
+    harvestAnim = raw as 'chop' | 'gather' | 'mine' | 'salvage';
   }
 
   const loot = obj.loot === undefined ? undefined : parseLootTable(obj.loot, `${path}.loot`);

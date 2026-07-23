@@ -252,9 +252,9 @@ wall/gate/trap render steps read paths + frames from.
   — `Lightning`, `Barrel` (+`Boom`), and `Barricades/Archer` (turret + its `Arrow` projectile). Not
   wired by plan 037; only the spike trap ships now.
 
-### Savage action — destroyed tents (Gemini art + loot table)
+### Salvage action — destroyed tents (Gemini art + loot table)
 
-**Wrecked-tent** node skins (a ~6-person tent) for the **savage** action — scavenging a collapsed tent
+**Wrecked-tent** node skins (a ~6-person tent) for the **salvage** action — scavenging a collapsed tent
 for items from a predefined set instead of a single fixed yield.
 
 - **Art is Gemini-generated** (`scripts/gen-tents.py`), image-to-image, since no pack ships tent art.
@@ -281,8 +281,8 @@ for items from a predefined set instead of a single fixed yield.
   > `TAILSCALE_KEY`/`GUPPI_PASSWORD` — follow the verified recipe in
   > [MOBILE-EDITOR-ACCESS.md](MOBILE-EDITOR-ACCESS.md#claude-getting-a-shell-on-guppi--working-on-the-build-there).
   > Keep the key in-memory only; never commit/echo it.
-- **Node def:** `savagedTent` in `src/data/maps/nodes.json` — `maxHp:1`, `blocksPath:true`,
-  `harvestAnim:'savage'`, the 17 skins above (each with a `_searched` depleted swap), regrows like a
+- **Node def:** `salvagedTent` in `src/data/maps/nodes.json` — `maxHp:1`, `blocksPath:true`,
+  `harvestAnim:'salvage'`, the 17 skins above (each with a `_searched` depleted swap), regrows like a
   rock (10 min) **for now** (the one-time-harvest + "clear the area" mechanic is the next step). Six
   instances (all 3 orientations) placed near the camp in `the-moon.map.json`.
 - **Loot mechanic (the actually-new bit):** a node def may carry a `loot` table
@@ -290,9 +290,9 @@ for items from a predefined set instead of a single fixed yield.
   draws from a `drops` set, each a `[min,max]` quantity. When present, `ResourceNodeManager.chop`
   rolls it (pure `rollLoot`, `src/systems/loot.ts`) through the same yield sink instead of the fixed
   `yieldItemId`. The tent's set: cloth / wood / berries / cannedFood.
-- **`'savage'` has no bespoke player strip yet** — `harvestAnimMotion` (`systems/nodeDefs.ts`) maps it
+- **`'salvage'` has no bespoke player strip yet** — `harvestAnimMotion` (`systems/nodeDefs.ts`) maps it
   to the `gather` (forage/rummage) motion for the swing + depletion fx, the reskin-stand-in pattern
-  chop/mine/punch already use. Swap in a real savage strip by editing that one mapper.
+  chop/mine/punch already use. Swap in a real salvage strip by editing that one mapper.
 
 > **Sourcing / generating new art?** The tileset candidates weighed up, the AI-gen service trials
 > (Retro Diffusion / PixelLab), the Gemini bespoke-asset pipeline, and **`style_match.py`** (snaps

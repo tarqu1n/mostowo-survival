@@ -50,7 +50,7 @@ PACK = ROOT / "public/assets/tilesets/mostowo-custom/Environment/Props/Static"
 RAW = ROOT / "scripts/.gen-icons/raw"
 # A clean isolated chevron ROOF from the active pack, seen from the game's exact HIGH TOP-DOWN
 # angle — the perspective + pixel-art-style anchor (the game is top-down, not side-on). Component
-# bbox found via alpha connected-components on Roofs.png (see docs/wired-art.md savage section).
+# bbox found via alpha connected-components on Roofs.png (see docs/wired-art.md salvage section).
 ROOFS = ROOT / "public/assets/tilesets/pixel-crawler/Environment/Structures/Buildings/Roofs.png"
 ROOF_BBOX = (272, 87, 368, 187)
 # SIDE orientation anchor: a real pack BROADSIDE roof (horizontal ridge, one long slope seen from
@@ -218,7 +218,7 @@ def images_for(orient: str) -> list[bytes]:
 
 
 # ---- Ruined / "harvested" state (image-to-image from the LIVE sprite) ----------------------------
-# After the tent is savaged it swaps to a fully-DESTROYED sprite. We generate that from the tent's own
+# After the tent is salvaged it swaps to a fully-DESTROYED sprite. We generate that from the tent's own
 # live art (image-to-image) so the ruin keeps its colour/angle/footprint and reads as "this exact tent,
 # now flattened". Written to `<id>_ruined.png` (NOT `_searched.png`, which --reprocess derives + would
 # clobber). PROMPT IS STILL BEING DIALED IN — see docs/AI-SPRITE-PIPELINE.md.
@@ -353,7 +353,7 @@ def main() -> None:
                     help="re-run post-processing on the saved raw PNGs only (no API call, no spend)")
     ap.add_argument("--ruined", action="store_true",
                     help="build the fully-DESTROYED '<id>_ruined.png' from each LIVE sprite "
-                         "(image-to-image); the savaged/harvested depleted state. Reprocesses a saved "
+                         "(image-to-image); the salvaged/harvested depleted state. Reprocesses a saved "
                          "'<id>_ruined_raw.png' if present (no re-spend); else generates one")
     ap.add_argument("--regen", action="store_true",
                     help="with --ruined: force a fresh generation even if a saved raw exists")

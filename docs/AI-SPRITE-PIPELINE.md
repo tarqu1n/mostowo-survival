@@ -204,7 +204,7 @@ prompt the prop into every frame, and scope to the facings the model draws well.
 ## Static world-prop sprites (the destroyed tents) — a reusable playbook
 
 Third use of the pipeline, and the first for **static world props** (not character animation): the
-destroyed-tent set for the savage action — `scripts/gen-tents.py`, 17 sprites across 3 orientations.
+destroyed-tent set for the salvage action — `scripts/gen-tents.py`, 17 sprites across 3 orientations.
 Single-frame, so no strip/anim work; the hard parts were **orientation** and **matching the pack's
 flat palette**. What generalises to any new prop:
 

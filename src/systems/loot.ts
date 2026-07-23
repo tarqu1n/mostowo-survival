@@ -1,5 +1,5 @@
 /**
- * Loot tables — the pure, Phaser-free decision core for the "savage" action (scavenging a wrecked
+ * Loot tables — the pure, Phaser-free decision core for the "salvage" action (scavenging a wrecked
  * tent for items from a predefined set, rather than a node's single fixed `yieldItemId`).
  *
  * A node whose def carries a {@link LootTable} rolls it per harvest hit instead of yielding one
@@ -24,7 +24,7 @@ export interface LootDrop {
 }
 
 /** A predefined item set a node hands out per harvest hit. `rolls` = how many independent weighted
- *  draws happen (so a single savage of a tent can grant several stacks). */
+ *  draws happen (so a single salvage of a tent can grant several stacks). */
 export interface LootTable {
   /** Independent weighted draws per harvest hit (integer ≥ 1). */
   readonly rolls: number;
