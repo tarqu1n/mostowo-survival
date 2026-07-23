@@ -1,6 +1,6 @@
 # Salvage Node Lifecycle
 
-> Status: planned — run /execute-plan to begin.
+> Status: in review
 
 ## Summary
 
@@ -234,7 +234,8 @@ Key files/patterns to mirror (from research):
   - Done when: a queued `clear` shows the same silhouette glow on the ruin that a queued `harvest`
     shows on a live node.
 
-- [ ] **Step 8: tests + docs** `[inline]`
+- [x] **Step 8: tests + docs** `[inline]`
+  - Outcome: **e2e** `tests/e2e/salvage-lifecycle.spec.ts` — drives the full salvage→clear lifecycle: places a `salvagedTent` adjacent to the player, salvages it (asserts ≥2 loot items, node !alive+oneShot+still-blocking, `currentKind` null), advances a driven window (still ruined, no regrow), then orders `clear` (asserts the ruin glows via `outlinedTreeIds`, gated on `isWebGL` — Step 7), and after completion asserts ≥1 clearLoot scrap, node gone from `nodes()`, tile freed (`blocked`→false). **Harness/testApi additions:** `ScenarioSpec.tents`/`ScenarioResult.tentIds` (place wrecked tents), a standalone `nodes()` read seam (`{id,col,row,alive,oneShot}[]`, like `walls()` — NOT in DebugState, so the refactor-tripwire golden is untouched), and a `setNodeProgress(id,ms)` seam that seeds the persistent `progressMs` so the 20s/40s timed actions cross their thresholds in a few driven frames (mirrors `campfireFuel` seeding) — which also exercises resume-from-persisted-progress. **Loot asserted as RANGES** (chop/`runClear` roll off `Math.random`, not the injected rng — exact roll math is Tier-1 in `loot.test.ts`). **No new unit helper** (no cleanly-extractable pure logic beyond the Step 1/2 parser/registry tests). **Docs:** `wired-art.md` (regrow→one-shot lifecycle + durations + `clearLoot` + `clear` anim stand-in), `STATUS.md` (new "Salvage node lifecycle" subsystem entry), `DECISIONS.md` index + full `decisions/gameplay.md` entry (oneShot/generic-clear/persistent-progress/shake-as-looping-tween). **Deviation from plan:** used a standalone `nodes()` seam + `setNodeProgress` rather than a new DebugState `ruinedNodeIds` field — cleaner (no golden churn, directly proves "gone from `trees()`") and the seed makes the timed actions feasible under headless fixed-step rendering (~45ms/frame makes a real 20s+40s+regrow-window advance blow the timeout). The full-window (600 000ms `regrowMs`) no-regrow advance is infeasible to drive; the guarantee is structural (`oneShot` never schedules the regrow `delayedCall`) and the spec drives a modest window as a persistence check (documented in-spec). Gates: typecheck clean; 962 unit green; eslint 0 errors; markdownlint 0 errors; prettier clean; `salvage-lifecycle` + `refactor-tripwire`/`glow`/`chop`/`mine` e2e green. Pre-existing `menu-start` boot-canary case + `docs/ui-overhaul/pitch.html` format failure are unrelated (verified on origin/master).
   - Scenario (`tests/e2e/`): add a spec driving the full lifecycle via `order(page, {kind:'harvest',
     treeId})` then `{kind:'clear', treeId}`, advancing the clock; assert loot credited, node becomes
     `!alive` and **stays** ruined after advancing past a normal regrow window (no regrow), the tile
