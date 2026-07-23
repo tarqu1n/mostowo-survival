@@ -370,11 +370,22 @@ Tuning: `CHOP_RECOIL_PX`/`CHOP_RECOIL_MS`/`CHOP_RECOIL_SQUASH`/`CHOP_TREMBLE_PX`
 - Player **chop** (Slice) + **punch** (Crush) directional swings; workers act from a resource's **base**
   tile and **face** the target (`faceTile`, `TREE_BASE_STAND_OFFSETS`). `TREE_TILES_TALL` = 5.
 
-## Menu / UI kit
+## HUD — DOM/React overlay (plan 046, Field Kit)
 
-Menu UI stays in Phaser (no DOM overlay), on a Container-based UI kit (`src/ui/`: `Button`, `Panel`,
-`arrangeRow/Column/Grid`, shared `theme`). The HUD (`UIScene`) and build/inventory panels are built
-from these primitives. Rationale in [DECISIONS.md](DECISIONS.md) (2026-07-12).
+The in-game HUD is a **DOM/React overlay** floating over the Phaser canvas (`src/hud/`), replacing the
+entire hand-placed Phaser HUD — `UIScene`, `src/scenes/hud/*`, and the `src/ui/` Container kit are all
+**deleted**. A page-level `#hud-root` hosts a React tree; a Zustand `store.ts` mirrors game state
+one-way, fed by an event `bridge.ts` (the only file touching `game.events` + `registry`) that also
+exposes a typed `emit` for HUD→world events. Field Kit layout: circular meter rings, a day/night dial,
+and resource chips up top; a persistent 6-slot **manual-pin hotbar** (persisted to `localStorage` per
+save) above a **command bar that morphs by mode** (Scavenge/Build/Fight); build catalog, pack, and
+status as tabbed bottom-sheet drawers; inspect/companion/dev as overlays. Taps are gated by DOM
+`pointer-events` (controls `auto`, empty space `none` → world), retiring the old `hudHitTest`; the DOM
+movepad's `movepadHeld` registry flag is the one HUD→world input coupling. Tailwind is scoped under
+`#hud-root` (no preflight — canvas untouched). Portrait-first; spells deferred; landscape tuning and
+editor/HUD primitive consolidation out of scope. Seam details in [CONVENTIONS.md](CONVENTIONS.md);
+decision in [DECISIONS.md](DECISIONS.md) (2026-07-23). The old menu-UI rationale (Phaser kit,
+2026-07-12) is superseded for the HUD; the Main Menu itself is still Phaser.
 
 ## GameScene decomposition (plans 013, 015)
 

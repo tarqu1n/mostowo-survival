@@ -1,6 +1,6 @@
 # Field Kit — DOM/React HUD Overlay
 
-> Status: planned — run /execute-plan to begin.
+> Status: in review
 
 ## Summary
 
@@ -522,7 +522,7 @@ crispness proven at the Step 1 gate before any component is built on top.
     intercepts, empty HUD space falls through to the CANVAS). Full e2e suite deferred to Step 14
     per the plan's end-of-plan verification.
 
-- [ ] **Step 14: DOM e2e coverage + docs** `[inline]`
+- [x] **Step 14: DOM e2e coverage + docs** `[inline]`
   - Add `tests/e2e/hud-*.spec.ts` (Playwright DOM-driven) for meters, day/night, hotbar pin,
     build catalog select, drawers open/close + eat, inspect, and companion assign. Update
     docs: `docs/ui-overhaul/README.md` (status → built, note deviations), `docs/CONVENTIONS.md`
@@ -533,6 +533,23 @@ crispness proven at the Step 1 gate before any component is built on top.
     Keep doc edits terse/high-signal.
   - Side effects: none.
   - Done when: new specs pass in CI; docs reflect the shipped architecture.
+  - Outcome: added 3 DOM-driven spec files (9 tests, all green) — `tests/e2e/hud-cluster.spec.ts`
+    (meters reflect HP/food/fire/supply events, day/night dial + wave banner, starving vignette
+    ramp), `tests/e2e/hud-drawers.spec.ts` (build catalog opens + Defense/Survival tabs + select→
+    `build:select`+close; pack lists stock + tap-consumable→`needs:eat`; long-press-pin→hotbar +
+    survives reload via localStorage), `tests/e2e/hud-overlays.spec.ts` (inspect card mirror +
+    dismiss→`inspect:hide`; mode-change clears inspect; companion menu opens on `npc:menuOpen`,
+    rows emit `npc:assignDayRole`/`npc:beginPlaceGuard`). They drive the real DOM controls +
+    the bus, no canvas/timing. Docs: `docs/ui-overhaul/README.md` status → BUILT (v5) + deviations;
+    `docs/CONVENTIONS.md` scenes/input/manager bullets rewritten + a new `src/hud/` seam bullet
+    (DOM overlay, bridge, `pointer-events` gating, persist-across-restart lifecycle); `docs/STATUS.md`
+    "Menu / UI kit" replaced with a "HUD — DOM/React overlay" section; `docs/DECISIONS.md` + the
+    `architecture` shard: existing 2026-07-22 entry marked **Landed 2026-07-23** with deviations
+    (rather than a duplicate entry); `CLAUDE.md` architecture map updated (`src/scenes/` no longer
+    lists a HUD scene; `src/ui/` bullet replaced by `src/hud/`; editor "never loads Tailwind" claim
+    corrected). `docs/STANDARDS.md` already carried the scoped-Tailwind note from Step 1 (left as-is).
+    Verified: typecheck + lint (0 errors) + the 3 new specs (9 passed) — the full-suite run is the
+    remaining pre-review gate below.
 
 ## Out of scope
 

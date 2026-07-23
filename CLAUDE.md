@@ -29,18 +29,23 @@ Data-driven content · pure systems · decoupled scenes:
   (Action-kind registry — per-kind order metadata/decision core, mirrors `StructureManager`), `grid`,
   `Inventory`, `combat`, `mapFormat/` (schema/parse/serialize/resize behind a barrel).
 - **`src/entities/`** — actor classes owning their sprite (`Character` → `PlayerCharacter`/`MonsterCharacter`).
-- **`src/scenes/`** — Boot → Preload → MainMenu → Game (world) + `UIScene` HUD overlay; comms via
-  `game.events` (`build:*`) + shared `registry`. Game boots into an **authored map** loaded at runtime
-  (`systems/mapRuntime.ts`, plan 018 — not procedural gen). `fx`/`input`/`build`/`combat`/`world` hold the
-  extracted scene managers (`world/` = state-owning world subsystems, e.g.
-  `ResourceNodeManager`/`EnemyManager`/`CompanionManager` — the last owns the single `NpcCharacter` ally;
-  `combat/CombatController`); `hud/` holds `UIScene`'s per-widget builders (bars/wellbeing/build/combat/
-  inspect/dev-menu). `GameScene`/`UIScene` stay thin composition roots.
-- **`src/ui/`** — Container-based UI kit (`Button`, `Panel`, `arrangeRow/Column/Grid`, `theme`).
+- **`src/scenes/`** — Boot → Preload → MainMenu → Game (world); the HUD is a DOM overlay, not a scene
+  (see `src/hud/`). Comms with the HUD via `game.events` (`build:*`, `mode:*`, `npc:*`, …) + shared
+  `registry`. Game boots into an **authored map** loaded at runtime (`systems/mapRuntime.ts`, plan 018 —
+  not procedural gen). `fx`/`input`/`build`/`combat`/`world` hold the extracted scene managers (`world/`
+  = state-owning world subsystems, e.g. `ResourceNodeManager`/`EnemyManager`/`CompanionManager` — the
+  last owns the single `NpcCharacter` ally; `combat/CombatController`). `GameScene` stays a thin
+  composition root.
+- **`src/hud/`** — the **DOM/React HUD overlay** (plan 046, Field Kit) floating over the canvas,
+  replacing the deleted Phaser HUD + `src/ui/` kit. `store.ts` (Zustand mirror) ← `bridge.ts` (the sole
+  `game.events`/`registry` touch-point; typed `emit` for HUD→world) → `GameHud.tsx` + `components/*`.
+  Page-level, persists across GameScene restart; taps gated by DOM `pointer-events`. shadcn primitives
+  copied into `src/hud/ui/`. Seam detail: [docs/CONVENTIONS.md](docs/CONVENTIONS.md).
 - **`src/render/`** — baked textures (e.g. `glowTexture.ts`), not frame-loop shaders.
 - **`src/editor/`** — dev-only Map Builder (`editor.html`), styled with **Tailwind v4 + shadcn/ui**
-  (canonical palette as `@theme` tokens in `editor.css`); excluded from the prod build — the game
-  page never loads Tailwind. State is Zustand: `store/editorStore.ts` composes domain `store/slices/*`;
+  (canonical palette as `@theme` tokens in `editor.css`); excluded from the prod build. Its plain
+  (unscoped, preflight-injecting) Tailwind ships only in `editor.html` — the game page loads its own
+  Tailwind scoped under `#hud-root` (see `src/hud/`). State is Zustand: `store/editorStore.ts` composes domain `store/slices/*`;
   `EditorScene.ts` composes `scene/*` controllers (input/camera/texture-bake/render). Shared pure
   modules: `hooks/usePanZoom` + `zoom`/`regionGeometry`/`pixelAlpha` (unit-tested). Compact/touch shell
   below a breakpoint (`hooks/useIsCompact.ts`) swaps panels for drawers and adds a per-tool

@@ -18,7 +18,7 @@ Shards: [rendering](decisions/rendering.md) · [architecture](decisions/architec
 
 ## 2026-07-22 — [DECIDED] UI overhaul: DOM/React HUD overlay, "Field Kit" direction (plan 046)
 
-Retire the hand-placed Phaser HUD for a DOM/React overlay over the canvas (event bridge ⇄ Zustand store; reuse the editor's React+Tailwind+shadcn stack, Tailwind now scoped onto the game page). Direction: **Field Kit** (morphing command bar + 6-slot manual-pin hotbar + tabbed catalogs). Full migration, portrait-first, spells deferred. Supersedes the Twin Grip lean recorded in `docs/ui-overhaul/`.
+Retire the hand-placed Phaser HUD for a DOM/React overlay over the canvas (event bridge ⇄ Zustand store; reuse the editor's React+Tailwind+shadcn stack, Tailwind now scoped onto the game page). Direction: **Field Kit** (morphing command bar + 6-slot manual-pin hotbar + tabbed catalogs). Full migration, portrait-first, spells deferred. Supersedes the Twin Grip lean recorded in `docs/ui-overhaul/`. **Landed 2026-07-23** — `UIScene`/`src/scenes/hud/*`/`src/ui/*` deleted, taps gated by DOM `pointer-events` (no more `hudHitTest`); deviations: no Craft tab yet, `INVENTORY_SLOTS` kept.
 
 → [architecture.md](decisions/architecture.md#2026-07-22--decided-ui-overhaul-domreact-hud-overlay-field-kit-direction-plan-046)
 

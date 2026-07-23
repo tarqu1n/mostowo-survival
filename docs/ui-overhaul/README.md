@@ -12,15 +12,18 @@ build-stack decision, and **three candidate design directions**.
   Spells · Night`. The **hotbar** shows in play; **Build** and **Spells** open the
   populated catalogs so you can judge how each direction handles volume. Self-contained,
   no build step, no external hosting.
-- **Status (v4): IN PROGRESS — Field Kit (B).** Migration underway per plan 046 (React overlay +
-  scoped Tailwind mounted; components/cutover following). Direction (v3): Owner (Matt) selected
-  Field Kit over the earlier
-  Twin Grip lean: the labelled morphing command bar is the most legible/discoverable and the
-  safest first overhaul. Scope: **full HUD migration**, portrait-first, spells deferred,
-  6-slot manual-pin hotbar. Implementation plan: [`plans/046-field-kit-hud-overlay.md`](../../plans/046-field-kit-hud-overlay.md);
-  decision recorded in [`docs/DECISIONS.md`](../DECISIONS.md). Twin Grip / Emberlight are not
-  being built (the shared bridge/tokens/hotbar/catalog work is direction-agnostic, so a later
-  pivot keeps most of it). Open questions Q1–Q5 are resolved (see plan Context).
+- **Status (v5): BUILT — Field Kit (B).** The full migration landed (plan 046): the entire Phaser
+  HUD (`src/scenes/UIScene.ts` + `src/scenes/hud/*` + the `src/ui/*` kit) is deleted and replaced by
+  a DOM/React overlay in `src/hud/` — a page-level `#hud-root` over the canvas, a Zustand store fed by
+  an event bridge on `game.events`, and DOM `pointer-events` gating taps (the old `hudHitTest` is
+  gone). Direction (v3): Owner (Matt) selected Field Kit over the earlier Twin Grip lean — the
+  labelled morphing command bar is the most legible/discoverable. Scope shipped: **full HUD
+  migration**, portrait-first, spells deferred, 6-slot manual-pin hotbar. **Deviations from plan:**
+  no Craft catalog tab (no `craft` buildable exists yet — it renders once content lands); `HOTBAR_SLOTS`
+  swept but `INVENTORY_SLOTS` kept (still the real `Inventory` capacity). Landscape tuning + editor/HUD
+  primitive consolidation remain out of scope. Plan: [`plans/046-field-kit-hud-overlay.md`](../../plans/046-field-kit-hud-overlay.md);
+  decision in [`docs/DECISIONS.md`](../DECISIONS.md). Twin Grip / Emberlight were not built (the
+  shared bridge/tokens/hotbar/catalog work is direction-agnostic, so a later pivot keeps most of it).
 
 ---
 

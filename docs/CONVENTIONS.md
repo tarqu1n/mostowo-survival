@@ -13,15 +13,18 @@ _To be firmed up as we go. Starting position:_
 - **Systems over god-objects.** Keep inventory / crafting / time-of-day / resources as separate,
   testable modules (day/night and hunger are `systems/daynight`/`systems/needs` — pure, Phaser-free,
   unit-tested).
-- **Scenes:** Boot → Preload → Menu → Game (world) → UI overlay. Keep UI decoupled from world logic.
-  The core-loop slice set the pattern: content is data in **`src/data/`** (`ITEMS`/`NODES`/`BUILDABLES` +
-  `types.ts`), logic is small modules in **`src/systems/`** (`Inventory`, `grid`), and the HUD is a
-  parallel **`UIScene`** launched over `GameScene` — not baked in. Cross-scene comms via
-  `this.game.events` (`build:*`) + a shared instance in `this.registry` (the `Inventory`).
-- **World-scene input gates on the HUD hit-region.** A scene-level `input.on('pointerdown')` fires for
-  _every_ tap, including ones over the overlay — so `GameScene` ignores pointers inside `UIScene`'s
-  hit-region (`hudHitTest`) before routing move/chop/build. Route all pointer handlers (`down` + `move`)
-  through one intent gate.
+- **Scenes:** Boot → Preload → Menu → Game (world). Keep UI decoupled from world logic. The core-loop
+  slice set the pattern: content is data in **`src/data/`** (`ITEMS`/`NODES`/`BUILDABLES` + `types.ts`),
+  logic is small modules in **`src/systems/`** (`Inventory`, `grid`), and the HUD is **not a scene** —
+  it's the DOM/React overlay in **`src/hud/`** (see the `src/hud/` seam below). Comms via
+  `this.game.events` (`build:*`, `mode:*`, `inspect:*`, `npc:*`, …) + shared instances in
+  `this.registry` (the `Inventory`, `playerStats`, `movepadHeld`).
+- **The HUD gates its own taps via DOM `pointer-events`** (plan 046, replacing the old Phaser
+  `hudHitTest`). `#hud-root` is `pointer-events:none`; interactive controls opt back in with `auto`, so
+  a press on a control is consumed by the DOM and never reaches the Phaser canvas, while empty HUD space
+  falls through to `GameScene`'s pointer handlers. The one HUD→world coupling left is the `movepadHeld`
+  registry flag (the DOM movepad sets it while dragging, so world pan/tap stay suppressed mid-drive).
+  Route all world pointer handlers (`down` + `move`) through one intent gate.
 - **Tear down cross-scene listeners** in `this.events.once(SHUTDOWN, …)` — `game.events`/`registry`
   outlive a scene, so listeners double-register on restart otherwise.
 - **Worker task system** (plan 002): units move via A* (`src/systems/pathfind.ts` — `findPath` returns
@@ -32,8 +35,9 @@ _To be firmed up as we go. Starting position:_
   reject. Tapping an already-queued tree **toggles** it: first tap un-queues it (if it's the live chop,
   the worker advances to the next order); tap again to re-queue it at the **end** of the list. Building is a timed
   on-site job: place a passable _blueprint_ (wood reserved on placement), worker paths to a reachable
-  adjacent tile and works `BUILD_MS`, then it becomes a blocking wall. `hudHitTest` is visibility-aware
-  so hidden buttons don't swallow world taps. Pathing obstacles = completed walls + live trees.
+  adjacent tile and works `BUILD_MS`, then it becomes a blocking wall. HUD controls swallow their own
+  taps via DOM `pointer-events` (see above), so world taps only fire over open canvas. Pathing obstacles
+  = completed walls + live trees.
 - **Order-kind registry (`src/systems/orders.ts`, plan 043) — the order-extension seam, mirroring
   `StructureManager`+`BUILDABLES`.** The per-kind _decision data_ for worker orders lives in one pure,
   Phaser-free module: `ORDER_META` (`Record<Action['kind'], {highlight, dedupeOnEnqueue}>`) plus generic
@@ -96,7 +100,7 @@ _To be firmed up as we go. Starting position:_
   (`SurvivalClock`), fog-of-war/vision (`VisionController`), and pointer-pick + tap-intent
   (`ScenePicker`) — extract into managers, not a growing GameScene: scene→manager is always a
   **direct method call**, never a `game.events` round-trip (the bus stays reserved for
-  scene↔UIScene); a manager's constructor takes the scene plus a **narrow deps object of closures**
+  scene↔HUD comms); a manager's constructor takes the scene plus a **narrow deps object of closures**
   over exactly the scene state/methods it needs, never raw field access; there is **no
   manager↔manager coupling** — if two managers need each other's data, the scene mediates. Every
   manager registers its own `destroy()` on `Phaser.Scenes.Events.SHUTDOWN` (tween Maps/Sets are the
@@ -104,12 +108,21 @@ _To be firmed up as we go. Starting position:_
   stays the composition root and keeps the task-execution loop. One-shot setup that isn't stateful
   (no deps object, no teardown) stays a plain free function instead — e.g. `world/actorAnims.ts`'s
   `registerActorAnims` and `world/groundRenderer.ts`'s `drawGround`.
-- **HUD widgets (`src/scenes/hud/`, plan 043).** `UIScene` decomposes the same way: per-widget builders
-  (HUD bars, wellbeing panel, build controls, combat controls, inspect panel, dev menu, NPC-assign, mode/
-  top-centre controls) each own their GameObjects + `onXChanged` handlers and push interactive elements
-  back via an `addHudElement` closure, so `UIScene`'s single `hudElements` hit-region list stays
-  authoritative. Widgets type against `Phaser.Scene` (no circular import); `UIScene` stays the composition
-  root keeping the bus wiring + SHUTDOWN teardown.
+- **The HUD seam (`src/hud/`, plan 046) — a DOM/React overlay, NOT a Phaser scene.** The whole Phaser
+  HUD (the old `UIScene` + `src/scenes/hud/*` + the `src/ui/*` kit) was replaced by a page-level React
+  overlay mounted into `#hud-root` over the canvas (mirrors how `src/editor/` bridges React↔Phaser via
+  a Zustand store, inverted so React floats above the canvas rather than hosting it). Layers:
+  `store.ts` (Zustand — the one-way mirror of game state + the hotbar loadout); `bridge.ts`
+  (`initBridge(bus, registry)` — the ONLY file touching `game.events`/`registry`: subscribes outbound
+  events + registry keys → store setters, exposes a typed `emit(InboundEvent)` for HUD→world, and the
+  `movepadHeld` flag); `GameHud.tsx` (composition root — canvas-rect coordinate mapping, the top
+  cluster, the morphing command bar + hotbar + bottom-sheet drawers, and the inspect/companion/dev
+  overlays); `components/*` are presentational (read `useHudStore`, emit via `bridge.emit`). **Lifecycle
+  differs from the old per-scene UIScene:** the overlay is page-level and PERSISTS across a GameScene
+  death→restart — the bridge never tears down on SHUTDOWN; it re-syncs the store from GameScene's
+  restart re-emits (`buildWorld` tail) and rebinds the fresh registry `Inventory`. Tailwind is scoped
+  under `#hud-root` (see STANDARDS). shadcn primitives are copied into `src/hud/ui/` (deliberately
+  duplicated from `src/editor/ui/` for now).
 - **Big pure modules split behind a barrel.** `systems/mapFormat/` is a directory
   (`schema`/`parse`/`serialize`/`resize`) with an `index.ts` re-export, so the `systems/mapFormat` import
   path and full export surface are unchanged for all consumers (plan 043) — the API-preserving split rule.

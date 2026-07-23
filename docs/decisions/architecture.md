@@ -34,6 +34,14 @@ mockups live in [`docs/ui-overhaul/`](../ui-overhaul/README.md); the build plan 
   landscape reflow), **spells deferred** (catalog is spell-ready but no spell content ships;
   combat keeps melee/bow).
 
+**Landed 2026-07-23 (plan 046 complete → in review).** Shipped as planned; `UIScene` +
+`src/scenes/hud/*` + the `src/ui/*` Phaser kit are deleted. Tap-gating went further than "touch the
+deps-closures": `hudHitTest`/`addHudElement`/`downOnUI` were retired entirely — DOM `pointer-events`
+now gate taps (controls `auto`, empty space `none` → world), with the `movepadHeld` registry flag the
+lone HUD→world input coupling. **Deviations:** no Craft catalog tab (no `craft` buildable exists — it
+renders once content lands); `HOTBAR_SLOTS` swept but **`INVENTORY_SLOTS` kept** (still the real
+`Inventory` capacity, not dead). DOM-driven e2e (`tests/e2e/hud-*.spec.ts`) added.
+
 ## 2026-07-15 — [DECIDED] Map Builder editor + map/world file format (plan 014)
 
 Resolves the 2026-07-11 [OPEN] "want a map editor" steer below. The editor is a **React chrome over
