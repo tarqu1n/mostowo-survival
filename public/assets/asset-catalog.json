@@ -46685,6 +46685,29 @@
       "origin": "self-made"
     },
     {
+      "id": "mostowo-custom/Environment/Props/Static/tent_side_2_ruined.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_side_2_ruined.png"
+      },
+      "w": 80,
+      "h": 39,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "2",
+        "environment",
+        "props",
+        "ruined",
+        "side",
+        "static",
+        "tent"
+      ],
+      "origin": "self-made"
+    },
+    {
       "id": "mostowo-custom/Environment/Props/Static/tent_side_2_searched.png",
       "pack": "mostowo-custom",
       "type": "object",
@@ -46816,6 +46839,29 @@
         "side",
         "static",
         "tent"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/tent_wreck_1_ruined.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/tent_wreck_1_ruined.png"
+      },
+      "w": 64,
+      "h": 52,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "1",
+        "environment",
+        "props",
+        "ruined",
+        "static",
+        "tent",
+        "wreck"
       ],
       "origin": "self-made"
     },

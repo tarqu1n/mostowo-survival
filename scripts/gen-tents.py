@@ -215,6 +215,39 @@ def images_for(orient: str) -> list[bytes]:
     return [side_ref_png()] if orient == "side" else [roof_ref_png()]
 
 
+# ---- Ruined / "harvested" state (image-to-image from the LIVE sprite) ----------------------------
+# After the tent is savaged it swaps to a fully-DESTROYED sprite. We generate that from the tent's own
+# live art (image-to-image) so the ruin keeps its colour/angle/footprint and reads as "this exact tent,
+# now flattened". Written to `<id>_ruined.png` (NOT `_searched.png`, which --reprocess derives + would
+# clobber). PROMPT IS STILL BEING DIALED IN — see docs/AI-SPRITE-PIPELINE.md.
+RUIN = (
+    "The attached image is a wrecked {colour} 6-person camping tent (flat pixel-art game prop, high "
+    "top-down angle). Redraw this SAME tent now COMPLETELY DESTROYED and abandoned — collapsed flat "
+    "into a low heap: the canvas ripped to shreds and pooled/draped on the ground, the poles snapped "
+    "and scattered, the structure caved in so it barely reads as a tent — just a ruined pile of torn "
+    "fabric and broken sticks. KEEP the same {colour} canvas colour, the same high top-down angle, and "
+    "roughly the same footprint/position (so it can replace the standing wreck in place), but MUCH "
+    "flatter and lower to the ground. {style} {bg}"
+)
+
+
+def ruin_ref_png(tid: str) -> bytes:
+    """The live pack sprite, upscaled x8 (nearest) on magenta — the identity/colour/angle anchor for
+    its ruined version (same upscaled-reference trick as the rogue)."""
+    im = Image.open(PACK / f"{tid}.png").convert("RGBA")
+    up = im.resize((im.width * 8, im.height * 8), Image.NEAREST)
+    canvas = Image.new("RGBA", up.size, (255, 0, 255, 255))
+    canvas.alpha_composite(up)
+    out = RAW / f"_ruinref_{tid}.png"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    canvas.convert("RGB").save(out)
+    return out.read_bytes()
+
+
+def compose_ruin(colour: str) -> str:
+    return RUIN.format(colour=colour, style=STYLE, bg=BG)
+
+
 def gemini_image(prompt: str, images: list[bytes], api_key: str, model: str) -> bytes:
     parts: list[dict] = [{"text": prompt}]
     for img in images:
@@ -321,6 +354,9 @@ def main() -> None:
     ap.add_argument("--raw-only", action="store_true", help="keep raw PNGs, skip post-process")
     ap.add_argument("--reprocess", action="store_true",
                     help="re-run post-processing on the saved raw PNGs only (no API call, no spend)")
+    ap.add_argument("--ruined", action="store_true",
+                    help="generate the fully-DESTROYED '<id>_ruined.png' from each LIVE sprite "
+                         "(image-to-image); the savaged/harvested depleted state")
     ap.add_argument("--model", default=DEFAULT_MODEL,
                     help=f"Gemini image model (default {DEFAULT_MODEL}; image-to-image capable ids: "
                          "gemini-3-pro-image, gemini-3.1-flash-image, gemini-2.5-flash-image)")
@@ -355,6 +391,18 @@ def main() -> None:
     key = os.environ.get("GEMINI_API_KEY")
     if not key:
         sys.exit("Missing GEMINI_API_KEY (guppi/house-helper/.env, via Tailscale). --dry-run to test.")
+
+    if args.ruined:
+        for tid in ids:
+            orient, colour = VARIANTS[tid]
+            print(f"\n=== {tid} RUINED ({orient}) ===")
+            raw = gemini_image(compose_ruin(colour), [ruin_ref_png(tid)], key, args.model)
+            raw_png = RAW / f"{tid}_ruined_raw.png"
+            raw_png.write_bytes(raw)
+            live = to_sprite(raw_png, target_width(orient))
+            live.save(PACK / f"{tid}_ruined.png")
+            print(f"  -> {tid}_ruined.png ({live.width}x{live.height})")
+        return
 
     for tid in ids:
         orient, colour = VARIANTS[tid]
