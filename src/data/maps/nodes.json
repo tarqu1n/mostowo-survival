@@ -177,6 +177,26 @@
               "h": 10
             }
           }
+        },
+        {
+          "id": "skin_8",
+          "asset": "pixel-crawler/Environment/Props/Static/Trees/Model_01/Size_02.png",
+          "weight": 1,
+          "region": {
+            "x": 161,
+            "y": 17,
+            "w": 26,
+            "h": 47
+          },
+          "depleted": {
+            "asset": "pixel-crawler/Environment/Props/Static/Trees/Model_01/Size_02.png",
+            "region": {
+              "x": 133,
+              "y": 59,
+              "w": 6,
+              "h": 6
+            }
+          }
         }
       ]
     },
@@ -344,20 +364,60 @@
       "loot": {
         "rolls": 2,
         "drops": [
-          { "itemId": "cloth", "min": 1, "max": 3, "weight": 3 },
-          { "itemId": "wood", "min": 1, "max": 2, "weight": 2 },
-          { "itemId": "berries", "min": 1, "max": 2, "weight": 2 },
-          { "itemId": "cannedFood", "min": 1, "max": 1, "weight": 1 },
-          { "itemId": "rope", "min": 1, "max": 2, "weight": 2 }
+          {
+            "itemId": "cloth",
+            "min": 1,
+            "max": 3,
+            "weight": 3
+          },
+          {
+            "itemId": "wood",
+            "min": 1,
+            "max": 2,
+            "weight": 2
+          },
+          {
+            "itemId": "berries",
+            "min": 1,
+            "max": 2,
+            "weight": 2
+          },
+          {
+            "itemId": "cannedFood",
+            "min": 1,
+            "max": 1,
+            "weight": 1
+          },
+          {
+            "itemId": "rope",
+            "min": 1,
+            "max": 2,
+            "weight": 2
+          }
         ]
       },
       "oneShot": true,
       "clearLoot": {
         "rolls": 1,
         "drops": [
-          { "itemId": "cloth", "min": 1, "max": 2, "weight": 2 },
-          { "itemId": "wood", "min": 1, "max": 1, "weight": 1 },
-          { "itemId": "rope", "min": 1, "max": 1, "weight": 1 }
+          {
+            "itemId": "cloth",
+            "min": 1,
+            "max": 2,
+            "weight": 2
+          },
+          {
+            "itemId": "wood",
+            "min": 1,
+            "max": 1,
+            "weight": 1
+          },
+          {
+            "itemId": "rope",
+            "min": 1,
+            "max": 1,
+            "weight": 1
+          }
         ]
       },
       "color": 5138234,
