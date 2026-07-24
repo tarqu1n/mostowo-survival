@@ -90,7 +90,7 @@ queued station task over `craftMs`" — exactly the worker-order model here.
 
 ## Steps
 
-- [ ] **Step 1: Rope resource + craftable item stubs + tent loot** `[delegate sonnet]`
+- [x] **Step 1: Rope resource + craftable item stubs + tent loot** `[delegate sonnet]`
   - `src/data/items.ts`: add `rope` (inedible material) and the recipe outputs as **plain items** —
     `brand` (name "Brand"), `bow`, `sword`, each `maxStack: 1`, placeholder colour + icon. **No
     `equip`/`durability` fields yet** (those + combat/light land in 049; these stay inert bag items).
@@ -101,6 +101,12 @@ queued station task over `craftMs`" — exactly the worker-order model here.
   - Side effects: `data.test.ts` validates every `ItemDef`; `parseLootTable` cross-checks
     `itemId ∈ ITEMS`. Salvage fixtures asserting exact drops may need the new entry.
   - Done when: `npm test` + build + smoke green; salvaging a tent can yield rope.
+  - Outcome: added `rope` (material, `maxStack:50`) + inert `brand`/`bow`/`sword` (`maxStack:1`, no
+    equip/durability) to `src/data/items.ts`; added `rope` drops to both `salvagedTent.loot` and
+    `.clearLoot` in `nodes.json`; new `scripts/craft-items-art.mjs` bakes 4 placeholder 32×32 icons to
+    `public/assets/icons/{rope,brand,bow,sword}.png` (tent-art.mjs convention, zlib-only, re-runnable);
+    updated `tests/e2e/salvage-lifecycle.spec.ts` loot assertions for the new drop. `npm test` (967
+    tests), `npm run build`, `npm run smoke` all green.
 
 - [ ] **Step 2: Workbench buildable data + sprite/object region** `[inline]`
   - `src/data/buildables.ts`: add `workbench` — `cost:{ wood:50 }`, `behavior:'workbench'`,

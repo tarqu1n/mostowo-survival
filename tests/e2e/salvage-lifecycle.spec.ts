@@ -29,8 +29,8 @@ import { SALVAGE_MS, CLEAR_MS } from '../../src/config';
 // GameScene.runClear), so this asserts loot RANGES, not exact counts; the roll math is Tier-1 in
 // loot.test.ts. Every advance goes through __test.step (fixed 1/60s slices, no wall-clock).
 
-// The four items the salvage loot table can drop (nodes.json salvagedTent.loot).
-const SALVAGE_ITEMS = ['cloth', 'wood', 'berries', 'cannedFood'] as const;
+// The items the salvage loot table can drop (nodes.json salvagedTent.loot; `rope` added plan 048).
+const SALVAGE_ITEMS = ['cloth', 'wood', 'berries', 'cannedFood', 'rope'] as const;
 
 async function totalHeld(page: Page, ids: readonly string[]): Promise<number> {
   let sum = 0;
@@ -78,7 +78,7 @@ test('salvage → ruin (no regrow) → clear: loot, tile blocked then freed, nod
   expect(tent?.alive).toBe(false);
 
   // CLEAR — salvage reset the accumulator to 0 for this stage; seed it near CLEAR_MS and cross it.
-  const clothWoodBefore = await totalHeld(page, ['cloth', 'wood']);
+  const scrapBefore = await totalHeld(page, ['cloth', 'wood', 'rope']);
   expect(await setNodeProgress(page, tentId, CLEAR_MS - 200)).toBe(true);
   await order(page, { kind: 'clear', treeId: tentId });
 
@@ -90,8 +90,8 @@ test('salvage → ruin (no regrow) → clear: loot, tile blocked then freed, nod
 
   await step(page, 1000);
 
-  // A little scrap credited: ≥1 more cloth/wood from clearLoot (1 roll, grants ≥1).
-  expect(await totalHeld(page, ['cloth', 'wood'])).toBeGreaterThanOrEqual(clothWoodBefore + 1);
+  // A little scrap credited: ≥1 more cloth/wood/rope from clearLoot (1 roll, grants ≥1).
+  expect(await totalHeld(page, ['cloth', 'wood', 'rope'])).toBeGreaterThanOrEqual(scrapBefore + 1);
 
   // The node is gone from the world and its tile is freed for building/pathing.
   expect((await nodes(page)).find((n) => n.id === tentId)).toBeUndefined();
