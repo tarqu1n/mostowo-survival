@@ -4375,6 +4375,19 @@
       "flipX": false,
       "flipY": false,
       "depth": 0
+    },
+    {
+      "id": "decor_0055",
+      "kind": "decor",
+      "asset": "mostowo-custom/Environment/Props/Static/jetty_diagonal_1.png",
+      "x": 1672,
+      "y": 2040,
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 0,
+      "flipX": false,
+      "flipY": false,
+      "depth": 0
     }
   ]
 }
