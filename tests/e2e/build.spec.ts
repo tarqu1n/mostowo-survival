@@ -1,5 +1,15 @@
 import { test, expect } from '@playwright/test';
-import { startGame, applyScenario, order, step, state, blocked, emit } from './harness';
+import {
+  startGame,
+  applyScenario,
+  order,
+  step,
+  state,
+  blocked,
+  emit,
+  wood,
+  tileToClient,
+} from './harness';
 import { wallToRouteAround } from './scenarios';
 
 // Tier-2: building + occupancy on the REAL grid (blueprint passable while unbuilt → worker builds it
@@ -51,4 +61,52 @@ test('Cancel clears the queue but leaves the blueprint standing (non-destructive
   expect(s.pending).toBe(0);
   expect(s.sites).toBe(1); // blueprint survives
   expect(await blocked(page, 4, 3)).toBe(false); // still an unbuilt, passable blueprint
+});
+
+// Tier-2: build-mode input rework (plan 050 Step 3, the load-bearing change) — placement moved from
+// pointer-DOWN to pointer-UP so a one-finger drag pans instead of dropping+charging for a tile on
+// touch-down. Zooming to MIN_ZOOM pins the camera (whole map visible, no scroll room) so screen↔tile
+// mapping stays fixed; the driven step() processes each queued pointer event deterministically.
+test('build mode: a tap places+spends exactly one tile on release (nothing on down)', async ({
+  page,
+}) => {
+  await startGame(page);
+  await applyScenario(page, { player: [11, 20], wood: 10 }); // 10 wood; the wall costs 2
+  for (let i = 0; i < 4; i++) await emit(page, 'zoom:delta', -0.5); // → MIN_ZOOM, static camera
+  await emit(page, 'build:select', { id: 'wall' }); // enter build mode, wall selected
+
+  const t = await tileToClient(page, 10, 20); // empty tile adjacent to the player → reachable
+
+  await page.mouse.move(t.x, t.y);
+  await page.mouse.down();
+  await step(page, 16); // process pointerdown → ARM only (ghost tracks; nothing placed/charged)
+  expect((await state(page)).sites).toBe(0); // the load-bearing invariant: down does NOT place
+  expect(await wood(page)).toBe(10); // …nor spend
+
+  await page.mouse.up();
+  await step(page, 16); // pointerup (never dragged) → single-tap placement resolves here
+  const s = await state(page);
+  expect(s.sites).toBe(1); // exactly one blueprint placed, on release
+  expect(await wood(page)).toBe(8); // the wall's 2 wood spent exactly once
+});
+
+test('build mode: a one-finger drag pans and places/charges nothing', async ({ page }) => {
+  await startGame(page);
+  await applyScenario(page, { player: [11, 20], wood: 10 });
+  for (let i = 0; i < 4; i++) await emit(page, 'zoom:delta', -0.5); // → MIN_ZOOM
+  await emit(page, 'build:select', { id: 'wall' });
+
+  const a = await tileToClient(page, 10, 20);
+  const b = await tileToClient(page, 2, 20); // 8 tiles away → well past DRAG_PX → a drag, not a tap
+
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await step(page, 16); // ARM
+  await page.mouse.move(b.x, b.y); // drag past DRAG_PX → classified as a pan
+  await step(page, 16);
+  await page.mouse.up();
+  await step(page, 16); // pointerup after a drag → NO placement (the drag panned)
+  const s = await state(page);
+  expect(s.sites).toBe(0); // nothing placed
+  expect(await wood(page)).toBe(10); // nothing charged
 });

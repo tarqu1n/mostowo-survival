@@ -724,11 +724,12 @@ export class GameScene extends Phaser.Scene {
     this.pointerInput = new PointerInputController(this, {
       getPlayerSprite: () => this.player,
       isBuildMode: () => this.buildManager.buildMode,
-      onBuildDown: (pointer) => {
-        this.buildManager.updateGhost(pointer);
-        this.buildManager.placeOrEnqueueBuild(pointer);
-      },
+      // Build placement resolves on pointer-UP, not down (plan 050 Step 3): down only ARMS the ghost so
+      // a drag can pan the camera without dropping/charging for a tile on touch-down; up places+spends a
+      // single tile IF the gesture never became a drag (the controller only calls onBuildUp then).
+      onBuildDown: (pointer) => this.buildManager.updateGhost(pointer),
       onBuildMove: (pointer) => this.buildManager.updateGhost(pointer),
+      onBuildUp: (pointer) => this.buildManager.placeOrEnqueueBuild(pointer),
       getMode: () => this.mode,
       // The DOM movepad (plan 046 Step 10) sets the `movepadHeld` registry flag through the HUD bridge;
       // read it here (was `this.ui.isMovepadHeld()`, the retired Phaser CombatControls movepad) so world

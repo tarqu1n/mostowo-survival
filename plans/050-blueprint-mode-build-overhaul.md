@@ -137,8 +137,9 @@ build slowly (one serial worker). Keep any fetched image-gen key in-memory only 
   - Done when: the wall ghost is wall-shaped and re-orients (flips for `left`) as `build:rotate` fires;
     campfire/trap show their sprite; boot smoke passes.
 
-- [ ] **Step 3: Build-mode input rework — pointer-up tap, pan enable, gate command-paint** `[inline]`
+- [x] **Step 3: Build-mode input rework — pointer-up tap, pan enable, gate command-paint** `[inline]`
   *(critique #1 — the load-bearing change; do first, before any pan/paint UX)*
+  - Outcome: `PointerInputController.ts` — `onBuildDown` now arms only (`updateGhost`, no spend); new `onBuildUp` dep does single-tap place+spend on release ONLY if never dragged (guarded by `isPanning`). Build-move early-return removed → build-mode drag falls through to the shared pan block; command-mode long-press/queue-paint block gated `if (!buildMode && getMode()==='command')`. `GameScene.ts` deps rewired (`onBuildDown: updateGhost`, `onBuildUp: placeOrEnqueueBuild`). Movepad gate + pinch preserved. Two new specs in `tests/e2e/build.spec.ts` (tap places 1 on release / drag pans+charges nothing) PASS; `gestures.spec.ts` still passes (command-mode byte-for-byte). typecheck clean, 996 unit pass. Deviation: no separate anchor-tile field (reused `isPanning`); movepad gate also applied to build-mode pointer-up for consistency.
   - Move single-tap placement from `pointerdown` to `pointerup`: split the build deps so `onBuildDown`
     only **arms** (update ghost, record anchor tile, no placement/spend); add `onBuildUp` that resolves
     a **single-tap placement** (existing immediate spend+enqueue via `placeOrEnqueueBuild`) **only if
