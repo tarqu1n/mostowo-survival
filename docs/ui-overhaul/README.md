@@ -4,8 +4,9 @@ Working record for the phone-UI overhaul. The current in-game HUD is hand-placed
 Phaser text that grew widget-by-widget and never got a layout system: small type,
 hard-coded pixels, no safe-area handling, brittle corner-stacking, and — critically —
 nowhere to put depth (there are 3 buildables today and no spells, but many buildings /
-spells / weapons are coming). This doc captures the research, the interaction flows, the
-build-stack decision, and **three candidate design directions**.
+spells / weapons are coming). This doc captures the research, the interaction flows, and
+**three candidate design directions**; the engine/build-stack rationale is split into
+[build-stack-decision.md](build-stack-decision.md).
 
 - **Interactive pitch:** [`pitch.html`](./pitch.html) — open in a browser (works on a
   phone). Tap the chips under each phone to move through `Scavenge · Build · Fight ·
@@ -124,25 +125,9 @@ The same flows must hold whichever visual direction wins.
 
 ## 5. Build decision — author the HUD in HTML, not Phaser
 
-**Recommendation: a DOM/React HUD overlay over the Phaser canvas.** The Map Builder
-(`src/editor/`) already runs React + Tailwind v4 + shadcn/ui, kept out of the game bundle —
-the pipeline is proven. This matters more now: scrollable catalog grids, drag-to-pin, tabs
-and safe-area layout are all things the browser gives for free.
-
-- **DOM / React owns:** HUD bars, meters, day/night dial, resource counts; **hotbar**,
-  build catalog, spellbook, pack, inspect card, companion & pause menus; scrollable grids,
-  drag-to-pin, tabs (reusing the editor's shadcn primitives + Tailwind `@theme` tokens);
-  safe-area insets, responsive layout, focus/accessibility.
-- **Phaser keeps:** world, camera, entities, lighting; *in-world* markers that must live in
-  world space (build ghost + grid snap, target outline, floating combat/gather text,
-  monster HP bars, queue markers); gesture mechanics on the canvas (tap / long-press paint /
-  pan / pinch) and the twin-thumb move/aim input.
-- **Costs:** a thin event bridge (`game.events` ↔ React state); coordinate mapping for the
-  few DOM→world actions; Tailwind loads on the game page (scoped; editor proves it). The
-  alternative — hand-rolling flexbox, safe-areas, scrollable grids and a token system in
-  Phaser — is the exact debt §1 is made of.
-
-Engine choice is **independent** of which look wins; all three directions sit on this stack.
+The engine rationale (DOM/React overlay over the Phaser canvas, and the DOM-vs-Phaser split of
+responsibilities) is its own doc — it's independent of which visual direction won and is the piece
+a future task is most likely to want on its own: **[build-stack-decision.md](build-stack-decision.md)**.
 
 ---
 
