@@ -1,5 +1,12 @@
 # Authoring custom terrain tiles
 
+> **This is the EXCEPTION pipeline, not the default.** Code-synthesis here is only for
+> **seamless terrain transition / Wang tiles** that must tile edge-to-edge AND survive editor
+> rotation with zero seams (coasts, multi-tile fills). For anything that's a *thing* — an
+> icon, sprite, prop, structure, or a themed one-off tile (a jetty, dock, furniture…) — the
+> default is the **Gemini image-gen + post-process** pipeline. Pick the pipeline first:
+> [ASSETS.md routing](ASSETS.md#which-pipeline-pick-this-before-generating-anything).
+
 How we synthesise new terrain tiles that match a stock pack and tile seamlessly.
 Written from the **water diagonal coast** job (first self-made terrain tile) — read
 this before making more edge/transition tiles so you don't re-derive the hard parts.

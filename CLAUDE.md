@@ -106,4 +106,4 @@ Full grouped map: [docs/README.md](docs/README.md). Load the one leaf a task nee
 - [docs/WORKFLOW.md](docs/WORKFLOW.md) — run / build / deploy + review gates; tests → [docs/testing.md](docs/testing.md)
 - [docs/DECISIONS.md](docs/DECISIONS.md) — decision-log index (what we chose and why; links to topic shards)
 - [docs/STATUS.md](docs/STATUS.md) — current state of what's built, by subsystem
-- Art & assets pipeline (packs, catalog, tiles, icons, rendering) → [docs/README.md](docs/README.md#art--assets-pipeline)
+- Art & assets pipeline (packs, catalog, tiles, icons, rendering) → [docs/README.md](docs/README.md#art--assets-pipeline). **Generating a tile/icon/sprite/prop? Default = the Gemini image-gen + post-process pipeline; pure code-synthesis is only for seamless-tiling terrain. Routing table: [docs/ASSETS.md](docs/ASSETS.md#which-pipeline-pick-this-before-generating-anything).**

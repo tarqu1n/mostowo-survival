@@ -27,7 +27,11 @@ surface stays lean — load the one leaf a task needs, not the whole set.
 
 ## Art & assets pipeline
 
-- [ASSETS.md](ASSETS.md) — art-pipeline **hub**: art direction, retired reference pack, item-icon overview, where files live (points to the two below)
+> **Generating a tile/icon/sprite/prop? Pick the pipeline first.** Default is **Gemini
+> image-gen + post-process**; pure code-synthesis is only for seamless-tiling terrain. The
+> routing table is at the top of [ASSETS.md](ASSETS.md#which-pipeline-pick-this-before-generating-anything).
+
+- [ASSETS.md](ASSETS.md) — art-pipeline **hub**: art direction, **which-pipeline routing**, retired reference pack, item-icon overview, where files live (points to the two below)
 - [wired-art.md](wired-art.md) — the concrete wired-art inventory: active Pixel Crawler tileset, sprite extraction, art-swap frames, runtime weapon pinning
 - [assets-catalog.md](assets-catalog.md) — asset catalog & pack-manifest schema: `pack.json`, `regions.json`, atlas regions, type/grid overrides, ingested packs
 - [TILE-AUTHORING.md](TILE-AUTHORING.md) — authoring self-made terrain tiles that tile seamlessly against a stock pack (global-band + connector technique)
