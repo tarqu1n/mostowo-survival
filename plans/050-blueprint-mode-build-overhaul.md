@@ -1,6 +1,6 @@
 # Blueprint Mode — Build Experience Overhaul
 
-> Status: in review
+> Status: deployed
 
 ## Summary
 
