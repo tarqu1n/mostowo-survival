@@ -3,6 +3,7 @@ import { NODES } from '../data/nodes';
 import { MELEE_WEAPONS } from '../data/weapons';
 import type { ParsedNodeDef } from '../systems/nodeDefs';
 import type { Inventory } from '../systems/Inventory';
+import type { EquipmentState } from '../systems/Equipment';
 import type { Dims } from '../systems/pathfind';
 import {
   cycleLengthMs,
@@ -111,6 +112,14 @@ export interface DebugState {
   // loop draws on. Backed by the dedicated `BaseSupply` store since Step 3 (see src/systems/baseSupply.ts);
   // the `{wood, rock}` shape is frozen. New fields go at the END + golden bumped.
   baseSupply: { wood: number; rock: number };
+  // Appended (plan 049 Step 6) — the player's three equip slots (`Equipment.snapshot()` shape): each
+  // slot is `{ id, durability }` (durability `null` for permanent gear, a number for the brand) or
+  // `null`. Lets a spec assert equip/unequip and the brand's drain→destroy. New fields go at the END.
+  equipment: EquipmentState;
+  // Appended (plan 049 Step 6) — the player's current personal-light radius (world px): the base
+  // `PLAYER_LIGHT_RADIUS`, or the larger `BRAND_LIGHT_RADIUS` while a lit brand is in the off hand.
+  // Lets a spec assert the brand grows the night disc (the render union isn't otherwise queryable).
+  playerLightRadius: number;
 }
 
 /**
@@ -173,6 +182,22 @@ export interface TestApiDeps {
    *  combat-entry `cancelAll` would be redundant, and its "same mode" early-return would wrongly
    *  skip the re-emit a fresh scenario needs). */
   setModeAndEmit(m: 'command' | 'combat' | 'inspect'): void;
+
+  /** Unequip every slot + re-emit (plan 049) — a scenario never inherits a prior run's loadout. */
+  clearEquipment(): void;
+  /** Force-equip an equippable item id into its declared slot with its starting durability (plan 049),
+   *  bypassing the bag — the deterministic scenario seam (mirrors how `spec.melee` force-sets a weapon),
+   *  for ranged/off-hand specs. A non-equippable id is a no-op. */
+  equipForTest(itemId: string): void;
+  /** The current equip loadout snapshot (plan 049) — surfaced in `debugState().equipment`. */
+  equipmentSnapshot(): EquipmentState;
+  /** Set the durability of an equipped consumable by item id (plan 049), re-emitting — lets a spec
+   *  fast-forward a brand to near-empty (like `setHunger`/`setNodeProgress`) instead of driving its
+   *  full real-time lifetime frame-by-frame. No-op if the item isn't equipped. */
+  setEquipDurability(itemId: string, value: number): void;
+  /** The player's current personal-light radius in world px (plan 049) — base or brand-raised —
+   *  surfaced in `debugState().playerLightRadius`. */
+  playerLightRadius(): number;
 
   setRng(fn: () => number): void;
 
@@ -261,6 +286,7 @@ export class TestApi {
     this.deps.setHarvestSwing(null);
     pc.attackLockUntil = 0;
     pc.setMeleeWeapon(undefined); // back to unarmed — a scenario never inherits a prior run's weapon (plan 036)
+    this.deps.clearEquipment(); // empty loadout — no equip carried into a fresh scenario (plan 049)
     this.deps.setCombatMoveVec({ dx: 0, dy: 0 });
     this.deps.clearBowTarget(); // no bow target carried into a fresh scenario (highlight cleared below)
     this.deps.fx.resetCombatFx(); // start each scenario with clean FX counters/flags (see create())
@@ -305,6 +331,10 @@ export class TestApi {
     // Optional: spawn the player already holding a demo melee weapon (mirrors enemy `weaponId`). An
     // unknown id resolves to undefined → unarmed. resetWorld already cleared it, so only set when given.
     if (spec.melee != null) this.deps.playerChar.setMeleeWeapon(MELEE_WEAPONS[spec.melee]);
+
+    // Optional: force-equip items into their declared slots (plan 049) — e.g. a bow to enable ranged,
+    // a brand to test the off-hand light/drain. Bypasses the bag for determinism (like `melee` above).
+    for (const id of spec.equip ?? []) this.deps.equipForTest(id);
 
     const inv = spec.inventory ?? (spec.wood != null ? { wood: spec.wood } : {});
     for (const [id, n] of Object.entries(inv)) if (n > 0) this.deps.inv.add(id, n);
@@ -618,6 +648,19 @@ export class TestApi {
     this.deps.playerChar.setMeleeWeapon(id != null ? MELEE_WEAPONS[id] : undefined);
   }
 
+  /** DEV/test-only: force-equip an equippable item id into its declared slot (plan 049) — enables the
+   *  ranged gate / off-hand light without walking the bag→toggle path. A non-equippable id is a no-op. */
+  equip(itemId: string): void {
+    this.deps.equipForTest(itemId);
+  }
+
+  /** DEV/test-only: set an equipped consumable's durability by item id (plan 049) — fast-forward a
+   *  brand toward empty so a spec can assert the real per-frame drain crossing zero without driving
+   *  its whole ~90s lifetime frame-by-frame. No-op if the item isn't equipped. */
+  setEquipDurability(itemId: string, value: number): void {
+    this.deps.setEquipDurability(itemId, value);
+  }
+
   /** State snapshot for the Tier-2 Playwright suite + the smoke test. */
   debugState(): DebugState {
     const pc = this.deps.playerChar;
@@ -677,6 +720,8 @@ export class TestApi {
       traps: this.trap.all().map((t) => ({ col: t.col, row: t.row, armed: t.state.armed })),
       companion: this.companionSnapshot(),
       baseSupply: this.deps.getBaseSupply(),
+      equipment: this.deps.equipmentSnapshot(),
+      playerLightRadius: this.deps.playerLightRadius(),
     };
   }
 

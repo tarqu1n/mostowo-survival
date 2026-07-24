@@ -63,9 +63,9 @@ completion the **cost is spent + the output added to the bag**; if unaffordable 
 the craft **fizzles** (red flash, no item). Several crafts can queue (append, not de-dupe).
 
 **Recipes** ([src/data/recipes.ts](../src/data/recipes.ts)): `brand` (1 wood + 1 cloth) · `bow` (2 rope +
-2 wood) · `sword` (2 wood + 1 stone) → 1 item each. Delivered as **inert bag items** (equip/function land
-in plan 049); **`rope`** is a new material dropped by `salvagedTent` salvage. The `CraftMenu` also offers a
-**Repair** action when the bench is damaged.
+2 wood) · `sword` (2 wood + 1 stone) → 1 item each. Now **equippable** (plan 049, below); **`rope`** is a
+new material dropped by `salvagedTent` salvage. The `CraftMenu` also offers a **Repair** action when the
+bench is damaged.
 
 Numbers: `CRAFT_BASE_MS`/`CRAFT_DAMAGED_MIN_FRAC`/`WORKBENCH_REPAIR_INTERVAL_MS`/`_PER_TICK` in
 [src/config.ts](../src/config.ts). Runtime in
@@ -73,6 +73,32 @@ Numbers: `CRAFT_BASE_MS`/`CRAFT_DAMAGED_MIN_FRAC`/`WORKBENCH_REPAIR_INTERVAL_MS`
 `craft`/`repair` executors + tap→menu in [src/scenes/GameScene.ts](../src/scenes/GameScene.ts) /
 [ScenePicker](../src/scenes/input/ScenePicker.ts); menu UI in
 [src/hud/components/CraftMenu.tsx](../src/hud/components/CraftMenu.tsx).
+
+## Equipping & the brand (plan 049)
+
+Three equip slots — **mainHand · ranged · offHand** — with an **empty default loadout** (unarmed melee,
+no ranged, empty off hand). Tap an equippable item (one with an `equip` slot) in the **toolbar or pack**
+to **toggle equip** (`equip:toggle`); the worn item shows a **gold outline**, and a consumable also shows
+a **durability bar**. State lives in the pure [`Equipment`](../src/systems/Equipment.ts) system (mirrors
+`Inventory`); durability lives only there.
+
+- **Permanent gear (bow/sword)** moves bag↔slot freely — equip spends one from the pack, unequip returns
+  it. **The brand is equip-to-consume:** equipping spends one and seeds its durability; unequipping (or
+  draining to 0) **discards it** — no partial restash.
+- **Main hand → melee:** the equipped item maps (via `ITEM_MELEE_WEAPON`) to its `MELEE_WEAPONS` stats —
+  the **`sword`** is a `{reach:1, arc:'wide'}` 2-damage swing (vs unarmed's 1-damage single front tile).
+  Empty main hand = unarmed (unchanged).
+- **Ranged needs a bow:** with no bow in the ranged slot, `combat:bow` does nothing and the **Bow button
+  is hidden** — the crafted bow is the first ranged weapon (see the bow bullet below).
+- **The brand** (off-hand hand-torch): while equipped it **raises the player's night light** to
+  `BRAND_LIGHT_RADIUS` (**TILE×3.5**, vs base `PLAYER_LIGHT_RADIUS` TILE×1.25) by growing the same disc
+  the night overlay already draws — fog/sight is unchanged. It **drains in real time** (`BRAND_DURABILITY`
+  **100** over `BRAND_LIFETIME_SEC` **90**s) whenever equipped and is **destroyed at 0**.
+
+Tunables `BRAND_*` in [src/config.ts](../src/config.ts); wiring (`toggleEquip`/`tickBrand`/`playerLight`)
+in [src/scenes/GameScene.ts](../src/scenes/GameScene.ts); HUD in
+[Hotbar.tsx](../src/hud/components/Hotbar.tsx)/[PackDrawer.tsx](../src/hud/components/PackDrawer.tsx) off
+the shared [hud/lib/equip.ts](../src/hud/lib/equip.ts) read-model.
 
 ## Combat feel & the bow (plan 035a)
 
@@ -103,7 +129,8 @@ All knobs in [src/config.ts](../src/config.ts); behaviour in [STATUS.md](STATUS.
   it only retracts past `COMBAT_ACTIVE_RADIUS_TILES + COMBAT_ACTIVE_HYSTERESIS_TILES` (**+3**), so an
   enemy loitering at the boundary can't flicker the HUD on/off. Never flips input `mode` (that would
   cancel the task queue); command-mode taps keep queuing orders.
-- **Bow:** auto-targets the facing-biased nearest live enemy within `BOW_RANGE_TILES` (**6**,
+- **Bow:** **requires a bow equipped in the ranged slot** (plan 049 — no bow ⇒ no ranged, Bow button
+  hidden). Auto-targets the facing-biased nearest live enemy within `BOW_RANGE_TILES` (**6**,
   Euclidean), deals `BOW_BASE_DAMAGE` (**2**) + the attacker's `dex` (**0** today → 2/shot, kills a
   3-HP kidZombie in 2) via `resolveRangedAttack` — **hitscan**; the arrow is a coded tracer
   (`BOW_ARROW_LEN_PX` dash over `BOW_ARROW_MS`). **Unlimited ammo** (no arrows resource yet). The

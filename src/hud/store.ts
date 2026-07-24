@@ -4,6 +4,7 @@ import { PLAYER_MAX_HP, HUNGER_MAX } from '@/config';
 import { BUILDABLES } from '@/data/buildables';
 import type { CombatantStats, InspectableStats } from '@/data/types';
 import type { NpcDayRole, NpcNightPosture } from '@/entities/NpcCharacter';
+import type { EquipmentState } from '@/systems/Equipment';
 
 /**
  * The DOM/React HUD's single source of truth (plan 046 Step 3). A Zustand store that mirrors the
@@ -110,6 +111,9 @@ export interface HudState {
   playerStats: CombatantStats | null;
   /** Aggregate item counts by id (the `Inventory.snapshot()` shape). */
   inventory: Record<string, number>;
+  /** The player's three equip slots (plan 049) — the `Equipment.snapshot()` shape, each slot an
+   *  `{ id, durability }` or `null`. Drives the toolbar/pack equip outline + durability bar. */
+  equipment: EquipmentState;
   hotbar: HotbarSlot[];
   following: boolean;
   zoom: number;
@@ -165,6 +169,8 @@ export interface HudActions {
   closeCraftMenu(): void;
   setPlayerStats(stats: CombatantStats | null): void;
   setInventory(inventory: Record<string, number>): void;
+  /** Mirror the player's equip loadout (from `equipment:changed`). */
+  setEquipment(equipment: EquipmentState): void;
   setHotbar(hotbar: HotbarSlot[]): void;
   /** Pin an item/buildable into the loadout — used by the long-press "pin" affordance on catalog/pack
    *  entries (plan 046). Fills the first empty slot, no-op if already pinned or the bar is full. The
@@ -213,6 +219,7 @@ const initialState: HudState = {
   craftMenu: { open: false, benchId: null, hp: 0, maxHp: 0 },
   playerStats: null,
   inventory: {},
+  equipment: { mainHand: null, ranged: null, offHand: null },
   hotbar: new Array<HotbarSlot>(HOTBAR_SLOTS).fill(null),
   following: true,
   zoom: 1,
@@ -255,6 +262,7 @@ export const useHudStore = create<HudState & HudActions>()(
     closeCraftMenu: () => set((s) => ({ craftMenu: { ...s.craftMenu, open: false } })),
     setPlayerStats: (playerStats) => set({ playerStats }),
     setInventory: (inventory) => set({ inventory }),
+    setEquipment: (equipment) => set({ equipment }),
     setHotbar: (hotbar) => set({ hotbar }),
     pinToHotbar: (entry) =>
       set((s) => {

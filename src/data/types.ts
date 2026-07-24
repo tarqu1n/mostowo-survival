@@ -6,6 +6,12 @@
 import type { LootTable } from '../systems/loot';
 import type { DecorRegion } from '../systems/mapFormat';
 
+/**
+ * The three equip slots surfaced on the HUD (plan 049). `mainHand` drives melee (maps to a
+ * `MELEE_WEAPONS` entry; empty = unarmed), `ranged` gates the bow, `offHand` holds the brand.
+ */
+export type EquipSlot = 'mainHand' | 'ranged' | 'offHand';
+
 /** An inventory item. `color` is the placeholder icon/rect colour (hex number). */
 export interface ItemDef {
   id: string;
@@ -17,6 +23,14 @@ export interface ItemDef {
   icon: string;
   /** Hunger restored per unit when eaten. Present ⇒ the item is edible; omit for inedible items. */
   nutrition?: number;
+  /** Which equip slot this item occupies when equipped. Present ⇒ the item is equippable (plan 049). */
+  equip?: EquipSlot;
+  /**
+   * Starting durability of a consumable equippable (plan 049). Present ⇒ the item depletes in real
+   * time while equipped and is destroyed at 0 (the brand). Absent ⇒ a permanent equippable (bow/sword)
+   * that moves bag↔slot freely. Durability lives on the `Equipment` slot, never on the bag `Slot`.
+   */
+  durability?: number;
 }
 
 /** Stats every world thing (mover or object) shares. */

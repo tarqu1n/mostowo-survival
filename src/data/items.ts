@@ -2,6 +2,7 @@
  * Item catalogue. Keyed by item id; add new items here, not in gameplay code.
  */
 
+import { BRAND_DURABILITY } from '../config';
 import type { ItemDef } from './types';
 
 export const ITEMS: Record<string, ItemDef> = {
@@ -31,10 +32,25 @@ export const ITEMS: Record<string, ItemDef> = {
   // Rope — a new salvage material (added to the salvagedTent loot table, plan 048 Step 1), inedible
   // like wood/stone. Feeds the `bow` recipe (Step 5).
   rope: { id: 'rope', name: 'Rope', color: 0xb5966a, maxStack: 50, icon: 'rope.png' },
-  // Craftable recipe OUTPUTS (plan 048). Stubs only: plain inert bag items, `maxStack: 1` (each is a
-  // single held tool/weapon, not a stackable material). NO `equip`/`durability` fields yet — those
-  // plus combat/light behaviour land in plan 049; until then these just sit in the pack doing nothing.
-  brand: { id: 'brand', name: 'Brand', color: 0xd9822b, maxStack: 1, icon: 'brand.png' },
-  bow: { id: 'bow', name: 'Bow', color: 0x8a5a2b, maxStack: 1, icon: 'bow.png' },
-  sword: { id: 'sword', name: 'Sword', color: 0xaab0b8, maxStack: 1, icon: 'sword.png' },
+  // Craftable recipe OUTPUTS (plan 048), now equippable (plan 049). Each is a single held tool/weapon
+  // (`maxStack: 1`). `equip` marks the slot; the brand also carries `durability` — a consumable that
+  // depletes in real time while equipped and is destroyed at 0 (bow/sword are permanent, no durability).
+  brand: {
+    id: 'brand',
+    name: 'Brand',
+    color: 0xd9822b,
+    maxStack: 1,
+    icon: 'brand.png',
+    equip: 'offHand',
+    durability: BRAND_DURABILITY,
+  },
+  bow: { id: 'bow', name: 'Bow', color: 0x8a5a2b, maxStack: 1, icon: 'bow.png', equip: 'ranged' },
+  sword: {
+    id: 'sword',
+    name: 'Sword',
+    color: 0xaab0b8,
+    maxStack: 1,
+    icon: 'sword.png',
+    equip: 'mainHand',
+  },
 };

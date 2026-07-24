@@ -32,6 +32,10 @@ export interface ScenarioSpec {
   /** Spawn the player holding a demo melee weapon (`MELEE_WEAPONS` id; unknown/omitted = unarmed) —
    *  mirrors an enemy's `weaponId`, for deterministic reach/arc specs (plan 036). */
   melee?: string;
+  /** Force-equip these equippable item ids into their declared slots (plan 049), bypassing the bag —
+   *  e.g. `['bow']` to enable ranged, `['brand']` for the off-hand light/drain. Deterministic setup
+   *  seam paralleling `melee`; the real bag↔slot toggle path is `equip:toggle`. */
+  equip?: string[];
   trees?: Array<[number, number]>;
   rocks?: Array<[number, number]>;
   bushes?: Array<[number, number]>;
@@ -166,6 +170,12 @@ export interface GameTestApi {
   /** DEV/test-only: equip the player's melee weapon by `MELEE_WEAPONS` id, or clear to unarmed with
    *  `null` (an unknown id also clears) — lets a spec assert reach/arc deterministically (plan 036). */
   setPlayerMelee(id: string | null): void;
+  /** DEV/test-only: force-equip an equippable item id into its declared slot (plan 049) — enables the
+   *  ranged gate / off-hand light without the bag→toggle path. A non-equippable id is a no-op. */
+  equip(itemId: string): void;
+  /** DEV/test-only: set an equipped consumable's durability by item id (plan 049) — fast-forward a
+   *  brand toward empty without driving its whole real-time lifetime. No-op if not equipped. */
+  setEquipDurability(itemId: string, value: number): void;
   /** DEV/test-only: set the companion's day role — round-trips to `debugState().companion.dayRole`
    *  (plan 042 Step 2). No-op if no companion is spawned; the behaviour it drives lands in later steps. */
   setNpcDayRole(role: NpcDayRole): void;

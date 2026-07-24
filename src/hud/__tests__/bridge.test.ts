@@ -96,6 +96,15 @@ describe('outbound event → store mapping', () => {
     bus.emit('supply:changed', { wood: 5, rock: 3 });
     expect(s().supply).toEqual({ wood: 5, rock: 3 });
 
+    // The equip loadout snapshot (plan 049) mirrors straight into the store.
+    const loadout = {
+      mainHand: { id: 'sword', durability: null },
+      ranged: null,
+      offHand: { id: 'brand', durability: 80 },
+    };
+    bus.emit('equipment:changed', loadout);
+    expect(s().equipment).toEqual(loadout);
+
     bus.emit('time:changed', { phase: 'night', dayCount: 2, cycleMs: 1, tNorm: 0.5 });
     expect(s().dayPhase).toBe('night');
     expect(s().dayCount).toBe(2);
@@ -202,6 +211,12 @@ describe('emit passthrough', () => {
     bridge.emit({ type: 'combat:attack' });
     expect(noPayload).toHaveBeenCalledTimes(1);
     expect(noPayload).toHaveBeenCalledWith(); // no trailing payload arg
+
+    // equip:toggle carries the tapped item id back to the world (plan 049).
+    const equipToggle = vi.fn();
+    bus.on('equip:toggle', equipToggle);
+    bridge.emit({ type: 'equip:toggle', payload: { itemId: 'brand' } });
+    expect(equipToggle).toHaveBeenCalledWith({ itemId: 'brand' });
   });
 });
 

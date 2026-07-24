@@ -57,6 +57,16 @@ export interface DebugState {
     carry: number;
   } | null;
   baseSupply: { wood: number; rock: number };
+  // plan 049: the three equip slots. Each slot is `{ id, durability }` (durability null = permanent
+  // gear, a number = the brand) or null. Mirrors `Equipment.snapshot()` / EquipmentState.
+  equipment: {
+    mainHand: { id: string; durability: number | null } | null;
+    ranged: { id: string; durability: number | null } | null;
+    offHand: { id: string; durability: number | null } | null;
+  };
+  // plan 049: the player's personal-light radius (world px) — base, or brand-raised while a lit brand
+  // is in the off hand.
+  playerLightRadius: number;
 }
 
 /**
@@ -154,6 +164,20 @@ export function moveEnemy(page: Page, index: number, col: number, row: number): 
 /** Equip the player's melee weapon by `MELEE_WEAPONS` id, or clear to unarmed with `null` (plan 036). */
 export function setPlayerMelee(page: Page, id: string | null): Promise<void> {
   return page.evaluate((i) => (window as any).game.__test.setPlayerMelee(i), id);
+}
+
+/** Force-equip an equippable item id into its declared slot (plan 049) — enables the ranged gate /
+ *  off-hand light without the bag→toggle path. */
+export function equip(page: Page, itemId: string): Promise<void> {
+  return page.evaluate((id) => (window as any).game.__test.equip(id), itemId);
+}
+
+/** Set an equipped consumable's durability by item id (plan 049) — fast-forward a brand toward empty. */
+export function setEquipDurability(page: Page, itemId: string, value: number): Promise<void> {
+  return page.evaluate(
+    ({ itemId, value }) => (window as any).game.__test.setEquipDurability(itemId, value),
+    { itemId, value },
+  );
 }
 
 /** The single companion's scaffold state (col/row/role/posture/hp/downed/carry), or null (plan 042) —

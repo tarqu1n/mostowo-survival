@@ -2,6 +2,7 @@ import { useHudStore } from './store';
 import type { HudMode } from './store';
 import type { CombatantStats, InspectableStats } from '@/data/types';
 import type { NpcDayRole, NpcNightPosture } from '@/entities/NpcCharacter';
+import type { EquipmentState } from '@/systems/Equipment';
 
 /**
  * Event bridge (plan 046 Step 3): the one-way pipe from the game into the HUD store, plus a typed
@@ -102,6 +103,7 @@ export type InboundEvent =
   | { type: 'npc:cancelPlaceGuard' }
   | { type: 'craft:queue'; payload: { benchId: string; recipeId: string } }
   | { type: 'craft:repair'; payload: { benchId: string } }
+  | { type: 'equip:toggle'; payload: { itemId: string } }
   | { type: 'debug:spawnEnemy' }
   | { type: 'debug:spawnNpc' }
   | { type: 'debug:toggleTime' }
@@ -160,6 +162,9 @@ export function initBridge(bus: EventBus, registry: Registry): Bridge {
     store.setFire(p ? { fuel: p.fuel, maxFuel: p.maxFuel, lit: p.lit } : null),
   );
   on<SupplyPayload>('supply:changed', (p) => store.setSupply({ wood: p.wood, rock: p.rock }));
+  // The player's equip loadout (plan 049). The game emits the full `Equipment.snapshot()` on every
+  // toggle (and, throttled, as the brand drains — Step 6); mirror it straight into the store.
+  on<EquipmentState>('equipment:changed', (snap) => store.setEquipment(snap));
   on<TimePayload>('time:changed', (p) => store.setTime(p.phase, p.dayCount, p.tNorm));
   // Continuous dial sweep between the sparse transition-only `time:changed` updates (see SurvivalClock).
   on<{ tNorm: number }>('time:progress', (p) => store.setTimeProgress(p.tNorm));

@@ -220,6 +220,23 @@ export const UNARMED_MELEE_SHAPE: AttackShape = { reach: 1, arc: 'single' };
 export const ATTACK_MOVE_SLOW = 0.2;
 
 /**
+ * Brand (hand-held torch, plan 049) tunables — PLACEHOLDER tuning per plan 040's convention.
+ *  - `BRAND_DURABILITY`: starting charge, drained in real time while equipped in the off hand.
+ *  - `BRAND_LIFETIME_SEC`: how long a full brand lasts equipped; the per-second drain is derived from
+ *    it so the two stay in step (retune the lifetime, not the drain).
+ *  - `BRAND_LIGHT_RADIUS`: the player-light disc while a lit brand is equipped — larger than
+ *    `PLAYER_LIGHT_RADIUS` but smaller than the campfire, so fires still clearly matter (decision #4).
+ */
+export const BRAND_DURABILITY = 100;
+export const BRAND_LIFETIME_SEC = 90;
+export const BRAND_DRAIN_PER_SEC = BRAND_DURABILITY / BRAND_LIFETIME_SEC;
+export const BRAND_LIGHT_RADIUS = TILE_SIZE * 3.5;
+/** How often (ms) the per-frame brand drain forwards the loadout to the HUD (plan 049 Step 6). The
+ *  durability bar animates smoothly at ~5/sec without the store re-rendering every frame; a destroy
+ *  still forwards immediately. Not gameplay — a HUD-refresh cadence knob. */
+export const BRAND_DRAIN_EMIT_MS = 200;
+
+/**
  * NPC companion (the Rogue, plan 042) — a named constants block mirroring the player block above,
  * NOT a data catalogue (the companion is one hand-built actor, like the player). `NpcCharacter`
  * assembles its `CombatantStats` from these; the day/night role + posture behaviour that reads the

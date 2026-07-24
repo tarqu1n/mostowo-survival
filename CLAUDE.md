@@ -80,13 +80,16 @@ worker order — the third `StructureManager` behavior module, plan 040), the **
 dev-spawned ally — day gather/repair off a separate `baseSupply` stockpile, 3 night postures, mob-aggroable
 → downed → auto-revives at dawn, plan 042), and the **workbench crafting station** (the first crafting
 content — a buildable, mob-bashable/player-repairable HP bench that runs a player-queued `craft` worker
-order at an HP-scaled rate to deliver items; the 4th `StructureManager` module, plan 048) have all
-landed. **Full feature/plan history:** [docs/STATUS.md](docs/STATUS.md).
+order at an HP-scaled rate to deliver items; the 4th `StructureManager` module, plan 048), and the
+**equip system** (three slots — mainHand/ranged/offHand — off a pure `Equipment` system; the crafted
+sword/bow/brand equip via the toolbar/pack; main hand drives melee, ranged gates the bow, and the
+off-hand brand casts light + drains to destruction, plan 049) have all landed. **Full feature/plan
+history:** [docs/STATUS.md](docs/STATUS.md).
 
 **Next:** the first-playable **MVP path is complete** (see [docs/ROADMAP.md](docs/ROADMAP.md): ✅ combat
 rework → ✅ night wave + campfire defense → ✅ base-defence walls → ✅ trap (plan 040) → ✅ hunger (plan 041) →
-✅ NPC (plan 042)); post-MVP **crafting** has begun (✅ workbench station, plan 048 → equippable items +
-torch/durability/combat next, plan 049). Full vision in
+✅ NPC (plan 042)); post-MVP **crafting** is underway (✅ workbench station, plan 048 → ✅ equippable items +
+brand/durability/combat, plan 049). Full vision in
 [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md); [docs/DECISIONS.md](docs/DECISIONS.md) for settled vs open.
 
 ## The game in one line

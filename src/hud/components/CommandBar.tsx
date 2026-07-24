@@ -74,6 +74,9 @@ export function CommandBar({
   const selection = useHudStore((s) => s.selection);
   const orientable = useHudStore((s) => s.orientable);
   const demolishMode = useHudStore((s) => s.demolishMode);
+  // Ranged is gated on an equipped bow (plan 049): no bow ⇒ hide the Bow button (and the world no-ops
+  // a stray `combat:bow`). The crafted bow is the first ranged weapon — a deliberate early-game gate.
+  const hasBow = useHudStore((s) => s.equipment.ranged !== null);
 
   // Utility rail state (always visible, independent of the morph): the raw game mode drives the
   // Fight/Inspect toggle highlights, and the queue summary reveals Cancel Queue when work is pending.
@@ -206,14 +209,17 @@ export function CommandBar({
           <Movepad size={60} onHeldChange={onMoveHeldChange} />
           <div className="flex items-center gap-2">
             {/* Pointer-down, not click: these must fire as a non-primary pointer while the movepad
-                holds the primary one — see onPress. */}
-            <Button
-              variant="secondary"
-              className="size-11 rounded-full p-0"
-              onPointerDown={onPress({ type: 'combat:bow' })}
-            >
-              Bow
-            </Button>
+                holds the primary one — see onPress. The Bow button shows only with a bow equipped
+                (plan 049); Attack (unarmed or a main-hand weapon) is always available. */}
+            {hasBow && (
+              <Button
+                variant="secondary"
+                className="size-11 rounded-full p-0"
+                onPointerDown={onPress({ type: 'combat:bow' })}
+              >
+                Bow
+              </Button>
+            )}
             <Button
               variant="destructive"
               className="size-14 rounded-full p-0 text-base"

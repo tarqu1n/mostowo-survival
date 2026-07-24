@@ -52,4 +52,17 @@ export interface MeleeWeapon {
 export const MELEE_WEAPONS: Record<string, MeleeWeapon> = {
   spear: { id: 'spear', name: 'Spear', damage: 1, attackShape: { reach: 2, arc: 'line' } }, // long thrust
   cleaver: { id: 'cleaver', name: 'Cleaver', damage: 1, attackShape: { reach: 1, arc: 'wide' } }, // short swing
+  // The craftable sword (plan 049) — the first equip-driven melee upgrade over unarmed: a short, wide
+  // swing hitting the front tile plus its two neighbours, for more damage than a bare-handed thrust.
+  sword: { id: 'sword', name: 'Sword', damage: 2, attackShape: { reach: 1, arc: 'wide' } },
+};
+
+/**
+ * Maps an equippable item id (from `ITEMS`) to the `MELEE_WEAPONS` id it activates when equipped in
+ * the main hand (plan 049). Equip drives *which* melee weapon is active; an item with no entry (or an
+ * empty main hand) falls back to unarmed (`UNARMED_*` in config.ts). Kept here, next to the stats it
+ * points at, so the item↔weapon link is a single data lookup rather than logic in the scene.
+ */
+export const ITEM_MELEE_WEAPON: Record<string, string> = {
+  sword: 'sword',
 };
