@@ -147,6 +147,10 @@ describe('outbound event → store mapping', () => {
     bus.emit('camera:followChanged', false);
     expect(s().following).toBe(false);
 
+    // A workbench tap opens the craft menu with the bench's id + live hp (plan 048 Step 7).
+    bus.emit('craft:menuOpen', { benchId: 'workbench-0', hp: 40, maxHp: 60 });
+    expect(s().craftMenu).toEqual({ open: true, benchId: 'workbench-0', hp: 40, maxHp: 60 });
+
     bridge.dispose(); // clears the pending eat-cooldown timer scheduled by the needs:fed emit above
   });
 });

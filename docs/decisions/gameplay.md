@@ -6,6 +6,46 @@ Part of the [decision log index](../DECISIONS.md). Newest first.
 
 ---
 
+## 2026-07-24 — [DECIDED] Workbench crafting station (plan 048): craft-as-worker-order, HP-scaled rate, workbench = attackable/repairable structure, bench-tapped menu
+
+The first crafting station (plan 048 — post-MVP content on the **crafting** pillar). It is the
+prerequisite half of a split; the equip system + torch/durability + combat rewire is the sibling
+[plan 049](../../plans/049-equippable-items-equip-slots.md). Full detail in
+[plan 048](../../plans/048-workbench-crafting-station.md); the settled calls:
+
+- **Workbench is a live, attackable, repairable HP structure** (owner requirement, kept over a Gate-2
+  "HP unmandated" finding). The 4th `StructureManager` behavior (`WorkbenchBehavior`, `behavior:'workbench'`),
+  mirroring the wall's HP spine: night mobs bash it via the generic structure-target seam (no monster-AI
+  change — the bench `blocksPath`, so a mob pathing through it attacks it), and the player repairs it.
+  **Destroyed at 0 HP like a wall** (real defend-or-lose stakes — the faithful reading of "bashed like a
+  wall"; the "never fully stalls" clause governs the craft *rate* at positive HP, not the HP itself).
+- **Static object sprite, not an anim.** Unlike the campfire/trap (animated `stations`/`structures`
+  manifest strips), the bench renders a **static crop** of a `Workbench.png` region via the shared
+  object-region path (`resolveDecorDraw`) — wired by a new `BuildableDef.objectSprite: {asset, region?}`
+  field (the same `asset`+`region` a decor/node skin uses). Damage feedback is a progressive **tint**
+  (white→dark-brown), no crumble sheet.
+- **Crafting = a player-queued `craft` worker order** (like `build`/`refuel`, not an instant menu action):
+  walk adjacent, then a timed progress accumulator on the bench. **Player-only** this pass (NPC doesn't
+  craft). Appends rather than de-dupes, so several crafts stack at one bench.
+- **Craft rate scales with bench HP** — `Phaser.Math.Linear(CRAFT_DAMAGED_MIN_FRAC, 1, hp/maxHp)`, so a
+  damaged bench crafts slower but **never fully stalls** (floors at the min fraction). Progress lives on
+  `WorkbenchStructure.craft`, so a walk-away + re-queue of the same recipe resumes.
+- **Spend + deliver at completion, fizzle if it can't.** Cost is spent and the output added to the bag
+  only when the craft finishes (materials may be gathered mid-craft); if unaffordable OR the bag is full
+  at that moment, the craft **fizzles** (a red bench flash, no item, no spend) rather than stalling.
+- **Recipes deliver inert bag items** — `brand` (wood+cloth) · `bow` (rope+wood) · `sword` (wood+stone),
+  data in `data/recipes.ts`. They are **plain, non-functional** items here; equip slots / torch light /
+  durability / combat land in plan 049. New **`rope`** material added to the `salvagedTent` salvage loot
+  (no new node). The craftable torch is the **`brand`** item id (the buildable perimeter `torch` name is
+  reserved).
+- **`repair` order generalised to any structure** — its field renamed `wallId`→`structureId`; the player
+  repair path (new `beginRepair`/`runRepair`, walk-adjacent → tend on a cadence → full HP, worker-time
+  only, no resource cost) targets a workbench, while the companion keeps repairing walls on its own queue.
+- **Crafting is a bench-tapped station interaction, not a command-bar mode.** Tapping a placed workbench
+  opens the `CraftMenu` sheet (recipe list + a Repair action when damaged) — exactly as tapping a campfire
+  refuels it or tapping the companion opens its menu. So the plan-046 "no Craft button" command-bar stub
+  stays: a context-free global Craft button would have no bench to act on.
+
 ## 2026-07-23 — [DECIDED] Salvage node lifecycle (plan 047): oneShot no-regrow node, generic `clear` order, timed actions with node-persistent progress, shake-as-looping-tween
 
 The wrecked-tent (`salvagedTent`) became a two-stage **salvage → clear** lifecycle (plan 047, post-MVP

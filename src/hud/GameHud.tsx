@@ -24,6 +24,7 @@ import { PackDrawer } from './components/PackDrawer';
 import { StatusDrawer } from './components/StatusDrawer';
 import { InspectCard } from './components/InspectCard';
 import { CompanionMenu } from './components/CompanionMenu';
+import { CraftMenu } from './components/CraftMenu';
 import { DevMenu } from './components/DevMenu';
 
 /** `0xRRGGBB` (config colour) → a CSS hex string. The vignette configs are shared with the (now
@@ -159,6 +160,8 @@ function ActionLayer() {
 function Overlays() {
   const menu = useHudStore((s) => s.companionMenu);
   const closeCompanionMenu = useHudStore((s) => s.closeCompanionMenu);
+  const craftMenu = useHudStore((s) => s.craftMenu);
+  const closeCraftMenu = useHudStore((s) => s.closeCraftMenu);
 
   return (
     <>
@@ -171,6 +174,13 @@ function Overlays() {
         // here" (which arms placement, then calls onClose) would immediately disarm itself. The ESC
         // guard-cancel stays in UIScene until the Step 13 cutover.
         onClose={closeCompanionMenu}
+      />
+      <CraftMenu
+        open={craftMenu.open}
+        benchId={craftMenu.benchId}
+        hp={craftMenu.hp}
+        maxHp={craftMenu.maxHp}
+        onClose={closeCraftMenu}
       />
       <DevMenu />
     </>

@@ -45,6 +45,35 @@ All numbers are `CAMPFIRE_FUEL_MAX`/`_BURN_PER_SEC`/`_PER_WOOD`/`_FEED_INTERVAL_
 pure fuel math (`drainFuel`/`feedFuel`/`isLit`/`fuelFrac`) in
 [src/systems/campfire.ts](../src/systems/campfire.ts).
 
+## Workbench & crafting (plan 048)
+
+Cost **50 wood**; placeable **base-zone only**; blocks its tile. A **live HP structure** (`maxHp` **60**,
+inline on the buildable) like a wall: **night mobs bash it** (the generic structure-target seam) and the
+**player repairs it** (a `repair` worker order — walk adjacent, then **+`WORKBENCH_REPAIR_PER_TICK` (4)**
+hp every **`WORKBENCH_REPAIR_INTERVAL_MS` (500ms)** until full, worker-time only, no cost). At **0 HP it's
+destroyed** (frees its tile), same as a wall. Renders a static `Workbench.png` sprite (object-region crop,
+via `BuildableDef.objectSprite`); damage shows as a darkening tint (no crumble sheet).
+
+**Crafting is a queued worker order (like refuel), not an instant tap:** tapping the bench (command mode)
+opens the **`CraftMenu`** — pick a recipe → a `craft` order enqueues → the worker walks adjacent and works
+the bench over **`CRAFT_BASE_MS` (8000ms)**, **scaled by bench HP**: rate = `Linear(CRAFT_DAMAGED_MIN_FRAC
+(0.4), 1, hp/maxHp)`, so a full bench crafts in ~8s and a near-dead one at ~0.4× (never stalls). An
+above-bench progress bar fills as it works; progress persists on the bench (re-queue resumes). On
+completion the **cost is spent + the output added to the bag**; if unaffordable / bag-full **at completion**
+the craft **fizzles** (red flash, no item). Several crafts can queue (append, not de-dupe).
+
+**Recipes** ([src/data/recipes.ts](../src/data/recipes.ts)): `brand` (1 wood + 1 cloth) · `bow` (2 rope +
+2 wood) · `sword` (2 wood + 1 stone) → 1 item each. Delivered as **inert bag items** (equip/function land
+in plan 049); **`rope`** is a new material dropped by `salvagedTent` salvage. The `CraftMenu` also offers a
+**Repair** action when the bench is damaged.
+
+Numbers: `CRAFT_BASE_MS`/`CRAFT_DAMAGED_MIN_FRAC`/`WORKBENCH_REPAIR_INTERVAL_MS`/`_PER_TICK` in
+[src/config.ts](../src/config.ts). Runtime in
+[src/scenes/world/WorkbenchBehavior.ts](../src/scenes/world/WorkbenchBehavior.ts) (sprite/HP/tint);
+`craft`/`repair` executors + tap→menu in [src/scenes/GameScene.ts](../src/scenes/GameScene.ts) /
+[ScenePicker](../src/scenes/input/ScenePicker.ts); menu UI in
+[src/hud/components/CraftMenu.tsx](../src/hud/components/CraftMenu.tsx).
+
 ## Combat feel & the bow (plan 035a)
 
 All knobs in [src/config.ts](../src/config.ts); behaviour in [STATUS.md](STATUS.md), rationale in

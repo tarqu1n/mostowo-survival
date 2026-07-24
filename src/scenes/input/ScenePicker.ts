@@ -111,6 +111,17 @@ export class ScenePicker {
       : undefined;
   }
 
+  /** The workbench whose sprite is drawn under a world point, or undefined for a non-bench / empty
+   *  ground. GameScene routes a command-mode hit to OPENING the craft menu (plan 048 Step 7) — a HUD
+   *  side effect, not an {@link Action} (crafting is a bench-tapped station interaction, like the
+   *  campfire's refuel). Reuses the same two-tier raycast as every other tap. */
+  workbenchAt(x: number, y: number): PlacedStructure | undefined {
+    const pick = this.pickSpriteAt(x, y);
+    return pick?.kind === 'structure' && pick.structure.behavior === 'workbench'
+      ? pick.structure
+      : undefined;
+  }
+
   // --- Companion-menu intent --------------------------------------------------
 
   /** The AI companion if its sprite is drawn under a world point — hit on its foot tile (a reliable

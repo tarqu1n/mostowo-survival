@@ -9,6 +9,7 @@ import {
   damageWorkbench,
   itemCount,
   enqueue,
+  emit,
 } from './harness';
 
 // Tier-2 (plan 048 Step 4): the workbench is a live HP structure like the wall — a walled-off mob
@@ -179,4 +180,39 @@ test('a damaged bench crafts slower than a healthy one, but never fully stalls',
     if ((await itemCount(page, 'brand')) >= 1) crafted = true;
   }
   expect(crafted).toBe(true); // a damaged bench still finishes eventually
+});
+
+test('the HUD craft-menu events (craft:queue / craft:repair) drive the real orders', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await startGame(page);
+  const { workbenchIds } = await applyScenario(page, {
+    player: PLAYER,
+    workbenches: [[FRONTIER.col, FRONTIER.row]],
+    inventory: { wood: 4, stone: 4 },
+  });
+  const benchId = workbenchIds[0];
+
+  // `craft:queue` is exactly what CraftMenu emits on a recipe tap (via the bridge) — it must reach
+  // GameScene's wireBus handler and enqueue the real craft order. Craft a sword (wood+stone).
+  await emit(page, 'craft:queue', { benchId, recipeId: 'sword' });
+  let crafted = false;
+  for (let i = 0; i < 40 && !crafted; i++) {
+    await step(page, 500);
+    if ((await itemCount(page, 'sword')) >= 1) crafted = true;
+  }
+  expect(crafted).toBe(true); // the menu's craft:queue delivered the sword
+  expect(await itemCount(page, 'wood')).toBe(2); // sword cost 2 wood + 1 stone, spent
+
+  // `craft:repair` is what the menu's Repair button emits — damage the bench, then drive the repair.
+  expect(await damageWorkbench(page, 0, 30)).toBe(false);
+  const maxHp = (await workbenches(page))[0].maxHp;
+  await emit(page, 'craft:repair', { benchId });
+  let mended = false;
+  for (let i = 0; i < 40 && !mended; i++) {
+    await step(page, 500);
+    if ((await workbenches(page))[0].hp >= maxHp) mended = true;
+  }
+  expect(mended).toBe(true); // the menu's craft:repair mended the bench to full
 });

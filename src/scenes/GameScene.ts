@@ -41,6 +41,7 @@ import { objectAsDefender } from '../systems/combat';
 import { hurtboxTiles, DEFAULT_HURTBOX } from '../systems/hurtbox';
 import type { DayPhase } from '../systems/daynight';
 import type { GameTestApi } from '../entities/testTypes';
+import type { PlacedStructure } from '../entities/types';
 import type { CharacterSprite } from '../entities/Character';
 import { PlayerCharacter } from '../entities/PlayerCharacter';
 import { CombatFxManager } from './fx/CombatFxManager';
@@ -739,6 +740,14 @@ export class GameScene extends Phaser.Scene {
           if (wall) this.enqueue({ kind: 'deconstruct', wallId: wall.id });
           return;
         }
+        // A tap on a workbench opens its craft menu (plan 048 Step 7) — a HUD side effect, not a world
+        // order (crafting is a bench-tapped station interaction, like the NPC's assignment menu). Checked
+        // before the generic actionAt dispatch so the bench never falls through to a move onto its tile.
+        const bench = this.scenePicker.workbenchAt(pointer.worldX, pointer.worldY);
+        if (bench) {
+          this.openCraftMenu(bench);
+          return;
+        }
         const action = this.scenePicker.actionAt(pointer.worldX, pointer.worldY);
         // A tap on a tree or a campfire queues a job (harvest / refuel): it falls in behind the current
         // work (or starts at once if the worker is idle) instead of interrupting an in-progress job —
@@ -871,6 +880,11 @@ export class GameScene extends Phaser.Scene {
       ['npc:assignNightPosture', this.setNpcNightPosture, this],
       ['npc:beginPlaceGuard', this.beginPlaceGuardPoint, this],
       ['npc:cancelPlaceGuard', this.cancelPlaceGuardPoint, this], // Escape while armed
+      // Workbench craft menu (plan 048 Step 7) — the DOM craft menu routes a recipe pick back here to
+      // enqueue the real `craft` order, and a Repair pick (shown when the bench is damaged) to the
+      // player `repair` order — the same worker orders a `__test.enqueue` drives.
+      ['craft:queue', this.onCraftQueue, this],
+      ['craft:repair', this.onCraftRepair, this],
     ];
     for (const [event, handler, ctx] of subs) bus.on(event, handler, ctx);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -1840,6 +1854,30 @@ export class GameScene extends Phaser.Scene {
       dayRole: npc.dayRole,
       nightPosture: npc.nightPosture,
     });
+  }
+
+  /** Open the DOM craft menu for a tapped workbench (plan 048 Step 7): emit its id + live hp so the
+   *  menu can list recipes and offer Repair when damaged. Resolved through the module so `state` is
+   *  the typed {@link WorkbenchState}; a bench gone between pick and here is a silent no-op. */
+  private openCraftMenu(bench: PlacedStructure): void {
+    const b = this.workbench.benchById(bench.id);
+    if (!b) return;
+    this.game.events.emit('craft:menuOpen', {
+      benchId: b.id,
+      hp: b.state.hp,
+      maxHp: b.state.maxHp,
+    });
+  }
+
+  /** A recipe pick in the craft menu → enqueue the real `craft` worker order (plan 048 Step 7). */
+  private onCraftQueue(p: { benchId: string; recipeId: string }): void {
+    this.enqueue({ kind: 'craft', benchId: p.benchId, recipeId: p.recipeId });
+  }
+
+  /** The Repair pick in the craft menu (shown when the bench is damaged) → enqueue the player `repair`
+   *  worker order for the bench (plan 048 Step 7; the mechanic landed in Step 4). */
+  private onCraftRepair(p: { benchId: string }): void {
+    this.enqueue({ kind: 'repair', structureId: p.benchId });
   }
 
   /** True while the movepad is authoritative — manual Combat mode OR the combatActive auto-surface

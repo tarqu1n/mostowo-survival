@@ -386,6 +386,40 @@ Tuning: `SALVAGE_MS`/`CLEAR_MS` + `NODE_SHAKE_PX`/`_DEG`/`_HZ` + `NODE_PROGRESS_
 in `config.ts`. E2e: `tests/e2e/salvage-lifecycle.spec.ts` (drives the full lifecycle; seeds
 `progressMs` to cross the timed thresholds cheaply).
 
+## Workbench crafting station (plan 048)
+
+The game's first **crafting station**: a buildable **workbench** (50 wood, `category:'craft'` — its own
+Build-catalog tab) that crafts items over time via a player-queued **`craft` worker order**, and is a
+live HP structure like a wall.
+
+- **4th `StructureManager` behavior** (`world/WorkbenchBehavior.ts`, `behavior:'workbench'`): the
+  WallBehavior HP spine (`materialise`/`takeDamage`/`repair`/`stats`/…) but rendering a **static object
+  sprite** (a `Workbench.png` region crop via the shared object-region path `resolveDecorDraw`, wired by
+  the new `BuildableDef.objectSprite` field — NOT an anim) with **tint-based** damage feedback (no
+  crumble sheet). **Destroyed at 0 HP** like a wall (frees its tile). State record `WorkbenchStructure`
+  (`hp`/`maxHp` + a `craft:{recipeId,progress}|null`).
+- **Mobs bash it** — the generic structure-target seam (`structureAt`/`attackStructure`, plan 037 2c) now
+  resolves a blocking workbench too (no monster-AI change: the bench `blocksPath`). **Player repairs it**
+  — the `repair` order (field generalised `wallId`→`structureId`) now runs on the player queue for a
+  bench (walk-adjacent → tend on a cadence → full HP, worker-time only), alongside the companion's wall
+  repair.
+- **Recipes** (`data/recipes.ts`, `RECIPES`): `brand` (wood+cloth) · `bow` (rope+wood) · `sword`
+  (wood+stone) — all craft at the workbench over `CRAFT_BASE_MS`; delivered as **inert bag items**
+  (equip/function land in plan 049). New **`rope`** material drops from the `salvagedTent` salvage loot.
+- **`craft` order** (`beginCraft`/`runCraft`): walk adjacent, accumulate progress at a rate **scaled by
+  bench HP** (`Linear(CRAFT_DAMAGED_MIN_FRAC, 1, hp/maxHp)` — a damaged bench is slower, never stalls),
+  with an above-bench progress bar; on completion **spend cost + deliver output**, or **fizzle** (a red
+  flash) if unaffordable/bag-full. Progress lives on the bench (walk-away + re-queue resumes). Appends
+  (doesn't de-dupe), so several crafts queue.
+- **HUD** — tapping a workbench opens the **`CraftMenu`** sheet (recipe list w/ cost + affordability, à la
+  BuildCatalog; a **Repair** action when damaged), routing `craft:queue`/`craft:repair` back to the
+  scene. A bench-tapped station interaction (like refuel/NPC-menu), not a command-bar button.
+
+Tuning: `WORKBENCH` maxHp inline on the buildable; `CRAFT_BASE_MS`/`CRAFT_DAMAGED_MIN_FRAC`/
+`WORKBENCH_REPAIR_INTERVAL_MS`/`_PER_TICK` in `config.ts`. E2e: `tests/e2e/workbench.spec.ts` (mob
+bash+destroy, player repair, healthy vs HP-scaled-slow craft, HUD-menu event path). Out of scope (→ 049):
+equip/durability/torch-light/combat for the crafted items; NPC crafting.
+
 ## Rendering (art, glow, crisp actors)
 
 - **Active art is Pixel Crawler** (plan 005): `ACTIVE_TILESET` in `src/data/tileset.ts`; the Zombie

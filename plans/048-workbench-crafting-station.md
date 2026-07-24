@@ -1,7 +1,6 @@
 # Workbench — First Crafting Station
 
-> Status: planned — run /execute-plan to begin. **Gate 1 open**: plan-only deliverable; stop for
-> Matt's review. Split out of the original combined plan after the Gate-2 critique (see
+> Status: in review. Split out of the original combined plan after the Gate-2 critique (see
 > `## Critique resolution`). The **equip system + torch/durability + combat rewire** is the sibling
 > plan **049**; this plan (crafting station) is its prerequisite and ships first.
 

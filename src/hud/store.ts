@@ -63,6 +63,18 @@ export interface CompanionMenuState {
   readonly nightPosture: NpcNightPosture;
 }
 
+/** Workbench craft-menu state (plan 048 Step 7) — opened by the `craft:menuOpen` game event (fired
+ *  when the player taps a workbench), closed by the sheet's own dismiss. Carries the tapped bench's id
+ *  (routed back on a recipe/Repair pick) + its live hp/maxHp (the Repair option shows only when
+ *  damaged). The recipe list itself is read from `RECIPES` by the component, like BuildCatalog reads
+ *  `BUILDABLES` — so only the per-bench context lives here. */
+export interface CraftMenuState {
+  readonly open: boolean;
+  readonly benchId: string | null;
+  readonly hp: number;
+  readonly maxHp: number;
+}
+
 /** Live HUD state, one-way mirror of the game. */
 export interface HudState {
   hp: number;
@@ -89,6 +101,9 @@ export interface HudState {
   /** Companion assignment menu state (plan 046 Step 12) — opened by the `npc:menuOpen` game event
    *  (fired when the player taps the ally), closed by the sheet's own dismiss. */
   companionMenu: CompanionMenuState;
+  /** Workbench craft menu state (plan 048 Step 7) — opened by the `craft:menuOpen` game event (fired
+   *  when the player taps a workbench), closed by the sheet's own dismiss. */
+  craftMenu: CraftMenuState;
   /** The player's combat stat bag (armour/speed/strength/…), surfaced by GameScene on the registry
    *  (`playerStats`). Static per run; `null` until the bridge reads it. Feeds the Status drawer's stat
    *  rows (plan 046 Step 11 — the DOM replacement for the legacy WellbeingPanel stats). */
@@ -144,6 +159,10 @@ export interface HudActions {
   openCompanionMenu(dayRole: NpcDayRole, nightPosture: NpcNightPosture): void;
   /** Close the companion menu (the sheet's dismiss); leaves the last role/posture in place. */
   closeCompanionMenu(): void;
+  /** Open the craft menu for a tapped workbench (from `craft:menuOpen`), carrying its id + live hp. */
+  openCraftMenu(benchId: string, hp: number, maxHp: number): void;
+  /** Close the craft menu (the sheet's dismiss). */
+  closeCraftMenu(): void;
   setPlayerStats(stats: CombatantStats | null): void;
   setInventory(inventory: Record<string, number>): void;
   setHotbar(hotbar: HotbarSlot[]): void;
@@ -191,6 +210,7 @@ const initialState: HudState = {
   inspectTarget: null,
   // Defaults mirror NpcCharacter's initial dayRole/nightPosture; overwritten each time the menu opens.
   companionMenu: { open: false, dayRole: 'gather', nightPosture: 'follow' },
+  craftMenu: { open: false, benchId: null, hp: 0, maxHp: 0 },
   playerStats: null,
   inventory: {},
   hotbar: new Array<HotbarSlot>(HOTBAR_SLOTS).fill(null),
@@ -231,6 +251,8 @@ export const useHudStore = create<HudState & HudActions>()(
     openCompanionMenu: (dayRole, nightPosture) =>
       set({ companionMenu: { open: true, dayRole, nightPosture } }),
     closeCompanionMenu: () => set((s) => ({ companionMenu: { ...s.companionMenu, open: false } })),
+    openCraftMenu: (benchId, hp, maxHp) => set({ craftMenu: { open: true, benchId, hp, maxHp } }),
+    closeCraftMenu: () => set((s) => ({ craftMenu: { ...s.craftMenu, open: false } })),
     setPlayerStats: (playerStats) => set({ playerStats }),
     setInventory: (inventory) => set({ inventory }),
     setHotbar: (hotbar) => set({ hotbar }),

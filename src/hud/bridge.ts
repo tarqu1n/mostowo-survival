@@ -100,6 +100,8 @@ export type InboundEvent =
   | { type: 'npc:assignNightPosture'; payload: NpcNightPosture }
   | { type: 'npc:beginPlaceGuard' }
   | { type: 'npc:cancelPlaceGuard' }
+  | { type: 'craft:queue'; payload: { benchId: string; recipeId: string } }
+  | { type: 'craft:repair'; payload: { benchId: string } }
   | { type: 'debug:spawnEnemy' }
   | { type: 'debug:spawnNpc' }
   | { type: 'debug:toggleTime' }
@@ -181,6 +183,11 @@ export function initBridge(bus: EventBus, registry: Registry): Bridge {
   // uses only the live `dayRole`/`nightPosture` to highlight the active rows.
   on<{ dayRole: NpcDayRole; nightPosture: NpcNightPosture }>('npc:menuOpen', (p) =>
     store.openCompanionMenu(p.dayRole, p.nightPosture),
+  );
+  // A tap on a workbench opens its craft menu (plan 048 Step 7) — carries the bench id (routed back on
+  // a recipe/Repair pick) + its live hp (Repair shows only when damaged).
+  on<{ benchId: string; hp: number; maxHp: number }>('craft:menuOpen', (p) =>
+    store.openCraftMenu(p.benchId, p.hp, p.maxHp),
   );
   on<number>('zoom:changed', (z) => store.setZoom(z));
   on<boolean>('camera:followChanged', (on) => store.setFollowing(on));

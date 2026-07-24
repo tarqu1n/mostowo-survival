@@ -16,6 +16,12 @@ Shards: [rendering](decisions/rendering.md) · [architecture](decisions/architec
 
 ---
 
+## 2026-07-24 — [DECIDED] Workbench crafting station (plan 048): craft-as-worker-order, HP-scaled rate, workbench = attackable/repairable structure, bench-tapped menu
+
+The first crafting station: a buildable workbench (50 wood) is the 4th `StructureManager` behavior — a live HP structure that **night mobs bash and the player repairs** (like a wall; destroyed at 0 HP), with a **static object sprite** (new `BuildableDef.objectSprite` region-crop path, not an anim). Crafting is a **player-queued `craft` worker order** (walk-adjacent → timed accumulator), **rate scaled by bench HP** (`Linear(CRAFT_DAMAGED_MIN_FRAC,1,hp/maxHp)` — slower when damaged, never stalls); spend-cost-and-deliver (or fizzle) at completion. Recipes `brand`/`bow`/`sword` deliver **inert** bag items (equip/function → plan 049); new `rope` material from tent salvage. The `repair` order field generalised `wallId`→`structureId` (player repairs benches, companion still repairs walls). Menu is a **bench-tapped `CraftMenu` sheet** (like refuel/NPC-menu), not a command-bar button.
+
+→ [gameplay.md](decisions/gameplay.md#2026-07-24--decided-workbench-crafting-station-plan-048-craft-as-worker-order-hp-scaled-rate-workbench--attackablerepairable-structure-bench-tapped-menu)
+
 ## 2026-07-23 — [DECIDED] Salvage node lifecycle (plan 047): oneShot no-regrow node, generic `clear` order, timed actions with node-persistent progress, shake-as-looping-tween
 
 The wrecked-tent becomes a two-stage **salvage → clear** lifecycle: a `oneShot` node (never regrows, ruin keeps blocking its tile) salvaged by a timed ~20s `harvest`, then a generic `clear` order (~40s) rolls `clearLoot` and removes it to free the tile. Progress persists on the node across cancel; shake is a `repeat:-1` tween + an HP-bar-style progress bar; both actions reuse the `gather` anim stand-in. Player-only.

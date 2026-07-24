@@ -19,9 +19,11 @@ import { Movepad } from './Movepad';
  *  - **build**    → a buildable tray + Rotate / Place / Cancel / Demolish
  *  - **fight**    → the {@link Movepad} + Attack / Bow
  *
- * There is deliberately no Craft button: the game has no item-crafting system — building structures
- * from `BUILDABLES` (the Build catalog) is the only "crafting" — so the mockup's Craft affordance has
- * no backing action and is omitted until a craft system exists (plan 046 "Out of scope").
+ * There is deliberately no Craft button: item crafting (plan 048) is a STATION interaction, not a
+ * global mode — the player taps a placed workbench to open its recipe menu (`CraftMenu`), exactly as
+ * tapping a campfire refuels it or tapping the companion opens its assignment menu. A context-free
+ * command-bar Craft button would have no bench to craft at, so crafting stays bench-tapped and the
+ * bar keeps its three modes.
  */
 export type CommandBarMode = 'scavenge' | 'build' | 'fight';
 
