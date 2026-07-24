@@ -217,6 +217,1386 @@
               "h": 6
             }
           }
+        },
+        {
+          "id": "ff_green_1",
+          "name": "Green — large",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 2,
+            "y": 9,
+            "w": 186,
+            "h": 215
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 5,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 192,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_green_2",
+          "name": "Green — big",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 198,
+            "y": 30,
+            "w": 133,
+            "h": 194
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 4,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 192,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_green_3",
+          "name": "Green — medium",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 336,
+            "y": 78,
+            "w": 111,
+            "h": 146
+          },
+          "weight": 2,
+          "scale": 0.7,
+          "maxHp": 3,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 192,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_green_4",
+          "name": "Green — small",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 471,
+            "y": 134,
+            "w": 50,
+            "h": 90
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 2,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 192,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_green_5",
+          "name": "Green — sapling",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 531,
+            "y": 165,
+            "w": 40,
+            "h": 59
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 1,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 192,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_olive_1",
+          "name": "Olive — large",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 626,
+            "y": 9,
+            "w": 186,
+            "h": 215
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 5,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 192,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_olive_2",
+          "name": "Olive — big",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 822,
+            "y": 30,
+            "w": 133,
+            "h": 194
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 4,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 192,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_olive_3",
+          "name": "Olive — medium",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 960,
+            "y": 78,
+            "w": 111,
+            "h": 146
+          },
+          "weight": 2,
+          "scale": 0.7,
+          "maxHp": 3,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 192,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_olive_4",
+          "name": "Olive — small",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 1095,
+            "y": 134,
+            "w": 50,
+            "h": 90
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 2,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 192,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_olive_5",
+          "name": "Olive — sapling",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 1155,
+            "y": 165,
+            "w": 40,
+            "h": 59
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 1,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 192,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_fern_1",
+          "name": "Fern — large",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 2,
+            "y": 233,
+            "w": 186,
+            "h": 215
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 5,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 416,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_fern_2",
+          "name": "Fern — big",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 198,
+            "y": 254,
+            "w": 133,
+            "h": 194
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 4,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 416,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_fern_3",
+          "name": "Fern — medium",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 336,
+            "y": 302,
+            "w": 111,
+            "h": 146
+          },
+          "weight": 2,
+          "scale": 0.7,
+          "maxHp": 3,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 416,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_fern_4",
+          "name": "Fern — small",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 471,
+            "y": 358,
+            "w": 50,
+            "h": 90
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 2,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 416,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_fern_5",
+          "name": "Fern — sapling",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 531,
+            "y": 389,
+            "w": 40,
+            "h": 59
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 1,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 416,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_moss_1",
+          "name": "Moss — large",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 626,
+            "y": 233,
+            "w": 186,
+            "h": 215
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 5,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 416,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_moss_2",
+          "name": "Moss — big",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 822,
+            "y": 254,
+            "w": 133,
+            "h": 194
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 4,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 416,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_moss_3",
+          "name": "Moss — medium",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 960,
+            "y": 302,
+            "w": 111,
+            "h": 146
+          },
+          "weight": 2,
+          "scale": 0.7,
+          "maxHp": 3,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 416,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_moss_4",
+          "name": "Moss — small",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 1095,
+            "y": 358,
+            "w": 50,
+            "h": 90
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 2,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 416,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_moss_5",
+          "name": "Moss — sapling",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 1155,
+            "y": 389,
+            "w": 40,
+            "h": 59
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 1,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 416,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_pine_1",
+          "name": "Pine — large",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 2,
+            "y": 457,
+            "w": 186,
+            "h": 215
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 5,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 640,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_pine_2",
+          "name": "Pine — big",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 198,
+            "y": 478,
+            "w": 133,
+            "h": 194
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 4,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 640,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_pine_3",
+          "name": "Pine — medium",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 336,
+            "y": 526,
+            "w": 111,
+            "h": 146
+          },
+          "weight": 2,
+          "scale": 0.7,
+          "maxHp": 3,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 640,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_pine_4",
+          "name": "Pine — small",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 471,
+            "y": 582,
+            "w": 50,
+            "h": 90
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 2,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 640,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_pine_5",
+          "name": "Pine — sapling",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 531,
+            "y": 613,
+            "w": 40,
+            "h": 59
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 1,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 640,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_bronze_1",
+          "name": "Bronze — large",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 626,
+            "y": 457,
+            "w": 186,
+            "h": 215
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 5,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 640,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_bronze_2",
+          "name": "Bronze — big",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 822,
+            "y": 478,
+            "w": 133,
+            "h": 194
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 4,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 640,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_bronze_3",
+          "name": "Bronze — medium",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 960,
+            "y": 526,
+            "w": 111,
+            "h": 146
+          },
+          "weight": 2,
+          "scale": 0.7,
+          "maxHp": 3,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 640,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_bronze_4",
+          "name": "Bronze — small",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 1095,
+            "y": 582,
+            "w": 50,
+            "h": 90
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 2,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 640,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_bronze_5",
+          "name": "Bronze — sapling",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 1155,
+            "y": 613,
+            "w": 40,
+            "h": 59
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 1,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 640,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_blossom_1",
+          "name": "Blossom — large",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 2,
+            "y": 681,
+            "w": 186,
+            "h": 215
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 5,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 864,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_blossom_2",
+          "name": "Blossom — big",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 198,
+            "y": 702,
+            "w": 133,
+            "h": 194
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 4,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 864,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_blossom_3",
+          "name": "Blossom — medium",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 336,
+            "y": 750,
+            "w": 111,
+            "h": 146
+          },
+          "weight": 2,
+          "scale": 0.7,
+          "maxHp": 3,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 864,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_blossom_4",
+          "name": "Blossom — small",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 471,
+            "y": 806,
+            "w": 50,
+            "h": 90
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 2,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 864,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_blossom_5",
+          "name": "Blossom — sapling",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 531,
+            "y": 837,
+            "w": 40,
+            "h": 59
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 1,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 864,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_teal_1",
+          "name": "Teal — large",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 626,
+            "y": 681,
+            "w": 186,
+            "h": 215
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 5,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 864,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_teal_2",
+          "name": "Teal — big",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 822,
+            "y": 702,
+            "w": 133,
+            "h": 194
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 4,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 864,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_teal_3",
+          "name": "Teal — medium",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 960,
+            "y": 750,
+            "w": 111,
+            "h": 146
+          },
+          "weight": 2,
+          "scale": 0.7,
+          "maxHp": 3,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 864,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_teal_4",
+          "name": "Teal — small",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 1095,
+            "y": 806,
+            "w": 50,
+            "h": 90
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 2,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 864,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_teal_5",
+          "name": "Teal — sapling",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 1155,
+            "y": 837,
+            "w": 40,
+            "h": 59
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 1,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 864,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_mauve_1",
+          "name": "Mauve — large",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 2,
+            "y": 905,
+            "w": 186,
+            "h": 215
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 5,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 1088,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_mauve_2",
+          "name": "Mauve — big",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 198,
+            "y": 926,
+            "w": 133,
+            "h": 194
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 4,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 1088,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_mauve_3",
+          "name": "Mauve — medium",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 336,
+            "y": 974,
+            "w": 111,
+            "h": 146
+          },
+          "weight": 2,
+          "scale": 0.7,
+          "maxHp": 3,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 1088,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_mauve_4",
+          "name": "Mauve — small",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 471,
+            "y": 1030,
+            "w": 50,
+            "h": 90
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 2,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 1088,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_mauve_5",
+          "name": "Mauve — sapling",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 531,
+            "y": 1061,
+            "w": 40,
+            "h": 59
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 1,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 1088,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_azure_1",
+          "name": "Azure — large",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 626,
+            "y": 905,
+            "w": 186,
+            "h": 215
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 5,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 1088,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_azure_2",
+          "name": "Azure — big",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 822,
+            "y": 926,
+            "w": 133,
+            "h": 194
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 4,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 1088,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_azure_3",
+          "name": "Azure — medium",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 960,
+            "y": 974,
+            "w": 111,
+            "h": 146
+          },
+          "weight": 2,
+          "scale": 0.7,
+          "maxHp": 3,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 1088,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_azure_4",
+          "name": "Azure — small",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 1095,
+            "y": 1030,
+            "w": 50,
+            "h": 90
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 2,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 1088,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_azure_5",
+          "name": "Azure — sapling",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 1155,
+            "y": 1061,
+            "w": 40,
+            "h": 59
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 1,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 1088,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_violet_1",
+          "name": "Violet — large",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 2,
+            "y": 1128,
+            "w": 186,
+            "h": 215
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 5,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 1311,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_violet_2",
+          "name": "Violet — big",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 198,
+            "y": 1149,
+            "w": 133,
+            "h": 194
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 4,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 1311,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_violet_3",
+          "name": "Violet — medium",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 336,
+            "y": 1197,
+            "w": 111,
+            "h": 146
+          },
+          "weight": 2,
+          "scale": 0.7,
+          "maxHp": 3,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 1311,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_violet_4",
+          "name": "Violet — small",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 471,
+            "y": 1253,
+            "w": 50,
+            "h": 90
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 2,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 1311,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_violet_5",
+          "name": "Violet — sapling",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 531,
+            "y": 1284,
+            "w": 40,
+            "h": 59
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 1,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 584,
+              "y": 1311,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_indigo_1",
+          "name": "Indigo — large",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 626,
+            "y": 1129,
+            "w": 186,
+            "h": 215
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 5,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 1312,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_indigo_2",
+          "name": "Indigo — big",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 822,
+            "y": 1150,
+            "w": 133,
+            "h": 194
+          },
+          "weight": 3,
+          "scale": 0.7,
+          "maxHp": 4,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 1312,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_indigo_3",
+          "name": "Indigo — medium",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 960,
+            "y": 1198,
+            "w": 111,
+            "h": 146
+          },
+          "weight": 2,
+          "scale": 0.7,
+          "maxHp": 3,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 1312,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_indigo_4",
+          "name": "Indigo — small",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 1095,
+            "y": 1254,
+            "w": 50,
+            "h": 90
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 2,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 1312,
+              "w": 17,
+              "h": 32
+            }
+          }
+        },
+        {
+          "id": "ff_indigo_5",
+          "name": "Indigo — sapling",
+          "asset": "fairy-forest/Assets/Tree.png",
+          "region": {
+            "x": 1155,
+            "y": 1285,
+            "w": 40,
+            "h": 59
+          },
+          "weight": 1,
+          "scale": 0.7,
+          "maxHp": 1,
+          "depleted": {
+            "asset": "fairy-forest/Assets/Tree.png",
+            "region": {
+              "x": 1208,
+              "y": 1312,
+              "w": 17,
+              "h": 32
+            }
+          }
         }
       ]
     },
