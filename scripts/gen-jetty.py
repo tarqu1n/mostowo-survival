@@ -49,9 +49,9 @@ PHOTO_REF = RAW / "_jetty_photo_ref.png"   # personal photo — gitignored, neve
 ROOFS = ROOT / "public/assets/tilesets/pixel-crawler/Environment/Structures/Buildings/Roofs.png"
 ROOF_BBOX = (272, 87, 368, 187)
 
-TARGET_W = 112       # live sprite width (a short pier ≈ 7 tiles); height follows aspect
-SIDE_W = 128         # broadside pier runs wide
-VERT_W = 48          # vertical pier is tall + NARROW — bake by a small width so height stays sane
+TARGET_W = 60        # live sprite width (a short pier ≈ 3.75 tiles); height follows aspect
+SIDE_W = 64          # broadside pier ≈ 4 tiles wide
+VERT_W = 26          # vertical pier is tall + NARROW — bake by a small width so height stays sane
 QUANTISE_COLOURS = 10
 OUTLINE = (22, 20, 26, 255)  # pack dark near-black rim, faintly cool (weathered grey wood)
 

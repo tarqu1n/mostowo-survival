@@ -47008,8 +47008,8 @@
         "kind": "image",
         "path": "Environment/Props/Static/jetty_diagonal_1.png"
       },
-      "w": 112,
-      "h": 66,
+      "w": 60,
+      "h": 35,
       "category": "Environment/Props/Static",
       "tags": [
         "diagonal",
@@ -47031,8 +47031,8 @@
         "kind": "image",
         "path": "Environment/Props/Static/jetty_diagonal_2.png"
       },
-      "w": 112,
-      "h": 117,
+      "w": 60,
+      "h": 62,
       "category": "Environment/Props/Static",
       "tags": [
         "diagonal",
@@ -47054,8 +47054,8 @@
         "kind": "image",
         "path": "Environment/Props/Static/jetty_side_1.png"
       },
-      "w": 128,
-      "h": 42,
+      "w": 64,
+      "h": 21,
       "category": "Environment/Props/Static",
       "tags": [
         "broadside",
@@ -47078,8 +47078,8 @@
         "kind": "image",
         "path": "Environment/Props/Static/jetty_vertical_1.png"
       },
-      "w": 48,
-      "h": 146,
+      "w": 26,
+      "h": 79,
       "category": "Environment/Props/Static",
       "tags": [
         "environment",
@@ -47101,8 +47101,8 @@
         "kind": "image",
         "path": "Environment/Props/Static/jetty_vertical_2.png"
       },
-      "w": 48,
-      "h": 89,
+      "w": 26,
+      "h": 48,
       "category": "Environment/Props/Static",
       "tags": [
         "environment",
