@@ -179,13 +179,20 @@ queued station task over `craftMs`" — exactly the worker-order model here.
     full HP). Build + 967 unit + the 2 new e2e + 22 affected e2e (companion/refactor-tripwire/wall-attack/
     build) all green.
 
-- [ ] **Step 5: Recipe data model** `[delegate sonnet]`
+- [x] **Step 5: Recipe data model** `[delegate sonnet]`
   - New `src/data/recipes.ts`: `RECIPES: Record<string, RecipeDef>` where `RecipeDef =
     { id; name; station: 'workbench'; cost: Record<string,number>; output: { itemId; count }; craftMs }`.
     Entries: `brand` (`{ wood:1, cloth:1 }` → 1 brand), `bow` (`{ rope:2, wood:2 }` → 1 bow), `sword`
     (`{ wood:2, stone:1 }` → 1 sword). Add validation (costs/outputs ∈ ITEMS, station ∈ BUILDABLES).
   - Side effects: none until Step 6.
   - Done when: recipes resolve + validate; `npm test` green.
+  - Outcome: new `src/data/recipes.ts` (pure data — no consumers until Step 6); `RecipeDef` added to
+    `types.ts` between `BuildableDef`/`EnemyDef` (matches the ITEMS/BUILDABLES/NODES Def-in-types
+    convention). All three recipes craft at `workbench`, `craftMs = CRAFT_BASE_MS` (8000). Validation
+    follows the repo pattern — plain assertions in `data.test.ts` (a new `RECIPES` describe block, +6
+    tests: keyed-by-id, cost/output ids ∈ ITEMS, positive-int counts, station ∈ BUILDABLES, `craftMs>0`,
+    exact brand/bow/sword shape), NOT load-time (that's reserved for external JSON like nodeDefs). All
+    required item ids + the workbench buildable confirmed present. `npm test` (974 tests) + build green.
 
 - [ ] **Step 6: `craft` worker order (HP-scaled)** `[inline]`
   - `src/systems/tasks.ts`: add `{ kind:'craft', benchId, recipeId }` to `Action`. `src/systems/orders.ts`:

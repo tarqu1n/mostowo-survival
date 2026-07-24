@@ -181,6 +181,26 @@ export interface BuildableDef extends ObjectStats {
   objectSprite?: { asset: string; region?: DecorRegion };
 }
 
+/**
+ * A craftable recipe (plan 048) — consumed by the `craft` worker order (Step 6) at a `station`
+ * buildable. `cost` maps item id → quantity consumed per craft; `output` is the single item/qty
+ * granted on completion. `craftMs` is the base work-time (ms) for one craft at full station HP
+ * (the station's own damage-slowdown, e.g. `config.CRAFT_DAMAGED_MIN_FRAC` for the workbench,
+ * scales it down further at runtime — Step 6 concern, not this data). See `data/recipes.ts`.
+ */
+export interface RecipeDef {
+  id: string;
+  name: string;
+  /** Buildable id of the crafting station this recipe requires — cross-checked against `BUILDABLES`. */
+  station: 'workbench';
+  /** Item id → quantity consumed per craft. Cross-checked against `ITEMS`. */
+  cost: Record<string, number>;
+  /** The single item/qty granted on completion. `itemId` cross-checked against `ITEMS`. */
+  output: { itemId: string; count: number };
+  /** Base work-time (ms) for one craft at full station HP. */
+  craftMs: number;
+}
+
 /** An enemy catalogue entry — a combatant with a name/id/placeholder tint. */
 export interface EnemyDef extends CombatantStats {
   id: string;

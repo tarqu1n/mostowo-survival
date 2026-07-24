@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { ITEMS } from '../items';
 import { NODES } from '../nodes';
 import { BUILDABLES } from '../buildables';
+import { RECIPES } from '../recipes';
 import { ENEMIES } from '../enemies';
 import { MONSTER_WEAPONS } from '../weapons';
 import { ACTIVE_TILESET, dirEnemyAnimKey, facing4FromVelocity, type Facing4 } from '../tileset';
@@ -133,6 +134,63 @@ describe('BUILDABLES', () => {
   it('campfire costs exactly 10 stone + 10 wood and has a positive light radius', () => {
     expect(BUILDABLES.campfire.cost).toEqual({ stone: 10, wood: 10 });
     expect(BUILDABLES.campfire.light).toBeGreaterThan(0);
+  });
+});
+
+// RECIPES (plan 048 Step 5) has no consumer yet (the `craft` order lands Step 6) — these are the
+// data-model invariants: cost/output ids resolve in ITEMS, station resolves in BUILDABLES, mirroring
+// how ITEMS/BUILDABLES/NODES cross-check each other above.
+describe('RECIPES', () => {
+  it('every entry is keyed by its own id', () => {
+    for (const [key, recipe] of Object.entries(RECIPES)) {
+      expect(recipe.id).toBe(key);
+    }
+  });
+
+  it('every cost key references a real item id', () => {
+    for (const recipe of Object.values(RECIPES)) {
+      for (const itemId of Object.keys(recipe.cost)) {
+        expect(ITEMS[itemId]).toBeDefined();
+      }
+    }
+  });
+
+  it('every cost amount is a positive integer', () => {
+    for (const recipe of Object.values(RECIPES)) {
+      for (const amount of Object.values(recipe.cost)) {
+        expect(Number.isInteger(amount)).toBe(true);
+        expect(amount).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('every output references a real item id with a positive integer count', () => {
+    for (const recipe of Object.values(RECIPES)) {
+      expect(ITEMS[recipe.output.itemId]).toBeDefined();
+      expect(Number.isInteger(recipe.output.count)).toBe(true);
+      expect(recipe.output.count).toBeGreaterThan(0);
+    }
+  });
+
+  it('every station references a real buildable id', () => {
+    for (const recipe of Object.values(RECIPES)) {
+      expect(BUILDABLES[recipe.station]).toBeDefined();
+    }
+  });
+
+  it('craftMs is a positive number', () => {
+    for (const recipe of Object.values(RECIPES)) {
+      expect(recipe.craftMs).toBeGreaterThan(0);
+    }
+  });
+
+  it('brand costs wood+cloth, bow costs rope+wood, sword costs wood+stone', () => {
+    expect(RECIPES.brand.cost).toEqual({ wood: 1, cloth: 1 });
+    expect(RECIPES.brand.output).toEqual({ itemId: 'brand', count: 1 });
+    expect(RECIPES.bow.cost).toEqual({ rope: 2, wood: 2 });
+    expect(RECIPES.bow.output).toEqual({ itemId: 'bow', count: 1 });
+    expect(RECIPES.sword.cost).toEqual({ wood: 2, stone: 1 });
+    expect(RECIPES.sword.output).toEqual({ itemId: 'sword', count: 1 });
   });
 });
 
