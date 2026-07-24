@@ -4,6 +4,7 @@
  */
 
 import type { LootTable } from '../systems/loot';
+import type { DecorRegion } from '../systems/mapFormat';
 
 /** An inventory item. `color` is the placeholder icon/rect colour (hex number). */
 export interface ItemDef {
@@ -172,6 +173,12 @@ export interface BuildableDef extends ObjectStats {
   tilesTall?: number;
   /** Sprite anchor Y (mirrors ResourceNodeDef.originY) — bottom-anchored so a tall structure overhangs upward. */
   originY?: number;
+  /** Static object sprite for a NON-animated buildable, cropped from a sheet region via the shared
+   *  object-region path (plan 028 — `resolveDecorDraw`), the same `asset`(catalog id) + `region` a
+   *  decor instance or resource-node skin uses. Distinct from `animKey` (an animated strip): a
+   *  buildable sets at most one of the two. The workbench (plan 048) is the first — its behavior module
+   *  bakes + renders this crop on materialise; PreloadScene loads the source sheet. */
+  objectSprite?: { asset: string; region?: DecorRegion };
 }
 
 /** An enemy catalogue entry — a combatant with a name/id/placeholder tint. */

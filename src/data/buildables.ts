@@ -73,4 +73,32 @@ export const BUILDABLES: Record<string, BuildableDef> = {
     originY: 0.5,
     category: 'defense', // HUD build-catalog tab (plan 046)
   },
+  // Workbench (plan 048) — the game's first CRAFTING STATION: a buildable bench that crafts items over
+  // time via a player-queued `craft` worker order (Step 6). Like the wall it is a live HP structure
+  // (WorkbenchBehavior — the 4th StructureManager module, Step 3): night mobs bash it (it `blocksPath`,
+  // so a mob pathing through it attacks it) and the player repairs it, and it crafts SLOWER while
+  // damaged (rate scales with HP, never fully stalls — see config.CRAFT_*). `baseOnly` — a fixed camp
+  // fixture, not a field-deployable. maxHp/cost inline here (content, per plan 043 Step 16), craft-rate
+  // knobs in config. Sprite is a STATIC object crop (not an anim like campfire/trap): the smallest
+  // wooden Workbench variant (Workbench.png left column, 2nd row down) via the plan-028 object-region
+  // path — WorkbenchBehavior bakes + renders it, PreloadScene loads the sheet.
+  workbench: {
+    id: 'workbench',
+    name: 'Workbench',
+    cost: { wood: 50 },
+    color: 0x9c6b3a,
+    maxHp: 60,
+    armour: 0,
+    speed: 0,
+    baseOnly: true,
+    blocksPath: true,
+    behavior: 'workbench', // live/simulated — routed to WorkbenchBehavior on completion (finishSite)
+    tilesTall: 1, // ~1-tile bench (the region is ~1 tile square); bottom-anchored onto its tile
+    originY: 1,
+    objectSprite: {
+      asset: 'pixel-crawler/Environment/Structures/Stations/Workbench/Workbench.png',
+      region: { x: 0, y: 84, w: 32, h: 28 },
+    },
+    category: 'craft', // first 'craft'-category buildable — surfaces the HUD Craft tab (plan 046)
+  },
 };

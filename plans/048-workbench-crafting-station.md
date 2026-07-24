@@ -108,7 +108,7 @@ queued station task over `craftMs`" — exactly the worker-order model here.
     updated `tests/e2e/salvage-lifecycle.spec.ts` loot assertions for the new drop. `npm test` (967
     tests), `npm run build`, `npm run smoke` all green.
 
-- [ ] **Step 2: Workbench buildable data + sprite/object region** `[inline]`
+- [x] **Step 2: Workbench buildable data + sprite/object region** `[inline]`
   - `src/data/buildables.ts`: add `workbench` — `cost:{ wood:50 }`, `behavior:'workbench'`,
     `category:'craft'`, `maxHp: WORKBENCH_MAX_HP`, `blocksPath:true`, `baseOnly:true`, with
     `originY`/`tilesTall` for a ~1-tile bench. Wire its sprite to the **small wooden `Workbench.png`**
@@ -117,6 +117,19 @@ queued station task over `craftMs`" — exactly the worker-order model here.
   - Side effects: the Build catalog surfaces its first `'craft'`-category tab — verify
     `CommandBar`/`BuildCatalog` render a tab per non-empty category. `data.test.ts` buildable checks.
   - Done when: the workbench appears in the Build menu at 50 wood and renders its wooden sprite.
+  - Outcome: added `workbench` to `src/data/buildables.ts` (cost `{wood:50}`, `behavior:'workbench'`,
+    `category:'craft'`, `blocksPath`+`baseOnly`, `tilesTall:1`/`originY:1`). Sprite wired via a NEW
+    `BuildableDef.objectSprite?: { asset; region? }` field (`src/data/types.ts`, imports `DecorRegion`)
+    — the shared object-region path (`resolveDecorDraw`), asset
+    `pixel-crawler/…/Workbench/Workbench.png` region `{x:0,y:84,w:32,h:28}` (left column, 2nd row down;
+    smallest wooden variant). PreloadScene loads any `objectSprite` sheet unconditionally (deduped,
+    beside the campfire/barricade/trap loads). Craft-RATE knobs `CRAFT_BASE_MS`/`CRAFT_DAMAGED_MIN_FRAC`
+    added to `config.ts`. **Deviation:** `maxHp:60` is inline on the buildable entry (NOT a config
+    `WORKBENCH_MAX_HP`) to match wall/campfire/spike_trap and plan 043 Step 16's cost/stat
+    consolidation — only craft-rate tuning went to config. Build catalog auto-surfaces the Craft tab
+    (data-driven off categories). Build + 967 unit tests + smoke boot canary all green. NOTE: the
+    in-world wooden sprite RENDER lands in Step 3 (WorkbenchBehavior.materialise consumes `objectSprite`
+    - `resolveDecorDraw`); Step 2 lands the data, the field, the config, and the preload.
 
 - [ ] **Step 3: `WorkbenchBehavior` StructureManager module** `[inline]`
   - New `src/scenes/world/WorkbenchBehavior.ts` implementing `StructureBehavior` — copy `WallBehavior`

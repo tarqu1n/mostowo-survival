@@ -28,6 +28,7 @@ import {
 } from '../data/tileset';
 import { ITEMS } from '../data/items';
 import { NODES } from '../data/nodes';
+import { BUILDABLES } from '../data/buildables';
 import { loadMapFile } from '../systems/mapRuntime';
 import type { MapFile } from '../systems/mapFormat';
 import { parseAssetId, tilesetAssetUrl } from '../render/assetPaths';
@@ -200,6 +201,26 @@ export class PreloadScene extends Phaser.Scene {
       frameWidth: spikeTrap.sheet.frameWidth ?? spikeTrap.sheet.frameSize,
       frameHeight: spikeTrap.sheet.frameSize,
     });
+
+    // Object-sprite buildables (plan 048, the workbench): a STATIC crop from a catalog sheet via the
+    // shared object-region path (like a decor/node skin — whole-image load, region sub-frame baked at
+    // render by the buildable's behavior module). Load each distinct source sheet once, unconditionally
+    // (like the campfire/barricade stations above) so a placed/scenario station always has its texture.
+    const objectSheets = new Set<string>();
+    for (const def of Object.values(BUILDABLES)) {
+      if (!def.objectSprite) continue;
+      try {
+        const { pack, path } = parseAssetId(def.objectSprite.asset);
+        const key = tileImageKey(path);
+        if (objectSheets.has(key) || this.textures.exists(key)) continue;
+        objectSheets.add(key);
+        this.load.image(key, tilesetAssetUrl(pack, path));
+      } catch (e) {
+        console.warn(
+          `[preload] skipping buildable "${def.id}" objectSprite: ${(e as Error).message}`,
+        );
+      }
+    }
 
     // Monster + NPC weapon art and the two hand images (off-hand fist + main-hand open grip): one
     // static image each (no anim), keyed like the derived tiles. GameScene resolves them via
