@@ -7,6 +7,8 @@ import { BUILDABLES } from '../../data/buildables';
 import { isInBase, baseZoneFromSpawn, type Rect } from '../../systems/base';
 import { rowDepthOffset } from '../../systems/mapFormat';
 import { ghostTextureFor } from './ghostTexture';
+import { runTiles, selectRun, type RunTile, type RunSelection } from '../../systems/buildRun';
+import { buildTimeFor } from '../../systems/buildTime';
 import type { BuildSite, FacingSpec } from '../../entities/types';
 import type { CharacterSprite } from '../../entities/Character';
 import type { GameScene } from '../GameScene';
@@ -45,6 +47,10 @@ export interface BuildManagerDeps {
   inClaim(col: number, row: number): boolean;
   /** Can the player afford `cost` right now? (updateGhost's valid/invalid tint + the placement gate). */
   canAfford(cost: Record<string, number>): boolean;
+  /** Current held-item counts (an `Inventory` snapshot) — the pending-run selector's cumulative-cost
+   *  affordability walk needs quantities, not just the single-cost yes/no `canAfford` gives (plan 050
+   *  Step 5). */
+  heldCounts(): Record<string, number>;
   /** Spend `cost`; false (no-op) if unaffordable. */
   spend(cost: Record<string, number>): boolean;
   /** Append a build order for a site to the task queue. */
@@ -89,6 +95,16 @@ export class BuildManager {
    *  the camera follows the player; hidden/cleared on build-mode exit. Demolish never enters build mode,
    *  so it shows no grid. */
   private readonly snapGrid: Phaser.GameObjects.Graphics;
+  /** Blueprint-Mode **pending run** (plan 050 Step 5) — the anchor a drag started from and the ordered,
+   *  axis-locked tile line it currently spans ({@link runTiles}); `null`/empty when no run is in flight.
+   *  Pure model only this step: it spends nothing and creates no blueprint (Step 7 commits it). Cleared
+   *  on mode exit / selection change / reset. */
+  private runAnchor: Cell | null = null;
+  private pendingTiles: RunTile[] = [];
+  /** Ghost-sprite pool for rendering the pending run — one Step-2-style textured ghost per pending tile,
+   *  grown on demand and hidden (not destroyed) when the run shrinks/clears, mirroring the single
+   *  {@link ghost}. Destroyed with the manager in {@link destroy}. */
+  private readonly runGhosts: Phaser.GameObjects.Sprite[] = [];
   private readonly occupied = new Set<string>();
   private sites: BuildSite[] = [];
   private readonly siteTiles = new Set<string>();
@@ -211,21 +227,29 @@ export class BuildManager {
    *  Falls back to a neutral tile square if the buildable's texture isn't resident (shouldn't happen —
    *  PreloadScene loads every structure texture). */
   private applyGhostAppearance(): void {
-    const tex = ghostTextureFor(this.scene, this.selectedBuildableId, this.placeFacing);
+    this.applyAppearanceTo(this.ghost, this.placeFacing);
+  }
+
+  /** Texture a ghost sprite (the hover {@link ghost} or a {@link runGhosts} pool sprite) as the selected
+   *  buildable's in-world art for `facing`: texture/frame, orient flip, bottom-anchor + tile-scaled size
+   *  ({@link ghostTextureFor}). Leaves position/tint/alpha/visibility to the caller. Shared so the single
+   *  hover ghost and every pending-run ghost can't drift (plan 050 Step 5). */
+  private applyAppearanceTo(sprite: Phaser.GameObjects.Sprite, facing: FacingSpec): void {
+    const tex = ghostTextureFor(this.scene, this.selectedBuildableId, facing);
     if (!tex) {
-      this.ghost
+      sprite
         .setTexture('__WHITE')
         .setOrigin(0.5)
         .setFlipX(false)
         .setDisplaySize(TILE_SIZE, TILE_SIZE);
       return;
     }
-    if (tex.frame !== undefined) this.ghost.setTexture(tex.key, tex.frame);
-    else this.ghost.setTexture(tex.key);
-    this.ghost
+    if (tex.frame !== undefined) sprite.setTexture(tex.key, tex.frame);
+    else sprite.setTexture(tex.key);
+    sprite
       .setOrigin(0.5, tex.originY)
       .setFlipX(tex.flipX)
-      .setScale((TILE_SIZE * tex.tilesTall) / this.ghost.frame.height);
+      .setScale((TILE_SIZE * tex.tilesTall) / sprite.frame.height);
   }
 
   placeOrEnqueueBuild(pointer: Phaser.Input.Pointer): void {
@@ -257,11 +281,100 @@ export class BuildManager {
     return true;
   }
 
+  // --- Pending run (plan 050 Step 5) -----------------------------------------
+
+  /** Start a pending run at `anchor` — a length-1 run (just the anchor) until {@link extendRun} grows it.
+   *  Renders the anchor as a Step-2 ghost. No spend, no blueprint (Step 7 commits). */
+  beginRun(anchor: Cell): void {
+    this.runAnchor = anchor;
+    this.pendingTiles = runTiles(anchor, anchor, this.runFacing());
+    this.refreshRunGhosts();
+  }
+
+  /** Grow/redraw the pending run out to `tile`: recomputes the axis-locked straight line from the anchor
+   *  ({@link runTiles} — dominant axis vs anchor, inherently deduped). No-op-safe before a {@link beginRun}
+   *  (treats `tile` as a fresh anchor). Pure re-projection each call, so a drag that jitters back over
+   *  earlier tiles never duplicates. No spend, no blueprint. */
+  extendRun(tile: Cell): void {
+    if (!this.runAnchor) {
+      this.beginRun(tile);
+      return;
+    }
+    this.pendingTiles = runTiles(this.runAnchor, tile, this.runFacing());
+    this.refreshRunGhosts();
+  }
+
+  /** Drop the pending run + hide its ghost pool (kept for reuse, not destroyed). Called on mode
+   *  exit / selection change / reset, and by Step 7 once a run commits. */
+  clearRun(): void {
+    this.runAnchor = null;
+    this.pendingTiles = [];
+    for (const g of this.runGhosts) g.setVisible(false);
+  }
+
+  /**
+   * The Step-5 pending-run selector: `{ tiles, placeableCount, affordableCount, totalCost, etaMs }` for
+   * the current run — delegating the math to the pure {@link selectRun}, fed this manager's live
+   * {@link tilePlaceable} per tile, the selected buildable's cost, the {@link BuildManagerDeps.heldCounts}
+   * inventory snapshot, and its {@link buildTimeFor} time. Read-only (no spend); consumed by Step 7's
+   * commit + HUD.
+   */
+  runSelection(): RunSelection {
+    const def = BUILDABLES[this.selectedBuildableId];
+    const placeable = this.pendingTiles.map((t) => this.tilePlaceable(t.col, t.row));
+    return selectRun({
+      tiles: this.pendingTiles,
+      placeable,
+      cost: def.cost,
+      inventory: this.deps.heldCounts(),
+      buildTimeMs: buildTimeFor(def),
+    });
+  }
+
+  /** The placement facing to stamp on each run tile — the current {@link placeFacing} only for an
+   *  orientable buildable (the wall), else undefined (matching {@link createBlueprint}). */
+  private runFacing(): FacingSpec | undefined {
+    return BUILDABLES[this.selectedBuildableId].orientable ? this.placeFacing : undefined;
+  }
+
+  /** Redraw the ghost pool to the current {@link pendingTiles}: one Step-2-style textured ghost per tile,
+   *  tinted valid up to `affordableCount` (and only where placeable), invalid beyond — the single tile
+   *  being the length-1 case. Grows the pool on demand; hides surplus sprites. */
+  private refreshRunGhosts(): void {
+    const def = BUILDABLES[this.selectedBuildableId];
+    const placeable = this.pendingTiles.map((t) => this.tilePlaceable(t.col, t.row));
+    const { affordableCount } = selectRun({
+      tiles: this.pendingTiles,
+      placeable,
+      cost: def.cost,
+      inventory: this.deps.heldCounts(),
+      buildTimeMs: buildTimeFor(def),
+    });
+    while (this.runGhosts.length < this.pendingTiles.length) {
+      this.runGhosts.push(this.scene.add.sprite(0, 0, '__WHITE').setVisible(false).setDepth(6));
+    }
+    for (let i = 0; i < this.runGhosts.length; i++) {
+      const g = this.runGhosts[i];
+      if (i >= this.pendingTiles.length) {
+        g.setVisible(false);
+        continue;
+      }
+      const t = this.pendingTiles[i];
+      this.applyAppearanceTo(g, t.facing ?? 'down');
+      const valid = i < affordableCount && placeable[i];
+      g.setPosition(tileToWorldCenter(t.col), tileToWorldCenter(t.row))
+        .setTint(valid ? COLORS.ghostValid : COLORS.ghostInvalid)
+        .setAlpha(0.5)
+        .setVisible(true);
+    }
+  }
+
   /** Palette selected a buildable: remember it + enter build mode. Wired to `build:select` by the
    *  scene; emits `build:modeChanged` so the HUD reflects build mode (mirrors {@link toggleBuild}). */
   select(id: string): void {
     this.selectedBuildableId = id;
     this.placeFacing = 'down'; // a fresh selection starts front-facing (rotate cycles from here)
+    this.clearRun(); // a selection change abandons any in-flight run (would re-cost against the new pick)
     this.applyGhostAppearance(); // re-texture the ghost for the newly-selected buildable
     this.buildMode = true;
     this.scene.game.events.emit('build:modeChanged', this.buildMode);
@@ -383,7 +496,10 @@ export class BuildManager {
    *  scene (in), emits `build:modeChanged` (out) — names unchanged from the pre-move scene method. */
   toggleBuild(): void {
     this.buildMode = !this.buildMode;
-    if (!this.buildMode) this.ghost.setVisible(false);
+    if (!this.buildMode) {
+      this.ghost.setVisible(false);
+      this.clearRun(); // leaving build mode abandons any in-flight run + hides its ghosts
+    }
     this.scene.game.events.emit('build:modeChanged', this.buildMode);
   }
 
@@ -439,6 +555,7 @@ export class BuildManager {
     this.placeFacing = 'down'; // nor a prior rotate facing (a fresh scenario places walls front-facing)
     this.applyGhostAppearance(); // re-texture the (persisting) ghost back to the reset wall selection
     this.snapGrid.clear().setVisible(false); // buildMode is now false — drop the grid immediately too
+    this.clearRun(); // drop any in-flight run + hide its ghost pool (sprites persist like the ghost)
   }
 
   /**
@@ -457,6 +574,7 @@ export class BuildManager {
    */
   private destroy(): void {
     this.ghost.destroy();
+    for (const g of this.runGhosts) g.destroy(); // run-ghost pool goes with the ghost (plain sprites, no bodies)
     this.snapGrid.destroy(); // a plain Graphics (no physics body) — safe to drop the stale ref, like the ghost
   }
 }

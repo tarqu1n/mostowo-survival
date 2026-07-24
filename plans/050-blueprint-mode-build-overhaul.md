@@ -172,7 +172,8 @@ build slowly (one serial worker). Keep any fetched image-gen key in-memory only 
   - Docs: none.
   - Done when: entering build dims the world + shows the grid; leaving restores both; demolish clean.
 
-- [ ] **Step 5: Pending-run model + affordability (BuildManager)** `[inline]`
+- [x] **Step 5: Pending-run model + affordability (BuildManager)** `[inline]`
+  - Outcome: new pure `src/systems/buildRun.ts` (`runAxis`, `runTiles` axis-locked + inherently deduped, `selectRun` → `{tiles, placeableCount, affordableCount, totalCost, etaMs}`; affordable = cumulative-cost prefix, eta = affordableCount × buildTime serial) + 13 unit tests (`buildRun.test.ts`). `BuildManager` holds `runAnchor`/`pendingTiles`/`runGhosts` pool with `beginRun`/`extendRun`(recomputes full line)/`clearRun`/`runSelection()`; `applyGhostAppearance` refactored to shared `applyAppearanceTo` so pool + hover ghost can't drift; pending tiles rendered valid iff `i < affordableCount && placeable[i]`. Run cleared on mode exit/select/reset; pool destroyed on SHUTDOWN. NO spend/blueprint. New `heldCounts()` dep → `inv.snapshot()`. typecheck clean, 1009 unit pass, smoke pass.
   - Add a **pending run** to `BuildManager`: ordered `{col,row,facing}` list + `beginRun(anchor)`,
     `extendRun(tile)` (axis-lock to dominant axis vs anchor; dedupe repeats), `clearRun()`, and a
     selector `{ tiles, placeableCount, affordableCount, totalCost, etaMs }` (eta = `Σ buildTimeFor`

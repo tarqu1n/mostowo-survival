@@ -609,6 +609,7 @@ export class GameScene extends Phaser.Scene {
       hasLitClaim: () => this.campfire.hasLitHearth(),
       inClaim: (col, row) => this.campfire.inClaim(tileToWorldCenter(col), tileToWorldCenter(row)),
       canAfford: (cost) => this.inv.canAfford(cost),
+      heldCounts: () => this.inv.snapshot(),
       spend: (cost) => this.inv.spend(cost),
       enqueueBuild: (siteId) => this.enqueue({ kind: 'build', siteId }),
       // Dispatch a completed live buildable to its runtime behavior module (finishSite only calls this
