@@ -203,3 +203,56 @@ above is the one sanctioned catalog hand-edit (a value already derivable from th
    notch/pinch failure mode only shows when tiled, not on a single tile. Also render the
    self-made tile **side-by-side with the stock straight** to judge the profile match.
 7. Ship: generator script (reproducible origin) + PNG under the pack + regen catalog.
+
+## Second job: the wooden jetty (a *placed structure*, not a coast transition)
+
+The coast above is a **transition** between two terrains. The jetty is different: a wooden
+pier the player lays cell-by-cell **over** water. Same pipeline, but the seam problem shifts
+from "one continuous band across tiles" to "a rigid structure that must stay correct under
+the editor's rotation". Read this before authoring any other *placed-over-water* structure.
+
+- **Generator:** [`scripts/mostowo-custom/gen_wooden_jetty.py`](../scripts/mostowo-custom/gen_wooden_jetty.py)
+  — pure synthesis, no source PNG.
+- **Output:** `public/assets/tilesets/mostowo-custom/Environment/Tilesets/wooden_jetty.png`
+  — **96×16, 6×1 grid, 6 frames.** Base orientation: pier runs **vertical** (N–S),
+  seaward = top, water margins on the left/right long sides. Rotate in-editor for direction.
+
+  |frame|role|
+  |---|---|
+  |0|`deckA` straight segment (clean)|
+  |1–2|`deckB`/`deckC` straight variants (seeded knots + sparse grain, geometry unchanged so they interchange with `deckA`)|
+  |3|`end` seaward cap: lit plank front lip + two mooring posts standing in the water|
+  |4|`corner` outer L-bend: down-arm + right-arm decks meeting on a 1px diagonal **mitre seam** (vertical boards one side, horizontal the other); water on the top+left|
+  |5|`root` landward butt: the water margins ramp closed to full-width deck so it meets the bank with no water gap (also a short standalone stub)|
+
+**The rules that make it work (jetty-specific, on top of the coast's "bake the water" rule):**
+
+1. **Reuse the coast's water verbatim.** The baked water is the exact `water_diagonal`
+   palette + `fill` (base `#3e92d1` + sparse accents), so a jetty tile drops invisibly onto
+   the plain water the user paints around it — same reasoning as the coast fill.
+2. **Lengthwise planks — the rotation rule.** Editor terrain paint **rotates (0/90/180/270)
+   but does not flip.** If boards ran *across* the pier, a 90° rotation would turn them 90°
+   and they'd clash with an unrotated neighbour. **Boards run *lengthwise* (parallel to the
+   pier axis)**, so a vertical pier's vertical boards become a horizontal pier's horizontal
+   boards under rotation and stay correct — one baked orientation covers all four directions.
+   This is the jetty analogue of the coast's "pick the one geometry the transforms preserve".
+3. **Fixed deck geometry + no butt line.** Plank columns, the lit-left / shadow-right water
+   rims (both **solid 1px lines**, not dithered dots — dots drift and shimmer under tiling)
+   and the nail rows sit at the **same pixels in every straight/end/root frame**, and boards
+   span the full tile height with no butt-joint line, so a stacked run reads as one
+   continuous length of decking. Variants only add knots/grain *on top* of that geometry.
+
+**Wood palette** is sampled from the pack's own timber — `craftpix-dungeon`
+`Traps/Barricades` and `Traps/Spikes` (`#eb9661` lit / `#b55945` mid / `#734c44` shadow /
+`#0c0f2a` outline) — so the pier reads as the same wood the player already builds palisades
+and traps from.
+
+**Catalog:** a **new** sheet, so unlike a pixel-only coast retexture it needs its own
+`wooden_jetty` entry in `public/assets/asset-catalog.json` (`type: tile`, `w:96 h:16`,
+`frames: 6` — `frames` is the full grid cell count). Surgical hand-add of that one entry,
+same reasoning as the coast's `h`/`frames` bump: avoid the full `gen_regions.py` pipeline
+that churns every pack's sidecars.
+
+**Deferred (append as new frames, keeping 6 columns):** wide-platform tiles (fill + 4 edges +
+4 corners for docks more than one tile wide) and a T/branch junction. The 1-wide kit ships
+straight runs, capped ends, L-bends and shore roots — enough to build a jetty out into water.
