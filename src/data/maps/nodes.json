@@ -197,6 +197,26 @@
               "h": 6
             }
           }
+        },
+        {
+          "id": "skin_9",
+          "asset": "pixel-crawler/Environment/Props/Static/Trees/Model_01/Size_02.png",
+          "weight": 1,
+          "region": {
+            "x": 144,
+            "y": 34,
+            "w": 16,
+            "h": 30
+          },
+          "depleted": {
+            "asset": "pixel-crawler/Environment/Props/Static/Trees/Model_01/Size_02.png",
+            "region": {
+              "x": 133,
+              "y": 59,
+              "w": 6,
+              "h": 6
+            }
+          }
         }
       ]
     },
