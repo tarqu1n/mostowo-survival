@@ -47273,28 +47273,6 @@
       "frames": 18
     },
     {
-      "id": "mostowo-custom/Environment/Tilesets/wooden_jetty.png",
-      "pack": "mostowo-custom",
-      "type": "tile",
-      "role": "tile",
-      "source": {
-        "kind": "sheetFrame",
-        "sheet": "Environment/Tilesets/wooden_jetty.png",
-        "frame": 0
-      },
-      "w": 96,
-      "h": 16,
-      "category": "Environment/Tilesets",
-      "tags": [
-        "environment",
-        "jetty",
-        "tilesets",
-        "wooden"
-      ],
-      "origin": "self-made",
-      "frames": 6
-    },
-    {
       "id": "pixel-crawler/_derived/bush.png",
       "pack": "pixel-crawler",
       "type": "object",
