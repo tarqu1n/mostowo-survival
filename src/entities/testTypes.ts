@@ -10,6 +10,7 @@
 import type { DayPhase } from '../systems/daynight';
 import type { MonsterMode } from '../systems/monsterAI';
 import type { Action } from '../systems/tasks';
+import type { RunSelection } from '../systems/buildRun';
 import type { DebugState } from '../scenes/testApi';
 import type { NpcDayRole, NpcNightPosture } from './NpcCharacter';
 import type { FacingSpec } from './types';
@@ -114,6 +115,11 @@ export interface GameTestApi {
   blocked(col: number, row: number): boolean;
   /** Select `id` + attempt a real placement at a tile (runs tilePlaceable + the isInBase gate). */
   tryPlace(id: string, col: number, row: number): boolean;
+  /** DEV/test-only: the current Blueprint-Mode pending-run tally (plan 050 Step 7) — the tiles plus
+   *  placeable/affordable counts, the affordable subset's cumulative cost, and its serial build ETA
+   *  (BuildManager's `runSelection()`). Lets a spec assert the live run tally the commit bar renders;
+   *  an empty run yields `{ tiles: [], placeableCount: 0, affordableCount: 0, totalCost: {}, etaMs: 0 }`. */
+  runSelection(): RunSelection;
   /** True if the tile's centre falls within any lit campfire's light radius. */
   inLight(col: number, row: number): boolean;
   /** Run the real tap-to-feed path on the campfire at `index` (spend wood, top up, relight). */

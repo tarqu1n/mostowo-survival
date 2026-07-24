@@ -53,6 +53,18 @@ export interface WaveInfo {
 
 export type HudMode = 'command' | 'combat' | 'inspect';
 
+/** Blueprint-Mode pending-run tally (plan 050 Step 7) — the live count/cost/ETA of the run a line-tool
+ *  drag has painted, mirroring the `build:runChanged` payload (BuildManager's `runSelection()`, minus
+ *  the tile array). Drives the commit bar: `tileCount > 0` reveals it; it shows `affordableCount` of
+ *  `placeableCount`, the affordable subset's `totalCost`, and its serial build `etaMs`. */
+export interface RunTally {
+  readonly tileCount: number;
+  readonly placeableCount: number;
+  readonly affordableCount: number;
+  readonly totalCost: Record<string, number>;
+  readonly etaMs: number;
+}
+
 /** Companion-menu readout (plan 046 Step 12). The DOM `CompanionMenu` is a bottom sheet, not the
  *  legacy anchored popover, so it drops `npc:menuOpen`'s `x`/`y` and keeps only what it renders: the
  *  open flag plus the companion's live `dayRole`/`nightPosture` (to highlight the active rows). Held
@@ -96,6 +108,9 @@ export interface HudState {
    *  paints an axis-locked run of blueprints; the build-thumb-zone FAB reflects this. Mirrors the
    *  game's `build:lineToolChanged` (the game owns the flag; the FAB is a pure mirror). */
   lineTool: boolean;
+  /** Live tally of the Blueprint-Mode pending run (plan 050 Step 7) — mirrors `build:runChanged`. The
+   *  commit bar renders it and shows only while `tileCount > 0`. Reset to an empty run each (re)start. */
+  runTally: RunTally;
   /** Currently selected buildable id, or `null` when nothing is selected. */
   selection: string | null;
   /** Whether {@link selection} can be rotated at placement (derived from `BUILDABLES`). */
@@ -160,6 +175,8 @@ export interface HudActions {
   setBuildMode(on: boolean): void;
   /** Mirror the build line-tool armed/off flag (from `build:lineToolChanged`). */
   setLineTool(on: boolean): void;
+  /** Mirror the Blueprint-Mode pending-run tally (from `build:runChanged`). */
+  setRunTally(tally: RunTally): void;
   /** Select a buildable (or `null` to clear). Recomputes {@link HudState.orientable} from data. */
   setSelection(id: string | null): void;
   setDemolishMode(on: boolean): void;
@@ -216,6 +233,7 @@ const initialState: HudState = {
   mode: 'command',
   buildMode: false,
   lineTool: false,
+  runTally: { tileCount: 0, placeableCount: 0, affordableCount: 0, totalCost: {}, etaMs: 0 },
   selection: null,
   orientable: false,
   demolishMode: false,
@@ -255,6 +273,7 @@ export const useHudStore = create<HudState & HudActions>()(
     setMode: (mode) => set({ mode }),
     setBuildMode: (buildMode) => set({ buildMode }),
     setLineTool: (lineTool) => set({ lineTool }),
+    setRunTally: (runTally) => set({ runTally }),
     setSelection: (selection) =>
       set({
         selection,

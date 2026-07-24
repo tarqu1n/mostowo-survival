@@ -24,6 +24,7 @@ import { CommandBar } from './components/CommandBar';
 import type { CommandBarMode } from './components/CommandBar';
 import { BuildCatalog } from './components/BuildCatalog';
 import { LineToolFab } from './components/LineToolFab';
+import { CommitBar } from './components/CommitBar';
 import { PackDrawer } from './components/PackDrawer';
 import { StatusDrawer } from './components/StatusDrawer';
 import { InspectCard } from './components/InspectCard';
@@ -118,6 +119,7 @@ function ActionLayer() {
   const gameMode = useHudStore((s) => s.mode);
   const buildMode = useHudStore((s) => s.buildMode);
   const combatActive = useHudStore((s) => s.combatActive);
+  const hasPendingRun = useHudStore((s) => s.runTally.tileCount > 0);
   const [openDrawer, setOpenDrawer] = useState<OpenDrawer>(null);
 
   const barMode: CommandBarMode = buildMode
@@ -135,6 +137,9 @@ function ActionLayer() {
           only in build mode. Toggles the run-paint gesture; the CommandBar's build morph below carries
           the rest of the placement controls (Rotate/Place/Demolish/Cancel). */}
       {buildMode && <LineToolFab />}
+      {/* Commit bar (plan 050 Step 7) — shown only while build mode has a non-empty pending run painted
+          by the line tool; Confirm/Cancel commit or drop the run. */}
+      {buildMode && hasPendingRun && <CommitBar />}
       <div className="flex justify-center">
         <Hotbar />
       </div>

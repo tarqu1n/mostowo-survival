@@ -1,5 +1,5 @@
 import { useHudStore } from './store';
-import type { HudMode } from './store';
+import type { HudMode, RunTally } from './store';
 import type { CombatantStats, InspectableStats } from '@/data/types';
 import type { NpcDayRole, NpcNightPosture } from '@/entities/NpcCharacter';
 import type { EquipmentState } from '@/systems/Equipment';
@@ -83,6 +83,8 @@ export type InboundEvent =
   | { type: 'build:select'; payload: BuildSelectPayload }
   | { type: 'build:rotate' }
   | { type: 'build:lineTool'; payload: { on: boolean } }
+  | { type: 'build:commitRun' }
+  | { type: 'build:cancelRun' }
   | { type: 'demolish:toggle' }
   | { type: 'tasks:cancel' }
   | { type: 'zoom:delta'; payload: number }
@@ -182,6 +184,9 @@ export function initBridge(bus: EventBus, registry: Registry): Bridge {
   // Build line-tool armed/off (plan 050 Step 6) — the game echoes this back after handling the FAB's
   // `build:lineTool`, so the FAB's highlight is a pure mirror of the true flag (like build/demolish mode).
   on<boolean>('build:lineToolChanged', (on) => store.setLineTool(on));
+  // Blueprint-Mode pending-run tally (plan 050 Step 7) — the game emits this on every run mutation
+  // (begin/extend/clear/commit) + once per (re)start; mirror it so the commit bar renders the live tally.
+  on<RunTally>('build:runChanged', (p) => store.setRunTally(p));
   on<BuildSelectPayload>('build:select', (p) => store.setSelection(p.id));
   on<boolean>('demolish:modeChanged', (on) => store.setDemolishMode(on));
   on<boolean>('combat:activeChanged', (on) => store.setCombatActive(on));

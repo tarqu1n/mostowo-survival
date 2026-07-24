@@ -138,6 +138,17 @@ describe('outbound event → store mapping', () => {
     bus.emit('build:select', { id: 'campfire' });
     expect(s().orientable).toBe(false); // campfire is not
 
+    // The Blueprint-Mode pending-run tally (plan 050 Step 7) mirrors straight into the store.
+    const tally = {
+      tileCount: 5,
+      placeableCount: 5,
+      affordableCount: 3,
+      totalCost: { wood: 6 },
+      etaMs: 7500,
+    };
+    bus.emit('build:runChanged', tally);
+    expect(s().runTally).toEqual(tally);
+
     bus.emit('demolish:modeChanged', true);
     expect(s().demolishMode).toBe(true);
 

@@ -217,6 +217,19 @@ export function blocked(page: Page, col: number, row: number): Promise<boolean> 
   return page.evaluate(([c, r]) => (window as any).game.__test.blocked(c, r), [col, row] as const);
 }
 
+/** The current Blueprint-Mode pending-run tally (plan 050 Step 7) — tiles + placeable/affordable
+ *  counts + the affordable subset's cumulative cost + serial ETA (BuildManager.runSelection). Lets a
+ *  spec assert the live tally the HUD commit bar renders. */
+export function runSelection(page: Page): Promise<{
+  tiles: Array<{ col: number; row: number; facing?: string }>;
+  placeableCount: number;
+  affordableCount: number;
+  totalCost: Record<string, number>;
+  etaMs: number;
+}> {
+  return page.evaluate(() => (window as any).game.__test.runSelection());
+}
+
 /** Select a buildable + attempt a real placement (runs tilePlaceable + the isInBase gate). */
 export function tryPlace(page: Page, id: string, col: number, row: number): Promise<boolean> {
   return page.evaluate(([id, c, r]) => (window as any).game.__test.tryPlace(id, c, r), [

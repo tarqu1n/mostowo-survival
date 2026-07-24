@@ -888,6 +888,10 @@ export class GameScene extends Phaser.Scene {
     // Line tool: re-emit the reset value (false) so the build FAB doesn't linger armed from the prior
     // run (plan 050 Step 6).
     this.game.events.emit('build:lineToolChanged', this.lineTool);
+    // Blueprint-Mode run tally: the freshly-constructed BuildManager has an empty run, so re-emit it
+    // (an empty tally) — the persisting HUD store would otherwise linger on the prior run's tally and
+    // keep the commit bar shown (plan 050 Step 7).
+    this.buildManager.emitRunChanged();
     // Seed the base-supply readout with this (re)start's pool (fresh = 0/0) so it reflects this run
     // (plan 042 Step 3).
     this.game.events.emit('supply:changed', this.baseSupply.snapshot());
@@ -912,6 +916,8 @@ export class GameScene extends Phaser.Scene {
       ['build:select', this.onBuildSelect, this],
       ['build:modeChanged', this.onBuildModeChanged, this], // turn demolish off when build turns on (plan 037 2b)
       ['build:lineTool', this.onLineToolToggle, this], // FAB armed/off → flip the run-paint flag (plan 050 Step 6)
+      ['build:commitRun', this.buildManager.commitRun, this.buildManager], // commit bar Confirm → blueprint+enqueue the affordable run (plan 050 Step 7)
+      ['build:cancelRun', this.buildManager.clearRun, this.buildManager], // commit bar Cancel → drop the pending run, no spend (plan 050 Step 7)
       ['demolish:toggle', this.onDemolishToggle, this],
       ['tasks:cancel', this.cancelAll, this],
       ['debug:randomise', this.devWorldTools.randomiseWorld, this.devWorldTools], // dev menu: scatter nodes + enemies
@@ -1065,6 +1071,7 @@ export class GameScene extends Phaser.Scene {
       inspect: (c, r) => testApi.inspect(c, r),
       blocked: (c, r) => testApi.isTileBlocked(c, r),
       tryPlace: (id, c, r) => testApi.tryPlace(id, c, r),
+      runSelection: () => this.buildManager.runSelection(),
       inLight: (c, r) => testApi.inLight(c, r),
       feedCampfire: (i) => testApi.feedCampfire(i),
       damageFire: (i, amount) => testApi.damageFire(i, amount),

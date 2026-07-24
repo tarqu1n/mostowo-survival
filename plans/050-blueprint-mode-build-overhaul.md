@@ -200,7 +200,8 @@ build slowly (one serial worker). Keep any fetched image-gen key in-memory only 
   - Done when: armed → drag paints an axis-locked, deduped run of ghosts; off → drag pans; the FAB
     reflects state.
 
-- [ ] **Step 7: Commit bar HUD + commit handler (deferred spend, batch enqueue)** `[inline]`
+- [x] **Step 7: Commit bar HUD + commit handler (deferred spend, batch enqueue)** `[inline]`
+  - Outcome: `BuildManager.commitRun()` (spends + `createBlueprint` + `enqueueBuild` for the affordable-prefix ∩ placeable subset, then `clearRun`; no-ops on empty run) + `emitRunChanged()` on every run mutation. New outbound `build:runChanged` → store `runTally` (`RunTally`); new inbound `build:commitRun`/`build:cancelRun` (`bridge.ts` union + `wireBus` rows → `commitRun`/`clearRun`). New `src/hud/components/CommitBar.tsx` in `GameHud` ActionLayer, gated `buildMode && runTally.tileCount>0`, shows `<affordable> of <placeable>` + cost + ~Ns ETA, Confirm/Cancel fire on pointerdown. Single-tap path untouched. `runSelection()` added to `__test` surface. New `paintRun` helper + 2 commit-bar specs in `build.spec.ts`. typecheck clean, 1009 unit pass, all 7 `build.spec.ts` e2e pass. Deviation: commits affordable∩placeable (matches valid-tint preview, prevents blueprinting unplaceable tiles); smoke not run (needs separate preview server) — real-browser e2e exercised the path instead.
   - **Commit bar** in the thumb zone (ActionLayer, `buildMode`-gated), showing `<affordable> of
     <placeable>` count, total cost, and worker **ETA** from Step 5's selector, with **Confirm** +
     **Cancel**; fire on `pointerdown` (survive movepad hold) like combat buttons.

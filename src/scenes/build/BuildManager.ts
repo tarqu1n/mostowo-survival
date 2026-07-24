@@ -289,6 +289,7 @@ export class BuildManager {
     this.runAnchor = anchor;
     this.pendingTiles = runTiles(anchor, anchor, this.runFacing());
     this.refreshRunGhosts();
+    this.emitRunChanged();
   }
 
   /** Grow/redraw the pending run out to `tile`: recomputes the axis-locked straight line from the anchor
@@ -302,14 +303,55 @@ export class BuildManager {
     }
     this.pendingTiles = runTiles(this.runAnchor, tile, this.runFacing());
     this.refreshRunGhosts();
+    this.emitRunChanged();
   }
 
   /** Drop the pending run + hide its ghost pool (kept for reuse, not destroyed). Called on mode
-   *  exit / selection change / reset, and by Step 7 once a run commits. */
+   *  exit / selection change / reset, by {@link commitRun} once a run commits, and by the HUD Cancel
+   *  (`build:cancelRun`). Emits an empty tally so the HUD commit bar hides. */
   clearRun(): void {
     this.runAnchor = null;
     this.pendingTiles = [];
     for (const g of this.runGhosts) g.setVisible(false);
+    this.emitRunChanged();
+  }
+
+  /**
+   * Commit the pending run (plan 050 Step 7): blueprint + enqueue-build the run's VALID subset — each
+   * tile in the affordable PREFIX ({@link runSelection}'s `affordableCount`) that is ALSO placeable —
+   * spending its cost per tile through the shared `Inventory`, then {@link clearRun}. No-op on an empty
+   * run (Confirm on nothing). Building only the affordable-prefix∩placeable tiles matches the ghost
+   * preview's valid tint (see {@link refreshRunGhosts}), so a commit places exactly what the run showed
+   * as buildable and inventory drops by exactly that subset's cumulative cost. Build orders APPEND
+   * (`ORDER_META.build.dedupeOnEnqueue === false`), so a run batches cleanly behind any existing work.
+   */
+  commitRun(): void {
+    if (this.pendingTiles.length === 0) return; // Confirm no-ops on an empty run
+    const cost = BUILDABLES[this.selectedBuildableId].cost;
+    const { affordableCount } = this.runSelection();
+    for (let i = 0; i < this.pendingTiles.length && i < affordableCount; i++) {
+      const t = this.pendingTiles[i];
+      if (!this.tilePlaceable(t.col, t.row)) continue; // skip a non-placeable tile inside the affordable prefix
+      if (!this.deps.spend(cost)) break; // budget exhausted (shouldn't happen within the prefix) — stop
+      const site = this.createBlueprint(t.col, t.row);
+      this.deps.enqueueBuild(site.id);
+    }
+    this.clearRun();
+  }
+
+  /** Emit `build:runChanged` with the current pending-run tally so the HUD commit bar (plan 050 Step 7)
+   *  renders the live count/cost/ETA. Called on every run mutation (begin/extend/clear/commit) and once
+   *  per (re)start by GameScene's HUD resync. Lean payload — counts + the affordable subset's cost/ETA,
+   *  not the tile array — so the emit stays cheap even mid-drag. */
+  emitRunChanged(): void {
+    const sel = this.runSelection();
+    this.scene.game.events.emit('build:runChanged', {
+      tileCount: sel.tiles.length,
+      placeableCount: sel.placeableCount,
+      affordableCount: sel.affordableCount,
+      totalCost: sel.totalCost,
+      etaMs: sel.etaMs,
+    });
   }
 
   /**

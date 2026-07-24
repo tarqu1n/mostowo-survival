@@ -8,9 +8,34 @@ import {
   blocked,
   emit,
   wood,
+  runSelection,
   tileToClient,
 } from './harness';
 import { wallToRouteAround } from './scenarios';
+
+/**
+ * Arm the line tool and paint an axis-locked run of ghosts with a real pointer drag (plan 050 Step 6),
+ * so a Step-7 commit spec exercises the true gesture→run→tally path. Camera must already be at MIN_ZOOM
+ * (static, whole map visible) so screen↔tile mapping stays fixed; a single move to the far tile is
+ * enough — BuildManager re-projects the whole straight line from the anchor regardless of the path. The
+ * run STAYS pending on release (the line tool never commits on its own — that's the commit bar's job).
+ */
+async function paintRun(
+  page: import('@playwright/test').Page,
+  from: [number, number],
+  to: [number, number],
+): Promise<void> {
+  await emit(page, 'build:lineTool', { on: true }); // arm the run-paint gesture
+  const a = await tileToClient(page, from[0], from[1]);
+  const b = await tileToClient(page, to[0], to[1]);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await step(page, 16); // pointerdown → beginRun at the anchor tile
+  await page.mouse.move(b.x, b.y);
+  await step(page, 16); // drag to the far tile → extendRun re-projects the full straight line
+  await page.mouse.up();
+  await step(page, 16); // release ENDS the gesture; the run stays pending (no commit)
+}
 
 // Tier-2: building + occupancy on the REAL grid (blueprint passable while unbuilt → worker builds it
 // → solid blocking wall), and that the pathfinder respects that live grid.
@@ -109,4 +134,63 @@ test('build mode: a one-finger drag pans and places/charges nothing', async ({ p
   const s = await state(page);
   expect(s.sites).toBe(0); // nothing placed
   expect(await wood(page)).toBe(10); // nothing charged
+});
+
+// Tier-2: Blueprint-Mode commit bar (plan 050 Step 7) — paint a run with the line tool (deferred, no
+// spend), then Confirm commits ONLY the affordable subset (spends its cost, appends build orders) and
+// Cancel drops the run with no spend. Camera pinned at MIN_ZOOM so screen↔tile mapping stays fixed.
+test('commit bar: Confirm queues + spends exactly the affordable run subset, then builds', async ({
+  page,
+}) => {
+  // Boot (~15s) + driving two serial worker builds in fixed 1/60s slices is heavy in wall-clock, so
+  // give this build-through spec headroom over the default 30s per-test budget.
+  test.setTimeout(60_000);
+  await startGame(page);
+  // 4 wood; the wall costs 2 → affords exactly 2 of a 5-tile run. Row 20 (cols 6–11) is open ground.
+  await applyScenario(page, { player: [11, 20], wood: 4 });
+  for (let i = 0; i < 4; i++) await emit(page, 'zoom:delta', -0.5); // → MIN_ZOOM, static camera
+  await emit(page, 'build:select', { id: 'wall' }); // enter build mode, wall selected
+
+  await paintRun(page, [10, 20], [6, 20]); // 5-tile horizontal run: cols 10,9,8,7,6
+
+  // Live tally: the deferred run — 5 placeable tiles, only 2 affordable (4 wood / 2 each), nothing spent yet.
+  const sel = await runSelection(page);
+  expect(sel.tiles.length).toBe(5);
+  expect(sel.placeableCount).toBe(5);
+  expect(sel.affordableCount).toBe(2);
+  expect(sel.totalCost).toEqual({ wood: 4 }); // 2 affordable × 2 wood
+  expect((await state(page)).sites).toBe(0); // painting places NOTHING…
+  expect(await wood(page)).toBe(4); // …and spends nothing
+
+  await emit(page, 'build:commitRun'); // commit bar Confirm
+  await step(page, 16);
+  const committed = await state(page);
+  expect(committed.sites).toBe(2); // exactly the affordable subset became blueprints
+  expect(committed.pending + (committed.currentKind === 'build' ? 1 : 0)).toBe(2); // 2 build orders queued
+  expect(await wood(page)).toBe(0); // spent exactly 2 × 2 = 4 wood, no more
+  expect((await runSelection(page)).tiles.length).toBe(0); // run cleared on commit
+
+  // Step the clock through both builds → each finishes into a blocking wall.
+  await step(page, 16_000);
+  const built = await state(page);
+  expect(built.occupied).toBe(2); // both blueprints built out
+  expect(await blocked(page, 10, 20)).toBe(true);
+  expect(await blocked(page, 9, 20)).toBe(true);
+});
+
+test('commit bar: Cancel clears the pending run and spends nothing', async ({ page }) => {
+  await startGame(page);
+  await applyScenario(page, { player: [11, 20], wood: 6 });
+  for (let i = 0; i < 4; i++) await emit(page, 'zoom:delta', -0.5);
+  await emit(page, 'build:select', { id: 'wall' });
+
+  await paintRun(page, [10, 20], [6, 20]);
+  expect((await runSelection(page)).tiles.length).toBe(5); // a run is pending
+
+  await emit(page, 'build:cancelRun'); // commit bar Cancel
+  await step(page, 16);
+  const s = await state(page);
+  expect((await runSelection(page)).tiles.length).toBe(0); // run dropped
+  expect(s.sites).toBe(0); // no blueprints placed
+  expect(await wood(page)).toBe(6); // nothing spent
 });
