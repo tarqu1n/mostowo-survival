@@ -51,6 +51,7 @@ ROOF_BBOX = (272, 87, 368, 187)
 
 TARGET_W = 112       # live sprite width (a short pier ≈ 7 tiles); height follows aspect
 SIDE_W = 128         # broadside pier runs wide
+VERT_W = 48          # vertical pier is tall + NARROW — bake by a small width so height stays sane
 QUANTISE_COLOURS = 10
 OUTLINE = (22, 20, 26, 255)  # pack dark near-black rim, faintly cool (weathered grey wood)
 
@@ -97,6 +98,15 @@ ORIENT = {
         "(closest to camera) shows the front edge and two support posts, the boards running away from "
         "you toward the far end."
     ),
+    "vertical": (
+        "Orientation: the pier runs straight UP-AND-DOWN the frame — a long narrow plank deck stood "
+        "VERTICALLY, seen from the game's HIGH TOP-DOWN angle (you look DOWN onto the deck boards from "
+        "above). The deck boards run left-to-right ACROSS the width; a row of stubby support posts runs "
+        "down one long side. Clearly TALLER than wide (about 1:3), a long low straight walkway. CRITICAL: "
+        "do NOT let it recede to a far vanishing point (it is NOT an end-on view), and do NOT rotate it "
+        "to a diagonal — it is a flat straight up-and-down walkway, the same deck as the broadside but "
+        "turned 90 degrees."
+    ),
 }
 
 # id -> (orientation, flavour clause). The SHIPPED set, picked from the first candidate batch.
@@ -108,7 +118,9 @@ ORIENT = {
 VARIANTS = {
     "jetty_diagonal_1": ("diagonal", ""),  # short clean pier
     "jetty_diagonal_2": ("diagonal", "a couple of planks slightly warped/uneven, one board darker and rotten"),  # long hero
-    "jetty_side_1": ("side", ""),          # wide broadside walkway
+    "jetty_side_1": ("side", ""),          # wide broadside walkway (horizontal)
+    "jetty_vertical_1": ("vertical", ""),  # up-down walkway
+    "jetty_vertical_2": ("vertical", "a couple of planks slightly warped, one board darker and rotten"),
 }
 
 
@@ -242,7 +254,7 @@ def to_sprite(raw_png: Path, width: int) -> Image.Image:
 
 
 def target_width(orient: str) -> int:
-    return SIDE_W if orient == "side" else TARGET_W
+    return {"side": SIDE_W, "vertical": VERT_W}.get(orient, TARGET_W)
 
 
 def contact_sheet(ids: list[str]) -> None:

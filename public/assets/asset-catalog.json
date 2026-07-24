@@ -47070,6 +47070,52 @@
       "origin": "self-made"
     },
     {
+      "id": "mostowo-custom/Environment/Props/Static/jetty_vertical_1.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/jetty_vertical_1.png"
+      },
+      "w": 48,
+      "h": 146,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "environment",
+        "jetty",
+        "pier",
+        "props",
+        "static",
+        "vertical",
+        "wooden"
+      ],
+      "origin": "self-made"
+    },
+    {
+      "id": "mostowo-custom/Environment/Props/Static/jetty_vertical_2.png",
+      "pack": "mostowo-custom",
+      "type": "object",
+      "role": "object",
+      "source": {
+        "kind": "image",
+        "path": "Environment/Props/Static/jetty_vertical_2.png"
+      },
+      "w": 48,
+      "h": 89,
+      "category": "Environment/Props/Static",
+      "tags": [
+        "environment",
+        "jetty",
+        "pier",
+        "props",
+        "static",
+        "vertical",
+        "wooden"
+      ],
+      "origin": "self-made"
+    },
+    {
       "id": "mostowo-custom/Environment/Props/Static/tent_wreck_5_ruined.png",
       "pack": "mostowo-custom",
       "type": "object",

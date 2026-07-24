@@ -270,14 +270,19 @@ What carried over and what was new:
 - **Quantise, don't snap.** The jetty keeps the generation's own weathered greys
   (`QUANTISE_COLOURS`, no palette snap) — right for a multi-tone weathered object, same call
   the tents made. (Contrast the *tile* attempt, which snapped to the pack's 4 wood tones.)
-- **Diagonal + broadside land; end-on doesn't.** Exactly the tents' finding — a pier drawn
-  END-ON (running straight away from camera) folded into a malformed roof-like peak. Ship
-  diagonal + broadside and **reuse a rotated diagonal** for piers heading away; don't burn
-  generations chasing end-on. `ORIENT['end']` stays in the script for a future attempt.
-- **Batch + pick, then `--reprocess`.** Generated 7 candidates (2–3 per angle + a buoy
-  variant), kept 3 (`jetty_diagonal_1/2`, `jetty_side_1`); the buoy barely read (make it a
-  separate prop if wanted) and a 2nd broadside drifted to a square platform. `--reprocess`
-  re-bakes the kept raws (size/outline/quantise tuning) with no re-spend.
+- **Diagonal, broadside and vertical land; end-on doesn't.** A pier drawn END-ON (running
+  straight away from camera) folded into a malformed roof-like peak — exactly the tents'
+  hard-angle finding — so it's not shipped; **reuse a rotated diagonal** for piers heading
+  away rather than burning generations on it (`ORIENT['end']` stays for a future attempt). The
+  fix that unlocked the up-and-down pier was to prompt **vertical** as *"the broadside turned
+  90°, a flat top-down walkway"* and explicitly forbid a vanishing point — framed as a
+  receding view it becomes end-on and breaks; framed as a rotated flat deck it holds. A
+  vertical pier is tall+narrow so it bakes by a small width (`VERT_W`), not `TARGET_W`.
+- **Batch + pick, then `--reprocess`.** Kept 5 across the angles — `jetty_diagonal_1/2`
+  (short/long), `jetty_side_1` (broadside), `jetty_vertical_1/2` (up-down) — from an initial
+  7-candidate batch plus a 2-candidate vertical follow-up. Dropped: a buoy variant (the red
+  float barely read — make it a separate prop if wanted) and a 2nd broadside that drifted to a
+  square platform. `--reprocess` re-bakes kept raws (size/outline/quantise tuning) with no re-spend.
 
 **Meta:** a real photo is a *stronger* character anchor than a text description — but it
 fights the game camera, so it must be paired with a pack-angle reference, not used alone.
