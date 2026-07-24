@@ -7,6 +7,7 @@ import { ITEMS } from '@/data/items';
 import { BUILDABLES } from '@/data/buildables';
 import { cn } from '@/hud/lib/utils';
 import { iconUrl } from '@/hud/lib/icons';
+import { equipViewOf, isEquippable } from '@/hud/lib/equip';
 
 /**
  * Field Kit hotbar (plan 046 Step 6) — the always-visible quick-swap loadout row (`HUD_HOTBAR_SLOTS`
@@ -14,7 +15,9 @@ import { iconUrl } from '@/hud/lib/icons';
  * dimmed. Tapping a filled slot uses/equips/selects its entry:
  *  - buildable → `build:select` (opens placement for that structure);
  *  - edible item (has `nutrition`, e.g. berries) → `needs:eat`;
- *  - weapon/other item → no-op placeholder (no equipment system yet — deferred, plan 046).
+ *  - equippable item (has `equip`, e.g. brand/bow/sword) → `equip:toggle` (plan 049): a yellow outline
+ *    marks the equipped slot and a lit brand shows a durability bar;
+ *  - other item (plain resource) → no-op.
  *
  * Long-press is the "pin" affordance in the pitch, but the pin ACTION (`pinToHotbar`) is exercised
  * from the catalog/pack entries (Step 7), not from within the bar. Here long-press is a self-contained
@@ -41,10 +44,14 @@ export function Hotbar({ className }: { className?: string }) {
 }
 
 /** Whether tapping this slot actually does something: a buildable selects it for placement, an edible
- *  eats it. A plain resource (wood/stone) or a not-yet-usable item (weapons — no equip system) has NO
- *  action, so it must neither fire nor give the tap "pop" (see SlotButton). */
+ *  eats it, an equippable toggles equip (plan 049). A plain resource (wood/stone) has NO action, so it
+ *  must neither fire nor give the tap "pop" (see SlotButton). */
 function slotHasAction(slot: NonNullable<HotbarSlot>): boolean {
-  return slot.kind === 'buildable' || ITEMS[slot.id]?.nutrition != null;
+  return (
+    slot.kind === 'buildable' ||
+    ITEMS[slot.id]?.nutrition != null ||
+    (slot.kind === 'item' && isEquippable(slot.id))
+  );
 }
 
 /** Fire the tap action for a filled slot (see the component doc for the per-kind mapping). Only ever
@@ -59,6 +66,8 @@ function activate(slot: NonNullable<HotbarSlot>): void {
   const def = ITEMS[slot.id];
   if (def?.nutrition != null) {
     bridge.emit({ type: 'needs:eat', payload: { itemId: slot.id } });
+  } else if (def?.equip != null) {
+    bridge.emit({ type: 'equip:toggle', payload: { itemId: slot.id } });
   }
 }
 
@@ -85,6 +94,8 @@ function isEdibleSlot(slot: HotbarSlot): boolean {
 function SlotButton({ slot }: { slot: HotbarSlot }) {
   const count = useSlotCount(slot);
   const depleted = count === 0; // stackable item with none left (null count → not a counted slot)
+  const equipment = useHudStore((s) => s.equipment);
+  const equip = slot?.kind === 'item' ? equipViewOf(equipment, slot.id) : null;
   const cooldownActive = useHudStore((s) => s.eatCooldownActive);
   const cooldownMs = useHudStore((s) => s.eatCooldownMs);
   const cooldownNonce = useHudStore((s) => s.eatCooldownNonce);
@@ -139,10 +150,28 @@ function SlotButton({ slot }: { slot: HotbarSlot }) {
         'relative grid size-11 place-items-center overflow-hidden rounded-lg border border-border bg-surface-subtle/95',
         !slot && 'opacity-40',
         depleted && 'opacity-50', // out of stock — dim but keep it pinned (refills on next forage)
+        equip?.equipped && 'ring-2 ring-gold', // equipped in a slot (plan 049) → yellow outline
       )}
       aria-label={slot ? `${slotLabel(slot)}${count !== null ? ` (${count})` : ''}` : 'empty slot'}
+      aria-pressed={equip?.equipped ?? undefined}
     >
       {slot && <SlotContent slot={slot} />}
+      {/* Durability bar for an equipped consumable (the brand, plan 049) — a thin gold bar along the
+          bottom that shrinks as it drains (Step 6); absent for permanent gear (bow/sword). */}
+      {equip?.durabilityFrac !== null && equip !== null && (
+        <span
+          data-testid="hud-hotbar-durability"
+          className="pointer-events-none absolute inset-x-0.5 bottom-0.5 h-1 overflow-hidden rounded-full bg-black/50"
+        >
+          <span
+            className="block h-full rounded-full"
+            style={{
+              width: `${equip.durabilityFrac * 100}%`,
+              backgroundColor: 'var(--color-gold)',
+            }}
+          />
+        </span>
+      )}
       {count !== null && (
         <span
           data-testid="hud-hotbar-count"

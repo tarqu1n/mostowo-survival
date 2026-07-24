@@ -6,6 +6,38 @@ Part of the [decision log index](../DECISIONS.md). Newest first.
 
 ---
 
+## 2026-07-24 — [DECIDED] Equippable items + equip slots (plan 049): 3 slots, empty default loadout, durability on Equipment only, brand-via-playerLight, bow-not-default gate
+
+The first equippable items + the equip-slot system the HUD stubbed out since plan 046 (plan 049 —
+post-MVP content on the **crafting** pillar, consuming the brand/bow/sword crafted in
+[plan 048](../../plans/048-workbench-crafting-station.md)). Full detail in
+[plan 049](../../plans/049-equippable-items-equip-slots.md); the settled calls:
+
+- **Three equip slots** (`mainHand` · `ranged` · `offHand`) with an **empty default loadout** — unarmed
+  melee (exactly today), **no ranged until a bow is equipped**, empty off hand. Tapping an equippable in
+  the toolbar/pack toggles equip; the worn slot gets a gold outline.
+- **`Equipment` is a pure system** (`systems/Equipment.ts`) mirroring `Inventory` — extends
+  `eventemitter3`, imports no Phaser, plain-Node testable. Data-agnostic (no `ITEMS` import): the scene's
+  `toggleEquip` owns slot-match + bag bookkeeping.
+- **Durability lives ONLY on `Equipment`, never on the bag `Slot`.** The **brand is equip-to-consume**
+  (equipping spends 1 from the bag + seeds the slot's durability; unequipping OR draining to 0 discards
+  it — no partial restash in v1). **Permanent gear (bow/sword, no `durability`) moves bag↔slot freely.**
+- **Main hand → melee**: the equipped id maps (via `ITEM_MELEE_WEAPON`) to a `MELEE_WEAPONS` entry
+  (`sword` added here); empty = unarmed fallback (`UNARMED_*`). Re-synced off `Equipment` `'change'`.
+- **Ranged gated on an equipped bow** (`#5` in the split critique): `combat:bow` is a no-op without a bow
+  in the ranged slot, and the HUD hides the Bow button. This removes the old always-on bow — the crafted
+  bow becomes the first ranged weapon, matching GAME-DESIGN's "first ranged weapon is the first relief".
+- **Brand light via `playerLight()`, not a parallel disc** (`#4`): while a lit brand is in the off hand,
+  `playerLight()` returns `BRAND_LIGHT_RADIUS` instead of `PLAYER_LIGHT_RADIUS`. Because that method is
+  already in SurvivalClock's night-overlay light union, the disc grows around the player for free — the
+  exact path `config.ts` prescribed ("a future off-hand torch just raises this radius"). **Fog
+  (`VisionController`, fires-only) is unchanged** — the brand reveals the night overlay, not extra sight.
+- **Real-time drain while equipped** (`tickBrand` per frame), destroyed at 0; the HUD forward is
+  throttled (`BRAND_DRAIN_EMIT_MS`) so the durability bar animates without a per-frame store flood.
+- **Out of scope**: equipment rendering on the body (deferred [plan 010](../../plans/) — a held brand/
+  bow/sword is HUD-slot + light only), bag-slot durability / stashing a partial brand, armour/tool/shield
+  slots, NPC equipment, ammo, real item art.
+
 ## 2026-07-24 — [DECIDED] Workbench crafting station (plan 048): craft-as-worker-order, HP-scaled rate, workbench = attackable/repairable structure, bench-tapped menu
 
 The first crafting station (plan 048 — post-MVP content on the **crafting** pillar). It is the

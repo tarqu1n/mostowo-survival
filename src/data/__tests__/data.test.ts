@@ -4,8 +4,9 @@ import { NODES } from '../nodes';
 import { BUILDABLES } from '../buildables';
 import { RECIPES } from '../recipes';
 import { ENEMIES } from '../enemies';
-import { MONSTER_WEAPONS } from '../weapons';
+import { MONSTER_WEAPONS, MELEE_WEAPONS, ITEM_MELEE_WEAPON } from '../weapons';
 import { ACTIVE_TILESET, dirEnemyAnimKey, facing4FromVelocity, type Facing4 } from '../tileset';
+import type { EquipSlot } from '../types';
 
 // Pure-data invariant tests: catch a data-edit regression (a typo'd item id, a stat that breaks
 // an assumption another test suite relies on) cheaply, without touching Phaser or the systems
@@ -30,6 +31,30 @@ describe('ITEMS', () => {
       expect(typeof item.icon).toBe('string');
       expect(item.icon.length).toBeGreaterThan(0);
     }
+  });
+
+  it('every equip slot, when set, is one of the three known slots (plan 049)', () => {
+    const slots = new Set<EquipSlot>(['mainHand', 'ranged', 'offHand']);
+    for (const item of Object.values(ITEMS)) {
+      if (item.equip !== undefined) expect(slots.has(item.equip)).toBe(true);
+    }
+  });
+
+  it('every durability, when set, is a positive number on an equippable item', () => {
+    for (const item of Object.values(ITEMS)) {
+      if (item.durability === undefined) continue;
+      expect(item.durability).toBeGreaterThan(0);
+      expect(item.equip).toBeDefined(); // durability only makes sense on an equippable
+    }
+  });
+
+  it('the plan-049 equippables map to their slots (sword→mainHand, bow→ranged, brand→offHand+durability)', () => {
+    expect(ITEMS.sword.equip).toBe('mainHand');
+    expect(ITEMS.bow.equip).toBe('ranged');
+    expect(ITEMS.brand.equip).toBe('offHand');
+    expect(ITEMS.brand.durability).toBeGreaterThan(0);
+    expect(ITEMS.bow.durability).toBeUndefined(); // permanent
+    expect(ITEMS.sword.durability).toBeUndefined(); // permanent
   });
 });
 
@@ -325,5 +350,23 @@ describe('monster weapons + attach anchors', () => {
       expect(w.damage).toBeGreaterThan(0);
       expect(w.attackMs).toBeGreaterThan(0);
     }
+  });
+
+  it('MELEE_WEAPONS entries are keyed by their own id with positive damage + a valid attack shape', () => {
+    for (const [key, w] of Object.entries(MELEE_WEAPONS)) {
+      expect(w.id).toBe(key);
+      expect(w.damage).toBeGreaterThan(0);
+      expect(w.attackShape.reach).toBeGreaterThanOrEqual(1);
+      expect(['single', 'wide', 'line']).toContain(w.attackShape.arc);
+    }
+  });
+
+  it('every ITEM_MELEE_WEAPON mapping resolves an equippable item to a real melee weapon (plan 049)', () => {
+    for (const [itemId, weaponId] of Object.entries(ITEM_MELEE_WEAPON)) {
+      expect(ITEMS[itemId], `no item '${itemId}'`).toBeDefined();
+      expect(ITEMS[itemId].equip).toBe('mainHand'); // only main-hand items drive melee
+      expect(MELEE_WEAPONS[weaponId], `no melee weapon '${weaponId}'`).toBeDefined();
+    }
+    expect(ITEM_MELEE_WEAPON.sword).toBe('sword');
   });
 });

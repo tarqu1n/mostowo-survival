@@ -56,6 +56,10 @@ export interface CombatControllerDeps {
   cleanupActorFx(sprite: CharacterSprite): void;
   /** Clear the task queue + stop the worker — the player-death reset (GameScene.cancelAll). */
   cancelAll(): void;
+  /** Whether a bow is equipped in the ranged slot (plan 049) — the gate on {@link CombatController.bow}.
+   *  No bow ⇒ ranged is disabled (the crafted bow is the first ranged weapon), and the HUD hides the
+   *  Bow button off the same `equipment` store. */
+  hasBow(): boolean;
 }
 
 /**
@@ -142,6 +146,9 @@ export class CombatController {
    * plays the draw pose (the Bow button always feels heard) and just clears the target.
    */
   bow(): void {
+    // Equip gate (plan 049): ranged is disabled until a bow is equipped. The HUD hides the Bow button
+    // when none is equipped, so this defends the bus path (a stray `combat:bow` is a silent no-op).
+    if (!this.deps.hasBow()) return;
     const player = this.deps.playerChar();
     // Cooldown gate (playtest fix), same as melee: a press inside the window is ignored so the Bow
     // button can't be spammed to loose arrows faster than the draw cadence.

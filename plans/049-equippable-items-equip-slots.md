@@ -1,9 +1,6 @@
 # Equippable Items + Equip Slots (Brand · Bow · Sword)
 
-> Status: planned — run /execute-plan to begin. **Gate 1 open**: plan-only deliverable; stop for
-> Matt's review. **Depends on plan 048** (the workbench + `craft` order + `brand`/`bow`/`sword`/`rope`
-> items ship there). Split out of the original combined plan after the Gate-2 critique (see
-> `## Critique resolution`).
+> Status: in review
 
 ## Summary
 
@@ -90,7 +87,7 @@ critique — no paper-doll rendering (that's the deferred plan 010), no bag-dura
 
 ## Steps
 
-- [ ] **Step 1: Item equip model + sword stats + config** `[inline]`
+- [x] **Step 1: Item equip model + sword stats + config** `[inline]`
   - `src/data/types.ts`: `EquipSlot` + `equip?`/`durability?` on `ItemDef`.
   - `src/data/items.ts`: set `equip:'mainHand'` on `sword`, `equip:'ranged'` on `bow`,
     `equip:'offHand'` + `durability: BRAND_DURABILITY` on `brand` (all defined in 048).
@@ -99,16 +96,29 @@ critique — no paper-doll rendering (that's the deferred plan 010), no bag-dura
   - `src/config.ts`: `BRAND_*` tunables.
   - Side effects: `data.test.ts` field validation.
   - Done when: build + `npm test` green; equip fields resolve.
+  - Outcome: `types.ts` +`EquipSlot` type and `equip?`/`durability?` on `ItemDef`. `items.ts` sets
+    equip slots (sword→mainHand, bow→ranged, brand→offHand) + `durability: BRAND_DURABILITY` on brand;
+    imports `BRAND_DURABILITY` (no import cycle — config imports only `types`). `weapons.ts` +`sword`
+    `MELEE_WEAPONS` entry (`damage:2`, `{reach:1,arc:'wide'}`) + `ITEM_MELEE_WEAPON` map (sword→sword).
+    `config.ts` +`BRAND_DURABILITY`(100)/`BRAND_LIFETIME_SEC`(90)/`BRAND_DRAIN_PER_SEC`(derived)/
+    `BRAND_LIGHT_RADIUS`(TILE×3.5). `data.test.ts` +6 assertions (equip-slot/durability validity,
+    plan-049 slot mapping, MELEE_WEAPONS shape, ITEM_MELEE_WEAPON resolution). Build + 980 unit tests green.
 
-- [ ] **Step 2: `Equipment` pure system** `[inline]`
+- [x] **Step 2: `Equipment` pure system** `[inline]`
   - New `src/systems/Equipment.ts` mirroring `Inventory` (extends `eventemitter3`, no Phaser, injected
     lookups). State `Record<EquipSlot, { id: string; durability: number|null }|null>`. API:
     `get(slot)`, `equip(slot,id,durability?)`, `unequip(slot)`, `drain(slot,amount)` →
     `'ok'|'destroyed'`, `slotOf(id)`, `snapshot()`, emits `'change'`. Default loadout = **all empty**.
   - Side effects: new `Equipment.test.ts` (equip/unequip/swap/drain-to-destroy/empty default).
   - Done when: unit tests green.
+  - Outcome: `src/systems/Equipment.ts` — exports `Equipment` class + `EquippedItem`/`EquipmentState`/
+    `DrainResult` types + `EQUIP_SLOTS` const. `get` returns a copy; `equip`/`unequip`/`drain` emit
+    `'change'` on real mutation (`unequip`/`drain(0/permanent/empty)` no-op silently). `drain` clears
+    the slot + returns `'destroyed'` at ≤0. Data-agnostic (no ITEMS import) — caller owns slot-match +
+    bag bookkeeping. `Equipment.test.ts` 12 tests (empty default, equip/swap/unequip, drain-to-destroy
+    incl. overshoot, copy-safety, no-op paths). All green.
 
-- [ ] **Step 3: Wire `Equipment` into GameScene + bridge/store** `[inline]`
+- [x] **Step 3: Wire `Equipment` into GameScene + bridge/store** `[inline]`
   - Construct `Equipment` in the scene. Add the **equip toggle** as a scene method: permanent items
     move bag↔slot (spend/add, no durability); the **brand is equip-to-consume** (equip removes 1 from
     the bag + seeds slot durability; unequip discards; drain-to-0 destroys). `bridge.ts`: inbound
@@ -116,15 +126,31 @@ critique — no paper-doll rendering (that's the deferred plan 010), no bag-dura
     durability). Mirror into `store.ts` (`equipment`).
   - Side effects: `bridge.test.ts`; registry/`game.events` only via `bridge.ts`.
   - Done when: emitting `equip:toggle` equips/unequips and the store mirrors it; build green.
+  - Outcome: `GameScene.ts` +`equipment` field (constructed fresh beside `inv` in buildWorld);
+    `toggleEquip({itemId})` wired in `wireBus` (equip/unequip + bag bookkeeping: permanent restash,
+    brand equip-to-consume, displaced-slot vacate); `emitEquipment()` single forward point, seeded in
+    the HUD-resync block. `bridge.ts` +`equip:toggle` inbound + `equipment:changed`→`setEquipment`
+    outbound (imports `EquipmentState` type). `store.ts` +`equipment` state (default all-null) +
+    `setEquipment`. `bridge.test.ts` +2 assertions (outbound snapshot mirror + inbound toggle
+    passthrough). tsc clean; bridge/equipment/data suites green. Note: per-frame drain throttling is
+    deferred to Step 6 (drain emits Equipment `'change'` but only `emitEquipment` forwards to the HUD).
 
-- [ ] **Step 4: Toolbar + Pack equip UX (yellow outline + durability bar)** `[inline]`
+- [x] **Step 4: Toolbar + Pack equip UX (yellow outline + durability bar)** `[inline]`
   - `Hotbar.tsx`: `slotHasAction` true for an equippable; `activate` emits `equip:toggle`; draw a
     **yellow outline** when the item is equipped (read `equipment`); draw a **durability bar** for an
     equipped item with `durability`. `PackDrawer.tsx`: same toggle + outline + bar.
   - Side effects: presentational + the one emit.
   - Done when: tapping brand/bow/sword toggles the outline; the brand's durability renders; smoke green.
+  - Outcome: new `src/hud/lib/equip.ts` — pure shared read-model (`equipViewOf` → `{equipped,
+    durabilityFrac}`, `isEquippable`) so toolbar/pack don't drift. `Hotbar.tsx`: `slotHasAction`/
+    `activate` handle equippables (emit `equip:toggle`); `SlotButton` reads `equipment`, draws a
+    `ring-2 ring-gold` outline when equipped + a gold durability bar (`data-testid=hud-hotbar-durability`)
+    for a consumable. `PackDrawer.tsx`: entries now MERGE equipped ids (equipping spends the item out of
+    the bag, so it'd vanish otherwise) listed first with an "equipped" tag; tap toggles equip; same
+    gold outline + bar (`hud-pack-durability`). Yellow = existing `--color-gold` token. tsc clean; boot
+    smoke PASSED.
 
-- [ ] **Step 5: Equip → combat** `[inline]`
+- [x] **Step 5: Equip → combat** `[inline]`
   - Main-hand item → the active `MeleeWeapon` on `PlayerCharacter` (via the Step-1 mapping; empty →
     unarmed = today). Ranged slot gates `combat:bow` in `CombatController` (no bow ⇒ no-op; the
     `CommandBar` Bow button hidden/disabled). Re-sync on `Equipment` `'change'`.
@@ -132,8 +158,16 @@ critique — no paper-doll rendering (that's the deferred plan 010), no bag-dura
     keeps today's unarmed melee; ranged now gated (update any test asserting always-on bow).
   - Done when: equipping a sword changes melee shape/damage; equipping a bow enables ranged; both
     empty = today's unarmed + no-bow; `npm test` + build green.
+  - Outcome: `GameScene.syncMeleeFromEquipment()` (main-hand id → `ITEM_MELEE_WEAPON` → `MELEE_WEAPONS`
+    → `PlayerCharacter.setMeleeWeapon`; empty → unarmed) bound to `Equipment` `'change'`.
+    `CombatController` +`hasBow()` dep (reads `equipment.get('ranged')`); `bow()` no-ops without a bow.
+    `CommandBar` hides the Bow button when `equipment.ranged === null`. Test seams: `ScenarioSpec.equip?:
+    string[]` + `__test.equip(itemId)` force-equip into declared slot (+ `clearEquipment`/`equipForTest`
+    deps; `resetWorld` clears the loadout). Updated 4 existing bow e2e (`combat`×3, `boar`, `hud-fight-
+    controls`) to `equip:['bow']`/`__test.equip('bow')`. tsc clean; 992 unit tests + combat/boar/
+    hud-fight-controls e2e green.
 
-- [ ] **Step 6: Brand light + real-time durability drain** `[inline]`
+- [x] **Step 6: Brand light + real-time durability drain** `[inline]`
   - Per-frame (GameScene or a tiny `world/` controller): while a lit brand is in the off hand,
     `Equipment.drain(offHand, BRAND_DRAIN_PER_SEC × dt)`; on `'destroyed'` clear the slot + emit
     `equipment:changed`. Make `playerLight()` (`GameScene.ts:1548`) return `BRAND_LIGHT_RADIUS` while
@@ -142,14 +176,33 @@ critique — no paper-doll rendering (that's the deferred plan 010), no bag-dura
   - Side effects: HUD durability bar (Step 4) animates down; on destroy the slot clears.
   - Done when: equipping a brand enlarges the player's night light, drains visibly, and the brand
     vanishes at 0; e2e asserts drain→destroy.
+  - Outcome: `GameScene.tickBrand(delta)` in `update()` (above the no-action early-return, beside the
+    survival/structure ticks): drains any durability-bearing off-hand item; on `'destroyed'` forwards
+    the emptied loadout immediately, else throttles the HUD forward to `BRAND_DRAIN_EMIT_MS` (200ms →
+    ~5/sec smooth bar, no per-frame store flood) via `brandEmitAccumMs`. `playerLight()` returns
+    `BRAND_LIGHT_RADIUS` when a brand is in the off hand (fed to SurvivalClock's night-overlay union —
+    disc grows for free); fog unchanged. `config.ts` +`BRAND_DRAIN_EMIT_MS`. Observability seam:
+    `DebugState.equipment` (+ `equipmentSnapshot` dep + harness mirror + refactor-tripwire golden
+    bumped). tsc clean; 992 unit tests + golden e2e green; build green. e2e drain→destroy asserted in
+    Step 7.
 
-- [ ] **Step 7: Tests + docs** `[delegate sonnet]`
+- [x] **Step 7: Tests + docs** `[inline]` (plan tagged `[delegate sonnet]`; done inline — e2e needed
+    live iteration + tight coupling with the golden snapshot + docs matching exact impl choices)
   - e2e: craft (048) + equip a brand → light + drain → destroy; craft + equip a bow → ranged fire;
     unarmed default = no bow. Docs (terse): `docs/STATUS.md` (equip subsystem), `docs/DECISIONS.md`
     (3 slots, empty default loadout, equip-to-consume durability on Equipment only, brand-via-
     PLAYER_LIGHT_RADIUS, bow-not-default gate), `docs/GAME-MECHANICS.md` (equip + brand), `CLAUDE.md`
     Status one-liner, flip this plan's Status.
   - Done when: `npm run check:all` green; docs match shipped behaviour.
+  - Outcome: new `tests/e2e/equip.spec.ts` (4 tests, all green): no-bow gate, bow bag→slot toggle →
+    ranged fire, sword melee upgrade (2-hit kill), brand equip → light grows (`playerLightRadius`
+    20→56) + real-time drain + destroy-at-0 (fast-forwarded via `setEquipDurability` seam to stay in
+    the 30s budget). Added `DebugState.playerLightRadius` + `__test.setEquipDurability` seams (+ harness
+    helpers `equip`/`setEquipDurability`; refactor-tripwire golden bumped for both new fields). Docs:
+    STATUS.md +plan-049 section, DECISIONS.md index + gameplay.md shard, GAME-MECHANICS.md +Equipping
+    section & bow-gate note, CLAUDE.md status. `tsc`/unit(992)/e2e(equip+combat+boar+fight+tripwire)/
+    build all green; `format:check` red ONLY on two pre-existing non-049 docs HTML files (plan 050
+    mockups), flagged separately.
 
 ## Out of scope
 

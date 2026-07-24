@@ -19,12 +19,17 @@ import {
   INVENTORY_SLOTS,
   DEFAULT_MAX_STACK,
   PLAYER_LIGHT_RADIUS,
+  BRAND_DRAIN_PER_SEC,
+  BRAND_LIGHT_RADIUS,
+  BRAND_DRAIN_EMIT_MS,
 } from '../config';
 import { ITEMS } from '../data/items';
+import { MELEE_WEAPONS, ITEM_MELEE_WEAPON } from '../data/weapons';
 import { BUILDABLES } from '../data/buildables';
 import { RECIPES } from '../data/recipes';
 import { iconKey } from '../data/tileset';
 import { Inventory } from '../systems/Inventory';
+import { Equipment, EQUIP_SLOTS } from '../systems/Equipment';
 import { BaseSupply } from '../systems/baseSupply';
 import { tileToWorldCenter, worldToTile } from '../systems/grid';
 import { findPath, reachableAdjacent, type Cell } from '../systems/pathfind';
@@ -149,6 +154,15 @@ export class GameScene extends Phaser.Scene {
   private devWorldTools!: DevWorldTools;
 
   private inv!: Inventory;
+
+  // Player equip slots (plan 049) — mainHand (melee) / ranged (bow gate) / offHand (brand). Constructed
+  // fresh each (re)start in buildWorld() beside `inv`; the equip toggle (toggleEquip) moves items bag↔slot
+  // and the loadout is mirrored to the HUD via `equipment:changed`. Pure state — no scene deps.
+  private equipment!: Equipment;
+
+  // Accumulated ms since the last throttled `equipment:changed` forward during a brand drain (plan 049
+  // Step 6) — so the HUD durability bar animates at ~BRAND_DRAIN_EMIT_MS cadence, not every frame.
+  private brandEmitAccumMs = 0;
 
   private readonly queue = new TaskQueue();
   private actionGoal: Cell | null = null; // the tile we're currently pathing to (for re-pathing)
@@ -388,6 +402,14 @@ export class GameScene extends Phaser.Scene {
     });
     this.registry.set('inventory', this.inv);
 
+    // Player equip slots (plan 049) — fresh each (re)start (a death-restart begins with an empty
+    // loadout: unarmed melee, no bow, empty off hand). Its loadout reaches the HUD via `equipment:changed`
+    // (re-emitted in the HUD-resync block below). Re-sync the active melee weapon off its `'change'`:
+    // the main-hand item drives which `MELEE_WEAPONS` entry is live (empty → unarmed = today). Fresh
+    // each (re)start, so the old instance + this listener are dropped on restart (mirrors baseSupply).
+    this.equipment = new Equipment();
+    this.equipment.on('change', () => this.syncMeleeFromEquipment());
+
     // Shared base-supply pool (plan 042 Step 3) — fresh each (re)start (so a death-restart starts
     // empty). Bridge its 'change' to a `supply:changed` game event so the HUD reflects
     // deposits/withdrawals/seeding, mirroring how CampfireBehavior feeds the fire bar via `fire:changed`.
@@ -566,6 +588,9 @@ export class GameScene extends Phaser.Scene {
       syncBowTargetHighlight: (sprite) => this.fx.syncBowTargetHighlight(sprite),
       cleanupActorFx: (sprite) => this.fx.cleanupActorFx(sprite),
       cancelAll: () => this.cancelAll(),
+      // Ranged is gated on a bow being equipped (plan 049): no bow ⇒ `bow()` is a no-op and the HUD
+      // hides the Bow button (via the `equipment` store). The first ranged weapon is a crafted upgrade.
+      hasBow: () => this.equipment.get('ranged') !== null,
     });
 
     // Build placement (plan 013 Step 6) — constructed fresh each (re)start; its constructor wires a
@@ -838,6 +863,9 @@ export class GameScene extends Phaser.Scene {
     // Seed the base-supply readout with this (re)start's pool (fresh = 0/0) so it reflects this run
     // (plan 042 Step 3).
     this.game.events.emit('supply:changed', this.baseSupply.snapshot());
+    // Seed the equip readout with this (re)start's loadout (fresh = all empty) so the toolbar/pack
+    // outline + durability bar reflect this run (plan 049 Step 3).
+    this.emitEquipment();
   }
 
   /** Wire every `game.events` scene↔HUD listener + its matching SHUTDOWN teardown (the same 12
@@ -885,6 +913,8 @@ export class GameScene extends Phaser.Scene {
       // player `repair` order — the same worker orders a `__test.enqueue` drives.
       ['craft:queue', this.onCraftQueue, this],
       ['craft:repair', this.onCraftRepair, this],
+      // Tapping an equippable item in the toolbar/pack (plan 049) toggles it in/out of its slot.
+      ['equip:toggle', this.toggleEquip, this],
     ];
     for (const [event, handler, ctx] of subs) bus.on(event, handler, ctx);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -944,6 +974,24 @@ export class GameScene extends Phaser.Scene {
       setModeAndEmit: (m) => {
         this.mode = m;
         this.game.events.emit('mode:changed', this.mode);
+      },
+      clearEquipment: () => {
+        for (const slot of EQUIP_SLOTS) this.equipment.unequip(slot);
+        this.emitEquipment();
+      },
+      equipForTest: (itemId) => {
+        const def = ITEMS[itemId];
+        if (!def?.equip) return;
+        this.equipment.equip(def.equip, itemId, def.durability ?? null);
+        this.emitEquipment();
+      },
+      equipmentSnapshot: () => this.equipment.snapshot(),
+      playerLightRadius: () => this.playerLight().radius,
+      setEquipDurability: (itemId, value) => {
+        const slot = this.equipment.slotOf(itemId);
+        if (!slot) return;
+        this.equipment.equip(slot, itemId, value);
+        this.emitEquipment();
       },
       setRng: (fn) => {
         this.rng = fn;
@@ -1019,6 +1067,8 @@ export class GameScene extends Phaser.Scene {
       zoneAt: (c, r) => this.zoneAt(c, r),
       moveEnemy: (i, c, r) => testApi.moveEnemy(i, c, r),
       setPlayerMelee: (id) => testApi.setPlayerMelee(id),
+      equip: (itemId) => testApi.equip(itemId),
+      setEquipDurability: (itemId, value) => testApi.setEquipDurability(itemId, value),
       // Companion assignment setters (plan 042 Step 2) — route to the SHARED scene methods the
       // assignment menu also calls (plan 042 Step 9), so the harness and the in-game menu drive exactly
       // one code path. No-op if no companion is spawned; each writes a live-polled field.
@@ -1048,6 +1098,10 @@ export class GameScene extends Phaser.Scene {
     // Live structures tick every frame too (above the early-return), so a campfire burns down whether
     // or not a worker task is active — mirrors the survival tick. See src/scenes/world/StructureManager.ts.
     this.structureManager.tick(delta);
+
+    // Equipped brand burns down in real time (plan 049 Step 6) — above the early-return so it drains
+    // whether or not a worker task is active, like the survival/structure ticks.
+    this.tickBrand(delta);
 
     // AI companion (plan 042) — drive it each frame (advance path + anim today; the gather/guard tick
     // lands later). Above the no-action early-return so it ticks whether or not a worker task is active.
@@ -1717,7 +1771,11 @@ export class GameScene extends Phaser.Scene {
     // glow lights the character. x is unaffected (originX 0.5 is already centred).
     const s = this.player;
     const centerY = s.y - (s.originY - 0.5) * s.displayHeight;
-    return { x: s.x, y: centerY, radius: PLAYER_LIGHT_RADIUS };
+    // A lit brand in the off hand (plan 049) raises the disc to BRAND_LIGHT_RADIUS — the path
+    // config.ts prescribed ("a future off-hand torch just raises this radius"). SurvivalClock's
+    // night-overlay union already consumes playerLight(), so the disc grows for free; fog is unchanged.
+    const litBrand = this.equipment.get('offHand')?.id === 'brand';
+    return { x: s.x, y: centerY, radius: litBrand ? BRAND_LIGHT_RADIUS : PLAYER_LIGHT_RADIUS };
   }
 
   private litHearth(): { id: string; tile: Cell; pos: { x: number; y: number } } | null {
@@ -1878,6 +1936,80 @@ export class GameScene extends Phaser.Scene {
    *  worker order for the bench (plan 048 Step 7; the mechanic landed in Step 4). */
   private onCraftRepair(p: { benchId: string }): void {
     this.enqueue({ kind: 'repair', structureId: p.benchId });
+  }
+
+  /** Emit the current equip loadout to the HUD (plan 049). The single forward point for
+   *  `equipment:changed`, called after {@link toggleEquip} and on (re)start; Step 6's drain loop also
+   *  calls it (throttled) so the durability bar animates without a per-frame flood. */
+  private emitEquipment(): void {
+    this.game.events.emit('equipment:changed', this.equipment.snapshot());
+  }
+
+  /** Re-derive the player's active melee weapon from the main-hand slot (plan 049): the equipped item
+   *  maps (via `ITEM_MELEE_WEAPON`) to a `MELEE_WEAPONS` entry; an empty (or unmapped) main hand falls
+   *  back to unarmed — today's behaviour. Bound to `Equipment` `'change'`, so equip/unequip flips the
+   *  swing shape/damage immediately. */
+  private syncMeleeFromEquipment(): void {
+    if (!this.playerChar) return; // equipment is built before the player; no change fires in that gap
+    const main = this.equipment.get('mainHand');
+    const weaponId = main ? ITEM_MELEE_WEAPON[main.id] : undefined;
+    this.playerChar.setMeleeWeapon(weaponId ? MELEE_WEAPONS[weaponId] : undefined);
+  }
+
+  /** Burn down an equipped brand in real time (plan 049 Step 6): while a consumable is in the off hand
+   *  (durability-bearing — the brand), drain it by the per-second rate scaled to this frame's `delta`.
+   *  On destroy the slot is already cleared by `drain`, so forward the emptied loadout immediately (the
+   *  HUD drops the icon + bar, and `playerLight()` reverts to the base radius next frame); otherwise
+   *  forward on a throttle so the durability bar animates without a per-frame store flood. */
+  private tickBrand(delta: number): void {
+    const off = this.equipment.get('offHand');
+    if (!off || off.durability === null) {
+      this.brandEmitAccumMs = 0;
+      return;
+    }
+    if (this.equipment.drain('offHand', BRAND_DRAIN_PER_SEC * (delta / 1000)) === 'destroyed') {
+      this.brandEmitAccumMs = 0;
+      this.emitEquipment();
+      return;
+    }
+    this.brandEmitAccumMs += delta;
+    if (this.brandEmitAccumMs >= BRAND_DRAIN_EMIT_MS) {
+      this.brandEmitAccumMs = 0;
+      this.emitEquipment();
+    }
+  }
+
+  /**
+   * Toggle-equip an item from the toolbar/pack (plan 049): tapping an equippable item equips it into
+   * its declared slot, or unequips it if it's already worn. Non-equippable ids are a silent no-op.
+   *
+   * Bag bookkeeping mirrors the two durability models (decision #6): a **permanent** item (bow/sword,
+   * no `durability`) moves bag↔slot — equipping spends one from the bag, unequipping returns it. The
+   * **brand** is **equip-to-consume** — equipping spends one and seeds the slot's durability;
+   * unequipping (or draining to 0, Step 6) discards it with no restash. Equipping into an occupied slot
+   * first vacates it under the same rules (a displaced permanent returns to the bag; a displaced brand
+   * is discarded).
+   */
+  private toggleEquip(p: { itemId: string }): void {
+    const def = ITEMS[p.itemId];
+    if (!def?.equip) return; // not an equippable item
+    const worn = this.equipment.slotOf(p.itemId);
+    if (worn) {
+      this.equipment.unequip(worn);
+      if (def.durability === undefined) this.inv.add(p.itemId, 1); // permanent → back to bag; brand → discarded
+      this.emitEquipment();
+      return;
+    }
+    if (!this.inv.has(p.itemId, 1)) return; // nothing to equip
+    // Vacate the target slot first, restashing a displaced permanent (a displaced brand is discarded).
+    const displaced = this.equipment.get(def.equip);
+    if (displaced) {
+      this.equipment.unequip(def.equip);
+      if (ITEMS[displaced.id]?.durability === undefined) this.inv.add(displaced.id, 1);
+    }
+    this.inv.spend({ [p.itemId]: 1 });
+    this.equipment.equip(def.equip, p.itemId, def.durability ?? null);
+    this.emitEquipment();
   }
 
   /** True while the movepad is authoritative — manual Combat mode OR the combatActive auto-surface

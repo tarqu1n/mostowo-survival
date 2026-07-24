@@ -420,6 +420,36 @@ Tuning: `WORKBENCH` maxHp inline on the buildable; `CRAFT_BASE_MS`/`CRAFT_DAMAGE
 bash+destroy, player repair, healthy vs HP-scaled-slow craft, HUD-menu event path). Out of scope (→ 049):
 equip/durability/torch-light/combat for the crafted items; NPC crafting.
 
+## Equippable items + equip slots (plan 049)
+
+The first **equippable items** and the equip-slot system, giving the 048-crafted brand/bow/sword a use.
+Three slots — **mainHand · ranged · offHand** — with an **empty default loadout** (unarmed melee, no
+ranged, empty off hand). Tapping an equippable in the toolbar/pack **toggles equip** (`equip:toggle`);
+the worn slot gets a **gold outline**.
+
+- **`Equipment` pure system** (`systems/Equipment.ts`) — mirrors `Inventory` (extends `eventemitter3`,
+  no Phaser, plain-Node testable). State `Record<EquipSlot, {id, durability|null}|null>`; `equip`/
+  `unequip`/`drain`→`'ok'|'destroyed'`/`slotOf`/`snapshot`, emits `'change'`. Durability lives **only
+  here**, never on the bag `Slot`.
+- **Bag↔slot (`GameScene.toggleEquip`)** — permanent gear (bow/sword, no `durability`) moves bag↔slot;
+  the **brand is equip-to-consume** (equip spends 1 + seeds durability; unequip/destroy discards, no
+  restash). Equip fields are data on `ItemDef` (`equip?`/`durability?`); `ITEM_MELEE_WEAPON` maps a
+  main-hand id → its `MELEE_WEAPONS` entry.
+- **Combat** — main-hand item → active melee weapon (`syncMeleeFromEquipment` off `Equipment` `'change'`;
+  empty → unarmed). **Ranged gated on an equipped bow**: `combat:bow` no-ops without one and the HUD
+  hides the Bow button (the crafted bow is the first ranged weapon).
+- **Brand** (off-hand hand-torch) — while equipped, `playerLight()` raises the night disc to
+  `BRAND_LIGHT_RADIUS`, and it **drains in real time** (`tickBrand`, throttled HUD forward), **destroyed
+  at 0**. A **durability bar** renders in the toolbar + pack.
+- **Seam** — `bridge.ts` `equip:toggle`(in)/`equipment:changed`(out) → store `equipment`; shared HUD
+  read-model `hud/lib/equip.ts`. `DebugState.equipment`/`playerLightRadius` + `__test.equip`/
+  `setEquipDurability` + `ScenarioSpec.equip[]` for specs.
+
+Tuning: `BRAND_DURABILITY`/`BRAND_LIFETIME_SEC`/`BRAND_DRAIN_PER_SEC`/`BRAND_LIGHT_RADIUS`/
+`BRAND_DRAIN_EMIT_MS` + `MELEE_WEAPONS.sword` in `config.ts`/`data/weapons.ts`. E2e:
+`tests/e2e/equip.spec.ts` (no-bow gate, bow ranged-fire, sword melee upgrade, brand light+drain+destroy).
+Out of scope: equipment rendering on the body (→ plan 010), armour/tool/shield slots, NPC equipment, ammo.
+
 ## Rendering (art, glow, crisp actors)
 
 - **Active art is Pixel Crawler** (plan 005): `ACTIVE_TILESET` in `src/data/tileset.ts`; the Zombie

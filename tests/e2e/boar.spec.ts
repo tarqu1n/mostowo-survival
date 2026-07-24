@@ -105,6 +105,7 @@ test('a boar takes bow damage from range (reuses the 035a bow)', async ({ page }
     player: [10, 10],
     facing: 'up',
     mode: 'combat',
+    equip: ['bow'], // ranged gated on an equipped bow (plan 049)
     enemies: [{ at: [10, 5], id: 'boar' }],
   });
   expect((await state(page)).enemies).toBe(1);

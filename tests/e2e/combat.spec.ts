@@ -207,8 +207,9 @@ test('firing the bow slows the player only lightly — kite-able, unlike melee (
   const fullDist = (await state(page)).px - startFull;
 
   // Same drive after firing the bow: the bow-fire lock slows movement only to BOW_MOVE_SLOW (0.75) —
-  // you keep kiting. Contrast the melee test above (~0.2, near-rooted).
-  await applyScenario(page, { player: [10, 10], mode: 'combat' });
+  // you keep kiting. Contrast the melee test above (~0.2, near-rooted). Bow equipped to enable ranged
+  // (plan 049 gates `combat:bow` on an equipped bow).
+  await applyScenario(page, { player: [10, 10], mode: 'combat', equip: ['bow'] });
   const startBow = (await state(page)).px;
   await emit(page, 'combat:bow'); // BOW_DRAW_MS lock (~450ms) covers the whole 300ms drive
   await emit(page, 'combat:move', { dx: 1, dy: 0 });
@@ -230,6 +231,7 @@ test('the bow auto-targets the nearest enemy in the facing direction (plan 035a)
     player: [10, 10],
     facing: 'right',
     mode: 'combat',
+    equip: ['bow'], // ranged gated on an equipped bow (plan 049)
     enemies: [
       [13, 10],
       [10, 13],
@@ -253,6 +255,7 @@ test('the bow kills an enemy from range while the player stays put, then clears 
     player: [10, 10],
     facing: 'up',
     mode: 'combat',
+    equip: ['bow'], // ranged gated on an equipped bow (plan 049)
     enemies: [[10, 5]],
   });
   expect((await state(page)).enemies).toBe(1);
@@ -306,6 +309,7 @@ test('the bow target keeps its HP bar persistently, past the on-hit fade (plan 0
     player: [10, 10],
     facing: 'up',
     mode: 'combat',
+    equip: ['bow'], // ranged gated on an equipped bow (plan 049)
     enemies: [[10, 5]],
   });
 

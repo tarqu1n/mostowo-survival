@@ -15,6 +15,7 @@ async function armFightHud(page: import('@playwright/test').Page) {
     g.__combat = { attack: 0, bow: 0 };
     g.events.on('combat:attack', () => (g.__combat.attack += 1));
     g.events.on('combat:bow', () => (g.__combat.bow += 1));
+    g.__test.equip('bow'); // the Bow button shows only with a bow equipped (plan 049)
     g.events.emit('mode:changed', 'combat'); // render the fight morph in the HUD
   });
   await page.waitForSelector('[data-testid="hud-movepad"]');
