@@ -4388,6 +4388,38 @@
       "flipX": false,
       "flipY": false,
       "depth": 0
+    },
+    {
+      "id": "node_0055",
+      "kind": "node",
+      "ref": "tree",
+      "col": 123,
+      "row": 114,
+      "skin": "ff_violet_4"
+    },
+    {
+      "id": "node_0056",
+      "kind": "node",
+      "ref": "tree",
+      "col": 124,
+      "row": 116,
+      "skin": "ff_green_1"
+    },
+    {
+      "id": "node_0057",
+      "kind": "node",
+      "ref": "tree",
+      "col": 126,
+      "row": 118,
+      "skin": "ff_green_5"
+    },
+    {
+      "id": "node_0058",
+      "kind": "node",
+      "ref": "tree",
+      "col": 127,
+      "row": 120,
+      "skin": "ff_azure_2"
     }
   ]
 }
