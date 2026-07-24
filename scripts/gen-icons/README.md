@@ -25,6 +25,32 @@ public Google API, so only the *key* needs the LAN:
 
 `--dry-run` needs no key (composes and prints prompts, no API call, no spend).
 
+### Running it from a Claude cloud session (verified 2026-07-24)
+
+Two gotchas make the naive run fail, so capture them here rather than rediscover them:
+
+1. **Each Bash tool call is a fresh shell** — shell state does not persist. So the key-fetch and
+   the `generate.py` call must be in **one** invocation, or the exported `GEMINI_API_KEY` is gone by
+   the next call.
+2. **The sandbox ships without the Python image deps** (`numpy`, `pillow`) — install them first.
+
+The end-to-end sequence that works:
+
+```bash
+# 1. Python deps (neither numpy nor pillow is preinstalled in the sandbox)
+pip install -q numpy pillow
+
+# 2. Join the Tailnet + define `gssh` — full bring-up (install tailscale, userspace networking +
+#    SOCKS5 proxy, sshpass) is in docs/MOBILE-EDITOR-ACCESS.md. Then, in ONE shell, fetch the key
+#    into env and generate — the key never touches disk, a log, or a preview:
+export GEMINI_API_KEY="$(gssh 'grep -E "^GEMINI_API_KEY=" /home/guppi/house-helper/.env | cut -d= -f2- | tr -d "\r\n"')"
+[ -n "$GEMINI_API_KEY" ] || { echo "key not loaded"; exit 1; }   # never echo the value itself
+python3 scripts/gen-icons/generate.py            # all items — or --only <id>
+```
+
+If `urllib` hits a TLS error reaching `generativelanguage.googleapis.com` through the agent proxy,
+`export SSL_CERT_FILE=/root/.ccr/ca-bundle.crt` before generating (see `/root/.ccr/README.md`).
+
 ## Run
 
 ```bash
