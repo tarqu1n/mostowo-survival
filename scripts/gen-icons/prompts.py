@@ -41,6 +41,14 @@ SUBJECTS = {
         "a small cluster of dark forest berries on a short sprig with one or two green "
         "leaves, plump and juicy, faintly ominous"
     ),
+    "cloth": (
+        "a folded stack of rough torn fabric / rags, frayed ragged edges and a loose "
+        "hanging thread, muted grimy off-white, beige and grey tones"
+    ),
+    "cannedFood": (
+        "a single stubby tin can of food, metal lid, a worn part-peeling paper label with "
+        "no readable text, faint dents and specks of rust"
+    ),
 }
 
 

@@ -1,19 +1,19 @@
 /**
- * Placeholder art for the destroyed-tent "salvage" nodes + their two new salvage item icons
- * (plan: salvage action — scavenge a wrecked 6-person tent for a loot roll). Same self-contained
- * RGBA/8-bit PNG encoder as `scripts/placeholder-art.mjs` (Node `zlib` only, no image deps).
+ * Placeholder art for the destroyed-tent "salvage" nodes (plan: salvage action — scavenge a wrecked
+ * 6-person tent for a loot roll). Same self-contained RGBA/8-bit PNG encoder as
+ * `scripts/placeholder-art.mjs` (Node `zlib` only, no image deps).
  *
  * These are hand-authored PLACEHOLDERS — the game has no tent art in any pack and the Gemini
  * image-to-image pipeline (docs/AI-SPRITE-PIPELINE.md) needs a key that isn't reachable from a
  * cloud session. Regenerate the real sprites through that pipeline later; until then these read as
  * collapsed tents at game scale. Deterministic (no RNG) so it's safe to re-run.
  *
- * Emits (all under the self-made `mostowo-custom` pack + the shared icon dir):
+ * Emits (under the self-made `mostowo-custom` pack):
  *   - tilesets/mostowo-custom/Environment/Props/Static/tent_wreck_{1,2,3}.png        (live)
  *   - tilesets/mostowo-custom/Environment/Props/Static/tent_wreck_{1,2,3}_searched.png (depleted)
- *   - icons/cloth.png, icons/canned_food.png                                          (32×32 items)
  *
- * Re-run: `node scripts/tent-art.mjs`.
+ * The salvage item icons (`cloth`, `cannedFood`) are NOT emitted here anymore — they're
+ * Gemini-generated real art via `scripts/gen-icons/` (prompts.py). Re-run: `node scripts/tent-art.mjs`.
  */
 import { deflateSync } from 'node:zlib';
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -142,7 +142,6 @@ function write(path, raster) {
 }
 
 const TILESET = 'public/assets/tilesets/mostowo-custom/Environment/Props/Static';
-const ICONS = 'public/assets/icons';
 
 // A destroyed 6-person tent reads at ~3×2 tiles (48×32px). Canvas leaves headroom for a leaning
 // pole + slack guy-lines; content is base-anchored (originY≈0.85) so it sits on the ground tile.
@@ -284,38 +283,7 @@ for (const v of VARIANTS) {
   write(`${TILESET}/tent_wreck_${v.n}_searched.png`, tentSearched(v));
 }
 
-// ---- Item icons for the two new salvage items (32×32) ----
-// cloth: a folded bolt of grubby canvas.
-{
-  const r = new Raster(32, 32);
-  const CLOTH = [0xc9, 0xba, 0x9a, 255];
-  const CLOTH_SH = [0x9a, 0x8a, 0x6c, 255];
-  const CLOTH_HI = [0xe4, 0xd8, 0xbd, 255];
-  r.rect(6, 9, 20, 15, CLOTH_SH); // stacked-fold shadow slab
-  r.rect(5, 7, 20, 14, CLOTH); // main folded bolt
-  r.rect(5, 7, 20, 3, CLOTH_HI); // lit top fold
-  for (let y = 12; y < 21; y += 3) r.line(6, y, 23, y, CLOTH_SH); // fold seams
-  r.line(5, 7, 24, 7, [0x6b, 0x5f, 0x48, 255]); // top edge
-  r.line(5, 20, 24, 20, [0x6b, 0x5f, 0x48, 255]); // bottom edge
-  write(`${ICONS}/cloth.png`, r);
-}
-// canned_food: a dented tin can with a label band.
-{
-  const r = new Raster(32, 32);
-  const TIN = [0x9b, 0xa3, 0xa8, 255];
-  const TIN_HI = [0xcf, 0xd6, 0xda, 255];
-  const TIN_SH = [0x6a, 0x71, 0x76, 255];
-  const LABEL = [0xb8, 0x5c, 0x33, 255];
-  const LABEL_HI = [0xd8, 0x7a, 0x4c, 255];
-  r.rect(9, 6, 14, 21, TIN); // can body
-  r.rect(9, 6, 3, 21, TIN_HI); // left highlight
-  r.rect(20, 6, 3, 21, TIN_SH); // right shade
-  r.rect(9, 12, 14, 9, LABEL); // paper label band
-  r.rect(9, 12, 14, 2, LABEL_HI);
-  r.disc(16, 6, 7, TIN); // lid ellipse-ish top
-  r.rect(9, 5, 14, 2, TIN_HI); // lid rim
-  r.line(9, 5, 22, 5, TIN_SH);
-  // A dent in the side.
-  r.disc(21, 18, 2, TIN_SH);
-  write(`${ICONS}/canned_food.png`, r);
-}
+// NOTE: the `cloth` + `cannedFood` item icons used to be hand-baked here as placeholders. They're
+// now Gemini-generated real art owned by `scripts/gen-icons/` (see prompts.py) and committed as
+// `icons/cloth.png` / `icons/cannedFood.png`. This script no longer emits any item icons — it only
+// bakes the tent-wreck props above. Regenerate the salvage icons via `scripts/gen-icons/generate.py`.

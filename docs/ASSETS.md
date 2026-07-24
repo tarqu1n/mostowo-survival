@@ -65,9 +65,11 @@ missing). They're generated from prompts, not hand-drawn:
   `GEMINI_API_KEY`** (LAN-only, via Tailscale), so it's a run-when-reachable step, not part of the
   build — the game stays green on whatever icons are committed.
 
-> **Origins:** `wood`, `stone`, `berries` are all **Gemini-generated** (plan 009,
-> `gemini-2.5-flash-image`) via `scripts/gen-icons/` — regenerate/tweak from `prompts.py`, the
-> reproducible source. No item icons remain as plan-008 placeholders.
+> **Origins:** all five item icons — `wood`, `stone`, `berries`, `cloth`, `cannedFood` — are
+> **Gemini-generated** (`gemini-2.5-flash-image`) via `scripts/gen-icons/`; regenerate/tweak from
+> `prompts.py`, the reproducible source. No item icons remain as placeholders (`cloth`/`cannedFood`
+> were the last `tent-art.mjs` coloured-rect stand-ins; `cannedFood`'s file was renamed
+> `canned_food.png` → `cannedFood.png` to match the `<id>.png` convention).
 
 ## Where assets live
 

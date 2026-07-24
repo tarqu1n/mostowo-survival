@@ -275,7 +275,8 @@ for items from a predefined set instead of a single fixed yield.
   bit wider (`SIDE_W` 80px) since they render low. Regenerate: export `GEMINI_API_KEY` (guppi, over
   Tailscale — see below), `python3 scripts/gen-tents.py` (`--model` / `--dry-run` / `--reprocess` /
   `--only ID`), then `npm run assets:catalog`. The two salvage **item icons** (`icons/cloth.png`,
-  `icons/canned_food.png`) are still the hand-baked placeholders from `scripts/tent-art.mjs`.
+  `icons/cannedFood.png`) are Gemini-generated real art via `scripts/gen-icons/` (prompts.py), no
+  longer hand-baked placeholders.
   > **Getting the Gemini key from a cloud session:** guppi is Matt's **non-prod home server** and the
   > key lives in `guppi/house-helper/.env`, reachable over Tailscale with the session's own
   > `TAILSCALE_KEY`/`GUPPI_PASSWORD` — follow the verified recipe in

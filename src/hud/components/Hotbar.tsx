@@ -6,6 +6,7 @@ import { HUD_HOTBAR_SLOTS, LONGPRESS_MS } from '@/config';
 import { ITEMS } from '@/data/items';
 import { BUILDABLES } from '@/data/buildables';
 import { cn } from '@/hud/lib/utils';
+import { iconUrl } from '@/hud/lib/icons';
 
 /**
  * Field Kit hotbar (plan 046 Step 6) — the always-visible quick-swap loadout row (`HUD_HOTBAR_SLOTS`
@@ -59,11 +60,6 @@ function activate(slot: NonNullable<HotbarSlot>): void {
   if (def?.nutrition != null) {
     bridge.emit({ type: 'needs:eat', payload: { itemId: slot.id } });
   }
-}
-
-/** Absolute URL of an item icon (mirrors PreloadScene's `assets/icons/<file>` load path). */
-function iconUrl(file: string): string {
-  return encodeURI(`${import.meta.env.BASE_URL}assets/icons/${file}`);
 }
 
 /** Live stack count for an item slot (from the mirrored inventory), or `null` when a count shouldn't

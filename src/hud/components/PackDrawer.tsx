@@ -3,6 +3,7 @@ import { ITEMS } from '@/data/items';
 import { useHudStore } from '@/hud/store';
 import { hudBridge } from '@/hud/hooks/useBridge';
 import { cn } from '@/hud/lib/utils';
+import { iconUrl } from '@/hud/lib/icons';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/hud/ui/sheet';
 
 /**
@@ -89,7 +90,7 @@ function PackSlot({
     >
       {def?.icon ? (
         <img
-          src={`/assets/icons/${def.icon}`}
+          src={iconUrl(def.icon)}
           alt=""
           className="size-12 [image-rendering:pixelated]"
           aria-hidden

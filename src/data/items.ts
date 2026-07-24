@@ -18,14 +18,14 @@ export const ITEMS: Record<string, ItemDef> = {
   },
   // Salvage set — scavenged from a wrecked tent via the "salvage" action (loot table on the
   // `salvagedTent` node). `cloth` is a crafting/repair material (inedible); `cannedFood` is edible
-  // trail rations. Both placeholder icons are baked by `scripts/tent-art.mjs`.
+  // trail rations. Icons are Gemini-generated (scripts/gen-icons/), keyed `<id>.png` like the rest.
   cloth: { id: 'cloth', name: 'Cloth', color: 0xc9ba9a, maxStack: 50, icon: 'cloth.png' },
   cannedFood: {
     id: 'cannedFood',
     name: 'Canned Food',
     color: 0xb85c33,
     maxStack: 50,
-    icon: 'canned_food.png',
+    icon: 'cannedFood.png',
     nutrition: 40,
   },
 };
