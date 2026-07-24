@@ -3458,7 +3458,7 @@
       "kind": "node",
       "ref": "tree",
       "col": 108,
-      "row": 146,
+      "row": 147,
       "skin": "default",
       "rotation": 326.3866414888742
     },
@@ -4362,6 +4362,19 @@
       "row": 128,
       "skin": "default",
       "rotation": 350
+    },
+    {
+      "id": "decor_0054",
+      "kind": "decor",
+      "asset": "mostowo-custom/Environment/Props/Static/jetty_side_1.png",
+      "x": 1704,
+      "y": 2312,
+      "scaleX": 1,
+      "scaleY": 1,
+      "rotation": 0,
+      "flipX": false,
+      "flipY": false,
+      "depth": 0
     }
   ]
 }
