@@ -5,6 +5,7 @@ import type { BuildableDef } from '@/data/types';
 import { useHudStore } from '@/hud/store';
 import { hudBridge } from '@/hud/hooks/useBridge';
 import { cn } from '@/hud/lib/utils';
+import { BuildableIcon } from './BuildableIcon';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/hud/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/hud/ui/tabs';
 
@@ -96,10 +97,16 @@ function BuildTile({
       )}
       {...press}
     >
-      <span
-        className="size-12 rounded-sm border border-border"
-        style={{ backgroundColor: hexColor(def.color) }}
-        aria-hidden
+      <BuildableIcon
+        def={def}
+        className="size-12"
+        fallback={
+          <span
+            className="size-12 rounded-sm border border-border"
+            style={{ backgroundColor: hexColor(def.color) }}
+            aria-hidden
+          />
+        }
       />
       <span className="text-xs font-medium text-foreground">{def.name}</span>
       <span className="flex flex-wrap justify-center gap-1">

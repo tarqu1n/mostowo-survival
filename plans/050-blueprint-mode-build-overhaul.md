@@ -242,7 +242,9 @@ build slowly (one serial worker). Keep any fetched image-gen key in-memory only 
   - Done when: building shows a progress bar + scaffold resolving into the built sprite; no fx leaks;
     smoke passes.
 
-- [ ] **Step 10: Structure icons (separable follow-up)** `[inline]`
+- [~] **Step 10: Structure icons (separable follow-up)** `[inline]` — CODE PART DONE; icon-art generation DEFERRED (follow-up)
+  - Outcome (code part): new shared `src/hud/components/BuildableIcon.tsx` (`{def, className?, fallback}` — renders pixel-crisp `<img src={iconUrl(def.icon)}>` when `icon` set, else the caller's `fallback`). Wired into `BuildCatalog.tsx` (icon vs colour swatch), `Hotbar.tsx` `SlotContent` (icon vs name text; dropped stale TODO), `CommandBar.tsx` build tray chip (icon-only slot, `null` fallback). `CommitBar.tsx` skipped — `RunTally` has no buildable identity, no natural slot. No buildable sets `icon` yet, so visuals are byte-for-byte unchanged; the `<img>` path activates once icon files land. typecheck clean, 1009 unit pass, build compiles.
+  - DEFERRED (not done): generating structure-icon PNGs into `public/assets/icons/` via the Gemini pipeline over Tailscale/guppi + setting `icon` per buildable + the art/assets doc pointer. Left as a separate follow-up (per session decision to avoid external-service connection here); swatch fallback fully covers the gap.
   - Render `<img src={`/assets/icons/${def.icon}`}>` (`image-rendering:pixelated`) wherever buildables
     show — build catalog (`BuildCatalog.tsx:99-103`), hotbar (`Hotbar.tsx:189-191` TODO), command-bar
     tray, commit bar — **falling back to the colour swatch** when `def.icon` is unset.

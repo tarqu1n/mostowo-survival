@@ -7,6 +7,7 @@ import { ITEMS } from '@/data/items';
 import type { BuildableDef } from '@/data/types';
 import { Button } from '@/hud/ui/button';
 import { cn } from '@/hud/lib/utils';
+import { BuildableIcon } from './BuildableIcon';
 import { Movepad } from './Movepad';
 
 /**
@@ -161,6 +162,9 @@ export function CommandBar({
                     : 'border-border bg-surface-subtle text-fg-muted',
                 )}
               >
+                {/* Buildable icon atop the chip when its art exists; nothing today (icon unset), so
+                    the chip stays name+cost text — falls back via BuildableIcon (plan 050 Step 10). */}
+                <BuildableIcon def={def} className="mx-auto mb-0.5 size-8" fallback={null} />
                 <span className="block truncate text-[9px] leading-tight">{def.name}</span>
                 <span className="mt-0.5 block truncate text-[8px] text-gold">{costLabel(def)}</span>
               </button>

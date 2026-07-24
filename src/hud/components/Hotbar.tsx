@@ -8,6 +8,7 @@ import { BUILDABLES } from '@/data/buildables';
 import { cn } from '@/hud/lib/utils';
 import { iconUrl } from '@/hud/lib/icons';
 import { equipViewOf, isEquippable } from '@/hud/lib/equip';
+import { BuildableIcon } from './BuildableIcon';
 
 /**
  * Field Kit hotbar (plan 046 Step 6) — the always-visible quick-swap loadout row (`HUD_HOTBAR_SLOTS`
@@ -195,7 +196,9 @@ function SlotButton({ slot }: { slot: HotbarSlot }) {
   );
 }
 
-/** Icon (item art) or a short text label (buildables ship no icon in data yet — TODO: buildable icons). */
+/** Icon art or a short text label, for either kind. Items and buildables both render their `icon` PNG
+ *  when the data carries one, falling back to the short name (no buildable ships an icon yet — the art
+ *  is a deferred plan-050 follow-up, but the render path is wired via {@link BuildableIcon}). */
 function SlotContent({ slot }: { slot: NonNullable<HotbarSlot> }) {
   if (slot.kind === 'item') {
     const def = ITEMS[slot.id];
@@ -211,9 +214,10 @@ function SlotContent({ slot }: { slot: NonNullable<HotbarSlot> }) {
     }
     return <SlotText>{def?.name ?? slot.id}</SlotText>;
   }
-  // Buildable: no icon field on BuildableDef, so fall back to the short name (TODO: buildable icons).
+  // Buildable: an icon PNG when the data sets one (none do yet), else the short name.
   const def = BUILDABLES[slot.id];
-  return <SlotText>{def?.name ?? slot.id}</SlotText>;
+  if (!def) return <SlotText>{slot.id}</SlotText>;
+  return <BuildableIcon def={def} className="size-9" fallback={<SlotText>{def.name}</SlotText>} />;
 }
 
 function SlotText({ children }: { children: string }) {
