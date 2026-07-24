@@ -614,6 +614,15 @@ export const CRAFT_BASE_MS = 8000;
 export const CRAFT_DAMAGED_MIN_FRAC = 0.4;
 
 /**
+ * Player workbench repair (plan 048 Step 4) — the player-queued `repair` order tends a damaged bench
+ * on a cadence, restoring `WORKBENCH_REPAIR_PER_TICK` hp every `WORKBENCH_REPAIR_INTERVAL_MS` until
+ * full (worker-time only, no resource cost this pass — mirrors the trap re-arm). Distinct from the
+ * companion's wall repair (`NPC_REPAIR_HP_PER_TICK`, off baseSupply). Placeholder numbers.
+ */
+export const WORKBENCH_REPAIR_INTERVAL_MS = 500;
+export const WORKBENCH_REPAIR_PER_TICK = 4;
+
+/**
  * Trap tuning (placeholder — tune vs wave DPS). The spike trap (plan 040) is an ARMED floor tile that
  * triggers ONCE when an enemy stands on it, deals flat `SPIKE_TRAP_DAMAGE` through the normal kill
  * path, then goes spent until re-armed (a dawn worker order + a tap).

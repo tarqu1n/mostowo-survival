@@ -21,7 +21,7 @@ describe('orderTargetId', () => {
     expect(orderTargetId(build('s1'))).toBe('s1');
     expect(orderTargetId(deconstruct('w1'))).toBe('w1');
     expect(orderTargetId(rearm('r1'))).toBe('r1');
-    expect(orderTargetId({ kind: 'repair', wallId: 'w9' })).toBe('w9');
+    expect(orderTargetId({ kind: 'repair', structureId: 'w9' })).toBe('w9');
   });
 
   it('is null for a move (no target)', () => {
@@ -37,7 +37,7 @@ describe('sameOrderTarget', () => {
 
   it('false across kinds even when ids coincide', () => {
     // a wall id shared by deconstruct + repair must not collide
-    expect(sameOrderTarget(deconstruct('w1'), { kind: 'repair', wallId: 'w1' })).toBe(false);
+    expect(sameOrderTarget(deconstruct('w1'), { kind: 'repair', structureId: 'w1' })).toBe(false);
   });
 
   it('a move never matches (null target)', () => {

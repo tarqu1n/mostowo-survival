@@ -153,7 +153,7 @@ queued station task over `craftMs`" — exactly the worker-order model here.
     Build + 967 unit tests + smoke green; the runtime materialise/damage/repair proof lands in Step 4's
     scenario test (as sequenced).
 
-- [ ] **Step 4: Mobs attack + player repairs the workbench** `[inline]`
+- [x] **Step 4: Mobs attack + player repairs the workbench** `[inline]`
   - Extend the GameScene wiring of `EnemyManager` `structureAt`/`attackStructure` (currently
     wall-only) to also resolve a **blocking workbench** and route damage to
     `WorkbenchBehavior.takeDamage`. Allow the player `repair` order to target a workbench (add a
@@ -163,6 +163,21 @@ queued station task over `craftMs`" — exactly the worker-order model here.
     change (bench `blocksPath`).
   - Done when: a night mob adjacent to a workbench damages it; a queued repair restores it; a
     scenario test shows both.
+  - Outcome: `structureAt` now resolves wall-first-then-workbench (bench = `objectAsDefender` +
+    0 thorns); `attackStructure` routes damage by id lookup (wall else bench). Generalised the `repair`
+    Action's field `wallId`→`structureId` (honest — repair targets a structure); updated `orders.ts`
+    (`orderTargetId` + doc), CompanionManager (2 refs — its wall repair still works), `orders.test.ts`.
+    Added a PLAYER `repair` begin/run (`beginRepair`/`runRepair`, workbench-scoped: walk-adjacent →
+    tend on a cadence → hp to max, worker-time only, no resource cost) wired into the begin/run dispatch
+    tables (was a no-op stub); config `WORKBENCH_REPAIR_INTERVAL_MS`/`_PER_TICK`. The player-facing
+    repair TRIGGER (a Repair action in the craft menu when damaged) is deferred to Step 7 — Step 4
+    proves the mechanic via the DEV enqueue seam. Scenario harness: `workbenches` fixture (ScenarioSpec)
+    - `workbenchIds` (ScenarioResult) + `workbenches()`/`damageWorkbench()` DEV seams (standalone, NOT in
+    DebugState, so the refactor-tripwire golden is untouched) across `testTypes.ts`/`testApi.ts`/
+    `GameScene` `__test`/`harness.ts`. New `tests/e2e/workbench.spec.ts` (2 tests: a walled-off mob
+    bashes+destroys the bench then reaches the player; a player `repair` order mends a damaged bench to
+    full HP). Build + 967 unit + the 2 new e2e + 22 affected e2e (companion/refactor-tripwire/wall-attack/
+    build) all green.
 
 - [ ] **Step 5: Recipe data model** `[delegate sonnet]`
   - New `src/data/recipes.ts`: `RECIPES: Record<string, RecipeDef>` where `RecipeDef =

@@ -454,7 +454,7 @@ export class CompanionManager {
       npc.advancePath(); // nothing to mend (no damaged wall, or empty supply) — settle in place
       return;
     }
-    if (action.kind === 'repair') this.runRepair(npc, action.wallId, delta);
+    if (action.kind === 'repair') this.runRepair(npc, action.structureId, delta);
 
     if (npc.isStuck()) this.repath(npc);
   }
@@ -475,7 +475,7 @@ export class CompanionManager {
       this.deps.dims(),
     );
     if (stand && this.pathTo(npc, stand)) {
-      this.queue.replace({ kind: 'repair', wallId: wall.id });
+      this.queue.replace({ kind: 'repair', structureId: wall.id });
       this.repairElapsed = 0;
     }
   }

@@ -27,6 +27,7 @@ import type { CompanionManager } from './world/CompanionManager';
 import type { CampfireBehavior } from './world/CampfireBehavior';
 import type { WallBehavior } from './world/WallBehavior';
 import type { TrapBehavior } from './world/TrapBehavior';
+import type { WorkbenchBehavior } from './world/WorkbenchBehavior';
 import type { WaveDirector } from './world/WaveDirector';
 import type { TaskGlowRenderer } from './fx/TaskGlowRenderer';
 import type { CombatFxManager } from './fx/CombatFxManager';
@@ -233,6 +234,9 @@ export class TestApi {
   private get trap(): TrapBehavior {
     return this.deps.structureManager.behavior<TrapBehavior>('trap');
   }
+  private get workbench(): WorkbenchBehavior {
+    return this.deps.structureManager.behavior<WorkbenchBehavior>('workbench');
+  }
 
   /**
    * Reset the live world to empty — destroy every tree/enemy/site/marker GameObject and clear all
@@ -358,6 +362,16 @@ export class TestApi {
       trapIds.push(list[list.length - 1].id);
     }
 
+    // Workbenches (plan 048): mirror the campfire/trap path (finishSite → materialiseBuildable →
+    // StructureManager.materialise → WorkbenchBehavior). Placed full-hp + idle; a spec drives one
+    // damaged via damageWorkbench (or an adjacent mob) then mends it with a `repair` order.
+    const workbenchIds: string[] = [];
+    for (const [c, r] of spec.workbenches ?? []) {
+      this.deps.buildManager.finishSite(this.deps.buildManager.createBlueprint(c, r, 'workbench'));
+      const list = this.workbench.all();
+      workbenchIds.push(list[list.length - 1].id);
+    }
+
     const siteIds: string[] = [];
     for (const [c, r] of spec.blueprints ?? [])
       siteIds.push(this.deps.buildManager.createBlueprint(c, r, 'wall').id);
@@ -425,7 +439,17 @@ export class TestApi {
 
     this.deps.updateVision();
     this.deps.emitTasks();
-    return { treeIds, rockIds, bushIds, tentIds, enemyIds, siteIds, campfireIds, trapIds };
+    return {
+      treeIds,
+      rockIds,
+      bushIds,
+      tentIds,
+      enemyIds,
+      siteIds,
+      campfireIds,
+      trapIds,
+      workbenchIds,
+    };
   }
 
   /**
@@ -506,6 +530,28 @@ export class TestApi {
     const w = this.wall.all()[index];
     if (!w) return false;
     return this.wall.takeDamage(w.id, amount);
+  }
+
+  /** DEV/test-only: the live workbenches (col/row/hp/maxHp + whether crafting), placement order — a
+   *  standalone read seam for the workbench spec (plan 048). NOT part of the serialized
+   *  {@link DebugState} (like {@link walls}), so the refactor-tripwire golden stays untouched. */
+  workbenches(): { col: number; row: number; hp: number; maxHp: number; crafting: boolean }[] {
+    return this.workbench.all().map((b) => ({
+      col: b.col,
+      row: b.row,
+      hp: b.state.hp,
+      maxHp: b.state.maxHp,
+      crafting: b.state.craft != null,
+    }));
+  }
+
+  /** DEV/test-only: damage the workbench at `index` by `amount` — the real
+   *  {@link WorkbenchBehavior.takeDamage} (the path a bashing mob drives). Returns whether that blow
+   *  destroyed the bench; false if there's no bench at that index. Mirrors {@link damageWall}. */
+  damageWorkbench(index: number, amount: number): boolean {
+    const b = this.workbench.all()[index];
+    if (!b) return false;
+    return this.workbench.takeDamage(b.id, amount);
   }
 
   /** DEV/test-only: live enemies' current HP, spec order — a standalone read seam (like {@link walls})

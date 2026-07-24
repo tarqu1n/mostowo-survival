@@ -61,6 +61,10 @@ export interface ScenarioSpec {
   /** Spike traps placed built + ARMED, bypassing tilePlaceable (fixtures) — a spec drives one spent by
    *  scripting an enemy onto its tile (plan 040). See __test.applyScenario. */
   traps?: Array<[number, number]>;
+  /** Workbenches placed built + full-hp, bypassing tilePlaceable/base-zone (fixtures) — a spec drives
+   *  one damaged via `damageWorkbench` (or an adjacent mob) then mends it with a `repair` order (plan
+   *  048). Ids returned as `workbenchIds`. See __test.applyScenario. */
+  workbenches?: Array<[number, number]>;
   /** Place the single AI companion (plan 042). `at` is its spawn tile; the rest seed its scaffold
    *  state so a spec can read it back via `debugState().companion` (behaviour lands in later steps).
    *  `guardAt` sets the night guard tile (not yet behavioural); `hp`/`downed` seed collapse-state e2e. */
@@ -91,6 +95,7 @@ export interface ScenarioResult {
   siteIds: string[];
   campfireIds: string[];
   trapIds: string[];
+  workbenchIds: string[];
 }
 
 /** The DEV-only debug surface installed at `window.game.__test` (see GameScene.create). */
@@ -119,6 +124,13 @@ export interface GameTestApi {
   /** DEV/test-only: damage the wall at `index` by `amount` (WallBehavior.takeDamage — the path chunk
    *  2c's enemy drives). Returns whether the blow destroyed it; false if no wall at that index. */
   damageWall(index: number, amount: number): boolean;
+  /** DEV/test-only: the live workbenches (col/row/hp/maxHp + whether crafting), placement order (plan
+   *  048) — the read seam the workbench spec asserts damage/repair against. NOT part of DebugState (like
+   *  {@link walls}), so the refactor-tripwire golden stays untouched. */
+  workbenches(): { col: number; row: number; hp: number; maxHp: number; crafting: boolean }[];
+  /** DEV/test-only: damage the workbench at `index` by `amount` (WorkbenchBehavior.takeDamage — the
+   *  path a bashing mob drives). Returns whether the blow destroyed it; false if none at that index. */
+  damageWorkbench(index: number, amount: number): boolean;
   /** DEV/test-only: live enemies' current HP, spec order (plan 037 2c) — lets the enemy-attack spec
    *  watch a mob's HP fall to a spiked wall's thorns. NOT part of DebugState (no golden bump). */
   enemyHps(): number[];
