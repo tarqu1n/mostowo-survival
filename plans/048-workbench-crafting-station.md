@@ -131,7 +131,7 @@ queued station task over `craftMs`" — exactly the worker-order model here.
     in-world wooden sprite RENDER lands in Step 3 (WorkbenchBehavior.materialise consumes `objectSprite`
     - `resolveDecorDraw`); Step 2 lands the data, the field, the config, and the preload.
 
-- [ ] **Step 3: `WorkbenchBehavior` StructureManager module** `[inline]`
+- [x] **Step 3: `WorkbenchBehavior` StructureManager module** `[inline]`
   - New `src/scenes/world/WorkbenchBehavior.ts` implementing `StructureBehavior` — copy `WallBehavior`
     for `materialise`/`takeDamage`/`repair`/`stats`/`highlightBounds`/`reset`/`destroy` + the
     SHUTDOWN/reset sprite rule. Add `WorkbenchStructure` to `entities/types.ts` (`hp`/`maxHp`, plus a
@@ -140,6 +140,18 @@ queued station task over `craftMs`" — exactly the worker-order model here.
   - Side effects: `StructureManager.stats`/`highlightBounds`/`materialise` already dispatch on
     `behavior` — just the registration + new module.
   - Done when: a built workbench is a live structure with HP that Inspect shows; build passes.
+  - Outcome: new `src/scenes/world/WorkbenchBehavior.ts` (copies the WallBehavior HP spine; renders the
+    STATIC `objectSprite` region crop via `resolveDecorDraw`+`parseAssetId`, no anim; damage feedback =
+    a progressive tint lerp white→dark-brown, no crumble sheet). `WorkbenchState`/`WorkbenchStructure`
+    (`hp`/`maxHp`/`craft`) added to `entities/types.ts`; `placedWorkbenchStats` added to `systems/stats.ts`
+    (currentHp bar + Idle/Crafting status). Registered under `'workbench'` in GameScene `buildWorld()`
+    with `freeTile`+`repath` deps (same as the wall). **Design decision (flag):** a bench IS destroyed
+    at `hp<=0` like the wall (faithful to "bashed by night mobs like a wall" — real defend-or-lose
+    stakes; the "never fully stalls" clause governs the craft RATE at positive HP, Step 6, not the HP).
+    The behavior-specific `workbench` getter is deferred to Step 4 (its first consumer) to avoid an
+    unused-symbol error — Step 3 reaches the bench only through the generic StructureManager dispatch.
+    Build + 967 unit tests + smoke green; the runtime materialise/damage/repair proof lands in Step 4's
+    scenario test (as sequenced).
 
 - [ ] **Step 4: Mobs attack + player repairs the workbench** `[inline]`
   - Extend the GameScene wiring of `EnemyManager` `structureAt`/`attackStructure` (currently

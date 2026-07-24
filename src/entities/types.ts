@@ -133,6 +133,23 @@ export interface TrapState {
 export type TrapStructure = PlacedStructure<TrapState>;
 
 /**
+ * A workbench crafting-station's runtime state (plan 048). The 4th StructureManager behavior — an HP
+ * structure like the wall (`hp`/`maxHp`: night mobs bash it, the player repairs it, and it crafts
+ * SLOWER while damaged — the `craft` order scales its rate by `hp/maxHp`), but with a STATIC object
+ * sprite ({@link PlacedStructure.sprite}, a `Workbench.png` region crop — no anim). `craft` is the
+ * in-flight craft an assigned worker is accumulating (`recipeId` + `progress` in ms toward the
+ * recipe's HP-scaled work-time); `null` when idle. Set/advanced/cleared by the `craft` worker order
+ * (Step 6), so a bench's progress survives the worker being interrupted mid-craft. WorkbenchBehavior
+ * is the sole writer of the sprite (damage-tint step) + this state.
+ */
+export interface WorkbenchState {
+  hp: number;
+  maxHp: number;
+  craft: { recipeId: string; progress: number } | null;
+}
+export type WorkbenchStructure = PlacedStructure<WorkbenchState>;
+
+/**
  * What a pointer "raycast" landed on: the specific world entity whose *rendered sprite* is drawn
  * under the point (see {@link ScenePicker.pickSpriteAt}). `null` (the absence of a pick) means empty
  * ground — no interactive sprite there — and the caller falls back to a plain move-to-tile. A built

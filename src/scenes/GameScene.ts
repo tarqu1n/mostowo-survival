@@ -54,6 +54,7 @@ import { StructureManager } from './world/StructureManager';
 import { CampfireBehavior } from './world/CampfireBehavior';
 import { WallBehavior } from './world/WallBehavior';
 import { TrapBehavior } from './world/TrapBehavior';
+import { WorkbenchBehavior } from './world/WorkbenchBehavior';
 import { SurvivalClock } from './world/SurvivalClock';
 import { WaveDirector } from './world/WaveDirector';
 import { VisionController } from './fx/VisionController';
@@ -231,6 +232,9 @@ export class GameScene extends Phaser.Scene {
   private get trap(): TrapBehavior {
     return this.structureManager.behavior<TrapBehavior>('trap');
   }
+  // The behavior-SPECIFIC workbench getter (takeDamage/repair/benchById) lands in Step 4, with its
+  // first consumer (the enemy-attack + repair wiring). Step 3 reaches the bench only through the generic
+  // StructureManager dispatch (materialise/stats/highlightBounds), so no getter is needed yet.
 
   // Pointer "raycast" + the tap/inspect intent built on top of it (plan 015 Step 5) — see
   // src/scenes/input/ScenePicker.ts. Stateless (no fields but scene+deps, no SHUTDOWN teardown — see
@@ -612,6 +616,17 @@ export class GameScene extends Phaser.Scene {
           this.enemyManager.hurtEnemy(z, amount);
           return true;
         },
+      }),
+    );
+    // Workbench crafting station (plan 048) — the 4th behavior: an HP structure like the wall (mobs bash
+    // it, the player repairs it, it crafts slower while damaged) but with a static object sprite. A
+    // destroyed bench frees its tile back through BuildManager (the sole occupancy/collision writer) +
+    // repaths, same as the wall.
+    this.structureManager.register(
+      'workbench',
+      new WorkbenchBehavior(this, {
+        freeTile: (c, r) => this.buildManager.releaseTile(c, r),
+        repath: () => this.repath(),
       }),
     );
 
