@@ -1,0 +1,542 @@
+<title>Mostowo Survival — Build UI: three directions (mobile-first)</title>
+<style>
+  :root {
+    --ground:#12160e; --ground-2:#171c11; --panel:#1c2215; --panel-2:#232a1a;
+    --line:#34402440; --line-solid:#3a4527; --ink:#ece7d6; --ink-dim:#a7a390;
+    --ink-faint:#6f6d5c; --ember:#ec8a3c; --ember-2:#f4b25a; --ember-glow:#ec8a3c33;
+    --valid:#6bc267; --invalid:#cf5040;
+    --wall:#7a5a38; --wall-hi:#9c7748; --wall-lo:#543c24;
+    --shadow:0 8px 30px -12px #000000cc; --radius:14px;
+    --f-display:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --f-body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --f-mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --ground:#d8d2bd; --ground-2:#cfc9b2; --panel:#f2ecdb; --panel-2:#e8e1cc;
+      --line:#3a35201f; --line-solid:#cabf9e; --ink:#2a2416; --ink-dim:#5f5844; --ink-faint:#8f8770;
+      --ember:#c46a1e; --ember-2:#d98a2c; --ember-glow:#c46a1e22;
+      --wall:#8a6842; --wall-hi:#a9824f; --wall-lo:#66492c; --shadow:0 8px 24px -14px #5a4a2a66; }
+  }
+  :root[data-theme="dark"]{ --ground:#12160e; --ground-2:#171c11; --panel:#1c2215; --panel-2:#232a1a;
+    --line:#34402440; --line-solid:#3a4527; --ink:#ece7d6; --ink-dim:#a7a390; --ink-faint:#6f6d5c;
+    --ember:#ec8a3c; --ember-2:#f4b25a; --ember-glow:#ec8a3c33;
+    --wall:#7a5a38; --wall-hi:#9c7748; --wall-lo:#543c24; --shadow:0 8px 30px -12px #000000cc; }
+  :root[data-theme="light"]{ --ground:#d8d2bd; --ground-2:#cfc9b2; --panel:#f2ecdb; --panel-2:#e8e1cc;
+    --line:#3a35201f; --line-solid:#cabf9e; --ink:#2a2416; --ink-dim:#5f5844; --ink-faint:#8f8770;
+    --ember:#c46a1e; --ember-2:#d98a2c; --ember-glow:#c46a1e22;
+    --wall:#8a6842; --wall-hi:#a9824f; --wall-lo:#66492c; --shadow:0 8px 24px -14px #5a4a2a66; }
+
+  *{ box-sizing:border-box; }
+  body{ margin:0; color:var(--ink); font-family:var(--f-body); line-height:1.55; -webkit-font-smoothing:antialiased;
+    background: radial-gradient(120% 80% at 50% -10%, var(--ember-glow), transparent 60%), var(--ground); }
+  .wrap{ max-width:1080px; margin:0 auto; padding: clamp(18px,4vw,52px) clamp(14px,4vw,36px) 72px; }
+  .ic{ width:1em; height:1em; display:inline-block; vertical-align:-0.12em; fill:currentColor; }
+
+  /* header */
+  header{ position:relative; margin-bottom:20px; }
+  .eyebrow{ font-family:var(--f-mono); font-size:12px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--ember); margin:0 0 14px; display:flex; align-items:center; gap:10px; }
+  .eyebrow::before{ content:""; width:26px; height:1px; background:var(--ember); opacity:.6; }
+  h1{ font-family:var(--f-display); font-weight:700; text-wrap:balance; font-size:clamp(28px,5.4vw,50px);
+    line-height:1.05; margin:0 0 18px; letter-spacing:-.01em; }
+  h1 em{ color:var(--ember-2); font-style:italic; }
+  .lede{ max-width:62ch; color:var(--ink-dim); font-size:clamp(15px,1.6vw,18px); margin:0; }
+  .mobile-note{ margin-top:16px; display:inline-flex; align-items:center; gap:9px; font-family:var(--f-mono);
+    font-size:12px; color:var(--ember-2); background:var(--panel); border:1px solid var(--ember);
+    border-radius:999px; padding:7px 14px; }
+  .problems{ display:flex; flex-wrap:wrap; gap:8px; margin-top:20px; }
+  .prob{ font-family:var(--f-mono); font-size:12px; background:var(--panel); border:1px solid var(--line-solid);
+    color:var(--ink-dim); padding:7px 12px; border-radius:999px; display:flex; align-items:center; gap:8px; }
+  .prob b{ color:var(--ink); font-weight:600; font-family:var(--f-body); }
+  .prob .x{ color:var(--invalid); display:inline-flex; }
+  .theme-toggle{ position:absolute; top:0; right:0; font-family:var(--f-mono); font-size:11px; letter-spacing:.1em;
+    text-transform:uppercase; background:var(--panel); color:var(--ink-dim); border:1px solid var(--line-solid);
+    border-radius:999px; padding:8px 13px; cursor:pointer; display:flex; align-items:center; gap:7px; }
+  .theme-toggle:hover{ color:var(--ink); border-color:var(--ember); }
+
+  /* option blocks */
+  .option{ margin-top:40px; border-top:1px solid var(--line-solid); padding-top:32px; }
+  .opt-head{ display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:6px; }
+  .opt-tag{ font-family:var(--f-mono); font-size:13px; font-weight:600; letter-spacing:.12em; color:var(--ground);
+    background:var(--ember); border-radius:6px; padding:3px 10px; }
+  .opt-head h2{ font-family:var(--f-display); font-size:clamp(22px,3vw,31px); margin:0; font-weight:700; }
+  .opt-head .sub{ color:var(--ink-dim); font-style:italic; font-family:var(--f-display); font-size:18px; }
+  .opt-desc{ color:var(--ink-dim); max-width:68ch; margin:4px 0 22px; }
+  .opt-grid{ display:grid; grid-template-columns: auto 1fr; gap:34px; align-items:start; }
+  @media (max-width:760px){ .opt-grid{ grid-template-columns:1fr; gap:22px; justify-items:center; } }
+
+  /* phone frame */
+  .phone{ width:min(288px,80vw); flex:none; border-radius:34px; padding:9px; background:#0a0c07;
+    border:1px solid #000; box-shadow: var(--shadow), 0 0 0 2px #ffffff08 inset; position:relative; }
+  .phone::before{ content:""; position:absolute; top:15px; left:50%; transform:translateX(-50%);
+    width:64px; height:5px; border-radius:3px; background:#00000088; z-index:20; }
+  .stage{ position:relative; aspect-ratio:9/16; border-radius:26px; overflow:hidden; image-rendering:pixelated;
+    user-select:none; touch-action:none;
+    background: radial-gradient(60% 40% at 60% 55%, #3a2a1533, transparent 70%),
+      linear-gradient(180deg, var(--ground-2), var(--ground)); }
+  .grid{ position:absolute; inset:0; background-image:
+      linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size:12.5% 7%, 12.5% 7%; }
+  .grass{ position:absolute; inset:0; opacity:.45; mix-blend-mode:soft-light;
+    background: repeating-linear-gradient(46deg,#4a5a2e 0 2px,transparent 2px 9px),
+      repeating-linear-gradient(-46deg,#33421f 0 2px,transparent 2px 11px); }
+  .fire{ position:absolute; left:58%; top:40%; width:0; height:0; }
+  .fire::before{ content:""; position:absolute; width:110px; height:110px; left:-55px; top:-55px; border-radius:50%;
+    background: radial-gradient(circle, var(--ember-glow), transparent 68%); animation:flick 2.6s ease-in-out infinite; }
+  .fire .flame{ position:absolute; width:11px; height:14px; left:-5px; top:-8px; border-radius:40% 40% 45% 45%;
+    background: linear-gradient(#f4d06a, var(--ember)); box-shadow:0 0 10px 2px var(--ember); animation:flick 1.4s ease-in-out infinite; }
+  .fire .logs{ position:absolute; width:20px; height:6px; left:-10px; top:4px; background:var(--wall-lo); border-radius:2px; }
+  @keyframes flick{ 0%,100%{transform:scale(1);opacity:.95;} 50%{transform:scale(1.12);opacity:.75;} }
+  .player{ position:absolute; left:40%; top:52%; width:13px; height:17px; }
+  .player .body{ position:absolute; inset:0; background:#3d6ea5; border:1px solid #24406a; }
+  .player .head{ position:absolute; left:2px; top:-6px; width:9px; height:8px; background:#d9b48a; border:1px solid #7a5a38; }
+
+  .wall{ position:absolute; width:12.5%; height:7%;
+    background: linear-gradient(180deg, var(--wall-hi), var(--wall) 40%, var(--wall-lo));
+    border:1px solid var(--wall-lo); box-shadow: inset 0 2px 0 #ffffff22, inset 0 -3px 0 #00000033; }
+  .ghost{ position:absolute; width:12.5%; height:7%; border:2px dashed var(--valid); background:#6bc26722;
+    box-shadow:0 0 14px #6bc26744; display:grid; place-items:center; }
+  .ghost.bad{ border-color:var(--invalid); background:#cf504022; box-shadow:0 0 14px #cf504044; }
+  .ghost .silhouette{ position:absolute; inset:1px; opacity:.5; background:linear-gradient(180deg,var(--wall-hi),var(--wall-lo)); }
+  .ghost .gic{ position:relative; z-index:2; color:var(--valid); width:12px; height:12px; transition:transform .18s ease; }
+  /* line-ghost tiles (revealed during the drag demo) */
+  .lg{ position:absolute; width:12.5%; height:7%; border:2px dashed var(--valid); background:#6bc26722;
+    opacity:0; transform:scale(.6); transition:opacity .15s ease, transform .15s ease; }
+  .lg.on{ opacity:1; transform:scale(1); }
+  .touchdot{ position:absolute; width:26px; height:26px; border-radius:50%; margin:-13px 0 0 -13px;
+    background:#ffffff22; border:2px solid #fff; box-shadow:0 0 12px #fff8; opacity:0; z-index:15;
+    transition:left 1.1s cubic-bezier(.4,0,.2,1), top 1.1s cubic-bezier(.4,0,.2,1), opacity .2s; pointer-events:none; }
+  .runbadge{ position:absolute; z-index:16; font-family:var(--f-mono); font-size:11px; font-weight:700;
+    color:var(--ground); background:var(--valid); border-radius:999px; padding:2px 9px; opacity:0;
+    transform:translateY(4px); transition:opacity .2s, transform .2s; box-shadow:0 2px 6px #0007; }
+  .runbadge.on{ opacity:1; transform:translateY(0); }
+
+  .wprog{ position:absolute; width:15%; height:5px; background:#000000aa; border:1px solid #000; border-radius:2px; transform:translateY(-9px); }
+  .wprog i{ display:block; height:100%; width:45%; background:linear-gradient(90deg,var(--ember),var(--ember-2)); }
+  .scaffold{ position:absolute; width:12.5%; height:7%; border:1px solid var(--ember); opacity:.8;
+    background: repeating-linear-gradient(45deg,#ec8a3c22 0 4px, transparent 4px 8px); animation:rise 1.8s ease-in-out infinite; }
+  @keyframes rise{ 0%,100%{opacity:.55;} 50%{opacity:.9;} }
+  .cursor{ position:absolute; width:9px; height:9px; border:2px solid var(--ink); border-radius:50%; opacity:.7; }
+
+  .pin{ position:absolute; width:20px; height:20px; border-radius:50%; transform:translate(-50%,-50%);
+    background:var(--ember); color:var(--ground); font-family:var(--f-mono); font-weight:700; font-size:11px;
+    display:grid; place-items:center; border:2px solid #00000055; box-shadow:0 2px 6px #0007; z-index:18; }
+
+  /* thumb-zone HUD (bottom band, reachable) */
+  .thumb{ position:absolute; left:0; right:0; bottom:0; padding:10px; display:flex; align-items:flex-end;
+    gap:8px; z-index:12; }
+  .fab{ width:46px; height:46px; border-radius:14px; border:1px solid var(--line-solid); background:#0d100aee;
+    color:var(--ink); display:grid; place-items:center; flex:none; backdrop-filter:blur(3px); box-shadow:0 4px 14px #0007; }
+  .fab .ic{ width:20px; height:20px; }
+  .fab.on{ color:var(--ember); border-color:var(--ember); }
+  .fab.big{ width:56px; height:56px; background:var(--ember); color:var(--ground); border-color:transparent; }
+  .chip-min{ display:flex; align-items:center; gap:8px; background:#0d100aee; border:1px solid var(--line-solid);
+    border-radius:12px; padding:7px 9px; backdrop-filter:blur(3px); }
+  .chip-min .ico{ width:26px; height:26px; border-radius:6px; background:linear-gradient(180deg,var(--wall-hi),var(--wall-lo)); border:1px solid var(--wall-lo); }
+  .chip-min .t{ font-family:var(--f-mono); font-size:11px; color:var(--ink); }
+  .chip-min .t small{ display:block; color:var(--ink-dim); font-size:10px; }
+
+  /* B: bottom sheet card */
+  .sheet{ position:absolute; left:0; right:0; bottom:0; z-index:12; background:#0d100af5; backdrop-filter:blur(5px);
+    border-top:1px solid var(--line-solid); border-radius:20px 20px 26px 26px; padding:11px 12px 14px;
+    display:flex; flex-direction:column; gap:10px; }
+  .sh-top{ display:flex; gap:9px; align-items:center; }
+  .sh-ico{ width:38px; height:38px; border-radius:8px; background:linear-gradient(180deg,var(--wall-hi),var(--wall) 45%,var(--wall-lo)); border:1px solid var(--wall-lo); flex:none; box-shadow:inset 0 2px 0 #ffffff22; }
+  .sh-name{ font-family:var(--f-display); font-size:15px; font-weight:700; }
+  .sh-cost{ font-family:var(--f-mono); font-size:11px; color:var(--ink-dim); }
+  .sh-cost b{ color:var(--ember-2); font-weight:600; }
+  .sh-queue{ margin-left:auto; text-align:right; font-family:var(--f-mono); font-size:11px; color:var(--valid); }
+  .sh-queue b{ font-size:15px; }
+  .arrows{ display:flex; justify-content:center; gap:6px; }
+  .arrows button{ width:38px; height:34px; border-radius:9px; border:1px solid var(--line-solid); background:var(--panel-2);
+    color:var(--ink-faint); display:grid; place-items:center; }
+  .arrows button.on{ color:var(--ember); border-color:var(--ember); }
+  .arrows button .ic{ width:15px; height:15px; }
+  .sh-row2{ display:flex; gap:8px; align-items:center; }
+  .sh-bar{ flex:1; height:8px; background:#0006; border-radius:4px; overflow:hidden; }
+  .sh-bar i{ display:block; height:100%; width:0; background:linear-gradient(90deg,var(--ember),var(--ember-2)); }
+  .sh-confirm{ height:34px; padding:0 14px; border-radius:9px; border:none; background:var(--ember); color:var(--ground);
+    font-family:var(--f-mono); font-weight:700; font-size:12px; display:flex; align-items:center; gap:6px; }
+  .sh-lbl{ font-family:var(--f-mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-faint); text-align:center; }
+
+  /* C: blueprint */
+  .bp-dim{ position:absolute; inset:0; background:#06080455; }
+  .bp-grid{ position:absolute; inset:0; background-image:
+    linear-gradient(#8fb2ff26 1px, transparent 1px), linear-gradient(90deg,#8fb2ff26 1px, transparent 1px);
+    background-size:12.5% 7%, 12.5% 7%; }
+  .ring{ position:absolute; width:70px; height:70px; transform:translate(-50%,-50%); border-radius:50%;
+    border:1.5px dashed var(--ember); display:grid; place-items:center; }
+  .ring .pointer{ color:var(--ember); width:16px; height:16px; transition:transform .2s ease; }
+  .bp-banner{ position:absolute; top:26px; left:50%; transform:translateX(-50%); font-family:var(--f-mono);
+    font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:var(--ember-2); border:1px solid var(--ember);
+    border-radius:999px; padding:5px 14px; background:#0d100acc; display:flex; align-items:center; gap:7px; z-index:12; }
+  .bp-eta{ position:absolute; font-family:var(--f-mono); font-size:10px; color:var(--ink); background:#0d100acc;
+    border:1px solid var(--line-solid); border-radius:6px; padding:3px 7px; transform:translate(-50%,-28px); }
+  .bp-commit{ position:absolute; left:10px; right:10px; bottom:10px; z-index:12; display:flex; align-items:center;
+    gap:10px; background:#0d100af5; border:1px solid var(--line-solid); border-radius:14px; padding:9px 11px; backdrop-filter:blur(4px); }
+  .bp-commit .n{ font-family:var(--f-mono); font-size:12px; color:var(--ink); }
+  .bp-commit .n b{ color:var(--valid); font-size:16px; }
+  .bp-commit .n small{ display:block; color:var(--ink-dim); font-size:10px; }
+  .bp-commit .go{ margin-left:auto; height:40px; padding:0 16px; border-radius:11px; border:none; background:var(--ember);
+    color:var(--ground); font-family:var(--f-mono); font-weight:700; font-size:12px; display:flex; align-items:center; gap:7px; }
+
+  /* interactive toolbar under phone */
+  .stage-tools{ display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; justify-content:center; max-width:288px; }
+  .stage-tools button{ font-family:var(--f-mono); font-size:11px; letter-spacing:.04em; cursor:pointer;
+    background:var(--panel); color:var(--ink-dim); border:1px solid var(--line-solid); border-radius:8px;
+    padding:8px 12px; display:flex; align-items:center; gap:7px; }
+  .stage-tools button:hover{ color:var(--ink); border-color:var(--ember); }
+  .stage-tools .ic{ width:14px; height:14px; }
+
+  /* side notes */
+  .side{ min-width:0; }
+  .side h3{ font-family:var(--f-mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-faint); margin:0 0 12px; }
+  .solves{ list-style:none; margin:0 0 22px; padding:0; display:flex; flex-direction:column; gap:11px; }
+  .solves li{ display:grid; grid-template-columns:22px 1fr; gap:11px; align-items:start; font-size:14px; }
+  .solves .num{ width:22px; height:22px; border-radius:50%; background:var(--ember); color:var(--ground);
+    font-family:var(--f-mono); font-weight:700; font-size:12px; display:grid; place-items:center; }
+  .solves .num.star{ background:var(--valid); }
+  .solves b{ display:block; }
+  .solves span{ color:var(--ink-dim); font-size:13px; }
+  .solves li.gap .num{ background:transparent; border:1px dashed var(--ink-faint); color:var(--ink-faint); }
+  code{ color:var(--ember-2); background:var(--panel); padding:1px 5px; border-radius:4px; font-family:var(--f-mono); font-size:.85em; }
+  .meta{ display:flex; flex-direction:column; gap:14px; border-top:1px solid var(--line); padding-top:16px; }
+  .meterrow{ display:flex; align-items:center; gap:12px; }
+  .meterrow .k{ font-family:var(--f-mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); width:60px; }
+  .meter{ flex:1; height:8px; background:var(--panel-2); border-radius:4px; overflow:hidden; border:1px solid var(--line); }
+  .meter i{ display:block; height:100%; background:linear-gradient(90deg,var(--ember),var(--ember-2)); }
+  .meterrow .v{ font-family:var(--f-mono); font-size:11px; color:var(--ink-dim); width:60px; text-align:right; }
+  .touches{ font-family:var(--f-mono); font-size:11px; color:var(--ink-dim); line-height:1.7; }
+
+  /* compare */
+  .compare{ margin-top:54px; border-top:1px solid var(--line-solid); padding-top:28px; }
+  .compare h2{ font-family:var(--f-display); font-size:25px; margin:0 0 18px; }
+  .tbl-scroll{ overflow-x:auto; }
+  table{ border-collapse:collapse; width:100%; min-width:560px; font-size:14px; }
+  th,td{ text-align:left; padding:11px 13px; border-bottom:1px solid var(--line); }
+  th{ font-family:var(--f-mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); font-weight:600; }
+  td:first-child{ color:var(--ink-dim); }
+  td .ic{ width:15px; height:15px; vertical-align:-.2em; margin-right:5px; }
+  .yes{ color:var(--valid); } .part{ color:var(--ember-2); } .no{ color:var(--ink-faint); }
+  tbody tr:hover{ background:var(--panel); }
+  .rec{ margin-top:32px; background:linear-gradient(180deg,var(--panel),var(--panel-2)); border:1px solid var(--line-solid);
+    border-left:3px solid var(--ember); border-radius:var(--radius); padding:22px 24px; }
+  .rec h3{ margin:0 0 8px; font-family:var(--f-display); font-size:20px; }
+  .rec p{ margin:0 0 10px; color:var(--ink-dim); max-width:70ch; }
+  .rec .path{ font-family:var(--f-mono); font-size:12px; color:var(--ember-2); margin:0; }
+  footer{ margin-top:44px; color:var(--ink-faint); font-family:var(--f-mono); font-size:11px; letter-spacing:.05em; }
+  @media (prefers-reduced-motion: reduce){ *{ animation:none !important; } }
+</style>
+
+<!-- icon sprite -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M12 3l7 8h-4v10h-6V11H5z"/></symbol>
+  <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M12 5V2L7.5 6 12 10V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></symbol>
+  <symbol id="i-hammer" viewBox="0 0 24 24"><path d="M13.5 2.5l8 8-2.1 2.1-2.8-2.8-5.2 5.2 1.1 1.1-5 5-3.1-3.1 5-5 1 1 5.2-5.2-2.6-2.6z"/></symbol>
+  <symbol id="i-theme" viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0 0 18z"/><circle cx="12" cy="12" r="8.2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zm0 8l9 5-9 5-9-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-line" viewBox="0 0 24 24"><circle cx="5" cy="19" r="2.6"/><circle cx="19" cy="5" r="2.6"/><path d="M6.6 17.4l10.8-10.8" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="2.4 2.4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 13l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+</svg>
+
+<div class="wrap">
+  <header>
+    <button class="theme-toggle" id="themeBtn"><svg class="ic"><use href="#i-theme"/></svg> theme</button>
+    <p class="eyebrow">Mostowo Survival · build experience</p>
+    <h1>You should <em>see</em> what you're building —<br>and place a whole run in one drag.</h1>
+    <p class="lede">Today, placement is a green square: no picture of the structure, no facing, no build animation,
+      no honest progress, and one tap per tile. Three directions for fixing it — same problems, three
+      philosophies about where the feedback lives. All three are drawn <b>mobile-first</b>.</p>
+    <span class="mobile-note"><svg class="ic"><use href="#i-line"/></svg> Mobile is the primary platform — thumb-zone controls, drag-to-paint a line of walls or traps</span>
+    <div class="problems">
+      <span class="prob"><span class="x"><svg class="ic"><use href="#i-cross"/></svg></span> <b>No image</b></span>
+      <span class="prob"><span class="x"><svg class="ic"><use href="#i-cross"/></svg></span> <b>No rotation</b></span>
+      <span class="prob"><span class="x"><svg class="ic"><use href="#i-cross"/></svg></span> <b>No animation</b></span>
+      <span class="prob"><span class="x"><svg class="ic"><use href="#i-cross"/></svg></span> <b>No progress</b></span>
+      <span class="prob"><span class="x"><svg class="ic"><use href="#i-cross"/></svg></span> <b>One tap per tile</b></span>
+    </div>
+  </header>
+
+  <!-- OPTION A -->
+  <section class="option" data-opt="a">
+    <div class="opt-head"><span class="opt-tag">OPTION A</span><h2>Faithful Ghost</h2><span class="sub">world-first · lowest cost</span></div>
+    <p class="opt-desc">Almost no new HUD chrome — the canvas does the talking. The ghost becomes a real textured
+      sprite that flips as you rotate; <b>press-drag along the ground to paint a run</b> of walls/traps and release
+      to queue them all; a progress bar floats over each site while a worker builds it. Reuses the wall's
+      per-orientation art and the harvest progress bar that already ship.</p>
+    <div class="opt-grid">
+      <div style="display:flex;flex-direction:column;align-items:center">
+        <div class="phone"><div class="stage" id="stage-a">
+          <div class="grid"></div><div class="grass"></div>
+          <div class="fire"><span class="logs"></span><span class="flame"></span></div>
+          <div class="player"><span class="body"></span><span class="head"></span></div>
+          <div class="wall" style="left:25%; top:22%"></div>
+          <div class="wall" style="left:37.5%; top:22%"></div>
+          <div class="scaffold" style="left:50%; top:22%"></div>
+          <div class="wprog" data-prog="a" style="left:48.5%; top:22%"><i></i></div>
+          <!-- drag-paint row -->
+          <div class="lg" data-i="0" style="left:25%; top:64%"></div>
+          <div class="lg" data-i="1" style="left:37.5%; top:64%"></div>
+          <div class="lg" data-i="2" style="left:50%; top:64%"></div>
+          <div class="lg" data-i="3" style="left:62.5%; top:64%"></div>
+          <div class="lg" data-i="4" style="left:75%; top:64%"></div>
+          <div class="ghost" style="left:25%; top:64%"><span class="silhouette"></span><svg class="gic" id="arrow-a"><use href="#i-arrow"/></svg></div>
+          <div class="touchdot" id="dot-a" style="left:31%; top:67.5%"></div>
+          <div class="runbadge" id="badge-a" style="left:78%; top:60%">×5</div>
+          <div class="pin" style="left:22%; top:60%">1</div>
+          <div class="pin" style="left:31%; top:64%">2</div>
+          <div class="pin" style="left:56%; top:18%">4</div>
+          <div class="pin" style="left:78%; top:66%">5</div>
+          <div class="thumb">
+            <div class="chip-min"><span class="ico"></span><span class="t">Palisade<small>wood ×4</small></span></div>
+            <div style="flex:1"></div>
+            <button class="fab on" title="line mode"><svg class="ic"><use href="#i-line"/></svg></button>
+            <button class="fab" title="rotate"><svg class="ic"><use href="#i-rotate"/></svg></button>
+          </div>
+        </div></div>
+        <div class="stage-tools">
+          <button data-rotate="a"><svg class="ic"><use href="#i-rotate"/></svg> Rotate</button>
+          <button data-line="a"><svg class="ic"><use href="#i-line"/></svg> Paint a line</button>
+          <button data-build="a"><svg class="ic"><use href="#i-hammer"/></svg> Play build</button>
+        </div>
+      </div>
+      <div class="side">
+        <h3>How it solves the five</h3>
+        <ul class="solves">
+          <li><span class="num">1</span><div><b>Real ghost sprite</b><span>Textured silhouette at the cursor, not a square.</span></div></li>
+          <li><span class="num">2</span><div><b>Rotation on the ghost</b><span>Arrow + flipped art update live — reuses <code>WallBehavior</code> orient logic.</span></div></li>
+          <li><span class="num star">3</span><div><b>Drag to paint a run</b><span>One press-drag ghosts the whole line; release queues every tile. No tap-per-tile.</span></div></li>
+          <li><span class="num">4</span><div><b>Scaffold + progress bar</b><span>Rising shimmer while building, world-space bar per site (existing <code>NodeFxManager</code>).</span></div></li>
+          <li class="gap"><span class="num">5</span><div><b>Icon in HUD: minimal</b><span>Just a selected chip + two thumb FABs.</span></div></li>
+        </ul>
+        <div class="meta">
+          <div class="meterrow"><span class="k">Effort</span><div class="meter"><i style="width:40%"></i></div><span class="v">Low</span></div>
+          <div class="meterrow"><span class="k">Ceiling</span><div class="meter"><i style="width:58%"></i></div><span class="v">Good</span></div>
+          <p class="touches">Touches: <code>BuildManager</code> (drag-paint + ghost), <code>NodeFxManager</code>, small <code>icon</code> add. Mostly world code.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OPTION B -->
+  <section class="option" data-opt="b">
+    <div class="opt-head"><span class="opt-tag">OPTION B</span><h2>Build Card</h2><span class="sub">HUD-first · thumb-native</span></div>
+    <p class="opt-desc">A bottom sheet is the source of truth, sized for one-handed play. Icon, cost, a four-way
+      facing row, and — as you drag a run on the world — a <b>live queue total</b> (count + total cost) with one big
+      Confirm. Under-construction progress lives in the sheet, so you never squint at the canvas.</p>
+    <div class="opt-grid">
+      <div style="display:flex;flex-direction:column;align-items:center">
+        <div class="phone"><div class="stage" id="stage-b">
+          <div class="grid"></div><div class="grass"></div>
+          <div class="fire" style="left:62%"><span class="logs"></span><span class="flame"></span></div>
+          <div class="player" style="left:34%"><span class="body"></span><span class="head"></span></div>
+          <div class="wall" style="left:25%; top:20%"></div>
+          <div class="wall" style="left:37.5%; top:20%"></div>
+          <div class="lg" data-i="0" style="left:25%; top:40%"></div>
+          <div class="lg" data-i="1" style="left:37.5%; top:40%"></div>
+          <div class="lg" data-i="2" style="left:50%; top:40%"></div>
+          <div class="lg" data-i="3" style="left:62.5%; top:40%"></div>
+          <div class="lg" data-i="4" style="left:75%; top:40%"></div>
+          <div class="ghost" style="left:25%; top:40%"><span class="silhouette"></span><svg class="gic" id="arrow-b"><use href="#i-arrow"/></svg></div>
+          <div class="touchdot" id="dot-b" style="left:31%; top:43.5%"></div>
+          <div class="pin" style="left:31%; top:40%">2</div>
+          <div class="pin" style="left:50%; top:73%">1</div>
+          <div class="pin" style="left:85%; top:60%">3</div>
+          <div class="sheet">
+            <div class="sh-top">
+              <span class="sh-ico"></span>
+              <div><div class="sh-name">Palisade</div><div class="sh-cost">Cost <b>Wood ×4</b></div></div>
+              <div class="sh-queue"><b id="qn-b">×0</b><br><span id="qc-b">Wood ×0</span></div>
+            </div>
+            <div class="sh-lbl">Facing</div>
+            <div class="arrows" id="arrows-b">
+              <button data-face="left"><svg class="ic" style="transform:rotate(-90deg)"><use href="#i-arrow"/></svg></button>
+              <button data-face="up" class="on"><svg class="ic"><use href="#i-arrow"/></svg></button>
+              <button data-face="down"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-arrow"/></svg></button>
+              <button data-face="right"><svg class="ic" style="transform:rotate(90deg)"><use href="#i-arrow"/></svg></button>
+            </div>
+            <div class="sh-row2">
+              <span class="sh-bar"><i data-prog="b"></i></span>
+              <button class="sh-confirm"><svg class="ic"><use href="#i-check"/></svg> Confirm</button>
+            </div>
+          </div>
+        </div></div>
+        <div class="stage-tools">
+          <button data-rotate="b"><svg class="ic"><use href="#i-rotate"/></svg> Rotate</button>
+          <button data-line="b"><svg class="ic"><use href="#i-line"/></svg> Drag a run</button>
+          <button data-build="b"><svg class="ic"><use href="#i-hammer"/></svg> Play build</button>
+        </div>
+      </div>
+      <div class="side">
+        <h3>How it solves the five</h3>
+        <ul class="solves">
+          <li><span class="num">1</span><div><b>Icon everywhere</b><span>Real art in sheet, catalog, hotbar — needs an <code>icon</code> field on <code>BuildableDef</code>.</span></div></li>
+          <li><span class="num">2</span><div><b>Facing row</b><span>Four fat touch targets, current facing lit.</span></div></li>
+          <li><span class="num star">3</span><div><b>Live queue total</b><span>Drag a run; the sheet counts tiles and totals the cost, one Confirm commits the batch.</span></div></li>
+          <li><span class="num">4</span><div><b>Progress in the sheet</b><span>Bars where your thumb already is. New <code>build:progress</code> events over the bridge.</span></div></li>
+          <li><span class="num">1</span><div><b>Ghost still improves</b><span>Textured + oriented, supporting the sheet.</span></div></li>
+        </ul>
+        <div class="meta">
+          <div class="meterrow"><span class="k">Effort</span><div class="meter"><i style="width:62%"></i></div><span class="v">Medium</span></div>
+          <div class="meterrow"><span class="k">Ceiling</span><div class="meter"><i style="width:82%"></i></div><span class="v">High</span></div>
+          <p class="touches">Touches: new HUD sheet, <code>store.ts</code>/<code>bridge.ts</code> queue+progress events, <code>BuildableDef.icon</code>. Layers on top of A.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OPTION C -->
+  <section class="option" data-opt="c">
+    <div class="opt-head"><span class="opt-tag">OPTION C</span><h2>Blueprint Mode</h2><span class="sub">immersive · highest ceiling</span></div>
+    <p class="opt-desc">Building becomes its own moment. The world dims, a snap grid lights up, a rotation ring wraps
+      the cursor, and <b>dragging lays a snapped run of ghosts</b> — the commit bar tallies count, total cost and worker
+      ETA, then one Confirm queues the lot. Construction animates scaffold → build → settle. The Factorio/Valheim treatment.</p>
+    <div class="opt-grid">
+      <div style="display:flex;flex-direction:column;align-items:center">
+        <div class="phone"><div class="stage" id="stage-c">
+          <div class="grid"></div><div class="grass"></div>
+          <div class="fire" style="top:34%"><span class="logs"></span><span class="flame"></span></div>
+          <div class="player"><span class="body"></span><span class="head"></span></div>
+          <div class="wall" style="left:25%; top:15%"></div>
+          <div class="scaffold" style="left:25%; top:22%"></div>
+          <div class="wprog" data-prog="c" style="left:23.5%; top:22%"><i></i></div>
+          <div class="bp-eta" style="left:31%; top:22%">≈ 2s · worker</div>
+          <div class="bp-dim"></div>
+          <div class="bp-grid"></div>
+          <div class="bp-banner"><svg class="ic" style="width:12px;height:12px"><use href="#i-layers"/></svg> Blueprint</div>
+          <div class="lg" data-i="0" style="left:25%; top:52%"></div>
+          <div class="lg" data-i="1" style="left:37.5%; top:52%"></div>
+          <div class="lg" data-i="2" style="left:50%; top:52%"></div>
+          <div class="lg" data-i="3" style="left:62.5%; top:52%"></div>
+          <div class="lg" data-i="4" style="left:75%; top:52%"></div>
+          <div class="ghost" style="left:25%; top:52%"><span class="silhouette"></span></div>
+          <div class="ring" style="left:31%; top:55.5%"><svg class="pointer" id="ptr-c"><use href="#i-arrow"/></svg></div>
+          <div class="touchdot" id="dot-c" style="left:31%; top:55.5%"></div>
+          <div class="pin" style="left:22%; top:48%">2</div>
+          <div class="pin" style="left:81%; top:48%">1</div>
+          <div class="pin" style="left:31%; top:18%">4</div>
+          <div class="bp-commit">
+            <div class="n"><b id="qn-c">0</b> palisades <small id="qc-c">Wood ×0 · ≈ 0s</small></div>
+            <button class="go"><svg class="ic"><use href="#i-check"/></svg> Confirm</button>
+          </div>
+        </div></div>
+        <div class="stage-tools">
+          <button data-rotate="c"><svg class="ic"><use href="#i-rotate"/></svg> Rotate ring</button>
+          <button data-line="c"><svg class="ic"><use href="#i-line"/></svg> Drag a run</button>
+          <button data-build="c"><svg class="ic"><use href="#i-hammer"/></svg> Play build</button>
+        </div>
+      </div>
+      <div class="side">
+        <h3>How it solves the five</h3>
+        <ul class="solves">
+          <li><span class="num">1</span><div><b>Full preview</b><span>Real art, snap grid, green/red validity across every cell + footprint.</span></div></li>
+          <li><span class="num">2</span><div><b>Rotation ring</b><span>Compass ring around the cursor; drag/flip on touch, R on keyboard.</span></div></li>
+          <li><span class="num star">3</span><div><b>Snapped run + commit bar</b><span>Drag a line; count, total cost and ETA tallied; one Confirm queues the batch.</span></div></li>
+          <li><span class="num">4</span><div><b>Full construction arc</b><span>Scaffold → build → settle, progress + worker ETA, world dims to spotlight it.</span></div></li>
+          <li><span class="num">5</span><div><b>New data model</b><span>Needs <code>icon</code>, <code>ghostSprite</code>, per-buildable build time & footprint.</span></div></li>
+        </ul>
+        <div class="meta">
+          <div class="meterrow"><span class="k">Effort</span><div class="meter"><i style="width:94%"></i></div><span class="v">High</span></div>
+          <div class="meterrow"><span class="k">Ceiling</span><div class="meter"><i style="width:99%"></i></div><span class="v">Best</span></div>
+          <p class="touches">Touches: new overlay mode, <code>BuildableDef</code> fields, input parity, art. Data + world + HUD at once.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPARE -->
+  <section class="compare">
+    <h2>Side by side</h2>
+    <div class="tbl-scroll"><table>
+      <thead><tr><th>Problem</th><th>A · Faithful Ghost</th><th>B · Build Card</th><th>C · Blueprint Mode</th></tr></thead>
+      <tbody>
+        <tr><td>Image of the structure</td><td class="part"><svg class="ic"><use href="#i-check"/></svg>Ghost sprite</td><td class="yes"><svg class="ic"><use href="#i-check"/></svg>Icon everywhere</td><td class="yes"><svg class="ic"><use href="#i-check"/></svg>Sprite + footprint</td></tr>
+        <tr><td>Rotation shown</td><td class="yes"><svg class="ic"><use href="#i-check"/></svg>On the ghost</td><td class="yes"><svg class="ic"><use href="#i-check"/></svg>Facing row</td><td class="yes"><svg class="ic"><use href="#i-check"/></svg>Compass ring</td></tr>
+        <tr><td>Build animation</td><td class="yes"><svg class="ic"><use href="#i-check"/></svg>Scaffold</td><td class="part"><svg class="ic"><use href="#i-check"/></svg>Scaffold (A)</td><td class="yes"><svg class="ic"><use href="#i-check"/></svg>Full arc + dim</td></tr>
+        <tr><td>Progress bar</td><td class="yes"><svg class="ic"><use href="#i-check"/></svg>World-space</td><td class="yes"><svg class="ic"><use href="#i-check"/></svg>In the sheet</td><td class="yes"><svg class="ic"><use href="#i-check"/></svg>Bar + ETA</td></tr>
+        <tr><td>Queue a line in one drag</td><td class="yes"><svg class="ic"><use href="#i-check"/></svg>Paint run</td><td class="yes"><svg class="ic"><use href="#i-check"/></svg>Run + total</td><td class="yes"><svg class="ic"><use href="#i-check"/></svg>Snap run + ETA</td></tr>
+        <tr><td>Mobile / thumb ergonomics</td><td class="part"><svg class="ic"><use href="#i-check"/></svg>Good</td><td class="yes"><svg class="ic"><use href="#i-check"/></svg>Best</td><td class="part"><svg class="ic"><use href="#i-check"/></svg>Needs care</td></tr>
+        <tr><td>Effort</td><td class="yes"><svg class="ic"><use href="#i-check"/></svg>Low</td><td class="part">Medium</td><td class="no"><svg class="ic"><use href="#i-cross"/></svg>High</td></tr>
+        <tr><td>New data model</td><td class="yes"><svg class="ic"><use href="#i-check"/></svg>Barely</td><td class="part">icon field</td><td class="no"><svg class="ic"><use href="#i-cross"/></svg>Several fields</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="rec">
+      <h3>My lean: ship A, grow into B</h3>
+      <p>A fixes the two things you feel most — no image, no rotation — plus drag-to-paint the runs of walls and
+        traps you actually build every night, at the lowest cost, reusing the wall's orientation art and the harvest
+        progress bar that already exist. B's sheet then layers on with no rework and is the most thumb-native.
+        C is the destination if building becomes a headline pillar, but it's a data-model + input + art commitment.</p>
+      <p class="path">Pick one → I'll turn it into a plan-feature spec on <code>claude/build-experience-ui-hy3zml</code> → critique-plan → execute-plan.</p>
+    </div>
+  </section>
+
+  <footer>Mockups are schematic, drawn at phone proportions — colours and shapes stand in for the Pixel Crawler art, not final pixels. Buttons under each phone are live: rotate, paint a line, play build.</footer>
+</div>
+
+<script>
+  const root = document.documentElement;
+  document.getElementById('themeBtn').addEventListener('click', () => {
+    const cur = root.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    root.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+  });
+
+  const faces = ['up','right','down','left'];
+  const deg = { up:0, right:90, down:180, left:270 };
+  const rot = { a:0, b:0, c:0 };
+  const COST = 4;
+
+  function applyFace(opt){
+    const f = faces[rot[opt] % 4];
+    const arrow = document.getElementById('arrow-'+opt);
+    if (arrow){
+      const g = arrow.closest('.ghost');
+      arrow.style.transform = 'rotate('+deg[f]+'deg)';
+      g.style.transform = (f==='left') ? 'scaleX(-1)' : 'none';
+    }
+    if (opt==='b'){ document.querySelectorAll('#arrows-b button').forEach(b=>b.classList.toggle('on', b.dataset.face===f)); }
+    if (opt==='c'){ const p=document.getElementById('ptr-c'); if(p) p.style.transform='rotate('+deg[f]+'deg)'; }
+  }
+  document.querySelectorAll('[data-rotate]').forEach(btn=>btn.addEventListener('click',()=>{ const o=btn.dataset.rotate; rot[o]++; applyFace(o); }));
+  document.querySelectorAll('#arrows-b button').forEach(b=>b.addEventListener('click',()=>{ rot.b=faces.indexOf(b.dataset.face); applyFace('b'); }));
+
+  // paint-a-line demo
+  const cols = [25,37.5,50,62.5,75];
+  function paintLine(opt){
+    const stage = document.getElementById('stage-'+opt);
+    const dot = document.getElementById('dot-'+opt);
+    const lgs = [...stage.querySelectorAll('.lg')].sort((a,b)=>a.dataset.i-b.dataset.i);
+    const top = parseFloat(lgs[0].style.top);
+    lgs.forEach(l=>l.classList.remove('on'));
+    if (opt==='b'){ document.getElementById('qn-b').textContent='×0'; document.getElementById('qc-b').textContent='Wood ×0'; }
+    if (opt==='c'){ document.getElementById('qn-c').textContent='0'; document.getElementById('qc-c').textContent='Wood ×0 · ≈ 0s'; }
+    const badge = document.getElementById('badge-'+opt);
+    if (badge) badge.classList.remove('on');
+    dot.style.transition='none'; dot.style.opacity='0'; dot.style.left=(cols[0]+6)+'%'; dot.style.top=(top+3.5)+'%';
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      dot.style.transition='left 1.1s cubic-bezier(.4,0,.2,1), top .3s, opacity .2s';
+      dot.style.opacity='1'; dot.style.left=(cols[cols.length-1]+6)+'%';
+    }));
+    lgs.forEach((l,i)=>setTimeout(()=>{
+      l.classList.add('on');
+      const n=i+1;
+      if (opt==='b'){ document.getElementById('qn-b').textContent='×'+n; document.getElementById('qc-b').textContent='Wood ×'+(n*COST); }
+      if (opt==='c'){ document.getElementById('qn-c').textContent=n; document.getElementById('qc-c').textContent='Wood ×'+(n*COST)+' · ≈ '+(n*2)+'s'; }
+    }, 150 + i*(1000/lgs.length)));
+    if (badge) setTimeout(()=>{ badge.textContent='×'+lgs.length; badge.classList.add('on'); }, 200+1000);
+    setTimeout(()=>{ dot.style.opacity='0'; }, 1500);
+  }
+  document.querySelectorAll('[data-line]').forEach(btn=>btn.addEventListener('click',()=>paintLine(btn.dataset.line)));
+
+  // play build
+  document.querySelectorAll('[data-build]').forEach(btn=>btn.addEventListener('click',()=>{
+    const o=btn.dataset.build;
+    document.querySelectorAll('[data-prog="'+o+'"]').forEach(t=>{
+      const bar = t.matches('.wprog') ? t.querySelector('i') : t;
+      bar.style.transition='none'; bar.style.width='4%';
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ bar.style.transition='width 1.8s cubic-bezier(.4,0,.2,1)'; bar.style.width='100%'; }));
+    });
+  }));
+</script>
