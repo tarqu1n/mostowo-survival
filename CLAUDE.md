@@ -93,7 +93,9 @@ history:** [docs/STATUS.md](docs/STATUS.md).
 **Next:** the first-playable **MVP path is complete** (see [docs/ROADMAP.md](docs/ROADMAP.md): ✅ combat
 rework → ✅ night wave + campfire defense → ✅ base-defence walls → ✅ trap (plan 040) → ✅ hunger (plan 041) →
 ✅ NPC (plan 042)); post-MVP **crafting** is underway (✅ workbench station, plan 048 → ✅ equippable items +
-brand/durability/combat, plan 049). Full vision in
+brand/durability/combat, plan 049), and the **Blueprint Mode** build-UX overhaul landed (✅ plan 050 —
+pointer-up placement, line-tool run + commit bar, per-buildable build time, rotation ring; buildable-icon
+art deferred). Full vision in
 [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md); [docs/DECISIONS.md](docs/DECISIONS.md) for settled vs open.
 
 ## The game in one line

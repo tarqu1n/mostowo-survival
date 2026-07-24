@@ -1,6 +1,6 @@
 # Blueprint Mode — Build Experience Overhaul
 
-> Status: planned — run /execute-plan to begin.
+> Status: in review
 
 ## Summary
 
@@ -258,7 +258,8 @@ build slowly (one serial worker). Keep any fetched image-gen key in-memory only 
   - Done when: catalog/hotbar/commit bar show real art; a buildable with no `icon` still renders a
     swatch; build passes.
 
-- [ ] **Step 11: Tests + docs** `[inline]`
+- [x] **Step 11: Tests + docs** `[inline]`
+  - Outcome: unit coverage reviewed — `buildTime.test.ts` (4) + `buildRun.test.ts` (13) already cover buildTimeFor/axis-lock/dedupe/affordable-cutoff/ETA fully, no cases added. New `tests/e2e/blueprint.spec.ts` owns the 4 Blueprint-Mode scenario specs (tap-vs-drag ×2; line-tool paint→Confirm spends exactly affordable subset→finishSite; Cancel no-spend) moved out of `build.spec.ts` (+`paintRun` helper); `build.spec.ts` keeps its 3 core grid/occupancy specs; 7 pass together. Docs: `STATUS.md` (Blueprint Mode section), `CONVENTIONS.md` (pointer-up + pending-run seam + `build:*` event list synced to `bridge.ts`), `DECISIONS.md`+`decisions/architecture.md` (build-UX focus, links `build-ui-options.html`), `ROADMAP.md` (post-MVP note), `CLAUDE.md` (one lean Status clause). Icon-art deferral noted throughout. typecheck clean, 1009 unit pass, markdownlint clean. Full `npm run e2e`/`smoke` deferred to CI (repo rule).
   - **Unit** (`src/systems/__tests__/`): finalise `buildTimeFor`, axis-lock, run dedupe,
     affordable-subset cutoff, ETA. Mirror `tasks.test.ts`/`orders.test.ts`.
   - **Scenario** (`tests/e2e/blueprint.spec.ts`): mirror `gestures.spec.ts` + `build.spec.ts` — assert

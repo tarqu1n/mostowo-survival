@@ -6,6 +6,35 @@ Part of the [decision log index](../DECISIONS.md). Newest first.
 
 ---
 
+## 2026-07-24 — [DECIDED] Build-UX is the chosen focus: Blueprint Mode overhaul (plan 050) — pointer-up placement, line-tool pending run + commit bar, per-buildable build time, rotation ring
+
+The **build experience** is the chosen next focus: a legible **Blueprint Mode** replacing raw
+single-tap wall placement. Three mobile-first directions were explored in
+[`docs/build-ui-options.html`](../build-ui-options.html) (the plan drew on critique options #2/#3); the
+build plan is `plans/050-blueprint-mode-build-overhaul.md`. Settled calls:
+
+- **Pointer-up placement.** A build single-tap resolves on pointer **UP** (arm on down); a build-mode
+  **drag pans** the camera; command-mode long-press queue-paint is **gated off** in build mode. Fixes
+  the old drop+charge-on-touch-down that made a pan impossible one-handed.
+- **Deferred pending run + commit bar.** The line tool paints an **axis-locked straight run** (pure
+  `systems/buildRun.ts` — dominant-axis snap vs the anchor, inherently deduped) with cumulative
+  affordability + serial ETA. Painting spends **nothing**; a HUD **commit bar** Confirms (spend + queue
+  ONLY the affordable-and-placeable subset) or Cancels (drop, no spend). `BuildManager` owns run state
+  (`beginRun`/`extendRun`/`clearRun`/`runSelection`/`commitRun`) + a ghost pool; a `GameScene` line-tool
+  flag (`isLineTool()` dep) arms the gesture. Same state-vs-math split as `tasks`/`orders`.
+- **Per-buildable build time.** `systems/buildTime.ts` `buildTimeFor` (`BuildableDef.buildTimeMs` ??
+  `BUILD_MS`) — timing stays centralised but tunable per buildable.
+- **Rotation ring.** A HUD ring for `orientable` buildables + `R`/`Shift+R`; `build:rotate` extended to
+  `{dir?,to?}` (bare = cycle forward, `{dir:-1}` = reverse, `{to}` = jump), backward-compatible.
+- **Blueprint-Mode visuals + construction arc.** A DOM dim overlay + a Phaser snap grid (both gated on
+  build mode, not demolish); each site raises a **scaffold sprite** the world-space build bar hangs off
+  (retiring the blueprint-rect alpha-ramp).
+- **Buildable-icon ART deferred.** The `BuildableIcon` render path + optional `BuildableDef.icon` field
+  ship, but **no icon files were generated** — every site shows its colour-swatch/text fallback; dropping
+  icons into the data later "just works".
+- **Seam.** New `build:*` events (inbound `lineTool`/`commitRun`/`cancelRun` + extended `rotate`;
+  outbound `lineToolChanged`/`runChanged`/`facingChanged`) — see [CONVENTIONS.md](../CONVENTIONS.md).
+
 ## 2026-07-22 — [DECIDED] UI overhaul: DOM/React HUD overlay, "Field Kit" direction (plan 046)
 
 Replaces the hand-placed Phaser HUD (`UIScene` + `src/scenes/hud/*`) with a **DOM/React

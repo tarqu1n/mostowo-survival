@@ -48,6 +48,25 @@ _To be firmed up as we go. Starting position:_
   `TaskGlowRenderer` highlight branch in lockstep. Pure ⇒ unit-tested directly
   (`systems/__tests__/orders.test.ts`). `wireBus()` is likewise one `[event, handler, ctx]` table iterated
   for both `on` and the SHUTDOWN `off`, so the two can't drift.
+- **Build placement is pointer-UP + a pending run (`systems/buildRun.ts` + `BuildManager`, plan 050).**
+  A build single-tap resolves on pointer **UP** (arm on down), and a build-mode **drag pans** the camera
+  — command-mode long-press queue-paint is gated off in build mode, so the world pointer gate branches on
+  build mode. The line tool paints a **pending run**: pure `systems/buildRun.ts` projects a drag onto its
+  **dominant axis vs the anchor** (`runAxis`/`runTiles` — one straight, inherently-deduped line) and
+  computes the affordable prefix + total cost + serial ETA (`selectRun`); `BuildManager` owns the run
+  state (`beginRun`/`extendRun`/`clearRun`/`runSelection`/`commitRun`) + a ghost pool, reads a **line-tool
+  flag** on `GameScene` via the `isLineTool()` dep, and **commits only the affordable-and-placeable
+  subset** (spend-per-tile, append `build` orders). Painting is free — no resource spend until commit.
+  Per-buildable on-site time is `systems/buildTime.ts` `buildTimeFor` (`BuildableDef.buildTimeMs` ??
+  `BUILD_MS`), keeping build timing centralised while tunable per buildable. Same pure-system split as
+  `tasks`/`orders`: `BuildManager` owns state, `buildRun`/`buildTime` own the math (unit-tested plain-Node).
+- **Build `game.events` seam (HUD ⇄ world, plan 050).** The build namespace's inbound (HUD→world) events
+  are `build:toggle`, `build:select {id}`, `build:rotate {dir?,to?}` (bare = cycle forward; `{dir:-1}` =
+  reverse; `{to}` = jump to a facing — backward-compatible), `build:lineTool {on}`, `build:commitRun`,
+  `build:cancelRun`; outbound (world→HUD, mirrored into the HUD store) are `build:modeChanged`,
+  `build:select`, `build:lineToolChanged`, `build:runChanged` (the commit-bar pending-run tally),
+  `build:facingChanged` (the rotation ring's live quadrant). The `bridge.ts` `InboundEvent` union is the
+  source of truth for the inbound set; keep this list in step with it.
 - **Footprint vs hurtbox.** A creature's **footprint** (movement, occupancy, pathfinding) is always its
   single feet tile — logic keys off `col`/`row`, never the sprite transform. Its **hurtbox** (combat
   targeting: Punch/Inspect hit-tests, contact reach) is a separate, data-driven tile extent that can

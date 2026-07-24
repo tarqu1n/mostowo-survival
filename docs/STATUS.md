@@ -450,6 +450,46 @@ Tuning: `BRAND_DURABILITY`/`BRAND_LIFETIME_SEC`/`BRAND_DRAIN_PER_SEC`/`BRAND_LIG
 `tests/e2e/equip.spec.ts` (no-bow gate, bow ranged-fire, sword melee upgrade, brand light+drain+destroy).
 Out of scope: equipment rendering on the body (→ plan 010), armour/tool/shield slots, NPC equipment, ammo.
 
+## Blueprint Mode — build experience overhaul (plan 050)
+
+A build-UX overhaul turning single-tap wall placement into a legible **Blueprint Mode**: tap-vs-drag
+placement, a drag-to-paint **line tool** with a deferred pending run + commit bar, per-buildable build
+time, a rotation ring, and a construction-scaffold progress arc. Directions explored in
+[build-ui-options.html](build-ui-options.html).
+
+- **Pointer-up placement (Step 3).** Build single-tap now resolves on pointer **UP** (arm on down); a
+  build-mode **drag pans** the camera (command-mode long-press queue-paint is gated off in build mode).
+  So a one-finger drag no longer drops+charges a tile on touch-down. `PointerInputController` +
+  `GameScene`.
+- **Pending-run model (Steps 4–7).** Pure `src/systems/buildRun.ts` computes an **axis-locked straight
+  run** from a drag anchor (`runAxis`/`runTiles` — snapped to the dominant axis, inherently deduped) with
+  cumulative **affordability** (the affordable prefix), total cost, and a serial **ETA** (`selectRun`).
+  `BuildManager` owns the run STATE (`beginRun`/`extendRun`/`clearRun`/`runSelection`/`commitRun`) + a
+  pending-ghost pool; a **line-tool flag** on `GameScene` (read via `isLineTool()`) arms the paint
+  gesture. Painting spends **nothing** — Confirm commits ONLY the affordable-and-placeable subset
+  (spends per-tile cost, appends `build` orders), Cancel drops it. Per-buildable on-site time via
+  `src/systems/buildTime.ts` `buildTimeFor` (`BuildableDef.buildTimeMs` ?? `BUILD_MS`).
+- **Blueprint-Mode visuals (Step 4).** A DOM **dim overlay** in the HUD (`BuildDim`, gated on build
+  mode) + a Phaser **snap grid** in `BuildManager` (`syncSnapGrid`, redrawn against the camera view each
+  frame). Demolish mode shows neither.
+- **Construction arc (Step 9).** Each building site raises a per-site **scaffold sprite**
+  (`BuildManager.ensureScaffold`) that `NodeFxManager.showActionProgress` anchors the world-space build
+  bar to; the old blueprint-rect alpha-ramp is gone. Blanket-dropped on cancel/switch/idle.
+- **Rotation (Step 8).** A HUD **rotation ring** (`RotationRing`, shown for `orientable` buildables) +
+  `R`/`Shift+R` keys; `build:rotate`/`rotatePlacement` extended to accept `{dir}` (reverse) / `{to}`
+  (jump to a facing), backward-compatible with the bare cycle-forward emit.
+- **Buildable icons (Step 10) — ART DEFERRED.** A shared `BuildableIcon` component renders a
+  `BuildableDef.icon` PNG when set, else the caller's colour-swatch/text **fallback**. The render path is
+  wired but **no icon art has shipped** — no buildable sets `icon`, so every site still shows its
+  fallback; dropping icon files into the data later "just works".
+- **HUD↔world seam.** New events (`src/hud/bridge.ts`): inbound `build:lineTool {on}` / `build:commitRun`
+  / `build:cancelRun` + the extended `build:rotate {dir?,to?}`; outbound `build:lineToolChanged` /
+  `build:runChanged` (the commit-bar tally) / `build:facingChanged` (the rotation ring). DEV:
+  `__test.runSelection()`. Tuning: `BUILD_DIM_ALPHA` + per-buildable `buildTimeMs` in `config.ts`/data.
+- **Tests.** Unit: `systems/__tests__/buildRun.test.ts` (axis-lock, dedupe, affordable-subset cutoff,
+  ETA) + `buildTime.test.ts` (`buildTimeFor`). E2e: `tests/e2e/blueprint.spec.ts` (tap-vs-drag placement,
+  line-tool paint → live tally → Confirm-commits-affordable-subset-then-builds, Cancel).
+
 ## Rendering (art, glow, crisp actors)
 
 - **Active art is Pixel Crawler** (plan 005): `ACTIVE_TILESET` in `src/data/tileset.ts`; the Zombie
