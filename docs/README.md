@@ -36,3 +36,10 @@ surface stays lean — load the one leaf a task needs, not the whole set.
 - [gemini-pipeline.md](gemini-pipeline.md) — operational Gemini item-icon pipeline (endpoint, key, workflow); see also [scripts/gen-icons/README.md](../scripts/gen-icons/README.md)
 - [AI-SPRITE-PIPELINE.md](AI-SPRITE-PIPELINE.md) — reusable playbook for **generating animated pack-matching sprites** via Gemini image-to-image + an outline-first cel-shade downscale (Rogue attack was the first); includes prior-art / papers
 - [RENDERING.md](RENDERING.md) — custom PostFX pipelines + "when to reach for a shader"
+
+## Archival (decision provenance — the *why* behind already-shipped work)
+
+Load only when you need the rationale/history behind a change that has **already landed** — not current spec.
+
+- Cleanup audit (plan-043 pass, all findings applied): [smells](cleanup/smells.md) (severity-ranked code smells + what was done) · [standards](cleanup/standards.md) (STANDARDS/CONVENTIONS drift in `src/`, each resolved) · [perf](cleanup/perf.md) (`GameScene.update()` hot-path allocation audit) · [extensibility](cleanup/extensibility.md) ("edit data not code" seam + testability proposals)
+- UI/HUD overhaul (plan 046, shipped as the `src/hud/` Field Kit): [ui-overhaul/README.md](ui-overhaul/README.md) — research, UX flows, DOM-vs-Phaser build-stack decision, the three design directions + which shipped; interactive mockup of the candidates in [build-ui-options.html](build-ui-options.html)

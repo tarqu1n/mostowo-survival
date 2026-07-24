@@ -11,8 +11,8 @@ ghost (gated by `tilePlaceable`: bounds/occupancy/reachability, plus the base-zo
 `baseOnly` buildables) → cost is spent from the inventory **at placement**, not completion → a worker
 `build` task runs over `BUILD_MS` → `finishSite` materialises the result, branching on
 `def.behavior`: a *static* buildable (no `behavior` — the wall) becomes a static tile; a *live*
-buildable (`behavior` set — the campfire) hands off to its runtime manager (`CampfireManager`) to
-create the simulated sprite. (`behavior` is the live-vs-static discriminant; `animKey` is purely
+buildable (`behavior` set — the campfire) hands off to its `StructureManager` behavior module
+(`CampfireBehavior`) to create the simulated sprite. (`behavior` is the live-vs-static discriminant; `animKey` is purely
 visual — see [DECISIONS.md](DECISIONS.md) "generalise buildable runtime on buildable #2".) Buildables
 are defined in [src/data/buildables.ts](../src/data/buildables.ts) (`BuildableDef`,
 [src/data/types.ts](../src/data/types.ts)).
@@ -39,7 +39,7 @@ blocking fire tile.
 
 All numbers are `CAMPFIRE_FUEL_MAX`/`_BURN_PER_SEC`/`_PER_WOOD`/`_FEED_INTERVAL_MS`/`_LIGHT_MIN_FRAC`/
 `_FLAME_MIN_FRAC` in [src/config.ts](../src/config.ts). Owned at runtime by
-[src/scenes/world/CampfireManager.ts](../src/scenes/world/CampfireManager.ts) (sprite scale, fuel tick,
+[src/scenes/world/CampfireBehavior.ts](../src/scenes/world/CampfireBehavior.ts) (sprite scale, fuel tick,
 `feedOne`); the `refuel` executor + tap→action resolution are in
 [src/scenes/GameScene.ts](../src/scenes/GameScene.ts) / [ScenePicker](../src/scenes/input/ScenePicker.ts);
 pure fuel math (`drainFuel`/`feedFuel`/`isLit`/`fuelFrac`) in
@@ -154,7 +154,7 @@ col, row)` in [src/systems/base.ts](../src/systems/base.ts); gates any `baseOnly
 Lit campfires cut inverted-mask holes in the night overlay
 ([src/scenes/world/SurvivalClock.ts](../src/scenes/world/SurvivalClock.ts)) and extend the vision
 reveal ([src/scenes/fx/VisionController.ts](../src/scenes/fx/VisionController.ts)) — both fed by one
-scene-mediated `lightSources()` closure over `CampfireManager` (behavior-neutral seam, so future light
+scene-mediated `lightSources()` closure over `CampfireBehavior` (behavior-neutral seam, so future light
 emitters aggregate in without either consumer changing; no manager↔manager edge). Enemies are
 **not** fog-gated yet (deferred to the night-waves plan) — the reveal is purely the night-overlay hole
 making near-fire content readable, not a stealth mechanic. Mask technique (inverted geometry mask +
