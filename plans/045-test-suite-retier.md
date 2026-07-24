@@ -1,7 +1,8 @@
 # Test Suite Re-tier (Phase 2)
 
-> Status: in review — committed core (Steps 1–2) shipped; Phase 2b (Steps 3–8) stays opt-in, gated on
-> recorded CI-wall-blocking-work evidence (see "Why now / the real gate").
+> Status: deployed — committed core (Steps 1–2) merged to master. Phase 2b (Steps 3–8) stays opt-in,
+> gated on recorded CI-wall-blocking-work evidence (see "Why now / the real gate") — re-raise as a new
+> plan if that evidence shows up.
 
 ## Summary
 
