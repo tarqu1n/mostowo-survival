@@ -1,30 +1,42 @@
 #!/usr/bin/env python3
-"""Baker for **tile edge sets** (plan 052) — a tile edge set bundles, for one surface, its member
-tiles + the data about which edges join + gameplay semantics (walkable) + accent groups, all derived
-from the ART and committed as JSON so the editor/runtime does O(1) lookups and never touches pixels.
+"""Baker for **tile edge sets** (plan 052) — derives, for a tileset, the member tiles + which
+edges/corners join + gameplay semantics (walkable) + fill variants, and commits it as JSON so the
+editor/runtime does O(1) lookups and never touches pixels. **Full onboarding pipeline (how to fit a new
+sheet — e.g. muddy patches — to a method, step by step): docs/BIOMES.md. Read it before adding a set.**
 
-Two join methods, one schema (`method` gates the transition field):
-  - **blob** (grass/dirt): the 8-neighbour alpha autotiler from `autotile.py` — `mapping` = blob-key ->
-    frame. Edges are alpha (this-terrain vs not), so a mask paints straight into coherent edges/corners.
-  - **dualgrid** (water): the coast tiles are OPAQUE (land/water is a COLOUR transition, no alpha edge),
-    so the blob autotiler can't key them. Instead each display tile sits over a world-grid VERTEX and is
-    chosen by its 4 CORNERS (water/land) -> 16 cases; `coast.cases` = case -> frame, auto-derived by
-    classifying each coast tile's 4 corner blocks. (Spike write-up: plan 052 step 2 + biome_lake_poc.py.)
+Two methods (`method` in the emitted JSON):
+  - **blob** (grass/dirt): the 8-neighbour ALPHA autotiler from `autotile.py`. Tile edges are alpha
+    (this-terrain vs not), so a painted mask resolves straight into coherent edges/corners. Emits
+    `mapping` (blob-key -> frame) + one `surfaces[]` fill (base + accents, with a rotation-variety map).
+  - **depth** (water/mud): the tiles are OPAQUE — a level boundary is a COLOUR transition, not an alpha
+    edge — so the blob autotiler can't key them. A depth set is an ordered ramp of near-uniform shade
+    LEVELS (e.g. shallow < mid < deep) joined by CORNER dual-grid transition autotiles (one per adjacent
+    level pair) + a COAST autotile (land vs the shallowest level) + per-level SOLID fill variants
+    (surface decoration). Every display tile sits over a world-grid VERTEX and is chosen by the level on
+    its 4 CORNERS. Emits `levels[]`, `coast.cases`, `transitions[]` (each case -> LIST of [frame,rot]
+    options for variety), and `generate` params for the depth-field lake generator.
 
-Both carry `surfaces[]`: the fill tiers with a clean `base` frame + noise-scattered `accents`, each
-tagged `walkable`. Water splits into a LIGHT tier (shallow, walkable) and a DARK tier (deep, solid) —
-the sheet's two water pools are median-brightness ~146-152 vs ~126-138, a clean split. `accents` are
-kept only if they seam cleanly against the base under the pixel-adjacency (Wang) test (the "which
-bubble tiles fit together" check) — the surviving set is what a generator may scatter without clashes.
+Key facts the depth method encodes (learned onboarding Pixel Crawler water, plan 052):
+  - Classify per-BLOCK 2-material (each block holds exactly its two shades), not one global N-way split
+    — the levels are only a few RGB apart, so a global split is noise.
+  - Collect ALL (frame, rotation) per corner case: a few base tiles rotate to cover ~13/16 cases, and
+    keeping every option gives placement variety. Saddle cases (6, 9) have no tile; the depth field is
+    repaired so they never occur.
+  - Solid fill variants come ONLY from the surface rows (`variant_rows`); the transition-block rows are
+    bubble-EDGE pieces, wrong to scatter as solids.
+  - A level with no fill tile in the art (deepest water) is `authored` = a flat synthesized tile of its
+    shade (the shade the transitions actually lead to, so it seams).
 
-Onboard a surface = add a config entry below + re-run. Writes one JSON per set under
-`public/assets/tilesets/pixel-crawler/edge-sets/<id>.json`, plus a demo `bake_edge_set_demo.png` to
-eyeball. Re-run: `python3 scripts/pixel-crawler/bake_edge_set.py`, then `npx prettier --write` the JSON.
+Onboard a set = add a config entry to SETS + re-run. Writes one JSON per set under
+`public/assets/tilesets/pixel-crawler/edge-sets/<id>.json` + a demo `bake_edge_set_demo.png` (the
+acceptance guard: it MUST report `invalid tiles = 0`). Re-run:
+`python3 scripts/pixel-crawler/bake_edge_set.py`, then `npx prettier --write` the JSON outputs.
 """
 import json
 import os
 import random
 import sys
+from collections import deque
 
 import numpy as np
 from PIL import Image
@@ -37,8 +49,6 @@ PACK_ID = "pixel-crawler"
 FLOORS = "Environment/Tilesets/Floors_Tiles.png"
 WATER = "Environment/Tilesets/Water_tiles.png"
 COLS = 25  # both sheets are 25 tiles wide; frame = row*COLS + col
-COLOR_TH = 40   # per-pixel RGB distance counting two edge pixels as "different"
-FRAC_TH = 0.85  # > this fraction of a seam's pixel pairs differing => the two tiles do NOT fit
 EDGE_TH = 12    # max per-pixel RGB dist between two 1px borders for them to be the SAME edge class
                 # (the seam knob: tiles only sit adjacent if their touching edges share a class)
 
@@ -179,18 +189,6 @@ def with_edges(arr, surface, edge_th):
     return surface
 
 
-def diff_frac(line_a, line_b):
-    d = np.sqrt(((line_a[:, :3].astype(float) - line_b[:, :3]) ** 2).sum(1))
-    return float((d > COLOR_TH).mean())
-
-
-def seam_fit(arr, fa, fb, dirn):
-    """Worst-case not-fit fraction placing fb to the (E|S) of fa: compares the touching pixel lines."""
-    a = frame_tile_arr(arr, fa)
-    b = frame_tile_arr(arr, fb)
-    return diff_frac(a[:, 15], b[:, 0]) if dirn == "E" else diff_frac(a[15, :], b[0, :])
-
-
 def frame_tile_arr(arr, f):
     c, r = f % COLS, f // COLS
     return arr[r * TILE : (r + 1) * TILE, c * TILE : (c + 1) * TILE]
@@ -228,176 +226,371 @@ def build_blob_set(cfg):
     return doc, {"ground": dropped}
 
 
-# ----- dualgrid (water) -----------------------------------------------------
-def build_coast_cases(arr, rows, cols):
-    """Classify each opaque coast tile (grass-island-in-water) by its 4 corner blocks -> 16-case
-    (NW<<3|NE<<2|SW<<1|SE) map. water-corner=1. First-seen canonical per case."""
-    case2frame = {}
+# ----- depth method (water / mud): opaque shade-ramp with corner dual-grid transitions -----------
+# The tiles here are OPAQUE — a level boundary is a COLOUR transition, not an alpha edge — so the blob
+# autotiler (which keys on alpha) can't tile them. Instead a depth set has ordered LEVELS (near-uniform
+# shades, e.g. shallow<mid<deep), joined by CORNER dual-grid transition autotiles (one per adjacent
+# level pair) plus a COAST autotile (land vs the shallowest level), and per-level SOLID fill variants
+# (surface decoration). Every display tile is chosen by the level on its four CORNERS. Full onboarding
+# recipe (how to fit a new sheet like muddy patches to this): docs/BIOMES.md.
+def corner_shades(arr, f, rot=0):
+    """Mean RGB of a tile's 4 corner blocks (NW, NE, SW, SE), optionally rotated k*90deg (np.rot90)."""
+    c, r = f % COLS, f // COLS
+    t = arr[r * TILE : (r + 1) * TILE, c * TILE : (c + 1) * TILE, :3]
+    if rot:
+        t = np.rot90(t, rot)
+    g = lambda ys, xs: t[ys, xs].reshape(-1, 3).mean(0)  # noqa: E731
+    return [g(slice(0, 5), slice(0, 5)), g(slice(0, 5), slice(11, 16)),
+            g(slice(11, 16), slice(0, 5)), g(slice(11, 16), slice(11, 16))]
+
+
+def kmeans2(pts):
+    """2-means on RGB points -> (bright, dark) centroids (bright = higher mean channel). Robust when
+    two levels are only a few RGB apart and foam adds noise — a per-BLOCK binary split beats a global
+    N-way one, because each transition block contains exactly its own two shades."""
+    pts = np.asarray(pts, float)
+    a, b = pts[pts.mean(1).argmax()], pts[pts.mean(1).argmin()]
+    for _ in range(25):
+        da, db = np.linalg.norm(pts - a, axis=1), np.linalg.norm(pts - b, axis=1)
+        A, B = pts[da <= db], pts[da > db]
+        if len(A):
+            a = A.mean(0)
+        if len(B):
+            b = B.mean(0)
+    return (a, b) if a.mean() >= b.mean() else (b, a)
+
+
+def opaque_fill(arr, f):
+    c, r = f % COLS, f // COLS
+    return (arr[r * TILE : (r + 1) * TILE, c * TILE : (c + 1) * TILE, 3] > 250).mean() > 0.98
+
+
+def block_centroids(arr, box):
+    """(bright, dark) shades of one transition BLOCK, via 2-means over all its opaque tiles' corners."""
+    c0, c1, r0, r1 = box
+    corners = [v for r in range(r0, r1) for c in range(c0, c1) if opaque_fill(arr, r * COLS + c)
+               for v in corner_shades(arr, r * COLS + c)]
+    return kmeans2(corners)
+
+
+def build_corner_map(arr, box, bright, dark):
+    """A 2-material corner dual-grid autotile. case = 4 corner bits (1 where corner == bright/shallower;
+    order NW NE SW SE) -> LIST of [frame, rot] that produce it. ALL options are collected (including
+    every rotation), so the several corner/edge variants — and their rotations, which read a little
+    differently — all get used at render for variety. Saddle cases 6 & 9 usually stay empty (no tile in
+    the art); the depth-field repair keeps them from ever occurring."""
+    c0, c1, r0, r1 = box
+    cmap = {}
+    for r in range(r0, r1):
+        for c in range(c0, c1):
+            f = r * COLS + c
+            if not opaque_fill(arr, f):
+                continue
+            for rot in range(4):
+                bits = 0
+                for i, v in enumerate(corner_shades(arr, f, rot)):
+                    bits |= (1 if np.linalg.norm(v - bright) <= np.linalg.norm(v - dark) else 0) << (3 - i)
+                if 0 < bits < 15:  # 0/15 = all-one-level = a fill, not a transition
+                    cmap.setdefault(bits, []).append([f, rot])
+    return cmap
+
+
+def build_coast_map(arr, rows, cols):
+    """Land-vs-water corner dual-grid (the shore). case = corner bits (1 where corner is WATER; land
+    corner => the shallowest level shows) -> LIST of [frame, 0]. Multi-option across the sheet's repeated
+    coast blocks (their variants), but NOT rotated: coast art is directional (grass tufts, top-light)."""
+    cmap = {}
     for r in range(*rows):
         for c in range(*cols):
             t = frame_tile_arr(arr, r * COLS + c)
             if (t[:, :, 3] > 128).mean() < 0.5:
                 continue
-            nw = is_water_block(t[0:6, 0:6])
-            ne = is_water_block(t[0:6, 10:16])
-            sw = is_water_block(t[10:16, 0:6])
-            se = is_water_block(t[10:16, 10:16])
+            nw, ne = is_water_block(t[0:6, 0:6]), is_water_block(t[0:6, 10:16])
+            sw, se = is_water_block(t[10:16, 0:6]), is_water_block(t[10:16, 10:16])
             case = (nw << 3) | (ne << 2) | (sw << 1) | se
-            if 0 < case < 15:  # 0 = all land (grass shows), 15 = all water (a fill's job)
-                case2frame.setdefault(case, r * COLS + c)
-    return case2frame
+            if 0 < case < 15:  # 0 = all land (only grass shows), 15 = all water (a fill's job)
+                cmap.setdefault(case, []).append([r * COLS + c, 0])
+    return cmap
 
 
-def water_surface(arr, frames, role, walkable, accent_tol, edge_th):
-    """Base = flat shade-centroid; accents = same-shade tiles (within accent_tol) that also seam
-    cleanly vs the base. The colour gate kills the tile-boundary shade jumps; the seam gate is a
-    belt-and-braces adjacency check (fills tile seamlessly, so it rarely bites). Then the surface is
-    given its rotation-aware edge-contiguity map (with_edges)."""
-    base, near, dropped = pick_base_and_accents(arr, frames, accent_tol)
-    accents, rejected = [], list(dropped)
-    for f in near:
-        worst = max(seam_fit(arr, base, f, "E"), seam_fit(arr, f, base, "E"),
-                    seam_fit(arr, base, f, "S"), seam_fit(arr, f, base, "S"))
-        (accents if worst <= FRAC_TH else rejected).append(f if worst <= FRAC_TH else (f, round(worst, 2)))
-    surface = {"role": role, "walkable": walkable, "base": base, "accents": accents}
-    with_edges(arr, surface, edge_th)
-    return surface, rejected
+def is_solid_fill(arr, f, centroids, tol=18):
+    """A SOLID fill variant (a flat level shade + optional INTERIOR decoration like a ripple/swirl):
+    opaque, single shade (its 4 corners agree), and its mean matches some level centroid. Generic (no
+    per-colour test) so it works for any depth sheet. NOTE: the decorative variants live only in the
+    surface rows (`variant_rows`); the transition-block rows hold bubble-EDGE pieces that must NOT be
+    scattered as solids (their edge feature would drop a stray line into flat fill)."""
+    if not opaque_fill(arr, f):
+        return False
+    cs = corner_shades(arr, f)
+    if max(np.linalg.norm(a - b) for a in cs for b in cs) >= 8:  # corners must AGREE (adjacent levels
+        return False                                             # sit ~14 apart, so >=8 catches a band)
+    return min(np.linalg.norm(tile_mean_rgb(arr, f) - c) for c in centroids) < tol
 
 
-def build_water_set(cfg):
+def build_depth_set(cfg):
+    """Derive a depth tile edge set from `cfg` (see SETS + docs/BIOMES.md for the fields)."""
     arr = np.asarray(sheet(cfg["sheet"])).astype(float)
-    coast = build_coast_cases(arr, cfg["coast_rows"], cfg["coast_cols"])
-    # fills: two physically separate opaque water pools — the LEFT pool (light_cols) is the lighter
-    # water, the RIGHT pool (dark_cols) the darker. We classify by POOL MEMBERSHIP (the art's actual
-    # two-water-type layout), NOT a per-tile brightness cut — foam shadows dip a light tile's median
-    # below the split and would misfile it as deep. Brightness only validates the pools are ordered.
-    light, dark = [], []
-    for r in range(*cfg["fill_rows"]):
-        for c in range(cfg["light_cols"][0], cfg["dark_cols"][1]):
+    nlev = len(cfg["level_meta"])
+    # 1) level shades: 2-means each adjacent-pair BLOCK, then average the shade of any level shared
+    #    across blocks (the mid level is the dark side of block A and the bright side of block B).
+    shade_acc = {i: [] for i in range(nlev)}
+    block_shades = []
+    for blk in cfg["blocks"]:
+        bright, dark = block_centroids(arr, blk["box"])
+        shade_acc[blk["bright"]].append(bright)
+        shade_acc[blk["dark"]].append(dark)
+        block_shades.append((bright, dark))
+    centroids = [np.mean(shade_acc[i], axis=0) if shade_acc[i] else np.array(cfg["level_meta"][i]["rgb"])
+                 for i in range(nlev)]
+    # 2) one transition autotile per adjacent-level block
+    transitions = []
+    for blk, (bright, dark) in zip(cfg["blocks"], block_shades):
+        cmap = build_corner_map(arr, blk["box"], bright, dark)
+        transitions.append({"from": blk["bright"], "to": blk["dark"],
+                            "cases": {str(k): v for k, v in sorted(cmap.items())}})
+    # 3) coast (land <-> the shallowest level)
+    coast = build_coast_map(arr, cfg["coast_rows"], cfg["coast_cols"])
+    # 4) per-level fills. The BASE fill is the flattest solid tile of the level's shade found ANYWHERE
+    #    (mid's plain fill sits in a transition block, not the surface rows). DECORATIVE variants
+    #    (ripple/swirl) are collected ONLY from `variant_rows` — the transition rows hold bubble-EDGE
+    #    pieces, wrong to scatter as solids. A level's `variants` = its base fill + its surface decorations.
+    def level_of(f):
+        return int(np.argmin([np.linalg.norm(tile_mean_rgb(arr, f) - c) for c in centroids]))
+    n_rows = np.asarray(sheet(cfg["sheet"])).shape[0] // TILE
+    all_solids = [r * COLS + c for r in range(n_rows) for c in range(COLS)
+                  if is_solid_fill(arr, r * COLS + c, centroids)]
+    decor = {i: [] for i in range(nlev)}
+    for r in range(*cfg["variant_rows"]):
+        for c in range(COLS):
             f = r * COLS + c
-            t = frame_tile_arr(arr, f)
-            if (t[:, :, 3] > 250).mean() < 0.98 or not is_water_block(t):
-                continue
-            (light if c < cfg["light_cols"][1] else dark).append(f)
-    # Sanity: the pools' MEAN shade must separate (their rim tiles overlap — foam darkens the light
-    # pool's border — so compare central tendency, not min/max). Guards a mis-set light_cols/dark_cols.
-    mean_light = float(np.mean([tile_stats(arr, f)[0] for f in light]))
-    mean_dark = float(np.mean([tile_stats(arr, f)[0] for f in dark]))
-    if mean_light <= mean_dark + 5:
-        raise SystemExit(f"water pools not brightness-separated (mean light={mean_light:.0f} "
-                         f"dark={mean_dark:.0f}) — re-check light_cols/dark_cols before trusting walkability")
-    shallow, rej_s = water_surface(arr, light, "shallow", True, cfg["accent_tol"], cfg["edge_th"])
-    deep, rej_d = water_surface(arr, dark, "deep", False, cfg["accent_tol"], cfg["edge_th"])
+            if is_solid_fill(arr, f, centroids):
+                decor[level_of(f)].append(f)
+    # 5) assemble levels (a level may be `authored` = a flat synthesized tile of its shade, for a depth
+    #    with no distinct fill tile in the sheet — e.g. the deepest water)
+    levels = []
+    for i, meta in enumerate(cfg["level_meta"]):
+        rgb = [int(x) for x in centroids[i]]
+        if meta.get("authored"):
+            levels.append({"name": meta["name"], "walkable": meta["walkable"], "rgb": rgb, "authored": True, "variants": []})
+            continue
+        cand = [f for f in all_solids if level_of(f) == i]
+        base = min(cand, key=lambda f: tile_stats(arr, f)[1]) if cand else None
+        vs = ([base] if base is not None else []) + [f for f in decor[i] if f != base]
+        levels.append({"name": meta["name"], "walkable": meta["walkable"], "rgb": rgb,
+                       "fill": base, "variants": vs})
     doc = {
         "id": cfg["id"], "name": cfg["name"], "pack": PACK_ID, "sheet": cfg["sheet"], "cols": COLS,
-        "method": "dualgrid",
+        "method": "depth",
+        "levels": levels,
         "coast": {"cases": {str(k): v for k, v in sorted(coast.items())}},
-        "surfaces": [shallow, deep],
+        "transitions": transitions,
+        "generate": cfg["generate"],
     }
-    return doc, {"shallow": rej_s, "deep": rej_d, "missing_cases": [x for x in range(1, 15) if x not in coast]}
+    diag = {"levels": {meta["name"]: len(lv.get("variants", [])) for meta, lv in zip(cfg["level_meta"], levels)},
+            "missing": {f"{t['from']}->{t['to']}": [x for x in range(1, 15) if x not in (6, 9) and str(x) not in t["cases"]]
+                        for t in transitions}}
+    return doc, diag
 
 
 # ----- config ---------------------------------------------------------------
-# `accent_tol` = max RGB dE between an accent tile's mean colour and the base's before it's dropped as
-# a shade outlier (the "same colour" knob — lower = flatter/cleaner, higher = more variety but risks
-# blocky tile-boundary jumps). Grass tight (8): its two green variants sit ~18 apart, so 8 keeps one
-# coherent shade. Water looser (9): keeps the subtle foam variety while cutting the worst patchwork.
+# blob (grass): `accent_tol` = max RGB dE an accent's mean may sit from the base before it's dropped as
+# a shade outlier (grass has a dark + bright green variant ~14 apart; 8 keeps one shade). `prefer` picks
+# the bright cluster so the ground matches the grass baked into the water coast tiles (no shore halo).
+#
+# depth (water): `blocks` = the adjacent-level transition autotiles as (box=(c0,c1,r0,r1), bright/dark
+# level indices). `variant_rows` = the sheet rows holding SOLID surface-decoration fills (NOT the
+# transition rows). `level_meta` orders the levels shallow->deep (walkable flag; `authored` = synthesize
+# a flat tile of the level's shade, for a depth with no fill tile in the art). `generate` params drive
+# the demo/runtime lake generator. Full field-by-field recipe + how to onboard a new sheet: docs/BIOMES.md.
 SETS = [
     {"kind": "blob", "id": "grass", "name": "Grass", "sheet": FLOORS, "box": (0, 4, 0, 12),
      "role": "ground", "walkable": True, "accent_tol": 8, "edge_th": EDGE_TH, "prefer": "bright"},
-    {"kind": "dualgrid", "id": "water", "name": "Water", "sheet": WATER,
-     "coast_rows": (0, 5), "coast_cols": (0, 25), "fill_rows": (5, 15),
-     "light_cols": (0, 5), "dark_cols": (5, 10), "accent_tol": 9, "edge_th": EDGE_TH},
+    {"kind": "depth", "id": "water", "name": "Water", "sheet": WATER,
+     "coast_rows": (0, 5), "coast_cols": (0, 25),
+     "blocks": [
+         {"box": (0, 5, 5, 15), "bright": 0, "dark": 1},   # cols 0-4 rows 5-14: shallow(L) <-> mid(M)
+         {"box": (5, 10, 5, 15), "bright": 1, "dark": 2},  # cols 5-9 rows 5-14: mid(M) <-> deep(D)
+     ],
+     "variant_rows": (0, 2),                                # surface decorations (ripple/swirl) live in rows 0-1
+     "level_meta": [
+         {"name": "shallow", "walkable": True},
+         {"name": "mid", "walkable": False},
+         {"name": "deep", "walkable": False, "authored": True},
+     ],
+     "generate": {"bands": [2.5, 8.5], "noise": {"amp": 3.0, "scale": 4, "seed": 5},
+                  "scatterRate": 0.35, "distance": "bfs"}},
 ]
 
 
-def render_demo(root, sets):
-    """One organic lake: grass surround -> dual-grid coast -> deep(solid) centre ringed by
-    shallow(walkable), foam accents scattered. Eyeball the light/dark walkability split + seams."""
-    grass = next(s for s in sets if s["id"] == "grass")
-    water = next(s for s in sets if s["id"] == "water")
-    fim, wim = sheet(FLOORS), sheet(WATER)
-    W, H = 24, 18
-    mask = new_mask(W, H)
-    disc(mask, 12, 9, 7, 5.5)
-    disc(mask, 16, 6, 3.5, 3)
-    mask = smooth_mask(mask, 2)
-    flat = [1 if mask[y][x] else 0 for y in range(H) for x in range(W)]
-
-    def wet(x, y):
-        return 0 <= x < W and 0 <= y < H and flat[y * W + x] == 1
-
-    def deep_at(x, y):  # a cell is "deep" if all 4 neighbours are also water (interior)
-        return wet(x, y) and all(wet(x + dx, y + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))
-
-    rng = random.Random(5)
-    cv = Image.new("RGBA", (W * TILE, H * TILE))
-    def scatter(surf, calm):
-        """Pick a seam-safe open (frame, rot): mostly the base (rotated for variety), occasionally an
-        open accent. Every option shares the plain border class, so no placement makes an edge step."""
-        if rng.random() < calm:
-            return surf["base"], rng.randrange(4)
-        return tuple(rng.choice(surf["variants"]))
-
-    ga = grass["surfaces"][0]
+# ----- depth generator (reference implementation: powers the demo + is the acceptance guard) -----
+def value_noise(H, W, seed, scale, amp):
+    """Smooth value noise in ~[-amp, amp]: a coarse random grid, bilinearly upsampled."""
+    rr = np.random.default_rng(seed)
+    g = rr.uniform(-1, 1, (H // scale + 2, W // scale + 2))
+    out = np.zeros((H, W))
     for y in range(H):
         for x in range(W):
-            f, rot = scatter(ga, 0.75)
-            cv.alpha_composite(frame_tile(fim, f, rot), (x * TILE, y * TILE))
-    shallow = next(s for s in water["surfaces"] if s["role"] == "shallow")
-    deep = next(s for s in water["surfaces"] if s["role"] == "deep")
-    cases = {int(k): v for k, v in water["coast"]["cases"].items()}
+            gy, gx = y / scale, x / scale
+            y0, x0, fy, fx = int(gy), int(gx), gy - int(gy), gx - int(gx)
+            out[y, x] = ((g[y0, x0]*(1-fx) + g[y0, x0+1]*fx)*(1-fy)
+                         + (g[y0+1, x0]*(1-fx) + g[y0+1, x0+1]*fx)*fy)
+    return out * amp
+
+
+def depth_field(water, W, H, gen):
+    """Per-cell depth LEVEL for a water body. distance-from-shore (BFS) + smooth noise (mostly distance,
+    noise wobbles the bands), quantised by `bands`, then REPAIRED to be tileable: erode until every
+    king-adjacent pair differs by <=1 level (=> every 2x2 spans <=1, so a transition tile always exists),
+    and lower any saddle 2x2. Both passes only LOWER cells (bounded at 0) so the loop always terminates."""
+    d = [[10**9] * W for _ in range(H)]
+    dq = deque()
+    for y in range(H):
+        for x in range(W):
+            if not water[y][x]:
+                d[y][x] = 0
+                dq.append((x, y))
+    while dq:
+        x, y = dq.popleft()
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < W and 0 <= ny < H and d[ny][nx] > d[y][x] + 1:
+                d[ny][nx] = d[y][x] + 1
+                dq.append((nx, ny))
+    noise = value_noise(H, W, gen["noise"]["seed"], gen["noise"]["scale"], gen["noise"]["amp"])
+    bands = gen["bands"]
+    lv = [[-1] * W for _ in range(H)]
+    for y in range(H):
+        for x in range(W):
+            if water[y][x]:
+                lv[y][x] = sum(1 for b in bands if d[y][x] + noise[y, x] >= b)  # 0..len(bands)
+    kings = [(dx, dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1) if dx or dy]
+
+    def neigh(x, y):
+        for dx, dy in kings:
+            if 0 <= x + dx < W and 0 <= y + dy < H and water[y + dy][x + dx]:
+                yield x + dx, y + dy
+
+    for _ in range(80):
+        changed = False
+        for y in range(H):
+            for x in range(W):
+                if not water[y][x]:
+                    continue
+                for nx, ny in neigh(x, y):
+                    if lv[y][x] - lv[ny][nx] > 1:
+                        lv[y][x] = lv[ny][nx] + 1
+                        changed = True
+        saddles = 0
+        for y in range(H - 1):
+            for x in range(W - 1):
+                p = [(x, y), (x + 1, y), (x, y + 1), (x + 1, y + 1)]  # NW NE SW SE
+                if not all(water[cy][cx] for cx, cy in p):
+                    continue
+                vals = [lv[cy][cx] for cx, cy in p]
+                lo, hi = min(vals), max(vals)
+                if hi - lo == 1 and {i for i, v in enumerate(vals) if v == hi} in ({0, 3}, {1, 2}):
+                    for i in (i for i, v in enumerate(vals) if v == hi):
+                        cx, cy = p[i]
+                        lv[cy][cx] = lo
+                    saddles += 1
+        if not changed and saddles == 0:
+            break
+    return lv
+
+
+def render_depth_lake(root, grass_doc, depth_doc):
+    """Bake one organic lake: grass surround -> coast -> concentric-ish L/M/D depth (distance+noise),
+    autotiled by the corner maps with per-case random tile+rotation, per-level fill-variant scatter, and
+    the authored solid deep centre. `invalid` MUST be 0 (every 2x2 tileable) — that's the guard."""
+    fim, wim = sheet(grass_doc["sheet"]), sheet(depth_doc["sheet"])
+    gen, levels = depth_doc["generate"], depth_doc["levels"]
+    rng = random.Random(gen["noise"]["seed"])
+    W, H = 30, 22
+    mask = new_mask(W, H)
+    disc(mask, 15, 11, 11, 9)
+    disc(mask, 23, 6, 4, 3.5)
+    mask = smooth_mask(mask, 2)
+    water = [[bool(mask[y][x]) for x in range(W)] for y in range(H)]
+    lv = depth_field(water, W, H, gen)
+    coast = {int(k): v for k, v in depth_doc["coast"]["cases"].items()}
+    trans = {(t["from"], t["to"]): {int(k): v for k, v in t["cases"].items()} for t in depth_doc["transitions"]}
+    solid = {i: Image.new("RGBA", (TILE, TILE), tuple(levels[i]["rgb"]) + (255,)) for i in range(len(levels))}
+
+    def fill_img(i):
+        meta = levels[i]
+        if meta.get("authored"):
+            return solid[i]
+        pool = meta["variants"] or [meta["fill"]]
+        f = meta["fill"] if rng.random() > gen["scatterRate"] else rng.choice(pool)
+        return frame_tile(wim, f, rng.randrange(4))
+
+    def lvl(x, y):
+        return lv[y][x] if (0 <= x < W and 0 <= y < H and water[y][x]) else -1
+
+    cv = Image.new("RGBA", (W * TILE, H * TILE))
+    g = grass_doc["surfaces"][0]
+    for y in range(H):
+        for x in range(W):
+            gf, gr = (g["base"], rng.randrange(4)) if rng.random() < 0.75 else tuple(rng.choice(g["variants"]))
+            cv.alpha_composite(frame_tile(fim, gf, gr), (x * TILE, y * TILE))
+    invalid = 0
     for y in range(H + 1):
         for x in range(W + 1):
-            corners = (wet(x - 1, y - 1) << 3) | (wet(x, y - 1) << 2) | (wet(x - 1, y) << 1) | wet(x, y)
-            if corners == 0:
+            cs = [lvl(x - 1, y - 1), lvl(x, y - 1), lvl(x - 1, y), lvl(x, y)]  # NW NE SW SE cells
+            if all(c == -1 for c in cs):
                 continue
-            rot = 0
-            if corners == 15:
-                surf = deep if deep_at(x, y) and deep_at(x - 1, y - 1) else shallow
-                f, rot = scatter(surf, 0.6)
+            if any(c == -1 for c in cs):                       # shore: land-vs-water coast autotile
+                case = sum((1 if cs[i] != -1 else 0) << b for i, b in enumerate((3, 2, 1, 0)))
+                opts = coast.get(case)
+                img = frame_tile(wim, *rng.choice(opts)) if opts else fill_img(0)
             else:
-                f = cases.get(corners if corners not in (6, 9) else 15)
-                if f is None:
-                    f = shallow["base"]
-            cv.alpha_composite(frame_tile(wim, f, rot), (x * TILE, y * TILE))
+                lo, hi = min(cs), max(cs)
+                if lo == hi:                                   # single level -> solid fill (scatter)
+                    img = fill_img(lo)
+                elif hi - lo == 1:                             # adjacent-level transition autotile
+                    case = sum((1 if cs[i] == lo else 0) << b for i, b in enumerate((3, 2, 1, 0)))
+                    opts = trans.get((lo, hi), {}).get(case)
+                    if opts:
+                        img = frame_tile(wim, *rng.choice(opts))
+                    else:
+                        img, invalid = fill_img(hi), invalid + 1
+                else:                                          # spans 2 levels (repair should prevent)
+                    img, invalid = fill_img(hi), invalid + 1
+            cv.alpha_composite(img, (x * TILE, y * TILE))
     out = os.path.join(root, "scripts", "pixel-crawler", "bake_edge_set_demo.png")
-    cv.resize((W * TILE * 5, H * TILE * 5), Image.NEAREST).save(out)
-    return out
+    cv.resize((W * TILE * 4, H * TILE * 4), Image.NEAREST).save(out)
+    return out, invalid
 
 
 def main():
     root = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
     out_dir = os.path.join(root, "public", "assets", "tilesets", PACK_ID, "edge-sets")
     os.makedirs(out_dir, exist_ok=True)
-    built = []
+    built = {}
     for cfg in SETS:
-        if cfg["kind"] == "blob":
-            doc, diag = build_blob_set(cfg)
-        else:
-            doc, diag = build_water_set(cfg)
+        doc, diag = build_blob_set(cfg) if cfg["kind"] == "blob" else build_depth_set(cfg)
         doc["_comment"] = (
-            "GENERATED by scripts/pixel-crawler/bake_edge_set.py (plan 052) — do not hand-edit; "
-            "re-run the baker. A tile edge set: member tiles + edge-join data + walkability + accents."
+            "GENERATED by scripts/pixel-crawler/bake_edge_set.py (plan 052) — do not hand-edit; re-run "
+            "the baker. Tile edge set: member tiles + which edges/corners join + walkability + variants. "
+            "Onboarding pipeline for a new sheet: docs/BIOMES.md."
         )
         path = os.path.join(out_dir, f"{cfg['id']}.json")
         with open(path, "w") as fh:
             json.dump(doc, fh, indent=2)
             fh.write("\n")
-        built.append(doc)
-        surf = " ".join(f"{s['role']}(base={s['base']},{len(s['accents'])}acc,"
-                        f"{len(s['variants'])}open-rot,{s['_edgeClasses']}cls@th{s['_edgeTh']},"
-                        f"{'walk' if s['walkable'] else 'solid'})" for s in doc["surfaces"])
-        extra = ""
-        if doc["method"] == "dualgrid":
-            extra = f" | coast cases={len(doc['coast']['cases'])} missing={diag['missing_cases']}"
-        for s in doc["surfaces"]:
-            dropped = diag.get(s["role"], [])
-            if dropped:
-                extra += f" | {s['role']} dropped {len(dropped)} shade-outlier(s)={dropped[:4]}"
-        print(f"wrote {os.path.relpath(path, root)}: {surf}{extra}")
-    demo = render_demo(root, built)
-    print(f"wrote {os.path.relpath(demo, root)}")
+        built[cfg["id"]] = doc
+        rel = os.path.relpath(path, root)
+        if doc["method"] == "blob":
+            s = doc["surfaces"][0]
+            print(f"wrote {rel}: blob {s['role']} base={s['base']} {len(s['accents'])}acc {len(s['variants'])}open-rot")
+        else:
+            lvls = " ".join(
+                f"{lv['name']}({'authored' if lv.get('authored') else 'fill=' + str(lv.get('fill'))},"
+                f"{len(lv['variants'])}var,{'walk' if lv['walkable'] else 'solid'})" for lv in doc["levels"])
+            miss = "; ".join(f"{k} miss={v}" for k, v in diag["missing"].items() if v) or "all cases covered"
+            print(f"wrote {rel}: depth [{lvls}] | coast {len(doc['coast']['cases'])} cases | transitions {miss}")
+    demo, invalid = render_depth_lake(root, built["grass"], built["water"])
+    print(f"wrote {os.path.relpath(demo, root)}  (invalid tiles = {invalid}{'  <-- FAIL' if invalid else ''})")
 
 
 if __name__ == "__main__":

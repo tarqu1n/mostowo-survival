@@ -181,7 +181,16 @@ or the **one** guarding spec — never the full `npm run e2e`/`check:all` mid-wo
   - Done when: `npm test terrainOps` passes for grass **and** dirt; the grass-invariance check confirms
     grass is byte-identical; arming **Dirt** in the editor paints coherent edges + inner/outer corners.
 
-- [ ] **Step 2: Water-terrain SPIKE — verify overlay assumptions, onboard or fall back** `[inline]`
+- [x] **Step 2: Water tile edge set — depth dual-grid tiler + reusable baker/pipeline (LANDED)** `[inline]`
+  - **LANDED 2026-07-25.** Went far beyond the original spike: the water sheet is a **depth ramp**
+    (shallow/mid/deep opaque shade levels) joined by **corner dual-grid transition autotiles** + a coast
+    autotile + surface-decoration fill variants. Baked by `scripts/pixel-crawler/bake_edge_set.py`
+    (`method: "depth"`) → `edge-sets/water.json`, with a distance+noise depth-field generator (repaired
+    to be always-tileable: king-Lipschitz erode + saddle-break) as the demo/guard (`invalid tiles = 0`).
+    Corner/edge variety (all `[frame,rot]` options per case), authored solid deep, grass shade matched to
+    coast (no halo). **Full reusable onboarding pipeline documented in [docs/BIOMES.md](../docs/BIOMES.md)**
+    (so a fresh session can onboard the next sheet, e.g. muddy patches). Steps 6/7/10 (TS runtime/editor
+    generator) still consume this data. **Original spike outcome + superseded checklist below, for record:**
   - **SPIKE OUTCOME (recorded 2026-07-25 — steps below to be rewritten around it before ticking):**
     All three unknowns resolved against the actual `Water_tiles.png`: (1) the water fill box isolates
     cleanly (`(0,4,5,13)`, colour-gated); (2) grid width is **`cols=25`** — *same* as Floors, NOT
