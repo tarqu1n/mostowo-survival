@@ -89,20 +89,30 @@ def tile_mean_rgb(arr, f):
     return t[:, :, :3][op].mean(axis=0)
 
 
-def pick_base_and_accents(arr, frames, accent_tol):
+def pick_base_and_accents(arr, frames, accent_tol, prefer=None):
     """Choose a representative BASE tile + the accents that won't read as hard-edged patches.
 
     The base is the FLAT tile (low internal stddev, so it doesn't self-repeat visibly) whose MEAN
-    COLOUR is closest to the group's mean — a centroid, not an extreme, so accents deviate from it
-    symmetrically and minimally. An accent is kept only if its mean colour is within `accent_tol`
-    (RGB dE) of the base: that is the "which tiles count as the same colour" knob — tightening it
-    drops the shade outliers that show as blocky tile-boundary jumps when scattered. Returns
-    (base, accents, dropped[(frame, dE)]) with accents ordered closest-shade-first."""
+    COLOUR is closest to the mean of the chosen cluster — a centroid, not an extreme, so accents
+    deviate from it symmetrically and minimally. An accent is kept only if its mean colour is within
+    `accent_tol` (RGB dE) of the base: that is the "which tiles count as the same colour" knob —
+    tightening it drops the shade outliers that show as blocky tile-boundary jumps when scattered.
+
+    `prefer` picks WHICH shade cluster when a sheet has two (e.g. Floors grass has a dark and a bright
+    variant ~14 apart): 'bright'/'dark' restrict the base to the upper/lower brightness half, else the
+    base is the whole-group centroid. Grass uses 'bright' so the ground matches the grass baked into
+    Water_tiles.png's coast tiles (dE ~1) — otherwise a dark ground haloes bright-grass shorelines.
+    Returns (base, accents, dropped[(frame, dE)]) with accents ordered closest-shade-first."""
     means = {f: tile_mean_rgb(arr, f) for f in frames}
     stds = {f: tile_stats(arr, f)[1] for f in frames}
-    group_mean = np.mean(list(means.values()), axis=0)
-    med_std = float(np.median(list(stds.values())))
-    flat = [f for f in frames if stds[f] <= med_std] or frames  # the flatter half (never empty)
+    brt = {f: tile_stats(arr, f)[0] for f in frames}
+    pool = frames
+    if prefer in ("bright", "dark") and len(frames) > 2:
+        med_brt = float(np.median(list(brt.values())))
+        pool = [f for f in frames if (brt[f] >= med_brt) == (prefer == "bright")] or frames
+    group_mean = np.mean([means[f] for f in pool], axis=0)
+    med_std = float(np.median([stds[f] for f in pool]))
+    flat = [f for f in pool if stds[f] <= med_std] or pool  # the flatter half (never empty)
     base = min(flat, key=lambda f: np.linalg.norm(means[f] - group_mean))
     base_mean = means[base]
     scored = sorted(((float(np.linalg.norm(means[f] - base_mean)), f) for f in frames if f != base))
@@ -206,7 +216,7 @@ def build_blob_set(cfg):
         mapping[key_tuple_to_int(key_tuple)] = r * COLS + c
     fills = sorted(r * COLS + c for (c, r) in table[FULL])
     arr = np.asarray(sheet(cfg["sheet"])).astype(float)
-    base, accents, dropped = pick_base_and_accents(arr, fills, cfg["accent_tol"])
+    base, accents, dropped = pick_base_and_accents(arr, fills, cfg["accent_tol"], cfg.get("prefer"))
     surface = {"role": cfg["role"], "walkable": cfg["walkable"], "base": base, "accents": accents}
     with_edges(arr, surface, cfg["edge_th"])
     doc = {
@@ -294,7 +304,7 @@ def build_water_set(cfg):
 # coherent shade. Water looser (9): keeps the subtle foam variety while cutting the worst patchwork.
 SETS = [
     {"kind": "blob", "id": "grass", "name": "Grass", "sheet": FLOORS, "box": (0, 4, 0, 12),
-     "role": "ground", "walkable": True, "accent_tol": 8, "edge_th": EDGE_TH},
+     "role": "ground", "walkable": True, "accent_tol": 8, "edge_th": EDGE_TH, "prefer": "bright"},
     {"kind": "dualgrid", "id": "water", "name": "Water", "sheet": WATER,
      "coast_rows": (0, 5), "coast_cols": (0, 25), "fill_rows": (5, 15),
      "light_cols": (0, 5), "dark_cols": (5, 10), "accent_tol": 9, "edge_th": EDGE_TH},
