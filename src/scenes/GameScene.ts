@@ -21,6 +21,9 @@ import {
   TORCH_DRAIN_PER_SEC,
   TORCH_LIGHT_RADIUS,
   TORCH_DRAIN_EMIT_MS,
+  HELD_TORCH_OFFSET_X,
+  HELD_TORCH_OFFSET_Y,
+  HELD_TORCH_SCALE,
 } from '../config';
 import { ITEMS } from '../data/items';
 import { MELEE_WEAPONS, ITEM_MELEE_WEAPON } from '../data/weapons';
@@ -65,6 +68,7 @@ import { CampfireBehavior } from './world/CampfireBehavior';
 import { WallBehavior } from './world/WallBehavior';
 import { TrapBehavior } from './world/TrapBehavior';
 import { WorkbenchBehavior } from './world/WorkbenchBehavior';
+import { HeldItemOverlay } from './world/HeldItemOverlay';
 import { SurvivalClock } from './world/SurvivalClock';
 import { WaveDirector } from './world/WaveDirector';
 import { VisionController } from './fx/VisionController';
@@ -177,6 +181,11 @@ export class GameScene extends Phaser.Scene {
   // pure Inventory/Slot, which stays count-only), and re-equipping resumes from it. Only drain-to-0
   // destroys the torch (and clears its stash). Reset fresh each (re)start in buildWorld().
   private equipCharge: Record<string, number> = {};
+
+  // In-hand torch overlay (plan 051 Step 5) — the visible held-torch sprite pinned to the player's hand
+  // while a torch is in the off hand (the light itself stays playerLight()). Constructed fresh each
+  // (re)start in buildWorld() after the player; a death scene.restart() destroys the old sprite.
+  private heldOverlay!: HeldItemOverlay;
 
   private readonly queue = new TaskQueue();
   private actionGoal: Cell | null = null; // the tile we're currently pathing to (for re-pathing)
@@ -537,6 +546,17 @@ export class GameScene extends Phaser.Scene {
     // playerStats is the player's stat bag surfaced for the Wellbeing screen's stat rows.
     this.registry.set('playerStats', this.playerChar.stats);
     this.physics.world.setBounds(originPx.x, originPx.y, worldPx.w, worldPx.h);
+
+    // In-hand torch overlay (plan 051 Step 5) — reuses the already-loaded torch pack icon at hand scale,
+    // depth 11 (just above the player's depth 10). Hidden until update()'s syncHeldOverlay reveals it
+    // when a torch is in the off hand. Remade here each (re)start (the old sprite died with the restart).
+    this.heldOverlay = new HeldItemOverlay(this, {
+      texture: iconKey('torch'),
+      depth: 11,
+      offsetX: HELD_TORCH_OFFSET_X,
+      offsetY: HELD_TORCH_OFFSET_Y,
+      scale: HELD_TORCH_SCALE,
+    });
 
     // AI companion (plan 042 Step 2) — constructed AFTER the player (construction order is load-bearing:
     // later steps' per-frame tick env reads player state). Side-effect-free like EnemyManager: it does
@@ -1168,6 +1188,11 @@ export class GameScene extends Phaser.Scene {
     // Equipped torch burns down in real time (plan 049 Step 6) — above the early-return so it drains
     // whether or not a worker task is active, like the survival/structure ticks.
     this.tickTorch(delta);
+
+    // In-hand torch overlay (plan 051 Step 5) — reposition/flip the held sprite ONCE per non-death frame
+    // HERE, above the movement branch below (which has two updateAnim sites): wiring it beside either
+    // updateAnim would leave the torch un-following on the other movement path (critique finding #4).
+    this.syncHeldOverlay();
 
     // AI companion (plan 042) — drive it each frame (advance path + anim today; the gather/guard tick
     // lands later). Above the no-action early-return so it ticks whether or not a worker task is active.
@@ -1853,6 +1878,17 @@ export class GameScene extends Phaser.Scene {
     // night-overlay union already consumes playerLight(), so the disc grows for free; fog is unchanged.
     const litTorch = this.equipment.get('offHand')?.id === 'torch';
     return { x: s.x, y: centerY, radius: litTorch ? TORCH_LIGHT_RADIUS : PLAYER_LIGHT_RADIUS };
+  }
+
+  /** Place/flip the in-hand torch overlay (plan 051 Step 5) — shown iff a torch is in the off hand (the
+   *  same read that grows {@link playerLight}); it follows the player and mirrors to the correct hand
+   *  with facing. Called once per non-death frame from update() (above the movement branch). */
+  private syncHeldOverlay(): void {
+    const show = this.equipment.get('offHand')?.id === 'torch';
+    const s = this.player;
+    // Side art faces right; facing left mirrors the sprite (and our X offset) — mirrors updateAnim's flip.
+    const flipLeft = this.playerChar.facingDir() === 'side' && this.playerChar.lastFacing.dCol < 0;
+    this.heldOverlay.sync(show, s.x, s.y, flipLeft);
   }
 
   private litHearth(): { id: string; tile: Cell; pos: { x: number; y: number } } | null {

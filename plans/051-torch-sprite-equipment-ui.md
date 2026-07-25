@@ -212,7 +212,20 @@ and re-use); held-item rendering is the first sliver of the deferred paper-doll.
     with icon (+ torch durability bar); tapping a filled box unequips (torch returns to pack per Step 2);
     build + smoke green.
 
-- [ ] **Step 5: In-hand torch overlay sprite on the player** `[inline]`
+- [x] **Step 5: In-hand torch overlay sprite on the player** `[inline]`
+  - Outcome: new `src/scenes/world/HeldItemOverlay.ts` — a tiny world subsystem owning ONE Phaser image
+    (depth 11, above the player's 10), `setVisible(false)` by default, with `sync(show, x, y, flipLeft)`
+    to place/reveal or hide it (generic over texture/offsets so a future held item can reuse it). Reuses
+    the ALREADY-LOADED `iconKey('torch')` pack texture — no new PreloadScene load needed (the per-item
+    icon loop covers it). `GameScene`: new `heldOverlay` field constructed fresh in `buildWorld` right
+    after the player (old sprite dies with `scene.restart()`, so no leak); `syncHeldOverlay()` shows it
+    iff `equipment.get('offHand')?.id === 'torch'` (same read as `playerLight`), positions at the player
+    sprite origin + `HELD_TORCH_OFFSET_X/Y`, and `flipLeft` mirrors both the X offset and the sprite when
+    facing left (mirrors `updateAnim`'s `facingDir()==='side' && lastFacing.dCol<0`). Tick wired ONCE per
+    non-death frame right after `tickTorch` (~line 1173), ABOVE the movement branch's two `updateAnim`
+    sites (finding #4). Config: `HELD_TORCH_OFFSET_X=8`, `_OFFSET_Y=-18`, `_SCALE=0.55` (tuning knobs).
+    Typecheck + `npm run build` green; smoke canary PASSED; visually verified via dev-build screenshots —
+    the torch shows at the hand, follows movement, and flips to the correct hand facing left/right.
   - New small `world/` manager (e.g. `src/scenes/world/HeldItemOverlay.ts`) OR a private field-cluster
     on `GameScene`: owns a single Phaser sprite (`heldSprite`) created once, `setVisible(false)` by
     default, depth just above the player (11). **Tick placement (finding #4):** `GameScene.update()` has

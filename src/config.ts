@@ -237,6 +237,17 @@ export const TORCH_LIGHT_RADIUS = TILE_SIZE * 3.5;
 export const TORCH_DRAIN_EMIT_MS = 200;
 
 /**
+ * In-hand torch overlay (plan 051 Step 5) — the small visible torch sprite pinned to the player's hand
+ * while a torch is equipped in the off hand (the light itself stays `TORCH_LIGHT_RADIUS`). Offsets are
+ * from the player sprite's origin, in world px; `HELD_TORCH_OFFSET_X` mirrors with facing (so the torch
+ * swaps to the correct hand when facing left), `_Y` is negative to raise it from the feet-origin to hand
+ * height. `HELD_TORCH_SCALE` shrinks the ~32px pack icon to read at hand scale. Pure tuning knobs.
+ */
+export const HELD_TORCH_OFFSET_X = 8;
+export const HELD_TORCH_OFFSET_Y = -18;
+export const HELD_TORCH_SCALE = 0.55;
+
+/**
  * NPC companion (the Rogue, plan 042) — a named constants block mirroring the player block above,
  * NOT a data catalogue (the companion is one hand-built actor, like the player). `NpcCharacter`
  * assembles its `CombatantStats` from these; the day/night role + posture behaviour that reads the
