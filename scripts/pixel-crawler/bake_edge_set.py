@@ -195,6 +195,37 @@ def with_edges(arr, surface, edge_th):
     return surface
 
 
+def make_seamless(im):
+    """Force a tile to self-tile with a provably zero-diff seam: copy its own LEFT edge onto its RIGHT
+    edge and its own TOP edge onto its BOTTOM edge (col -1 := col 0, row -1 := row 0). A literal copy,
+    not a blend — the source art is a 2-colour dither/noise pattern, so blending would invent a colour
+    that doesn't belong. Operates on the full RGBA array (`np.array(im)` keeps whatever channels `im`
+    has), so alpha travels with the copy too — relevant for blob FULL tiles, which are the fully-solid
+    (alpha=255 everywhere) interior piece of an alpha-cutout terrain, not a plain opaque photo like
+    water's. Two side-by-side (or stacked) copies of the SAME corrected tile then always meet with an
+    identical border, by construction — this is what a colour-distance TOLERANCE can never guarantee,
+    because the sheet's flattest-looking tile (lowest internal stddev) still usually isn't itself
+    perfectly self-tileable (see docs/BIOMES.md gotchas): the properties don't correlate, so make the
+    chosen tile seamless directly instead of hunting for one that's already both flat and seamless."""
+    a = np.array(im)
+    a[:, -1] = a[:, 0]
+    a[-1, :] = a[0, :]
+    return Image.fromarray(a)
+
+
+_seamless_cache = {}
+
+
+def seamless_base_tile(doc):
+    """The `doc`'s primary surface `base` frame, corrected via `make_seamless` and cached per set id —
+    the tile to use for a biome's DEFAULT background (flat-looking, zero self-diff), as opposed to its
+    `variants` (occasional scattered accents, allowed to differ — that's the point of scattering them)."""
+    if doc["id"] not in _seamless_cache:
+        surf = doc["surfaces"][0]
+        _seamless_cache[doc["id"]] = make_seamless(frame_tile(sheet(doc["sheet"]), surf["base"], 0))
+    return _seamless_cache[doc["id"]]
+
+
 def frame_tile_arr(arr, f):
     c, r = f % COLS, f // COLS
     return arr[r * TILE : (r + 1) * TILE, c * TILE : (c + 1) * TILE]
@@ -209,15 +240,42 @@ def key_tuple_to_int(t):
     return (n * N) | (e * E) | (s * S) | (w * W) | (ne * NE) | (se * SE) | (sw * SW) | (nw * NW)
 
 
+def rotate_blob_key(key_tuple, rot):
+    """Rotate an 8-neighbour blob key the same way `np.rot90` rotates the TILE PIXELS it describes, by
+    laying the 8 neighbours (+ an unused centre) into a 3x3 grid and rotating that — so a tile classified
+    for one key, drawn at `rot`, is a valid (frame, rot) OPTION for whatever key its pixels rotate INTO,
+    not just its own native (rot=0) key. This is what gives blob edges/corners the same "collect every
+    rotation, not just the first" variety the depth method's transition autotiles already have (see
+    `build_corner_map`) — a single canonical frame per case was the actual cause of the harder-edged
+    corners: one frame is one frame's worth of shading, no matter how good a fit its shape is."""
+    n, e, s, w, ne, se, sw, nw = key_tuple
+    grid = np.array([[nw, n, ne], [w, 0, e], [sw, s, se]])
+    g = np.rot90(grid, rot)
+    (nw2, n2, ne2), (w2, _, e2), (sw2, s2, se2) = g
+    return (int(n2), int(e2), int(s2), int(w2), int(ne2), int(se2), int(sw2), int(nw2))
+
+
 def build_blob_set(cfg):
     """Blob-method tile edge set: reuse autotile.py's classifier for the mapping (same as
-    gen_terrains.py), then split the FULL-surround fills into a clean base + accents."""
+    gen_terrains.py) — ONE canonical frame per NATIVE key (`build_blob` already groups several
+    same-shaped frames under one key, e.g. grass's key (1,1,0,1,1,0,0,1) lists frames 2, 3, 29, 127,
+    128, 154 as interchangeable; they're only alpha-equivalent, NOT visually interchangeable — some
+    carry a baked-in edge shadow and some don't, so picking a canonical one keeps that consistent) —
+    then rotate THAT SAME single frame into whichever OTHER cases its pixels also satisfy
+    (`rotate_blob_key`), so each case still gets a LIST of [frame, rot] options for variety (matching
+    how the depth method's transition autotiles work), just never mixing distinct native frames
+    together. Finally split the FULL-surround fills into a clean base + accents."""
     box = cfg["box"]
     table = build_blob(cfg["sheet"], *box)
     mapping = {}
     for key_tuple, options in table.items():
         c, r = min(options, key=lambda cr: (cr[1], cr[0]))  # canonical: lowest (row,col)
-        mapping[key_tuple_to_int(key_tuple)] = r * COLS + c
+        f = r * COLS + c
+        for rot in range(4):
+            rkey = key_tuple_to_int(rotate_blob_key(key_tuple, rot))
+            opt = [f, rot]
+            if opt not in mapping.setdefault(rkey, []):
+                mapping[rkey].append(opt)
     fills = sorted(r * COLS + c for (c, r) in table[FULL])
     arr = np.asarray(sheet(cfg["sheet"])).astype(float)
     base, accents, dropped = pick_base_and_accents(arr, fills, cfg["accent_tol"], cfg.get("prefer"))
@@ -301,21 +359,44 @@ def build_corner_map(arr, box, bright, dark):
     return cmap
 
 
+def rotate_corner_case(case, rot):
+    """Rotate a 4-bit corner case (NW NE / SW SE) the same way `np.rot90` rotates the TILE PIXELS it
+    describes — lay the 4 corners into a 2x2 grid and rotate that, mirroring `rotate_blob_key`'s trick
+    for the 8-neighbour case. Used to find which OTHER case a coast tile's pixels also satisfy once
+    rotated, so cases that are pure rotations of each other (found by testing, not assumed) can share
+    options instead of each only ever drawing from its own native tiles."""
+    nw, ne, sw, se = (case >> 3) & 1, (case >> 2) & 1, (case >> 1) & 1, case & 1
+    grid = np.array([[nw, ne], [sw, se]])
+    g = np.rot90(grid, rot)
+    (nw2, ne2), (sw2, se2) = g
+    return (int(nw2) << 3) | (int(ne2) << 2) | (int(sw2) << 1) | int(se2)
+
+
 def build_coast_map(arr, rows, cols):
     """Land-vs-water corner dual-grid (the shore). case = corner bits (1 where corner is WATER; land
-    corner => the shallowest level shows) -> LIST of [frame, 0]. Multi-option across the sheet's repeated
-    coast blocks (their variants), but NOT rotated: coast art is directional (grass tufts, top-light)."""
+    corner => the shallowest level shows) -> LIST of [frame, rot] options. Multi-option across the
+    sheet's repeated coast blocks AND across rotation (`rotate_corner_case`): a tile also contributes to
+    whichever OTHER case its pixels satisfy once rotated, not just its own native (rot=0) case — more
+    variety than only ever drawing the one tile that's natively that shape. NOTE: coast art can be
+    directional (grass tufts hang down, light from the top in some pieces) — this shares tiles across
+    ANY rotation that produces a valid case regardless, so a rotated placement may show tufts hanging
+    sideways/upward; that's a real trade of lighting consistency for less repetition, not an oversight."""
     cmap = {}
     for r in range(*rows):
         for c in range(*cols):
-            t = frame_tile_arr(arr, r * COLS + c)
+            f = r * COLS + c
+            t = frame_tile_arr(arr, f)
             if (t[:, :, 3] > 128).mean() < 0.5:
                 continue
             nw, ne = is_water_block(t[0:6, 0:6]), is_water_block(t[0:6, 10:16])
             sw, se = is_water_block(t[10:16, 0:6]), is_water_block(t[10:16, 10:16])
             case = (nw << 3) | (ne << 2) | (sw << 1) | se
             if 0 < case < 15:  # 0 = all land (only grass shows), 15 = all water (a fill's job)
-                cmap.setdefault(case, []).append([r * COLS + c, 0])
+                for rot in range(4):
+                    rcase = rotate_corner_case(case, rot)
+                    opt = [f, rot]
+                    if opt not in cmap.setdefault(rcase, []):
+                        cmap[rcase].append(opt)
     return cmap
 
 
@@ -533,49 +614,117 @@ def depth_field(water, W, H, gen):
     return lv
 
 
-def render_blob_patch(cv, blob_doc, rng, ox, oy, w, h, scatter=0.4):
-    """Paint one irregular BLOB patch (mud-on-grass, same idea as grass-on-water's coast) directly onto
-    an existing canvas at tile offset (ox, oy): a small local disc+smooth mask, autotiled per-cell via
-    the SAME 8-neighbour `blob_key` + the set's own baked `mapping` (canonical edge/corner frame per
-    case), with the fully-surrounded interior cells scattering the set's `variants` (open rotations) for
-    texture instead of always the flattest fill — mirrors `fill_img`'s scatterRate idea for a blob set,
-    which otherwise has no scatter concept of its own."""
+def paint_blob_field(cv, blob_doc, rng, w, h, ox=0, oy=0, scatter=0.25):
+    """Fill a w x h tile rectangle (at canvas offset ox, oy) with this blob set's plain biome: its
+    SEAMLESS base tile (see `seamless_base_tile`) at rot=0 so adjacent cells are bit-identical, with an
+    occasional (`scatter` chance) accent variant (open rotation) dropped in for texture — the blob
+    equivalent of a depth level's `fill_img` (plain default + scattered decor), used both as a lake
+    demo's grass backdrop and as a two-layer patch demo's full background layer."""
+    im = sheet(blob_doc["sheet"])
+    surf = blob_doc["surfaces"][0]
+    base_img = seamless_base_tile(blob_doc)
+    for y in range(h):
+        for x in range(w):
+            img = base_img
+            if rng.random() < scatter and surf["variants"]:
+                f, r = tuple(rng.choice(surf["variants"]))
+                img = frame_tile(im, f, r)
+            cv.alpha_composite(img, ((ox + x) * TILE, (oy + y) * TILE))
+
+
+def disc_mask(w, h, rx_frac=0.32, ry_frac=0.32, hole=False):
+    """A smoothed disc mask sized to w x h tiles. `hole=False`: True only inside the disc (a small
+    PATCH). `hole=True`: True everywhere EXCEPT the disc (a small HOLE in an otherwise-full mask) — the
+    disc is built and smoothed the same way either way, then complemented, so the hole's edge reads as
+    the same clean organic curve as a patch's edge, just inside-out."""
+    base = new_mask(w, h, False)
+    disc(base, w / 2, h / 2, w * rx_frac, h * ry_frac)
+    base = smooth_mask(base, 2)
+    if hole:
+        return [[not base[y][x] for x in range(w)] for y in range(h)]
+    return base
+
+
+def paint_blob_masked(cv, blob_doc, rng, mask, ox=0, oy=0, scatter=0.3):
+    """Composite `blob_doc`'s OWN alpha-cutout blob tiles onto `cv` wherever `mask` is True, autotiled
+    per-cell via the 8-neighbour `blob_key` read from `mask` itself + the set's baked `mapping` (a LIST
+    of [frame, rot] options per case, randomly chosen — see `rotate_blob_key`). Wherever `mask` is
+    False, nothing is drawn — whatever `cv`
+    already carries there (the OTHER terrain's full opaque fill, painted first) just shows straight
+    through, and at the mask's boundary this set's own semi-transparent edge tiles blend into it. Put
+    the full, opaque background down first, always — this only ever adds a layer on top of it, never
+    the reverse. Fully-surrounded interior cells use the SEAMLESS base tile (`seamless_base_tile`) with
+    an occasional scattered accent for texture, mirroring `fill_img`'s scatterRate idea for a blob set."""
+    h_t = len(mask)
+    w_t = len(mask[0]) if h_t else 0
     im = sheet(blob_doc["sheet"])
     mapping = {int(k): v for k, v in blob_doc["mapping"].items()}
     surf = blob_doc["surfaces"][0]
     full_key = key_tuple_to_int(FULL)
-    mask = new_mask(w, h)
-    disc(mask, w / 2, h / 2, w * 0.32, h * 0.32)
-    mask = smooth_mask(mask, 2)
+    base_img = seamless_base_tile(blob_doc)
 
     def m(y, x):
-        return 0 <= y < h and 0 <= x < w and mask[y][x]
+        return 0 <= y < h_t and 0 <= x < w_t and mask[y][x]
 
-    for y in range(h):
-        for x in range(w):
+    for y in range(h_t):
+        for x in range(w_t):
             if not mask[y][x]:
                 continue
             key = key_tuple_to_int(blob_key(m(y - 1, x), m(y + 1, x), m(y, x - 1), m(y, x + 1),
                                              m(y - 1, x - 1), m(y - 1, x + 1), m(y + 1, x - 1), m(y + 1, x + 1)))
-            if key == full_key and rng.random() < scatter:
-                f, r = tuple(rng.choice(surf["variants"]))
+            if key == full_key:
+                img = base_img
+                if rng.random() < scatter and surf["variants"]:
+                    f, r = tuple(rng.choice(surf["variants"]))
+                    img = frame_tile(im, f, r)
             else:
-                f, r = mapping.get(key, mapping[full_key]), 0
-            cv.alpha_composite(frame_tile(im, f, r), ((ox + x) * TILE, (oy + y) * TILE))
+                f, r = rng.choice(mapping.get(key, mapping[full_key]))
+                img = frame_tile(im, f, r)
+            cv.alpha_composite(img, ((ox + x) * TILE, (oy + y) * TILE))
 
 
-def render_depth_lake(root, grass_doc, depth_doc, mud_doc=None):
+def render_grass_mud_demo(root, grass_doc, mud_doc, out_name, hole, W=20, H=16, seed=7):
+    """Two-LAYER demo matching how the hand-authored map actually does it: mud is the full, opaque
+    BOTTOM layer everywhere (its seamless base tile — mud never gets its own edge/corner art in this
+    technique, no `mapping` lookup at all), and grass's OWN alpha-cutout blob tiles are the layer on
+    top, painted only where `mask` says grass — mud shows through directly wherever grass is absent AND
+    through grass's semi-transparent edge pixels at the boundary. `hole=True`: grass covers ~everywhere
+    except a small disc, so the disc reads as a mud patch (a hole in the grass coverage) — the actual
+    hand-authored technique. `hole=False`: grass covers only a small disc, so the disc reads as a grass
+    patch in an otherwise-mud field — the mirror case, same mechanism, mask inverted."""
+    rng = random.Random(seed)
+    # Render PAD tiles larger on every side, then crop it off: a finite canvas has no "beyond the edge"
+    # neighbour, so blob_key reads the canvas border itself as a coastline (grass coasting out into
+    # nothing) — a real seam in the demo image, but not in-game, where the biome just continues past the
+    # viewport. Padding renders that artifact OUTSIDE the visible crop instead of pretending it away.
+    PAD = 3
+    PW, PH = W + 2 * PAD, H + 2 * PAD
+    cv = Image.new("RGBA", (PW * TILE, PH * TILE))
+    mud_base = seamless_base_tile(mud_doc)
+    for y in range(PH):
+        for x in range(PW):
+            cv.alpha_composite(mud_base, (x * TILE, y * TILE))
+    rx_frac = 0.22 if hole else 0.32
+    mask = disc_mask(PW, PH, rx_frac * W / PW, rx_frac * H / PH, hole=hole)
+    paint_blob_masked(cv, grass_doc, rng, mask)
+    cv = cv.resize((PW * TILE * 4, PH * TILE * 4), Image.NEAREST)
+    cv = cv.crop((PAD * TILE * 4, PAD * TILE * 4, (PAD + W) * TILE * 4, (PAD + H) * TILE * 4))
+    out = os.path.join(root, "scripts", "pixel-crawler", out_name)
+    cv.save(out)
+    return out
+
+
+def render_depth_lake(root, grass_doc, depth_doc):
     """Bake one organic lake: grass surround -> coast -> concentric-ish L/M/D depth (distance+noise),
     autotiled by the corner maps with per-case random tile+rotation, per-level fill-variant scatter, and
-    the authored solid deep centre. `invalid` MUST be 0 (every 2x2 tileable) — that's the guard. Also
-    scatters a mud patch (see `render_blob_patch`) in a corner clear of the lake, if `mud_doc` is given."""
-    fim, wim = sheet(grass_doc["sheet"]), sheet(depth_doc["sheet"])
+    the authored solid deep centre. `invalid` MUST be 0 (every 2x2 tileable) — that's the guard."""
+    wim = sheet(depth_doc["sheet"])
     gen, levels = depth_doc["generate"], depth_doc["levels"]
     rng = random.Random(gen["noise"]["seed"])
     W, H = 30, 22
     mask = new_mask(W, H)
-    disc(mask, 15, 11, 11, 9)
-    disc(mask, 23, 6, 4, 3.5)
+    disc(mask, 15, 11, 6, 5)
+    disc(mask, 23, 6, 2, 1.5)
     mask = smooth_mask(mask, 2)
     water = [[bool(mask[y][x]) for x in range(W)] for y in range(H)]
     lv = depth_field(water, W, H, gen)
@@ -597,13 +746,7 @@ def render_depth_lake(root, grass_doc, depth_doc, mud_doc=None):
         return lv[y][x] if (0 <= x < W and 0 <= y < H and water[y][x]) else -1
 
     cv = Image.new("RGBA", (W * TILE, H * TILE))
-    g = grass_doc["surfaces"][0]
-    for y in range(H):
-        for x in range(W):
-            gf, gr = (g["base"], rng.randrange(4)) if rng.random() < 0.75 else tuple(rng.choice(g["variants"]))
-            cv.alpha_composite(frame_tile(fim, gf, gr), (x * TILE, y * TILE))
-    if mud_doc is not None:
-        render_blob_patch(cv, mud_doc, rng, ox=2, oy=2, w=8, h=6)
+    paint_blob_field(cv, grass_doc, rng, W, H, scatter=0.25)
     invalid = 0
     for y in range(H + 1):
         for x in range(W + 1):
@@ -666,8 +809,15 @@ def main():
                 f"{len(lv['variants'])}var,{'walk' if lv['walkable'] else 'solid'})" for lv in doc["levels"])
             miss = "; ".join(f"{k} miss={v}" for k, v in diag["missing"].items() if v) or "all cases covered"
             print(f"wrote {rel}: depth [{lvls}] | coast {len(doc['coast']['cases'])} cases | transitions {miss}")
-    demo, invalid = render_depth_lake(root, built["grass"], built["water"], built.get("mud"))
+    demo, invalid = render_depth_lake(root, built["grass"], built["water"])
     print(f"wrote {os.path.relpath(demo, root)}  (invalid tiles = {invalid}{'  <-- FAIL' if invalid else ''})")
+    if "mud" in built:
+        d1 = render_grass_mud_demo(root, built["grass"], built["mud"],
+                                    "bake_edge_set_demo_mud_patch.png", hole=True)
+        print(f"wrote {os.path.relpath(d1, root)}")
+        d2 = render_grass_mud_demo(root, built["grass"], built["mud"],
+                                    "bake_edge_set_demo_grass_patch.png", hole=False)
+        print(f"wrote {os.path.relpath(d2, root)}")
 
 
 if __name__ == "__main__":

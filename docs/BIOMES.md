@@ -205,12 +205,26 @@ depth ramp at all, it's **irregular alpha-cutout blobs on grass**, i.e. the SAME
   config for the authoritative box rather than eyeballing one.
 - **Config** = a `blob` SETS entry exactly like `grass`'s, pointed at the mud box: `{"kind": "blob", "id":
   "mud", ..., "box": (11, 15, 0, 12)}`.
-- **Demo:** `render_blob_patch` (a small disc+smooth mask autotiled via the same `blob_key` + the set's
-  baked `mapping`, with `FULL`-key cells occasionally scattering `variants` for texture) — the blob
-  equivalent of `render_depth_lake`'s lake, since blob sets don't have levels/transitions to render.
-- Same self-tileability caveat as water: if the flattest-looking base tile isn't perfectly self-tileable,
-  that's the same "looks plain" vs "is seamless" tradeoff — the blob method doesn't yet have a
-  `fillAuthored` equivalent (only `depth` levels do); extend it the same way if it becomes visible.
+- **Layering matches how the hand-authored map actually does it — and it ISN'T symmetric.** Mud is
+  always the full, OPAQUE bottom layer (its `seamless_base_tile`, painted everywhere — mud never uses
+  its OWN `mapping`/edge tiles for this); grass's OWN alpha-cutout blob tiles are always the layer on
+  top, autotiled via `blob_key` against a mask. A "mud patch" is grass covering ~everywhere EXCEPT a
+  small hole (`disc_mask(..., hole=True)`) — the hole is what reveals the mud underneath. A "grass patch
+  in mud" is the same mechanism with the mask inverted (grass covers only a small disc). Both are
+  `render_grass_mud_demo` (`hole=True`/`hole=False`) — grass's blob tiles do 100% of the cutting either
+  way; mud's own edge/corner art (baked into `mud.json` regardless, for other uses) never enters into
+  this specific technique at all. Getting this backwards (mud's own edge tiles cutting into a grass
+  background) LOOKS plausible and renders without error, but isn't what the game's map actually paints —
+  when adding a new patch-style biome, check which terrain's tiles are the ones with real alpha in the
+  hand-authored map before assuming either direction.
+- **A finite demo canvas fakes a seam blob autotiling won't have in-game.** `blob_key` reads "off the
+  edge of the mask array" as false (not-this-terrain), so a biome that's meant to cover ~everywhere
+  reads its own canvas border as a coastline in a small demo — pad the render by a few tiles on every
+  side and crop the padding off afterwards (`render_grass_mud_demo`'s `PAD`) rather than mistake it for
+  a real bug.
+- Same self-tileability caveat as water applies to mud's OWN base fill too (measure it — see the "looks
+  plain" gotcha above) — irrelevant to the patch technique above (which never draws mud's edge tiles),
+  but matters if mud's own `mapping` gets used directly elsewhere.
 
 ## Files
 
