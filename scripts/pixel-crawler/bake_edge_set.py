@@ -313,18 +313,30 @@ def build_coast_map(arr, rows, cols):
     return cmap
 
 
-def is_solid_fill(arr, f, centroids, tol=18):
+def is_solid_fill(arr, f, centroids, tol=18, edge_tol=8):
     """A SOLID fill variant (a flat level shade + optional INTERIOR decoration like a ripple/swirl):
-    opaque, single shade (its 4 corners agree), and its mean matches some level centroid. Generic (no
-    per-colour test) so it works for any depth sheet. NOTE: the decorative variants live only in the
-    surface rows (`variant_rows`); the transition-block rows hold bubble-EDGE pieces that must NOT be
-    scattered as solids (their edge feature would drop a stray line into flat fill)."""
+    opaque, single shade (its 4 corners agree AND its 4 borders read as plain level shade), and its
+    mean matches some level centroid. Generic (no per-colour test) so it works for any depth sheet.
+    NOTE: the decorative variants live only in the surface rows (`variant_rows`); the transition-block
+    rows hold bubble-EDGE pieces that must NOT be scattered as solids (their edge feature would drop a
+    stray line into flat fill). The BORDER check is what catches the rest of that same failure mode
+    within variant_rows itself: a ripple/swirl whose decoration reaches a border (or a rotation that
+    puts it there) has agreeing CORNERS (the corners never touch it) but a border pixel far from the
+    level's shade — scattered next to a plain neighbour, that border shows as a hard seam where the
+    decoration is cut off instead of staying interior. `edge_tol` mirrors the corner tolerance: on
+    Pixel Crawler water, in-bounds decoration keeps every border within ~6 of the centroid while an
+    edge-touching one spikes to ~16, so 8 cleanly separates the two without dropping the good variants
+    (calibrated by eye against the demo — see docs/BIOMES.md gotchas)."""
     if not opaque_fill(arr, f):
         return False
     cs = corner_shades(arr, f)
     if max(np.linalg.norm(a - b) for a in cs for b in cs) >= 8:  # corners must AGREE (adjacent levels
         return False                                             # sit ~14 apart, so >=8 catches a band)
-    return min(np.linalg.norm(tile_mean_rgb(arr, f) - c) for c in centroids) < tol
+    centroid = min(centroids, key=lambda c: np.linalg.norm(tile_mean_rgb(arr, f) - c))
+    if np.linalg.norm(tile_mean_rgb(arr, f) - centroid) >= tol:
+        return False
+    edges = edge_lines(frame_arr(arr, f))
+    return max(np.linalg.norm(edges[s].astype(float) - centroid, axis=1).max() for s in edges) < edge_tol
 
 
 def build_depth_set(cfg):

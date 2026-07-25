@@ -166,6 +166,16 @@ A `SETS` entry (`kind` selects the builder):
 - **Calibrate "fits" by eye, then encode the rule.** Same-shade tiles fit; a cross-shade step never does
   (regardless of the dE number) — which is *why* levels are joined by transition tiles, not scattered
   together. If tuning a threshold, show a spectrum of pairs and get a human verdict.
+- **Corner agreement alone doesn't catch an edge-touching variant.** A ripple/swirl whose decoration
+  reaches a BORDER (not just a corner) still passes the 4-corner check — corners never touch it — but
+  seams as a hard cut where the decoration doesn't continue into the neighbour. `is_solid_fill` also
+  samples the four 1px border lines and requires them within `edge_tol` (8, same knob as the corner
+  check) of the level centroid. On Pixel Crawler water this cleanly separates the two populations
+  (in-bounds decoration keeps every border within ~6; an edge-touching one spikes to ~16) — don't go
+  much tighter: an over-strict per-edge filter drops nearly every variant (down to just the base fill)
+  instead of only the bad ones. Since rotation only relabels which border is N/E/S/W (it doesn't move
+  the decoration off the tile), a frame that fails is bad in **every** rotation — no per-rotation
+  bookkeeping needed, just drop the frame.
 
 ## Worked plan: muddy patches (fresh-chat starting point)
 
