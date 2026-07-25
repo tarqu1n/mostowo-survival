@@ -430,7 +430,7 @@ SETS = [
          {"name": "deep", "walkable": False, "authored": True},
      ],
      "generate": {"bands": [2.5, 8.5], "noise": {"amp": 3.0, "scale": 4, "seed": 5},
-                  "scatterRate": 0.35, "distance": "bfs"}},
+                  "scatterRate": 0.08, "distance": "bfs"}},
 ]
 
 
@@ -529,12 +529,19 @@ def render_depth_lake(root, grass_doc, depth_doc):
     solid = {i: Image.new("RGBA", (TILE, TILE), tuple(levels[i]["rgb"]) + (255,)) for i in range(len(levels))}
 
     def fill_img(i):
+        """The plain `fill` is always placed at rot=0, so two adjacent plain cells are bit-identical —
+        zero shade variance by construction, rather than by chasing an unreachable colour tolerance (the
+        art's own dithering means no tolerance tight enough to exclude that noise also keeps the tile
+        itself eligible). A scattered VARIANT is allowed to differ — that's the point of scattering it —
+        so only it gets a random rotation; its edges are still guarded by `is_solid_fill`'s corner+edge
+        check at bake time, not by anything here."""
         meta = levels[i]
         if meta.get("authored"):
             return solid[i]
         pool = meta["variants"] or [meta["fill"]]
         f = meta["fill"] if rng.random() > gen["scatterRate"] else rng.choice(pool)
-        return frame_tile(wim, f, rng.randrange(4))
+        rot = 0 if f == meta["fill"] else rng.randrange(4)
+        return frame_tile(wim, f, rot)
 
     def lvl(x, y):
         return lv[y][x] if (0 <= x < W and 0 <= y < H and water[y][x]) else -1
