@@ -26,6 +26,12 @@ Key facts the depth method encodes (learned onboarding Pixel Crawler water, plan
     bubble-EDGE pieces, wrong to scatter as solids.
   - A level with no fill tile in the art (deepest water) is `authored` = a flat synthesized tile of its
     shade (the shade the transitions actually lead to, so it seams).
+  - "Looks plain" and "is perfectly self-tileable" are DIFFERENT properties that don't correlate — the
+    flattest-looking candidate tile is rarely the one whose own opposite borders are pixel-identical.
+    A level whose default background should look plain sets `fillAuthored` (a flat synthesized tile,
+    same idea as a whole `authored` level but keeping its normal scattered variants pool) instead of
+    loosening the eligibility tolerance to chase a tile that's both — that just re-admits edge-touching
+    decoration (the original bug this baker exists to avoid).
 
 Onboard a set = add a config entry to SETS + re-run. Writes one JSON per set under
 `public/assets/tilesets/pixel-crawler/edge-sets/<id>.json` + a demo `bake_edge_set_demo.png` (the
@@ -42,7 +48,7 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(__file__))
-from autotile import build_blob, disc, new_mask, smooth_mask, FULL  # noqa: E402
+from autotile import build_blob, blob_key, disc, new_mask, smooth_mask, FULL  # noqa: E402
 from compose import sheet, TILE  # noqa: E402
 
 PACK_ID = "pixel-crawler"
@@ -314,7 +320,7 @@ def build_coast_map(arr, rows, cols):
 
 
 def is_solid_fill(arr, f, centroids, tol=5, edge_tol=5):
-    """A SOLID fill variant (a flat level shade + optional INTERIOR decoration like a ripple/swirl):
+    """A SOLID fill CANDIDATE (a flat level shade + optional INTERIOR decoration like a ripple/swirl):
     opaque, single shade (its 4 corners agree AND its 4 borders read as plain level shade), and its
     mean matches some level centroid. Generic (no per-colour test) so it works for any depth sheet.
     NOTE: the decorative variants live only in the surface rows (`variant_rows`); the transition-block
@@ -323,10 +329,17 @@ def is_solid_fill(arr, f, centroids, tol=5, edge_tol=5):
     within variant_rows itself: a ripple/swirl whose decoration reaches a border (or a rotation that
     puts it there) has agreeing CORNERS (the corners never touch it) but a border pixel far from the
     level's shade — scattered next to a plain neighbour, that border shows as a hard seam where the
-    decoration is cut off instead of staying interior. `edge_tol` mirrors the corner tolerance: on
-    Pixel Crawler water, in-bounds decoration keeps every border within ~6 of the centroid while an
-    edge-touching one spikes to ~16, so 8 cleanly separates the two without dropping the good variants
-    (calibrated by eye against the demo — see docs/BIOMES.md gotchas)."""
+    decoration is cut off instead of staying interior.
+
+    `tol`/`edge_tol` at 5 are deliberately tight — tight enough that the sheet's flattest-LOOKING tile
+    (lowest internal stddev) usually fails it, because that tile still isn't perfectly self-tileable (a
+    few of its own border pixels differ from their opposite-edge counterpart by ~6/255 — see
+    docs/BIOMES.md gotchas). What passes at 5 is instead whichever tile is genuinely self-seamless
+    (0/255 self-diff), which on Pixel Crawler water turns out to be one of the more decorated (ring)
+    tiles, not the plain-looking one. That's fine — this function only decides what's ELIGIBLE to
+    scatter as a variant; a level that wants its default background to look plain, not decorated, should
+    set `fillAuthored` (see `build_depth_set`) rather than loosening this tolerance, because loosening it
+    just re-admits tiles whose decoration touches a border (the original bug)."""
     if not opaque_fill(arr, f):
         return False
     cs = corner_shades(arr, f)
@@ -425,6 +438,8 @@ def build_depth_set(cfg):
 SETS = [
     {"kind": "blob", "id": "grass", "name": "Grass", "sheet": FLOORS, "box": (0, 4, 0, 12),
      "role": "ground", "walkable": True, "accent_tol": 8, "edge_th": EDGE_TH, "prefer": "bright"},
+    {"kind": "blob", "id": "mud", "name": "Mud", "sheet": FLOORS, "box": (11, 15, 0, 12),
+     "role": "ground", "walkable": True, "accent_tol": 8, "edge_th": EDGE_TH},
     {"kind": "depth", "id": "water", "name": "Water", "sheet": WATER,
      "coast_rows": (0, 5), "coast_cols": (0, 25),
      "blocks": [
@@ -518,10 +533,42 @@ def depth_field(water, W, H, gen):
     return lv
 
 
-def render_depth_lake(root, grass_doc, depth_doc):
+def render_blob_patch(cv, blob_doc, rng, ox, oy, w, h, scatter=0.4):
+    """Paint one irregular BLOB patch (mud-on-grass, same idea as grass-on-water's coast) directly onto
+    an existing canvas at tile offset (ox, oy): a small local disc+smooth mask, autotiled per-cell via
+    the SAME 8-neighbour `blob_key` + the set's own baked `mapping` (canonical edge/corner frame per
+    case), with the fully-surrounded interior cells scattering the set's `variants` (open rotations) for
+    texture instead of always the flattest fill — mirrors `fill_img`'s scatterRate idea for a blob set,
+    which otherwise has no scatter concept of its own."""
+    im = sheet(blob_doc["sheet"])
+    mapping = {int(k): v for k, v in blob_doc["mapping"].items()}
+    surf = blob_doc["surfaces"][0]
+    full_key = key_tuple_to_int(FULL)
+    mask = new_mask(w, h)
+    disc(mask, w / 2, h / 2, w * 0.32, h * 0.32)
+    mask = smooth_mask(mask, 2)
+
+    def m(y, x):
+        return 0 <= y < h and 0 <= x < w and mask[y][x]
+
+    for y in range(h):
+        for x in range(w):
+            if not mask[y][x]:
+                continue
+            key = key_tuple_to_int(blob_key(m(y - 1, x), m(y + 1, x), m(y, x - 1), m(y, x + 1),
+                                             m(y - 1, x - 1), m(y - 1, x + 1), m(y + 1, x - 1), m(y + 1, x + 1)))
+            if key == full_key and rng.random() < scatter:
+                f, r = tuple(rng.choice(surf["variants"]))
+            else:
+                f, r = mapping.get(key, mapping[full_key]), 0
+            cv.alpha_composite(frame_tile(im, f, r), ((ox + x) * TILE, (oy + y) * TILE))
+
+
+def render_depth_lake(root, grass_doc, depth_doc, mud_doc=None):
     """Bake one organic lake: grass surround -> coast -> concentric-ish L/M/D depth (distance+noise),
     autotiled by the corner maps with per-case random tile+rotation, per-level fill-variant scatter, and
-    the authored solid deep centre. `invalid` MUST be 0 (every 2x2 tileable) — that's the guard."""
+    the authored solid deep centre. `invalid` MUST be 0 (every 2x2 tileable) — that's the guard. Also
+    scatters a mud patch (see `render_blob_patch`) in a corner clear of the lake, if `mud_doc` is given."""
     fim, wim = sheet(grass_doc["sheet"]), sheet(depth_doc["sheet"])
     gen, levels = depth_doc["generate"], depth_doc["levels"]
     rng = random.Random(gen["noise"]["seed"])
@@ -555,6 +602,8 @@ def render_depth_lake(root, grass_doc, depth_doc):
         for x in range(W):
             gf, gr = (g["base"], rng.randrange(4)) if rng.random() < 0.75 else tuple(rng.choice(g["variants"]))
             cv.alpha_composite(frame_tile(fim, gf, gr), (x * TILE, y * TILE))
+    if mud_doc is not None:
+        render_blob_patch(cv, mud_doc, rng, ox=2, oy=2, w=8, h=6)
     invalid = 0
     for y in range(H + 1):
         for x in range(W + 1):
@@ -617,7 +666,7 @@ def main():
                 f"{len(lv['variants'])}var,{'walk' if lv['walkable'] else 'solid'})" for lv in doc["levels"])
             miss = "; ".join(f"{k} miss={v}" for k, v in diag["missing"].items() if v) or "all cases covered"
             print(f"wrote {rel}: depth [{lvls}] | coast {len(doc['coast']['cases'])} cases | transitions {miss}")
-    demo, invalid = render_depth_lake(root, built["grass"], built["water"])
+    demo, invalid = render_depth_lake(root, built["grass"], built["water"], built.get("mud"))
     print(f"wrote {os.path.relpath(demo, root)}  (invalid tiles = {invalid}{'  <-- FAIL' if invalid else ''})")
 
 

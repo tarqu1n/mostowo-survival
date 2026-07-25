@@ -33,7 +33,10 @@ but the "materials" are adjacent depth levels instead of on/off.
 ### The pieces
 
 - **Levels** — each a near-uniform opaque shade with a base `fill` frame, a `walkable` flag, and an
-  `rgb`. A level with no fill tile in the art is `authored`: a flat synthesized tile of its shade.
+  `rgb`. A level with no fill tile in the art is `authored`: a flat synthesized tile of its shade. A
+  level whose sheet fill tile is decorated rather than plain-looking can instead set `fillAuthored`: the
+  default background is a flat synthesized tile (like `authored`) while its normal scattered-variants
+  pool (ripples, rings, …) is kept intact — see [Gotchas](#gotchas--hard-won-lessons).
 - **Transitions** — one **corner autotile per adjacent level pair** (shallow↔mid, mid↔deep). Each maps
   a **case** (4 corner bits, `1` where the corner is the shallower level, order `NW NE SW SE`) to a
   **list** of `[frame, rot]` options. A handful of base tiles, in their 4 rotations, cover ~13 of 16
@@ -129,7 +132,7 @@ A `SETS` entry (`kind` selects the builder):
  ],
  "variant_rows": (0, 2),                               # rows holding SOLID surface-decoration fills
  "level_meta": [                                       # shallow -> deep
-     {"name": "shallow", "walkable": True},
+     {"name": "shallow", "walkable": True, "fillAuthored": True},  # flat synth BACKGROUND, real variants
      {"name": "mid", "walkable": False},
      {"name": "deep", "walkable": False, "authored": True},  # authored = flat synth tile of its shade
  ],
@@ -169,31 +172,45 @@ A `SETS` entry (`kind` selects the builder):
 - **Corner agreement alone doesn't catch an edge-touching variant.** A ripple/swirl whose decoration
   reaches a BORDER (not just a corner) still passes the 4-corner check — corners never touch it — but
   seams as a hard cut where the decoration doesn't continue into the neighbour. `is_solid_fill` also
-  samples the four 1px border lines and requires them within `edge_tol` (8, same knob as the corner
-  check) of the level centroid. On Pixel Crawler water this cleanly separates the two populations
-  (in-bounds decoration keeps every border within ~6; an edge-touching one spikes to ~16) — don't go
-  much tighter: an over-strict per-edge filter drops nearly every variant (down to just the base fill)
-  instead of only the bad ones. Since rotation only relabels which border is N/E/S/W (it doesn't move
-  the decoration off the tile), a frame that fails is bad in **every** rotation — no per-rotation
-  bookkeeping needed, just drop the frame.
+  samples the four 1px border lines and requires them within `edge_tol` of the level centroid. Since
+  rotation only relabels which border is N/E/S/W (it doesn't move the decoration off the tile), a frame
+  that fails is bad in **every** rotation — no per-rotation bookkeeping needed, just drop the frame.
+- **"Looks plain" and "is perfectly self-tileable" are different properties — don't assume the flattest
+  candidate is the seamless one.** Tightening `is_solid_fill`'s tolerance to find a "purer" default
+  background doesn't work the way it sounds: on Pixel Crawler water, the flattest-LOOKING shallow tile
+  (lowest internal stddev) still isn't itself perfectly self-tileable — 4 of its own 16 border pixels
+  differ from their opposite-edge counterpart by ~6/255 (measure it directly: render the tile against a
+  copy of itself, `np.max(np.abs(edge_lines(t)['E'] - edge_lines(t)['W']))`, not just "does it look
+  flat"). The tiles that ARE perfectly self-seamless (0/255) at that tolerance turn out to be the more
+  decorated ones (rings) instead. Tightening the tolerance to chase both properties at once just swaps
+  which tile wins — past a cliff around `edge_tol≈5.6` on this sheet it flips straight from the plain
+  tile to a decorated one, with **no** gradual middle ground (every value from there up to 8 is
+  identical). If you want a plain-looking, zero-diff default background, don't tune the tolerance for
+  it — set `fillAuthored` on that level instead (a flat synthesized tile as the default; its normal
+  `variants` pool, tolerance-filtered as above, still scatters in as occasional decorated accents).
 
-## Worked plan: muddy patches (fresh-chat starting point)
+## Worked example: muddy patches (`mud`, onboarded)
 
-Muddy patches are simpler than water — likely **one level** (mud) as **irregular blobs on grass**, no
-depth ramp:
+Muddy patches turned out simpler than the water plan below originally guessed — the art isn't an opaque
+depth ramp at all, it's **irregular alpha-cutout blobs on grass**, i.e. the SAME method as `grass`, not
+`depth`:
 
-- **Method:** `depth` with a **single level** (`level_meta` length 1) and **no `blocks`** (no
-  level↔level transitions — mud doesn't get deeper).
-- **Coast** = grass↔mud (the mud's edge), exactly the coast concept. Point `coast_rows/cols` at the
-  mud-in-grass tiles.
-- **Fill + variants** = the mud fill + any decorated mud tiles (find their surface rows).
-- **Placement** differs: instead of a lake `disc` + depth bands, mud wants a **noise-threshold patch
-  mask** (blobs where noise > t) — a small generator variant. The **data** baking (coast + level +
-  variants) is unchanged; only the demo's mask changes. Add a `generate.shape: "patches"` branch to
-  `render_depth_lake` (and later the runtime generator) that builds the mask from noise instead of a disc.
-
-So onboarding mud = map its sheet (§1), add a 1-level `depth` config, add the `patches` mask branch,
-run, verify `invalid tiles = 0`, tune noise. Everything else in this pipeline carries over.
+- **Method:** `blob`, not `depth`. There's no shade ramp to key off (mud doesn't get "deeper"); it's one
+  terrain, alpha-cut against transparency, exactly like grass.
+- **Sheet region:** `Floors_Tiles.png`, box `(11, 15, 0, 12)` — this is the SAME region already onboarded
+  as `"dirt"` for the editor's terrain paintbrush (`gen_terrains.py`'s `TERRAINS` list); the tile-edge-set
+  baker just derives its OWN `mud.json` from it for procedural scatter, same asset, different consumer.
+  Found by rendering the actual authored map (`src/data/maps/the-moon.map.json`) around a hand-painted
+  mud patch, reading which palette entries it used, then cross-checking `gen_terrains.py`'s existing
+  config for the authoritative box rather than eyeballing one.
+- **Config** = a `blob` SETS entry exactly like `grass`'s, pointed at the mud box: `{"kind": "blob", "id":
+  "mud", ..., "box": (11, 15, 0, 12)}`.
+- **Demo:** `render_blob_patch` (a small disc+smooth mask autotiled via the same `blob_key` + the set's
+  baked `mapping`, with `FULL`-key cells occasionally scattering `variants` for texture) — the blob
+  equivalent of `render_depth_lake`'s lake, since blob sets don't have levels/transitions to render.
+- Same self-tileability caveat as water: if the flattest-looking base tile isn't perfectly self-tileable,
+  that's the same "looks plain" vs "is seamless" tradeoff — the blob method doesn't yet have a
+  `fillAuthored` equivalent (only `depth` levels do); extend it the same way if it becomes visible.
 
 ## Files
 
