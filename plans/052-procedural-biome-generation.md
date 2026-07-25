@@ -295,7 +295,18 @@ or the **one** guarding spec — never the full `npm run e2e`/`check:all` mid-wo
   - Docs: none.
   - Done when: `npm test rng` passes; existing unit tests still green.
 
-- [ ] **Step 4: Value/fbm noise field (`src/systems/noise.ts`)** `[delegate]` (parallel: A)
+- [x] **Step 4: Value/fbm noise field (`src/systems/noise.ts`)** `[delegate]` (parallel: A)
+  - Outcome: `src/systems/noise.ts` (new) exports `Noise2D{sample,fbm}` + `makeNoise2D(rng: Rng)`. A
+    fixed 256×256 lattice of random values is drawn from `rng.nextFloat()` once at construction (never
+    per-sample, so `sample` is a pure function of `(x,y)`); `sample` hashes integer lattice coords
+    (bitmask-wrapped) and bilinearly interpolates the four surrounding corners with a Perlin smoothstep
+    fade (`6t^5-15t^4+10t^3`) for continuous `[0,1]` noise. `fbm(x,y,{octaves,scale})` sums octaves of
+    `sample` at doubling frequency/halving amplitude, normalized back into `[0,1]`. No `poisson.ts`
+    import (write-disjoint from the parallel Step 5). `src/systems/__tests__/noise.test.ts` (new, 8
+    tests): determinism (same/fresh instances), per-seed divergence, range `[0,1]` for both
+    `sample`/`fbm` across a grid, spatial continuity (small Δ → small value change), grid distinctness.
+    `npm test noise` → 8/8 pass; `tsc --noEmit` + eslint clean. Files touched: `src/systems/noise.ts`
+    (new), `src/systems/__tests__/noise.test.ts` (new).
   - Seeded 2D value-noise + fbm: `makeNoise2D(rng)` → `sample(x,y): number` in `[0,1]`, plus an fbm
     wrapper `(x,y,{octaves,scale}) → [0,1]`. Pure, Phaser-free, seeded via the Step-3 `Rng`. Unit-test
     determinism, range, and rough spatial continuity (adjacent samples close).
@@ -304,7 +315,18 @@ or the **one** guarding spec — never the full `npm run e2e`/`check:all` mid-wo
   - Docs: none.
   - Done when: `npm test noise` passes.
 
-- [ ] **Step 5: Poisson-disk sampler (`src/systems/poisson.ts`)** `[delegate]` (parallel: A)
+- [x] **Step 5: Poisson-disk sampler (`src/systems/poisson.ts`)** `[delegate]` (parallel: A)
+  - Outcome: `src/systems/poisson.ts` (new) exports `PoissonPoint`, `PoissonAccept` (`(x,y) => boolean |
+    number`), `PoissonSampleOptions{width,height,radius,rng,accept?}`, and `poissonSample(opts)`.
+    Standard Bridson: a background grid (cell size `radius/√2`, ≤1 point/cell) for O(1) neighbour
+    lookups, an active list, `k=30` candidates per active point sampled in the annulus
+    `[radius,2·radius]`; `accept` returning a `boolean` is a hard keep/reject, a `number` is a
+    keep-probability rolled against the injected `rng`. No `noise.ts` import (write-disjoint from the
+    parallel Step 4 — density is entirely caller-supplied via `accept`). `src/systems/__tests__/
+    poisson.test.ts` (new, 7 tests): minimum spacing (no pair closer than `radius`), determinism, hard
+    - probabilistic `accept` thinning reduces count, points stay in-bounds. `npm test poisson` → 7/7
+    pass; `tsc --noEmit` + eslint clean. Files touched: `src/systems/poisson.ts` (new),
+    `src/systems/__tests__/poisson.test.ts` (new).
   - Bridson fast Poisson-disk sampling, seeded via the Step-3 `Rng`:
     `poissonSample({width,height,radius,rng,accept?})` → `Array<{x,y}>`, where `accept?(x,y)` (bool or
     `0..1` probability) thins points against a density field. `radius` = min distance (tiles).
