@@ -117,7 +117,7 @@ function PackSlot({
       <span className="absolute right-1 bottom-0.5 text-[10px] text-muted-foreground">
         {equip.equipped ? 'equipped' : `×${count}`}
       </span>
-      {/* Durability bar for an equipped consumable (the brand, plan 049) — shrinks as it drains (Step 6). */}
+      {/* Durability bar for an equipped consumable (the torch, plan 049) — shrinks as it drains (Step 6). */}
       {equip.durabilityFrac !== null && (
         <span
           data-testid="hud-pack-durability"

@@ -8,7 +8,7 @@ import type { DecorRegion } from '../systems/mapFormat';
 
 /**
  * The three equip slots surfaced on the HUD (plan 049). `mainHand` drives melee (maps to a
- * `MELEE_WEAPONS` entry; empty = unarmed), `ranged` gates the bow, `offHand` holds the brand.
+ * `MELEE_WEAPONS` entry; empty = unarmed), `ranged` gates the bow, `offHand` holds the torch.
  */
 export type EquipSlot = 'mainHand' | 'ranged' | 'offHand';
 
@@ -27,7 +27,7 @@ export interface ItemDef {
   equip?: EquipSlot;
   /**
    * Starting durability of a consumable equippable (plan 049). Present ⇒ the item depletes in real
-   * time while equipped and is destroyed at 0 (the brand). Absent ⇒ a permanent equippable (bow/sword)
+   * time while equipped and is destroyed at 0 (the torch). Absent ⇒ a permanent equippable (bow/sword)
    * that moves bag↔slot freely. Durability lives on the `Equipment` slot, never on the bag `Slot`.
    */
   durability?: number;

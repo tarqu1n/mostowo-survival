@@ -70,7 +70,16 @@ and re-use); held-item rendering is the first sliver of the deferred paper-doll.
 
 ## Steps
 
-- [ ] **Step 1: Rename brand → torch (data, config, refs, tests)** `[inline]`
+- [x] **Step 1: Rename brand → torch (data, config, refs, tests)** `[inline]`
+  - Outcome: renamed item id/name/icon (`items.ts`), recipe key/id/name (`recipes.ts`), all 5 `BRAND_*`→`TORCH_*`
+    consts (`config.ts`), runtime refs in `GameScene.ts` (`litTorch`/`tickTorch`/`torchEmitAccumMs`/`=== 'torch'`),
+    plus `testApi.ts`, `Equipment.ts`, `types.ts`, `entities/testTypes.ts`, `hud/bridge.ts`, `Hotbar.tsx`,
+    `PackDrawer.tsx`, and tests (`data.test.ts`, `orders.test.ts`, `Equipment.test.ts`, `bridge.test.ts`,
+    `equip.spec.ts`, `workbench.spec.ts`, `harness.ts`, `refactor-tripwire.spec.ts`). `git mv brand.png torch.png`
+    (rename preserved) + `craft-items-art.mjs` output path. CraftMenu/WorkbenchBehavior read `RECIPES` dynamically
+    — no literals to change. Final grep: 7 residual "brand" hits, all legitimate English ("brand-new" / "branded
+    type"). `npm run build` green; full vitest unit suite green (1010 passed / 74 files). E2e literals renamed,
+    left for CI. Nothing outside plan-049/051 history references the old id.
   - `items.ts`: `brand` → `torch` (id + `name: 'Torch'` + `icon: 'torch.png'`); keep `equip:'offHand'`
     - `durability`. Rename the icon file `public/assets/icons/brand.png` → `torch.png` (`git mv`) and
     update its origin in `scripts/craft-items-art.mjs` (the actual generator of `brand.png` — it writes

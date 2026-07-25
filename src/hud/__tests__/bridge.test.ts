@@ -100,7 +100,7 @@ describe('outbound event → store mapping', () => {
     const loadout = {
       mainHand: { id: 'sword', durability: null },
       ranged: null,
-      offHand: { id: 'brand', durability: 80 },
+      offHand: { id: 'torch', durability: 80 },
     };
     bus.emit('equipment:changed', loadout);
     expect(s().equipment).toEqual(loadout);
@@ -227,8 +227,8 @@ describe('emit passthrough', () => {
     // equip:toggle carries the tapped item id back to the world (plan 049).
     const equipToggle = vi.fn();
     bus.on('equip:toggle', equipToggle);
-    bridge.emit({ type: 'equip:toggle', payload: { itemId: 'brand' } });
-    expect(equipToggle).toHaveBeenCalledWith({ itemId: 'brand' });
+    bridge.emit({ type: 'equip:toggle', payload: { itemId: 'torch' } });
+    expect(equipToggle).toHaveBeenCalledWith({ itemId: 'torch' });
   });
 });
 

@@ -2,7 +2,7 @@
  * Item catalogue. Keyed by item id; add new items here, not in gameplay code.
  */
 
-import { BRAND_DURABILITY } from '../config';
+import { TORCH_DURABILITY } from '../config';
 import type { ItemDef } from './types';
 
 export const ITEMS: Record<string, ItemDef> = {
@@ -33,16 +33,16 @@ export const ITEMS: Record<string, ItemDef> = {
   // like wood/stone. Feeds the `bow` recipe (Step 5).
   rope: { id: 'rope', name: 'Rope', color: 0xb5966a, maxStack: 50, icon: 'rope.png' },
   // Craftable recipe OUTPUTS (plan 048), now equippable (plan 049). Each is a single held tool/weapon
-  // (`maxStack: 1`). `equip` marks the slot; the brand also carries `durability` — a consumable that
+  // (`maxStack: 1`). `equip` marks the slot; the torch also carries `durability` — a consumable that
   // depletes in real time while equipped and is destroyed at 0 (bow/sword are permanent, no durability).
-  brand: {
-    id: 'brand',
-    name: 'Brand',
+  torch: {
+    id: 'torch',
+    name: 'Torch',
     color: 0xd9822b,
     maxStack: 1,
-    icon: 'brand.png',
+    icon: 'torch.png',
     equip: 'offHand',
-    durability: BRAND_DURABILITY,
+    durability: TORCH_DURABILITY,
   },
   bow: { id: 'bow', name: 'Bow', color: 0x8a5a2b, maxStack: 1, icon: 'bow.png', equip: 'ranged' },
   sword: {

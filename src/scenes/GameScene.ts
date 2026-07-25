@@ -18,9 +18,9 @@ import {
   INVENTORY_SLOTS,
   DEFAULT_MAX_STACK,
   PLAYER_LIGHT_RADIUS,
-  BRAND_DRAIN_PER_SEC,
-  BRAND_LIGHT_RADIUS,
-  BRAND_DRAIN_EMIT_MS,
+  TORCH_DRAIN_PER_SEC,
+  TORCH_LIGHT_RADIUS,
+  TORCH_DRAIN_EMIT_MS,
 } from '../config';
 import { ITEMS } from '../data/items';
 import { MELEE_WEAPONS, ITEM_MELEE_WEAPON } from '../data/weapons';
@@ -163,14 +163,14 @@ export class GameScene extends Phaser.Scene {
 
   private inv!: Inventory;
 
-  // Player equip slots (plan 049) — mainHand (melee) / ranged (bow gate) / offHand (brand). Constructed
+  // Player equip slots (plan 049) — mainHand (melee) / ranged (bow gate) / offHand (torch). Constructed
   // fresh each (re)start in buildWorld() beside `inv`; the equip toggle (toggleEquip) moves items bag↔slot
   // and the loadout is mirrored to the HUD via `equipment:changed`. Pure state — no scene deps.
   private equipment!: Equipment;
 
-  // Accumulated ms since the last throttled `equipment:changed` forward during a brand drain (plan 049
-  // Step 6) — so the HUD durability bar animates at ~BRAND_DRAIN_EMIT_MS cadence, not every frame.
-  private brandEmitAccumMs = 0;
+  // Accumulated ms since the last throttled `equipment:changed` forward during a torch drain (plan 049
+  // Step 6) — so the HUD durability bar animates at ~TORCH_DRAIN_EMIT_MS cadence, not every frame.
+  private torchEmitAccumMs = 0;
 
   private readonly queue = new TaskQueue();
   private actionGoal: Cell | null = null; // the tile we're currently pathing to (for re-pathing)
@@ -1157,9 +1157,9 @@ export class GameScene extends Phaser.Scene {
     // or not a worker task is active — mirrors the survival tick. See src/scenes/world/StructureManager.ts.
     this.structureManager.tick(delta);
 
-    // Equipped brand burns down in real time (plan 049 Step 6) — above the early-return so it drains
+    // Equipped torch burns down in real time (plan 049 Step 6) — above the early-return so it drains
     // whether or not a worker task is active, like the survival/structure ticks.
-    this.tickBrand(delta);
+    this.tickTorch(delta);
 
     // AI companion (plan 042) — drive it each frame (advance path + anim today; the gather/guard tick
     // lands later). Above the no-action early-return so it ticks whether or not a worker task is active.
@@ -1840,11 +1840,11 @@ export class GameScene extends Phaser.Scene {
     // glow lights the character. x is unaffected (originX 0.5 is already centred).
     const s = this.player;
     const centerY = s.y - (s.originY - 0.5) * s.displayHeight;
-    // A lit brand in the off hand (plan 049) raises the disc to BRAND_LIGHT_RADIUS — the path
+    // A lit torch in the off hand (plan 049) raises the disc to TORCH_LIGHT_RADIUS — the path
     // config.ts prescribed ("a future off-hand torch just raises this radius"). SurvivalClock's
     // night-overlay union already consumes playerLight(), so the disc grows for free; fog is unchanged.
-    const litBrand = this.equipment.get('offHand')?.id === 'brand';
-    return { x: s.x, y: centerY, radius: litBrand ? BRAND_LIGHT_RADIUS : PLAYER_LIGHT_RADIUS };
+    const litTorch = this.equipment.get('offHand')?.id === 'torch';
+    return { x: s.x, y: centerY, radius: litTorch ? TORCH_LIGHT_RADIUS : PLAYER_LIGHT_RADIUS };
   }
 
   private litHearth(): { id: string; tile: Cell; pos: { x: number; y: number } } | null {
@@ -2038,25 +2038,25 @@ export class GameScene extends Phaser.Scene {
     this.playerChar.setMeleeWeapon(weaponId ? MELEE_WEAPONS[weaponId] : undefined);
   }
 
-  /** Burn down an equipped brand in real time (plan 049 Step 6): while a consumable is in the off hand
-   *  (durability-bearing — the brand), drain it by the per-second rate scaled to this frame's `delta`.
+  /** Burn down an equipped torch in real time (plan 049 Step 6): while a consumable is in the off hand
+   *  (durability-bearing — the torch), drain it by the per-second rate scaled to this frame's `delta`.
    *  On destroy the slot is already cleared by `drain`, so forward the emptied loadout immediately (the
    *  HUD drops the icon + bar, and `playerLight()` reverts to the base radius next frame); otherwise
    *  forward on a throttle so the durability bar animates without a per-frame store flood. */
-  private tickBrand(delta: number): void {
+  private tickTorch(delta: number): void {
     const off = this.equipment.get('offHand');
     if (!off || off.durability === null) {
-      this.brandEmitAccumMs = 0;
+      this.torchEmitAccumMs = 0;
       return;
     }
-    if (this.equipment.drain('offHand', BRAND_DRAIN_PER_SEC * (delta / 1000)) === 'destroyed') {
-      this.brandEmitAccumMs = 0;
+    if (this.equipment.drain('offHand', TORCH_DRAIN_PER_SEC * (delta / 1000)) === 'destroyed') {
+      this.torchEmitAccumMs = 0;
       this.emitEquipment();
       return;
     }
-    this.brandEmitAccumMs += delta;
-    if (this.brandEmitAccumMs >= BRAND_DRAIN_EMIT_MS) {
-      this.brandEmitAccumMs = 0;
+    this.torchEmitAccumMs += delta;
+    if (this.torchEmitAccumMs >= TORCH_DRAIN_EMIT_MS) {
+      this.torchEmitAccumMs = 0;
       this.emitEquipment();
     }
   }
@@ -2067,9 +2067,9 @@ export class GameScene extends Phaser.Scene {
    *
    * Bag bookkeeping mirrors the two durability models (decision #6): a **permanent** item (bow/sword,
    * no `durability`) moves bag↔slot — equipping spends one from the bag, unequipping returns it. The
-   * **brand** is **equip-to-consume** — equipping spends one and seeds the slot's durability;
+   * **torch** is **equip-to-consume** — equipping spends one and seeds the slot's durability;
    * unequipping (or draining to 0, Step 6) discards it with no restash. Equipping into an occupied slot
-   * first vacates it under the same rules (a displaced permanent returns to the bag; a displaced brand
+   * first vacates it under the same rules (a displaced permanent returns to the bag; a displaced torch
    * is discarded).
    */
   private toggleEquip(p: { itemId: string }): void {
@@ -2078,12 +2078,12 @@ export class GameScene extends Phaser.Scene {
     const worn = this.equipment.slotOf(p.itemId);
     if (worn) {
       this.equipment.unequip(worn);
-      if (def.durability === undefined) this.inv.add(p.itemId, 1); // permanent → back to bag; brand → discarded
+      if (def.durability === undefined) this.inv.add(p.itemId, 1); // permanent → back to bag; torch → discarded
       this.emitEquipment();
       return;
     }
     if (!this.inv.has(p.itemId, 1)) return; // nothing to equip
-    // Vacate the target slot first, restashing a displaced permanent (a displaced brand is discarded).
+    // Vacate the target slot first, restashing a displaced permanent (a displaced torch is discarded).
     const displaced = this.equipment.get(def.equip);
     if (displaced) {
       this.equipment.unequip(def.equip);

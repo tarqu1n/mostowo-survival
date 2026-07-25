@@ -127,27 +127,27 @@ test('a queued craft at a healthy bench delivers the item to the pack (spending 
 }) => {
   test.setTimeout(15_000); // stepLogic (render-free) since plan 045; observed ~4.1s cold
   await startGame(page);
-  // Player adjacent to a full-hp bench, holding the brand recipe cost (wood + cloth) plus spare.
+  // Player adjacent to a full-hp bench, holding the torch recipe cost (wood + cloth) plus spare.
   const { workbenchIds } = await applyScenario(page, {
     player: PLAYER,
     workbenches: [[FRONTIER.col, FRONTIER.row]],
     inventory: { wood: 3, cloth: 3 },
   });
-  expect(await itemCount(page, 'brand')).toBe(0);
+  expect(await itemCount(page, 'torch')).toBe(0);
 
-  await enqueue(page, { kind: 'craft', benchId: workbenchIds[0], recipeId: 'brand' });
+  await enqueue(page, { kind: 'craft', benchId: workbenchIds[0], recipeId: 'torch' });
 
-  // Drive stepLogic() until the brand arrives (walk-adjacent is trivial — already adjacent — then ~craftMs
+  // Drive stepLogic() until the torch arrives (walk-adjacent is trivial — already adjacent — then ~craftMs
   // of work at full-hp 1× rate). Budget well over CRAFT_BASE_MS (8s).
   let crafted = false;
   for (let i = 0; i < 40 && !crafted; i++) {
     await stepLogic(page, 500);
-    if ((await itemCount(page, 'brand')) >= 1) crafted = true;
+    if ((await itemCount(page, 'torch')) >= 1) crafted = true;
   }
 
-  expect(crafted).toBe(true); // the brand was delivered to the pack
-  expect(await itemCount(page, 'brand')).toBe(1);
-  expect(await itemCount(page, 'wood')).toBe(2); // brand cost 1 wood…
+  expect(crafted).toBe(true); // the torch was delivered to the pack
+  expect(await itemCount(page, 'torch')).toBe(1);
+  expect(await itemCount(page, 'wood')).toBe(2); // torch cost 1 wood…
   expect(await itemCount(page, 'cloth')).toBe(2); // …+ 1 cloth, spent at completion
   expect((await workbenches(page))[0].crafting).toBe(false); // craft cleared on completion
 });
@@ -162,22 +162,22 @@ test('a damaged bench crafts slower than a healthy one, but never fully stalls',
     workbenches: [[FRONTIER.col, FRONTIER.row]],
     inventory: { wood: 3, cloth: 3 },
   });
-  // Cripple the bench (maxHp 60 → 5). Its craft rate = Linear(0.4, 1, 5/60) ≈ 0.45×, so brand takes
+  // Cripple the bench (maxHp 60 → 5). Its craft rate = Linear(0.4, 1, 5/60) ≈ 0.45×, so torch takes
   // ~CRAFT_BASE_MS/0.45 ≈ 17.8s vs 8s at full HP.
   expect(await damageWorkbench(page, 0, 55)).toBe(false);
-  await enqueue(page, { kind: 'craft', benchId: workbenchIds[0], recipeId: 'brand' });
+  await enqueue(page, { kind: 'craft', benchId: workbenchIds[0], recipeId: 'torch' });
 
   // After a window that a HEALTHY bench would have finished in (9s > 8s craftMs) but a crippled one
-  // would NOT (needs ~17.8s), the damaged craft is still in flight — no brand yet, still crafting.
+  // would NOT (needs ~17.8s), the damaged craft is still in flight — no torch yet, still crafting.
   await stepLogic(page, 9000);
-  expect(await itemCount(page, 'brand')).toBe(0); // slower — not done in the healthy-bench window
+  expect(await itemCount(page, 'torch')).toBe(0); // slower — not done in the healthy-bench window
   expect((await workbenches(page))[0].crafting).toBe(true); // …but still progressing (not stalled)
 
   // Given more time it DOES complete — the rate floors at CRAFT_DAMAGED_MIN_FRAC, never zero.
   let crafted = false;
   for (let i = 0; i < 40 && !crafted; i++) {
     await stepLogic(page, 500);
-    if ((await itemCount(page, 'brand')) >= 1) crafted = true;
+    if ((await itemCount(page, 'torch')) >= 1) crafted = true;
   }
   expect(crafted).toBe(true); // a damaged bench still finishes eventually
 });

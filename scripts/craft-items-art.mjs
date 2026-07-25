@@ -1,5 +1,5 @@
 /**
- * Placeholder icons for the plan-048 rope resource + the three craftable-item stubs (brand/bow/
+ * Placeholder icons for the plan-048 rope resource + the three craftable-item stubs (torch/bow/
  * sword). These items are added as data in plan 048 Step 1 as INERT bag items — no equip/durability/
  * combat/light behaviour yet (that lands in plan 049) — but `PreloadScene` still needs a resident
  * `icons/<file>` for every `ITEMS` entry or the boot smoke test 404s. Same self-contained RGBA/8-bit
@@ -7,7 +7,7 @@
  *
  * Emits (32×32 item icons under public/assets/icons/):
  *   - rope.png    — coiled rope (new salvage resource, matches items.ts `rope` colour 0xb5966a)
- *   - brand.png   — a wrapped hand-torch (the `brand` recipe output, name "Brand")
+ *   - torch.png   — a wrapped hand-torch (the `torch` recipe output, name "Torch")
  *   - bow.png     — a strung wooden bow
  *   - sword.png   — a plain short blade
  *
@@ -166,7 +166,7 @@ const ICONS = 'public/assets/icons';
   write(`${ICONS}/rope.png`, r);
 }
 
-// ---- brand.png: a wrapped hand-torch (recipe output "Brand" — wood + cloth) ----
+// ---- torch.png: a wrapped hand-torch (recipe output "Torch" — wood + cloth) ----
 {
   const r = new Raster(32, 32);
   const WOOD = [0x8a, 0x5a, 0x2b, 255];
@@ -184,7 +184,7 @@ const ICONS = 'public/assets/icons';
   // Charred tip / unlit ember head (placeholder — no light source behaviour yet).
   r.disc(19, 12, 4, EMBER);
   r.disc(18, 10, 1.6, EMBER_HI);
-  write(`${ICONS}/brand.png`, r);
+  write(`${ICONS}/torch.png`, r);
 }
 
 // ---- bow.png: a strung wooden bow ----

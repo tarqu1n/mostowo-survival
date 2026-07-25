@@ -170,7 +170,7 @@ export function initBridge(bus: EventBus, registry: Registry): Bridge {
   );
   on<SupplyPayload>('supply:changed', (p) => store.setSupply({ wood: p.wood, rock: p.rock }));
   // The player's equip loadout (plan 049). The game emits the full `Equipment.snapshot()` on every
-  // toggle (and, throttled, as the brand drains — Step 6); mirror it straight into the store.
+  // toggle (and, throttled, as the torch drains — Step 6); mirror it straight into the store.
   on<EquipmentState>('equipment:changed', (snap) => store.setEquipment(snap));
   on<TimePayload>('time:changed', (p) => store.setTime(p.phase, p.dayCount, p.tNorm));
   // Continuous dial sweep between the sparse transition-only `time:changed` updates (see SurvivalClock).

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { Equipment } from '../Equipment';
 
 // Pure-system tests (no Phaser, plain Node) mirroring Inventory.test.ts: the equip-slot state
-// machine — empty default loadout, equip/unequip/swap bookkeeping, and the brand's drain-to-destroy.
+// machine — empty default loadout, equip/unequip/swap bookkeeping, and the torch's drain-to-destroy.
 
 describe('Equipment', () => {
   it('defaults to an empty loadout (all three slots null)', () => {
@@ -25,13 +25,13 @@ describe('Equipment', () => {
 
   it('equip carries a starting durability for a consumable', () => {
     const eq = new Equipment();
-    eq.equip('offHand', 'brand', 100);
-    expect(eq.get('offHand')).toEqual({ id: 'brand', durability: 100 });
+    eq.equip('offHand', 'torch', 100);
+    expect(eq.get('offHand')).toEqual({ id: 'torch', durability: 100 });
   });
 
   it('get returns a copy — mutating it does not corrupt internal state', () => {
     const eq = new Equipment();
-    eq.equip('offHand', 'brand', 100);
+    eq.equip('offHand', 'torch', 100);
     const got = eq.get('offHand')!;
     got.durability = 5;
     expect(eq.get('offHand')!.durability).toBe(100);
@@ -65,21 +65,21 @@ describe('Equipment', () => {
 
   it('slotOf finds an equipped item and returns null for an unequipped one', () => {
     const eq = new Equipment();
-    eq.equip('offHand', 'brand', 100);
-    expect(eq.slotOf('brand')).toBe('offHand');
+    eq.equip('offHand', 'torch', 100);
+    expect(eq.slotOf('torch')).toBe('offHand');
     expect(eq.slotOf('sword')).toBeNull();
   });
 
-  it('drain reduces durability and returns ok while the brand survives', () => {
+  it('drain reduces durability and returns ok while the torch survives', () => {
     const eq = new Equipment();
-    eq.equip('offHand', 'brand', 100);
+    eq.equip('offHand', 'torch', 100);
     expect(eq.drain('offHand', 30)).toBe('ok');
     expect(eq.get('offHand')!.durability).toBe(70);
   });
 
   it('drain to 0 destroys the item, clears the slot, and returns destroyed', () => {
     const eq = new Equipment();
-    eq.equip('offHand', 'brand', 10);
+    eq.equip('offHand', 'torch', 10);
     const onChange = vi.fn();
     eq.on('change', onChange);
     expect(eq.drain('offHand', 10)).toBe('destroyed');
@@ -89,7 +89,7 @@ describe('Equipment', () => {
 
   it('drain overshooting past 0 still destroys (no negative durability lingers)', () => {
     const eq = new Equipment();
-    eq.equip('offHand', 'brand', 5);
+    eq.equip('offHand', 'torch', 5);
     expect(eq.drain('offHand', 999)).toBe('destroyed');
     expect(eq.get('offHand')).toBeNull();
   });
@@ -100,7 +100,7 @@ describe('Equipment', () => {
     expect(eq.drain('mainHand', 50)).toBe('ok');
     expect(eq.get('mainHand')).toEqual({ id: 'sword', durability: null });
     expect(eq.drain('ranged', 50)).toBe('ok'); // empty slot
-    eq.equip('offHand', 'brand', 100);
+    eq.equip('offHand', 'torch', 100);
     const onChange = vi.fn();
     eq.on('change', onChange);
     expect(eq.drain('offHand', 0)).toBe('ok'); // amount<=0

@@ -113,12 +113,12 @@ export interface DebugState {
   // the `{wood, rock}` shape is frozen. New fields go at the END + golden bumped.
   baseSupply: { wood: number; rock: number };
   // Appended (plan 049 Step 6) — the player's three equip slots (`Equipment.snapshot()` shape): each
-  // slot is `{ id, durability }` (durability `null` for permanent gear, a number for the brand) or
-  // `null`. Lets a spec assert equip/unequip and the brand's drain→destroy. New fields go at the END.
+  // slot is `{ id, durability }` (durability `null` for permanent gear, a number for the torch) or
+  // `null`. Lets a spec assert equip/unequip and the torch's drain→destroy. New fields go at the END.
   equipment: EquipmentState;
   // Appended (plan 049 Step 6) — the player's current personal-light radius (world px): the base
-  // `PLAYER_LIGHT_RADIUS`, or the larger `BRAND_LIGHT_RADIUS` while a lit brand is in the off hand.
-  // Lets a spec assert the brand grows the night disc (the render union isn't otherwise queryable).
+  // `PLAYER_LIGHT_RADIUS`, or the larger `TORCH_LIGHT_RADIUS` while a lit torch is in the off hand.
+  // Lets a spec assert the torch grows the night disc (the render union isn't otherwise queryable).
   playerLightRadius: number;
 }
 
@@ -192,10 +192,10 @@ export interface TestApiDeps {
   /** The current equip loadout snapshot (plan 049) — surfaced in `debugState().equipment`. */
   equipmentSnapshot(): EquipmentState;
   /** Set the durability of an equipped consumable by item id (plan 049), re-emitting — lets a spec
-   *  fast-forward a brand to near-empty (like `setHunger`/`setNodeProgress`) instead of driving its
+   *  fast-forward a torch to near-empty (like `setHunger`/`setNodeProgress`) instead of driving its
    *  full real-time lifetime frame-by-frame. No-op if the item isn't equipped. */
   setEquipDurability(itemId: string, value: number): void;
-  /** The player's current personal-light radius in world px (plan 049) — base or brand-raised —
+  /** The player's current personal-light radius in world px (plan 049) — base or torch-raised —
    *  surfaced in `debugState().playerLightRadius`. */
   playerLightRadius(): number;
 
@@ -337,7 +337,7 @@ export class TestApi {
     if (spec.melee != null) this.deps.playerChar.setMeleeWeapon(MELEE_WEAPONS[spec.melee]);
 
     // Optional: force-equip items into their declared slots (plan 049) — e.g. a bow to enable ranged,
-    // a brand to test the off-hand light/drain. Bypasses the bag for determinism (like `melee` above).
+    // a torch to test the off-hand light/drain. Bypasses the bag for determinism (like `melee` above).
     for (const id of spec.equip ?? []) this.deps.equipForTest(id);
 
     const inv = spec.inventory ?? (spec.wood != null ? { wood: spec.wood } : {});
@@ -690,7 +690,7 @@ export class TestApi {
   }
 
   /** DEV/test-only: set an equipped consumable's durability by item id (plan 049) — fast-forward a
-   *  brand toward empty so a spec can assert the real per-frame drain crossing zero without driving
+   *  torch toward empty so a spec can assert the real per-frame drain crossing zero without driving
    *  its whole ~90s lifetime frame-by-frame. No-op if the item isn't equipped. */
   setEquipDurability(itemId: string, value: number): void {
     this.deps.setEquipDurability(itemId, value);

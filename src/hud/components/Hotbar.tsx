@@ -16,8 +16,8 @@ import { BuildableIcon } from './BuildableIcon';
  * dimmed. Tapping a filled slot uses/equips/selects its entry:
  *  - buildable → `build:select` (opens placement for that structure);
  *  - edible item (has `nutrition`, e.g. berries) → `needs:eat`;
- *  - equippable item (has `equip`, e.g. brand/bow/sword) → `equip:toggle` (plan 049): a yellow outline
- *    marks the equipped slot and a lit brand shows a durability bar;
+ *  - equippable item (has `equip`, e.g. torch/bow/sword) → `equip:toggle` (plan 049): a yellow outline
+ *    marks the equipped slot and a lit torch shows a durability bar;
  *  - other item (plain resource) → no-op.
  *
  * Long-press is the "pin" affordance in the pitch, but the pin ACTION (`pinToHotbar`) is exercised
@@ -157,7 +157,7 @@ function SlotButton({ slot }: { slot: HotbarSlot }) {
       aria-pressed={equip?.equipped ?? undefined}
     >
       {slot && <SlotContent slot={slot} />}
-      {/* Durability bar for an equipped consumable (the brand, plan 049) — a thin gold bar along the
+      {/* Durability bar for an equipped consumable (the torch, plan 049) — a thin gold bar along the
           bottom that shrinks as it drains (Step 6); absent for permanent gear (bow/sword). */}
       {equip?.durabilityFrac !== null && equip !== null && (
         <span
