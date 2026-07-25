@@ -1,0 +1,21 @@
+{
+  "id": "grass",
+  "name": "Grass",
+  "pack": "pixel-crawler",
+  "sheet": "Environment/Tilesets/Floors_Tiles.png",
+  "fillFrame": 251,
+  "mapping": {
+    "32": 78,
+    "50": 76,
+    "64": 28,
+    "118": 102,
+    "145": 26,
+    "179": 50,
+    "217": 2,
+    "236": 54,
+    "247": 75,
+    "251": 1,
+    "254": 79,
+    "255": 251
+  }
+}

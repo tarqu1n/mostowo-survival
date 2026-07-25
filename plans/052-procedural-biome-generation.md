@@ -145,7 +145,21 @@ or the **one** guarding spec — never the full `npm run e2e`/`check:all` mid-wo
 
 ## Steps
 
-- [ ] **Step 1: Prove the tiling — generalise `gen_terrains.py` (per-sheet COLS), onboard `dirt`** `[inline]`
+- [x] **Step 1: Prove the tiling — generalise `gen_terrains.py` (per-sheet COLS), onboard `dirt`** `[inline]`
+  - Outcome: `gen_terrains.py` refactored to a `TERRAINS` config list `(id,name,sheet,box,cols)` with a
+    per-sheet `cols` field threaded into `canonical_mapping(table,cols)` (`frame=r*cols+c`); a
+    `build_terrain()` helper emits one `TerrainDef` + one `<id>-terrain-parity.json` per terrain. Dirt
+    onboarded (box `(11,15,0,12)`, `cols=25`, `fillFrame=11`, 10 mapping keys). Grass block is
+    **byte-identical** to before the refactor (verified). Added hand-committed
+    `fixtures/grass-terrain-def.snapshot.json` (NOT script-emitted) + a grass-invariance test asserting
+    `terrains.json`'s grass entry deep-equals it. Parity test parameterised via `it.each` over
+    `[grass,dirt]`. `npm test terrainOps` → 7 passed (2 parity + grass-invariance + 4 existing).
+    Files touched: `scripts/pixel-crawler/gen_terrains.py`, `public/assets/.../terrains.json`
+    (regenerated, +dirt), `src/editor/__tests__/fixtures/dirt-terrain-parity.json` (new),
+    `src/editor/__tests__/fixtures/grass-terrain-def.snapshot.json` (new),
+    `src/editor/__tests__/terrainOps.test.ts`. Editor Library auto-lists dirt (catalog maps `terrains[]`
+    generically). Dirt fixture bakes 13/13 cells with 9 distinct frames = coherent edges/corners resolve
+    (headless-equivalent of the "arm Dirt in editor" visual check).
   - Refactor `scripts/pixel-crawler/gen_terrains.py` to loop over a **list** of terrain configs
     `(id, name, sheet, box, cols)` — note the new **`cols`** field, so `frame = row*cols + col` is
     correct per sheet (Finding #1) — instead of the single hardcoded `GRASS_BOX`/`SHEET`/`COLS`.
@@ -171,7 +185,7 @@ or the **one** guarding spec — never the full `npm run e2e`/`check:all` mid-wo
   - **This is a de-risking spike, not routine execution (Finding #1).** Before any generator/editor
     work depends on the overlay-pond model, knock down three unknowns for `Water_tiles.png`:
     1. **Box isolation** — find the water blob's bounding box via `scripts/pixel-crawler/gridoverlay.py`
-       + `blob_map.py`.
+       - `blob_map.py`.
     2. **Grid width** — determine the sheet's `cols` (≠ 25) and feed it through the Step-1 `cols` field.
     3. **Land-side transparency** — **verify against the actual PNG** (inspect alpha on edge tiles, e.g.
        with the Python PIL tooling already used in `scripts/`) that water edges are transparent where
@@ -377,11 +391,11 @@ faithful reuse of the blob autotiler and the command/undo/palette pipeline) — 
 uncertain water-onboarding spike underpinning a load-bearing decision, and over-built the editor UX
 (ghost preview + full define-mode panel) for a one-biome v1; both addressed below.
 
-| # | Finding | Severity | Resolution |
-| - | ------- | -------- | ---------- |
-| 1 | Water onboarding is an uncertain spike on a different sheet; `COLS=25` is Floors-specific so `frame=row*COLS+col` breaks for water; overlay-pond premise (land-side transparency) only asserted. | High | Step 2 rewritten as an explicit upfront spike with PNG-verified transparency, per-sheet `cols` in the config tuple (Step 1), and a documented opaque fallback + decision gate before the generator chain. |
-| 2 | Editor UX over-built for v1: ghost preview had no render mechanism; re-roll can be undo→regen→apply; define-mode panel large yet in-memory-only with only Forest shipping. | Medium | v1 trimmed to apply-only (Step 11); ghost preview + define-mode panel moved to Out of scope (v2). |
-| 3 | `biomes.json` in `src/data/maps/` would bundle it like game content; biomes are editor-only like `terrains.json`. | Medium | Step 6 moves it to `public/assets/…/biomes.json`, fetched via a `biomeCatalogSource.ts` mirroring `terrainCatalogSource.ts`. |
-| 4 | Step 1 grass "byte-identical" guard was soft — the parity fixture regenerates with the script, so it can't detect grass drift. | Medium | Step 1 adds a separate grass-block invariance check on the committed `terrains.json`. |
-| 5 | Biome painter isn't on the roadmap (post-MVP crafting/content, multi-map, richer enemies). | Medium | Proceeding as owner-approved off-roadmap enabling tooling; recorded in DECISIONS (Step 12). |
-| 6 | "No seeded PRNG exists" was wrong — `mulberry32` already in `monsterAI.test.ts`, `stepMonster` threads an `rng` param. | Low | Step 3 consolidates that `mulberry32`; claim corrected in Context. |
+|#|Finding|Severity|Resolution|
+|-|-------|--------|----------|
+|1|Water onboarding is an uncertain spike on a different sheet; `COLS=25` is Floors-specific so `frame=row*COLS+col` breaks for water; overlay-pond premise (land-side transparency) only asserted.|High|Step 2 rewritten as an explicit upfront spike with PNG-verified transparency, per-sheet `cols` in the config tuple (Step 1), and a documented opaque fallback + decision gate before the generator chain.|
+|2|Editor UX over-built for v1: ghost preview had no render mechanism; re-roll can be undo→regen→apply; define-mode panel large yet in-memory-only with only Forest shipping.|Medium|v1 trimmed to apply-only (Step 11); ghost preview + define-mode panel moved to Out of scope (v2).|
+|3|`biomes.json` in `src/data/maps/` would bundle it like game content; biomes are editor-only like `terrains.json`.|Medium|Step 6 moves it to `public/assets/…/biomes.json`, fetched via a `biomeCatalogSource.ts` mirroring `terrainCatalogSource.ts`.|
+|4|Step 1 grass "byte-identical" guard was soft — the parity fixture regenerates with the script, so it can't detect grass drift.|Medium|Step 1 adds a separate grass-block invariance check on the committed `terrains.json`.|
+|5|Biome painter isn't on the roadmap (post-MVP crafting/content, multi-map, richer enemies).|Medium|Proceeding as owner-approved off-roadmap enabling tooling; recorded in DECISIONS (Step 12).|
+|6|"No seeded PRNG exists" was wrong — `mulberry32` already in `monsterAI.test.ts`, `stepMonster` threads an `rng` param.|Low|Step 3 consolidates that `mulberry32`; claim corrected in Context.|
