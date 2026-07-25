@@ -182,6 +182,29 @@ or the **one** guarding spec — never the full `npm run e2e`/`check:all` mid-wo
     grass is byte-identical; arming **Dirt** in the editor paints coherent edges + inner/outer corners.
 
 - [ ] **Step 2: Water-terrain SPIKE — verify overlay assumptions, onboard or fall back** `[inline]`
+  - **SPIKE OUTCOME (recorded 2026-07-25 — steps below to be rewritten around it before ticking):**
+    All three unknowns resolved against the actual `Water_tiles.png`: (1) the water fill box isolates
+    cleanly (`(0,4,5,13)`, colour-gated); (2) grid width is **`cols=25`** — *same* as Floors, NOT
+    "≠25" as the plan assumed; (3) **land-side transparency FAILS** — the sheet is opaque water fills +
+    land-islands-on-opaque-water, and `water_diagonal.png` is a tiny all-opaque coast strip, so **no
+    water blob with transparent land-facing edges exists**. The **overlay-pond model is dead**, and so
+    is the opaque flat-fill fallback (hard blocky edges — owner rejected on sight).
+  - **New direction (owner-directed, replaces the blob approach for water):** a **dual-grid /
+    marching-squares** coast tiler, **not** the alpha blob autotiler (which can't key on opaque
+    colour-transition tiles). Each display tile sits over a world-grid *vertex* and is chosen by its 4
+    **corners** (water/land) sampled from the mask → 16 cases; the case→tile map is auto-derived by
+    classifying each island tile's 4 corner blocks. Seam correctness validated by a **pixel-adjacency
+    (Wang) test** — two tiles fit iff their touching pixel lines mostly agree (`>0.85` different ⇒ no
+    fit); known-good seams ~0–0.31, mismatches 1.0. **Adjacency arrays + case map are precomputed
+    offline and committed as JSON** (like `terrains.json`); the editor does O(1) lookups, never touches
+    pixels at runtime. Grass/dirt stay on the existing blob autotiler. Fills (grass, water interior)
+    are all mutually edge-compatible, so the natural look comes from a **clean base tile + sparse
+    noise-driven accents**, not adjacency. Proven end-to-end (organic lake, real grass base, correct
+    internal/external corners) in **`scripts/pixel-crawler/biome_lake_poc.py`** (run it → demo PNG).
+  - **Scope note:** this adopts a *second* autotile engine (dual-grid), which the plan's Out-of-scope
+    listed as v2. Owner-approved as the v1 water tiler. Steps 1/6/7/10 + Out-of-scope + DECISIONS to be
+    updated when this step is formally rewritten; keeping the spike prototype committed as the checkpoint.
+  - **Original spike checklist (below) — superseded by the outcome above:**
   - **This is a de-risking spike, not routine execution (Finding #1).** Before any generator/editor
     work depends on the overlay-pond model, knock down three unknowns for `Water_tiles.png`:
     1. **Box isolation** — find the water blob's bounding box via `scripts/pixel-crawler/gridoverlay.py`

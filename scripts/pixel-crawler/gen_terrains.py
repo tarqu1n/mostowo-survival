@@ -6,9 +6,9 @@ pixel-classification `autotile.py`'s `build_blob` uses to build its (randomised-
 function, it doesn't fork its logic.
 
 Onboarding a terrain = add a `(id, name, sheet, box, cols)` entry to `TERRAINS` below and re-run.
-The **`cols`** field is the terrain's SHEET width in tiles — `frame = row*cols + col` — and is
-per-sheet (Floors_Tiles.png is 25 wide; Water_tiles.png is not), so it must NOT be a single global
-(plan 052 finding #1). See docs/BIOMES.md for the full onboarding recipe.
+The **`cols`** field is the terrain's SHEET width in tiles — `frame = row*cols + col` — kept per-sheet
+so it must NOT be a single global (plan 052 finding #1); Floors_Tiles.png and Water_tiles.png both
+happen to be 25 wide, but a future sheet needn't be.
 
 Writes:
   - public/assets/tilesets/pixel-crawler/terrains.json — committed terrain defs the editor's terrain

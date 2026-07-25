@@ -44,3 +44,4 @@ __pycache__/
 
 # throwaway local screenshot scripts
 _shot.mjs
+scripts/pixel-crawler/biome_lake_poc.png
