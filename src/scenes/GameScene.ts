@@ -18,9 +18,12 @@ import {
   INVENTORY_SLOTS,
   DEFAULT_MAX_STACK,
   PLAYER_LIGHT_RADIUS,
-  BRAND_DRAIN_PER_SEC,
-  BRAND_LIGHT_RADIUS,
-  BRAND_DRAIN_EMIT_MS,
+  TORCH_DRAIN_PER_SEC,
+  TORCH_LIGHT_RADIUS,
+  TORCH_DRAIN_EMIT_MS,
+  HELD_TORCH_OFFSET_X,
+  HELD_TORCH_OFFSET_Y,
+  HELD_TORCH_SCALE,
 } from '../config';
 import { ITEMS } from '../data/items';
 import { MELEE_WEAPONS, ITEM_MELEE_WEAPON } from '../data/weapons';
@@ -65,6 +68,7 @@ import { CampfireBehavior } from './world/CampfireBehavior';
 import { WallBehavior } from './world/WallBehavior';
 import { TrapBehavior } from './world/TrapBehavior';
 import { WorkbenchBehavior } from './world/WorkbenchBehavior';
+import { HeldItemOverlay } from './world/HeldItemOverlay';
 import { SurvivalClock } from './world/SurvivalClock';
 import { WaveDirector } from './world/WaveDirector';
 import { VisionController } from './fx/VisionController';
@@ -163,14 +167,25 @@ export class GameScene extends Phaser.Scene {
 
   private inv!: Inventory;
 
-  // Player equip slots (plan 049) — mainHand (melee) / ranged (bow gate) / offHand (brand). Constructed
+  // Player equip slots (plan 049) — mainHand (melee) / ranged (bow gate) / offHand (torch). Constructed
   // fresh each (re)start in buildWorld() beside `inv`; the equip toggle (toggleEquip) moves items bag↔slot
   // and the loadout is mirrored to the HUD via `equipment:changed`. Pure state — no scene deps.
   private equipment!: Equipment;
 
-  // Accumulated ms since the last throttled `equipment:changed` forward during a brand drain (plan 049
-  // Step 6) — so the HUD durability bar animates at ~BRAND_DRAIN_EMIT_MS cadence, not every frame.
-  private brandEmitAccumMs = 0;
+  // Accumulated ms since the last throttled `equipment:changed` forward during a torch drain (plan 049
+  // Step 6) — so the HUD durability bar animates at ~TORCH_DRAIN_EMIT_MS cadence, not every frame.
+  private torchEmitAccumMs = 0;
+
+  // Bag-side durability stash for unequipped durability items (plan 051): itemId → the charge it had
+  // when returned to the pack. Unequipping a torch preserves its remaining durability here (not on the
+  // pure Inventory/Slot, which stays count-only), and re-equipping resumes from it. Only drain-to-0
+  // destroys the torch (and clears its stash). Reset fresh each (re)start in buildWorld().
+  private equipCharge: Record<string, number> = {};
+
+  // In-hand torch overlay (plan 051 Step 5) — the visible held-torch sprite pinned to the player's hand
+  // while a torch is in the off hand (the light itself stays playerLight()). Constructed fresh each
+  // (re)start in buildWorld() after the player; a death scene.restart() destroys the old sprite.
+  private heldOverlay!: HeldItemOverlay;
 
   private readonly queue = new TaskQueue();
   private actionGoal: Cell | null = null; // the tile we're currently pathing to (for re-pathing)
@@ -418,6 +433,8 @@ export class GameScene extends Phaser.Scene {
     // each (re)start, so the old instance + this listener are dropped on restart (mirrors baseSupply).
     this.equipment = new Equipment();
     this.equipment.on('change', () => this.syncMeleeFromEquipment());
+    // Fresh bag-side durability stash each (re)start (plan 051) — a death-restart carries no held charge.
+    this.equipCharge = {};
 
     // Shared base-supply pool (plan 042 Step 3) — fresh each (re)start (so a death-restart starts
     // empty). Bridge its 'change' to a `supply:changed` game event so the HUD reflects
@@ -529,6 +546,17 @@ export class GameScene extends Phaser.Scene {
     // playerStats is the player's stat bag surfaced for the Wellbeing screen's stat rows.
     this.registry.set('playerStats', this.playerChar.stats);
     this.physics.world.setBounds(originPx.x, originPx.y, worldPx.w, worldPx.h);
+
+    // In-hand torch overlay (plan 051 Step 5) — reuses the already-loaded torch pack icon at hand scale,
+    // depth 11 (just above the player's depth 10). Hidden until update()'s syncHeldOverlay reveals it
+    // when a torch is in the off hand. Remade here each (re)start (the old sprite died with the restart).
+    this.heldOverlay = new HeldItemOverlay(this, {
+      texture: iconKey('torch'),
+      depth: 11,
+      offsetX: HELD_TORCH_OFFSET_X,
+      offsetY: HELD_TORCH_OFFSET_Y,
+      scale: HELD_TORCH_SCALE,
+    });
 
     // AI companion (plan 042 Step 2) — constructed AFTER the player (construction order is load-bearing:
     // later steps' per-frame tick env reads player state). Side-effect-free like EnemyManager: it does
@@ -1157,9 +1185,14 @@ export class GameScene extends Phaser.Scene {
     // or not a worker task is active — mirrors the survival tick. See src/scenes/world/StructureManager.ts.
     this.structureManager.tick(delta);
 
-    // Equipped brand burns down in real time (plan 049 Step 6) — above the early-return so it drains
+    // Equipped torch burns down in real time (plan 049 Step 6) — above the early-return so it drains
     // whether or not a worker task is active, like the survival/structure ticks.
-    this.tickBrand(delta);
+    this.tickTorch(delta);
+
+    // In-hand torch overlay (plan 051 Step 5) — reposition/flip the held sprite ONCE per non-death frame
+    // HERE, above the movement branch below (which has two updateAnim sites): wiring it beside either
+    // updateAnim would leave the torch un-following on the other movement path (critique finding #4).
+    this.syncHeldOverlay();
 
     // AI companion (plan 042) — drive it each frame (advance path + anim today; the gather/guard tick
     // lands later). Above the no-action early-return so it ticks whether or not a worker task is active.
@@ -1840,11 +1873,22 @@ export class GameScene extends Phaser.Scene {
     // glow lights the character. x is unaffected (originX 0.5 is already centred).
     const s = this.player;
     const centerY = s.y - (s.originY - 0.5) * s.displayHeight;
-    // A lit brand in the off hand (plan 049) raises the disc to BRAND_LIGHT_RADIUS — the path
+    // A lit torch in the off hand (plan 049) raises the disc to TORCH_LIGHT_RADIUS — the path
     // config.ts prescribed ("a future off-hand torch just raises this radius"). SurvivalClock's
     // night-overlay union already consumes playerLight(), so the disc grows for free; fog is unchanged.
-    const litBrand = this.equipment.get('offHand')?.id === 'brand';
-    return { x: s.x, y: centerY, radius: litBrand ? BRAND_LIGHT_RADIUS : PLAYER_LIGHT_RADIUS };
+    const litTorch = this.equipment.get('offHand')?.id === 'torch';
+    return { x: s.x, y: centerY, radius: litTorch ? TORCH_LIGHT_RADIUS : PLAYER_LIGHT_RADIUS };
+  }
+
+  /** Place/flip the in-hand torch overlay (plan 051 Step 5) — shown iff a torch is in the off hand (the
+   *  same read that grows {@link playerLight}); it follows the player and mirrors to the correct hand
+   *  with facing. Called once per non-death frame from update() (above the movement branch). */
+  private syncHeldOverlay(): void {
+    const show = this.equipment.get('offHand')?.id === 'torch';
+    const s = this.player;
+    // Side art faces right; facing left mirrors the sprite (and our X offset) — mirrors updateAnim's flip.
+    const flipLeft = this.playerChar.facingDir() === 'side' && this.playerChar.lastFacing.dCol < 0;
+    this.heldOverlay.sync(show, s.x, s.y, flipLeft);
   }
 
   private litHearth(): { id: string; tile: Cell; pos: { x: number; y: number } } | null {
@@ -2022,9 +2066,12 @@ export class GameScene extends Phaser.Scene {
 
   /** Emit the current equip loadout to the HUD (plan 049). The single forward point for
    *  `equipment:changed`, called after {@link toggleEquip} and on (re)start; Step 6's drain loop also
-   *  calls it (throttled) so the durability bar animates without a per-frame flood. */
+   *  calls it (throttled) so the durability bar animates without a per-frame flood. Also forwards the
+   *  bag-side `equipCharge` stash (plan 051) so a partially-drained torch sitting in the pack shows its
+   *  remaining charge, not a bare "×1"; a copy is sent so the HUD never holds the live map. */
   private emitEquipment(): void {
     this.game.events.emit('equipment:changed', this.equipment.snapshot());
+    this.game.events.emit('equipCharge:changed', { ...this.equipCharge });
   }
 
   /** Re-derive the player's active melee weapon from the main-hand slot (plan 049): the equipped item
@@ -2038,59 +2085,79 @@ export class GameScene extends Phaser.Scene {
     this.playerChar.setMeleeWeapon(weaponId ? MELEE_WEAPONS[weaponId] : undefined);
   }
 
-  /** Burn down an equipped brand in real time (plan 049 Step 6): while a consumable is in the off hand
-   *  (durability-bearing — the brand), drain it by the per-second rate scaled to this frame's `delta`.
+  /** Burn down an equipped torch in real time (plan 049 Step 6): while a consumable is in the off hand
+   *  (durability-bearing — the torch), drain it by the per-second rate scaled to this frame's `delta`.
    *  On destroy the slot is already cleared by `drain`, so forward the emptied loadout immediately (the
    *  HUD drops the icon + bar, and `playerLight()` reverts to the base radius next frame); otherwise
    *  forward on a throttle so the durability bar animates without a per-frame store flood. */
-  private tickBrand(delta: number): void {
+  private tickTorch(delta: number): void {
     const off = this.equipment.get('offHand');
     if (!off || off.durability === null) {
-      this.brandEmitAccumMs = 0;
+      this.torchEmitAccumMs = 0;
       return;
     }
-    if (this.equipment.drain('offHand', BRAND_DRAIN_PER_SEC * (delta / 1000)) === 'destroyed') {
-      this.brandEmitAccumMs = 0;
+    if (this.equipment.drain('offHand', TORCH_DRAIN_PER_SEC * (delta / 1000)) === 'destroyed') {
+      // A burnt-out torch leaves no bag-side stash and is not returned to the pack (plan 051).
+      delete this.equipCharge[off.id];
+      this.torchEmitAccumMs = 0;
       this.emitEquipment();
       return;
     }
-    this.brandEmitAccumMs += delta;
-    if (this.brandEmitAccumMs >= BRAND_DRAIN_EMIT_MS) {
-      this.brandEmitAccumMs = 0;
+    this.torchEmitAccumMs += delta;
+    if (this.torchEmitAccumMs >= TORCH_DRAIN_EMIT_MS) {
+      this.torchEmitAccumMs = 0;
       this.emitEquipment();
     }
   }
 
   /**
-   * Toggle-equip an item from the toolbar/pack (plan 049): tapping an equippable item equips it into
-   * its declared slot, or unequips it if it's already worn. Non-equippable ids are a silent no-op.
+   * Toggle-equip an item from the toolbar/pack (plan 049; unequip reworked in plan 051): tapping an
+   * equippable item equips it into its declared slot, or unequips it if it's already worn.
+   * Non-equippable ids are a silent no-op.
    *
-   * Bag bookkeeping mirrors the two durability models (decision #6): a **permanent** item (bow/sword,
-   * no `durability`) moves bag↔slot — equipping spends one from the bag, unequipping returns it. The
-   * **brand** is **equip-to-consume** — equipping spends one and seeds the slot's durability;
-   * unequipping (or draining to 0, Step 6) discards it with no restash. Equipping into an occupied slot
-   * first vacates it under the same rules (a displaced permanent returns to the bag; a displaced brand
-   * is discarded).
+   * Bag bookkeeping: BOTH a **permanent** item (bow/sword, no `durability`) and the **torch**
+   * (durability-bearing) move bag↔slot — equipping spends one from the bag, unequipping returns it. The
+   * torch's remaining durability is preserved in the bag-side `equipCharge` stash (plan 051), so
+   * re-equipping resumes from that charge; only draining to 0 (see {@link tickTorch}) destroys it.
+   *
+   * Return-to-bag is **add-first / commit-after** (finding #1): `Inventory.add` caps at the item's
+   * `maxStack` (torch/tools = 1) and returns the amount it fit, so a full bag would otherwise orphan the
+   * torch's charge on a discarded return. If the item can't fit the bag we DENY the unequip (leave it
+   * worn, write nothing) — and refuse an incoming equip whose displaced item can't be re-stashed.
    */
   private toggleEquip(p: { itemId: string }): void {
     const def = ITEMS[p.itemId];
     if (!def?.equip) return; // not an equippable item
     const worn = this.equipment.slotOf(p.itemId);
     if (worn) {
+      // Unequip → back to the bag. Add-first: if the torch/tool can't fit (bag already holds one), the
+      // add is a no-op (returns 0) and we deny — nothing is lost, the item stays worn.
+      const slotItem = this.equipment.get(worn);
+      if (this.inv.add(p.itemId, 1) < 1) return; // bag full → deny the unequip
       this.equipment.unequip(worn);
-      if (def.durability === undefined) this.inv.add(p.itemId, 1); // permanent → back to bag; brand → discarded
+      // Preserve a durability item's remaining charge in the bag-side stash so a re-equip resumes it.
+      if (def.durability != null)
+        this.equipCharge[p.itemId] = slotItem?.durability ?? def.durability;
       this.emitEquipment();
       return;
     }
     if (!this.inv.has(p.itemId, 1)) return; // nothing to equip
-    // Vacate the target slot first, restashing a displaced permanent (a displaced brand is discarded).
+    // Vacate the target slot first, returning any displaced item to the bag under the same add-first
+    // guard: if it can't fit, refuse the incoming equip and leave everything untouched.
     const displaced = this.equipment.get(def.equip);
     if (displaced) {
+      if (this.inv.add(displaced.id, 1) < 1) return; // bag full → refuse the equip
       this.equipment.unequip(def.equip);
-      if (ITEMS[displaced.id]?.durability === undefined) this.inv.add(displaced.id, 1);
+      const displacedDef = ITEMS[displaced.id];
+      if (displacedDef?.durability != null)
+        this.equipCharge[displaced.id] = displaced.durability ?? displacedDef.durability;
     }
     this.inv.spend({ [p.itemId]: 1 });
-    this.equipment.equip(def.equip, p.itemId, def.durability ?? null);
+    // Seed a durability item's slot from its stashed charge (resume) or its full starting charge, then
+    // clear the stash; a permanent item seeds `null`.
+    const seed = def.durability != null ? (this.equipCharge[p.itemId] ?? def.durability) : null;
+    delete this.equipCharge[p.itemId];
+    this.equipment.equip(def.equip, p.itemId, seed);
     this.emitEquipment();
   }
 

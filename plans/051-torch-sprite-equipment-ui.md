@@ -1,6 +1,6 @@
 # Torch Rename · Held-Item Overlay · Equipment Panel · Workbench Sprite (plan-049 polish)
 
-> Status: planned — run /execute-plan to begin.
+> Status: deployed
 
 ## Summary
 
@@ -70,7 +70,16 @@ and re-use); held-item rendering is the first sliver of the deferred paper-doll.
 
 ## Steps
 
-- [ ] **Step 1: Rename brand → torch (data, config, refs, tests)** `[inline]`
+- [x] **Step 1: Rename brand → torch (data, config, refs, tests)** `[inline]`
+  - Outcome: renamed item id/name/icon (`items.ts`), recipe key/id/name (`recipes.ts`), all 5 `BRAND_*`→`TORCH_*`
+    consts (`config.ts`), runtime refs in `GameScene.ts` (`litTorch`/`tickTorch`/`torchEmitAccumMs`/`=== 'torch'`),
+    plus `testApi.ts`, `Equipment.ts`, `types.ts`, `entities/testTypes.ts`, `hud/bridge.ts`, `Hotbar.tsx`,
+    `PackDrawer.tsx`, and tests (`data.test.ts`, `orders.test.ts`, `Equipment.test.ts`, `bridge.test.ts`,
+    `equip.spec.ts`, `workbench.spec.ts`, `harness.ts`, `refactor-tripwire.spec.ts`). `git mv brand.png torch.png`
+    (rename preserved) + `craft-items-art.mjs` output path. CraftMenu/WorkbenchBehavior read `RECIPES` dynamically
+    — no literals to change. Final grep: 7 residual "brand" hits, all legitimate English ("brand-new" / "branded
+    type"). `npm run build` green; full vitest unit suite green (1010 passed / 74 files). E2e literals renamed,
+    left for CI. Nothing outside plan-049/051 history references the old id.
   - `items.ts`: `brand` → `torch` (id + `name: 'Torch'` + `icon: 'torch.png'`); keep `equip:'offHand'`
     - `durability`. Rename the icon file `public/assets/icons/brand.png` → `torch.png` (`git mv`) and
     update its origin in `scripts/craft-items-art.mjs` (the actual generator of `brand.png` — it writes
@@ -93,7 +102,25 @@ and re-use); held-item rendering is the first sliver of the deferred paper-doll.
   - Done when: `grep -ri "\bbrand\b" src scripts tests` returns only plan-049 history; `npm run build`
     - `npm test` green; the item shows as "Torch" with `torch.png`.
 
-- [ ] **Step 2: Unequip returns the torch to the pack (partial durability persists)** `[inline]`
+- [x] **Step 2: Unequip returns the torch to the pack (partial durability persists)** `[inline]`
+  - Outcome: `GameScene` gains an `equipCharge: Record<string,number>` stash (reset each (re)start beside
+    the `Equipment` rebuild). `toggleEquip` is now add-first/commit-after: unequip does `inv.add(id,1)` and
+    **denies (leaves worn, writes nothing) if it returns <1** (bag full) — same guard refuses an incoming
+    equip whose displaced item can't be re-stashed; on success it `unequip`s and stashes the slot's
+    pre-unequip durability. Equip seeds the slot from `equipCharge[id] ?? def.durability` then clears the
+    stash; guarded to `def.durability != null` so permanents are untouched. `tickTorch` deletes the stash on
+    `'destroyed'` (burnt-out torch leaves nothing, no bag return). `emitEquipment` now also emits
+    `equipCharge:changed` (a copy). HUD: `store.ts` gains `equipCharge` + `setEquipCharge`; `bridge.ts`
+    mirrors `equipCharge:changed`; `PackDrawer` draws the gold durability bar for a **bagged** partial torch
+    via a new `baggedFrac` (frac = `equipCharge[id]/ITEMS[id].durability`, suppressed while equipped).
+    Verified `Inventory.add` returns the amount placed (so `<1` ⇒ full bag). Tests: `bridge.test.ts` gains an
+    `equipCharge:changed` round-trip (set + clear); the bag-full primitive the guard checks is already
+    covered by `Inventory.test.ts:153` (add returns 0 / leftover on a full bag). NB: `toggleEquip`'s guard
+    isn't unit-tested in isolation — `GameScene` is a Phaser scene with no unit-instantiation seam; the
+    end-to-end unequip-returns-to-pack + deny path is exercised by `equip.spec.ts` (updated in Step 7).
+    `npm run build` green; full vitest suite green (1010 passed).
+    NB2: recovered from a mid-step sub-agent hang — the agent completed the `GameScene`+`store` logic; the
+    bridge listener, PackDrawer bar, and the test were finished inline.
   - `GameScene`: add a scene field `equipCharge: Record<string, number>` (itemId → remaining
     durability), reset in `resetWorld`/on (re)start. In `toggleEquip`:
     - **Unequip a durability item — BAG-FULL GUARD (finding #1):** `Inventory.add` caps at `maxStack`
@@ -123,7 +150,16 @@ and re-use); held-item rendering is the first sliver of the deferred paper-doll.
     re-equip resumes at that charge (bar not full); a bag-already-full unequip is denied (item stays
     worn, nothing lost); drain-to-0 still destroys with no bag return. Build + tests green.
 
-- [ ] **Step 3: Suppress the native image context-menu / drag on HUD item slots** `[delegate]`
+- [x] **Step 3: Suppress the native image context-menu / drag on HUD item slots** `[inline]`
+  - Outcome: added a shared `noImageCallout` class (`select-none [-webkit-touch-callout:none]`) + a
+    `preventImageCallout` onContextMenu guard to `src/hud/lib/utils.ts`. Applied to every long-pressable
+    item-art site: `PackDrawer` PackSlot (the reported bug — now `draggable={false}` + guard on both the
+    `<img>` and its `<button>`), `Hotbar` SlotContent img + its slot button, and the shared `BuildableIcon`
+    (covers BuildCatalog/CommandBar/Hotbar buildable art). `ResourceChips` (lucide SVG, no `<img>`) and
+    `CraftMenu` (no icon art) correctly needed nothing. Only the browser default is stopped — the app's
+    `useLongPress` pin still fires; no global `contextmenu` blocker (would break the editor). Done inline
+    rather than delegated (plan tag was `[delegate]`) — tiny mechanical edit. Typecheck green; `npm run smoke`
+    (against the prod preview, pinned chromium) BOOT CANARY PASSED.
   - `PackDrawer.tsx` `PackSlot`: add `draggable={false}` to the `<img>` (mirror `Hotbar`'s
     `SlotContent`), and add `onContextMenu={(e) => e.preventDefault()}` + the CSS
     `[-webkit-touch-callout:none] select-none` to the slot `<button>` (and the img) so a long-press
@@ -140,7 +176,20 @@ and re-use); held-item rendering is the first sliver of the deferred paper-doll.
   - Done when: long-pressing a pack/hotbar item pins it (app gesture) with NO browser image menu;
     `npm run smoke` green.
 
-- [ ] **Step 4: Diablo-style equipment panel (paper-doll, 3 live slots)** `[inline]`
+- [x] **Step 4: Diablo-style equipment panel (paper-doll, 3 live slots)** `[inline]`
+  - Outcome: new `src/hud/components/EquipPanel.tsx` — a bottom `Sheet` (mirrors `PackDrawer`) holding an
+    inline-SVG humanoid silhouette with three absolutely-positioned slot boxes (`ranged` top-centre/back,
+    `mainHand` right hand, `offHand` left hand). Each `SlotBox` reads `store.equipment[slot]`, shows the
+    worn icon + a gold durability bar (via `equipViewOf`) or a dimmed dashed glyph/label when empty; a
+    filled box taps to emit `equip:toggle` (unequip → torch returns to pack per Step 2), an empty box is
+    inert. No new bridge event/store field — reads the already-mirrored `equipment`. Wired via a compact
+    icon-only **Gear** (`Shield`) button appended to `CommandBar`'s scavenge rail (`onEquip` prop, kept
+    icon-only so the 3 text buttons don't overflow) + a new `'equip'` member of `GameHud`'s `OpenDrawer`
+    union rendering `<EquipPanel>` (mirrors Pack/Status). Icons carry the Step-3 no-callout guard.
+    Typecheck + `npm run build` green; smoke canary PASSED; visually verified the empty paper-doll via a
+    Playwright screenshot (silhouette + 3 placed slots read clearly). Filled state (icon+ring+bar) reuses
+    proven pack markup; its equip/unequip round-trip gets an e2e in Step 7. NB: `window.game.__test` isn't
+    exposed in the prod preview build, so the screenshot showed the empty panel only.
   - New `src/hud/components/EquipPanel.tsx`: a `Sheet` (bottom drawer, mirror `PackDrawer`) OR a
     centred panel, containing a **body silhouette** with three slot boxes positioned over the body —
     `mainHand` (right hand), `offHand` (left hand), `ranged` (across the back/shoulder). Each box:
@@ -163,7 +212,20 @@ and re-use); held-item rendering is the first sliver of the deferred paper-doll.
     with icon (+ torch durability bar); tapping a filled box unequips (torch returns to pack per Step 2);
     build + smoke green.
 
-- [ ] **Step 5: In-hand torch overlay sprite on the player** `[inline]`
+- [x] **Step 5: In-hand torch overlay sprite on the player** `[inline]`
+  - Outcome: new `src/scenes/world/HeldItemOverlay.ts` — a tiny world subsystem owning ONE Phaser image
+    (depth 11, above the player's 10), `setVisible(false)` by default, with `sync(show, x, y, flipLeft)`
+    to place/reveal or hide it (generic over texture/offsets so a future held item can reuse it). Reuses
+    the ALREADY-LOADED `iconKey('torch')` pack texture — no new PreloadScene load needed (the per-item
+    icon loop covers it). `GameScene`: new `heldOverlay` field constructed fresh in `buildWorld` right
+    after the player (old sprite dies with `scene.restart()`, so no leak); `syncHeldOverlay()` shows it
+    iff `equipment.get('offHand')?.id === 'torch'` (same read as `playerLight`), positions at the player
+    sprite origin + `HELD_TORCH_OFFSET_X/Y`, and `flipLeft` mirrors both the X offset and the sprite when
+    facing left (mirrors `updateAnim`'s `facingDir()==='side' && lastFacing.dCol<0`). Tick wired ONCE per
+    non-death frame right after `tickTorch` (~line 1173), ABOVE the movement branch's two `updateAnim`
+    sites (finding #4). Config: `HELD_TORCH_OFFSET_X=8`, `_OFFSET_Y=-18`, `_SCALE=0.55` (tuning knobs).
+    Typecheck + `npm run build` green; smoke canary PASSED; visually verified via dev-build screenshots —
+    the torch shows at the hand, follows movement, and flips to the correct hand facing left/right.
   - New small `world/` manager (e.g. `src/scenes/world/HeldItemOverlay.ts`) OR a private field-cluster
     on `GameScene`: owns a single Phaser sprite (`heldSprite`) created once, `setVisible(false)` by
     default, depth just above the player (11). **Tick placement (finding #4):** `GameScene.update()` has
@@ -187,7 +249,22 @@ and re-use); held-item rendering is the first sliver of the deferred paper-doll.
   - Done when: equipping the torch shows it in the player's hand, following movement + flipping with
     facing; unequip/burn-out hides it; no leak across a death restart; build + smoke green.
 
-- [ ] **Step 6: Generate the new (bigger) workbench sprite** `[inline]`
+- [x] **Step 6: Generate the new (bigger) workbench sprite** `[inline]`
+  - Outcome: pulled `GEMINI_API_KEY` off guppi over Tailscale (userspace-networking + SOCKS5 + `gssh`,
+    per MOBILE-EDITOR-ACCESS.md; key in-memory only, never committed/echoed). New reproducible pipeline
+    script `scripts/pixel-crawler/gen_workbench_gemini.py` (image-to-image off the CURRENT workbench crop
+    as the orientation/palette anchor, per the static-world-prop playbook → magenta-key → autocrop →
+    LANCZOS to 32px tall → hard alpha → median-cut flatten to ~10 colours → 1px dark outline; `--samples`
+    to generate, `--reprocess`/`--commit RAW` to re-bake free). Generated 3 candidates; owner picked #1
+    (`workbench_0`). Committed derived sprite `public/assets/tilesets/pixel-crawler/_derived/workbench/Workbench.png`
+    (23×32 — baked to 32px tall so `TILE_SIZE*tilesTall` render scale == 1.0, pixel-perfect). Wired
+    `buildables.ts`: `objectSprite.asset` → the new `_derived` path, `region` → full image `{0,0,23,32}`,
+    `tilesTall: 1 → 2` (originY:1 unchanged). PreloadScene auto-loads it (its generic objectSprite loop)
+    and `WorkbenchBehavior` bakes the region — no code change needed. Footprint still ONE logical tile
+    (blocksPath unchanged); only the render grew (the tile-above overlap is the same y-sort convention
+    trees use). Verified: typecheck + `npm run build` green; boot canary PASSED (asset loads clean, no
+    console errors); **workbench.spec.ts 5/5 pass** (mechanics unchanged); in-game screenshot confirms a
+    visibly larger ~2-tile bench beside the player.
   - Pull `GEMINI_API_KEY` off guppi over Tailscale (see `CLAUDE.md` guppi section +
     `docs/MOBILE-EDITOR-ACCESS.md`); keep it in-memory only, never commit/echo it.
   - Follow the **static world-prop playbook** (`docs/AI-SPRITE-PIPELINE.md` § Static world-prop sprites;
@@ -208,7 +285,25 @@ and re-use); held-item rendering is the first sliver of the deferred paper-doll.
   - Done when: the placed workbench renders visibly larger (~2 tiles) with the new sprite; build green;
     e2e `workbench.spec.ts` still passes (mechanics unchanged).
 
-- [ ] **Step 7: Tests + docs** `[inline]`
+- [x] **Step 7: Tests + docs** `[inline]`
+  - Outcome: **Tests** — `equip.spec.ts`: fixed the stale "equip-to-consume" comments and added a new
+    spec `unequipping a partially-drained torch returns it to the pack; re-equip resumes its charge`
+    (equip → drain → unequip → back in pack at reduced charge → re-equip resumes, not reset). equip 5/5 +
+    workbench 5/5 pass. The equipment panel is covered at its seams (the `equipCharge`/`equipment` store
+    mirror unit test + the `equip:toggle` e2e) and the held overlay's show/hide mirrors `playerLight`
+    (e2e via `playerLightRadius`) + was screenshot-verified — no React render-test infra exists and
+    `DebugState` is golden-locked, so dedicated seams for those presentational bits were judged
+    disproportionate (noted rather than added). **Docs** — brand→torch + return-to-pack pass across
+    `STATUS.md` (equip section reworded + new plan-051 subsection), `GAME-MECHANICS.md` (torch section +
+    equip panel), `docs/decisions/gameplay.md` (new 2026-07-25 plan-051 entry; 049/048 history left
+    intact), `CLAUDE.md` status one-liner + crafting line. Freed the `torch` name (finding #2):
+    `GAME-DESIGN.md`/`ROADMAP.md` rename the future perimeter light to **torch_post** with a note the hand
+    item took `torch` (supersedes 049 #7). Art origins: `wired-art.md` new "Workbench sprite + held torch"
+    subsection; `ASSETS.md` routing row cites `gen_workbench_gemini.py`. Gates: typecheck + lint (0 errors)
+    - lint:md + unit (1010) + smoke + build all green; my changed files pass `prettier --check`. NB: full
+    `check:all` is red ONLY on pre-existing prettier drift in two unrelated design-mockup HTMLs
+    (`docs/build-ui-options.html`, `docs/ui-overhaul/pitch.html` — a 3.6k-line reformat) left untouched.
+    Status set to `in review` (not `deployed` — that awaits an explicit deploy step, per the workflow).
   - Tests: update `equip.spec.ts` for the rename + the **unequip-returns-to-pack** behaviour (equip →
     drain → unequip → still in pack at reduced charge → re-equip resumes); a unit/e2e check that the
     **equipment panel** reflects + toggles slots; a smoke check that the **held overlay** appears/hides

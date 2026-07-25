@@ -220,21 +220,32 @@ export const UNARMED_MELEE_SHAPE: AttackShape = { reach: 1, arc: 'single' };
 export const ATTACK_MOVE_SLOW = 0.2;
 
 /**
- * Brand (hand-held torch, plan 049) tunables — PLACEHOLDER tuning per plan 040's convention.
- *  - `BRAND_DURABILITY`: starting charge, drained in real time while equipped in the off hand.
- *  - `BRAND_LIFETIME_SEC`: how long a full brand lasts equipped; the per-second drain is derived from
+ * Torch (hand-held torch, plan 049) tunables — PLACEHOLDER tuning per plan 040's convention.
+ *  - `TORCH_DURABILITY`: starting charge, drained in real time while equipped in the off hand.
+ *  - `TORCH_LIFETIME_SEC`: how long a full torch lasts equipped; the per-second drain is derived from
  *    it so the two stay in step (retune the lifetime, not the drain).
- *  - `BRAND_LIGHT_RADIUS`: the player-light disc while a lit brand is equipped — larger than
+ *  - `TORCH_LIGHT_RADIUS`: the player-light disc while a lit torch is equipped — larger than
  *    `PLAYER_LIGHT_RADIUS` but smaller than the campfire, so fires still clearly matter (decision #4).
  */
-export const BRAND_DURABILITY = 100;
-export const BRAND_LIFETIME_SEC = 90;
-export const BRAND_DRAIN_PER_SEC = BRAND_DURABILITY / BRAND_LIFETIME_SEC;
-export const BRAND_LIGHT_RADIUS = TILE_SIZE * 3.5;
-/** How often (ms) the per-frame brand drain forwards the loadout to the HUD (plan 049 Step 6). The
+export const TORCH_DURABILITY = 100;
+export const TORCH_LIFETIME_SEC = 90;
+export const TORCH_DRAIN_PER_SEC = TORCH_DURABILITY / TORCH_LIFETIME_SEC;
+export const TORCH_LIGHT_RADIUS = TILE_SIZE * 3.5;
+/** How often (ms) the per-frame torch drain forwards the loadout to the HUD (plan 049 Step 6). The
  *  durability bar animates smoothly at ~5/sec without the store re-rendering every frame; a destroy
  *  still forwards immediately. Not gameplay — a HUD-refresh cadence knob. */
-export const BRAND_DRAIN_EMIT_MS = 200;
+export const TORCH_DRAIN_EMIT_MS = 200;
+
+/**
+ * In-hand torch overlay (plan 051 Step 5) — the small visible torch sprite pinned to the player's hand
+ * while a torch is equipped in the off hand (the light itself stays `TORCH_LIGHT_RADIUS`). Offsets are
+ * from the player sprite's origin, in world px; `HELD_TORCH_OFFSET_X` mirrors with facing (so the torch
+ * swaps to the correct hand when facing left), `_Y` is negative to raise it from the feet-origin to hand
+ * height. `HELD_TORCH_SCALE` shrinks the ~32px pack icon to read at hand scale. Pure tuning knobs.
+ */
+export const HELD_TORCH_OFFSET_X = 8;
+export const HELD_TORCH_OFFSET_Y = -18;
+export const HELD_TORCH_SCALE = 0.55;
 
 /**
  * NPC companion (the Rogue, plan 042) — a named constants block mirroring the player block above,

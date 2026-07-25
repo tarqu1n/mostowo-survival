@@ -96,11 +96,13 @@ export const BUILDABLES: Record<string, BuildableDef> = {
     baseOnly: true,
     blocksPath: true,
     behavior: 'workbench', // live/simulated — routed to WorkbenchBehavior on completion (finishSite)
-    tilesTall: 1, // ~1-tile bench (the region is ~1 tile square); bottom-anchored onto its tile
+    tilesTall: 2, // bigger bespoke bench (plan 051 Step 6) — renders ~2 tiles tall; bottom-anchored
     originY: 1,
     objectSprite: {
-      asset: 'pixel-crawler/Environment/Structures/Stations/Workbench/Workbench.png',
-      region: { x: 0, y: 84, w: 32, h: 28 },
+      // Bespoke Gemini-generated workbench (plan 051 Step 6) — baked to 32px tall so the
+      // TILE_SIZE*tilesTall scale lands at 1.0 (pixel-perfect). Repro: scripts/pixel-crawler/gen_workbench_gemini.py.
+      asset: 'pixel-crawler/_derived/workbench/Workbench.png',
+      region: { x: 0, y: 0, w: 23, h: 32 },
     },
     category: 'craft', // first 'craft'-category buildable — surfaces the HUD Craft tab (plan 046)
     buildTimeMs: 2500, // == config.BUILD_MS — timing unchanged (plan 050 Step 1)

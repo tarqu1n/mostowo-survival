@@ -2,7 +2,7 @@ import { EventEmitter } from 'eventemitter3';
 import type { EquipSlot } from '../data/types';
 
 /** One equipped item. `durability` is `null` for a permanent equippable (bow/sword), a number for a
- *  consumable that drains while equipped (the brand). `null` slot = nothing equipped there. */
+ *  consumable that drains while equipped (the torch). `null` slot = nothing equipped there. */
 export type EquippedItem = { id: string; durability: number | null };
 
 /** The full three-slot loadout: every {@link EquipSlot} maps to an {@link EquippedItem} or `null`. */
@@ -16,7 +16,7 @@ export type DrainResult = 'ok' | 'destroyed';
 
 /**
  * The player's three equip slots (plan 049): `mainHand` (melee), `ranged` (bow gate), `offHand`
- * (brand). Pure world logic, no scene deps — mirrors {@link Inventory} exactly: extends `eventemitter3`
+ * (torch). Pure world logic, no scene deps — mirrors {@link Inventory} exactly: extends `eventemitter3`
  * directly (imports no Phaser, stays plain-Node testable) and emits `'change'` (payload:
  * {@link snapshot}) after any real mutation so the HUD reacts without polling.
  *

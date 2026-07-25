@@ -58,13 +58,13 @@ export interface DebugState {
   } | null;
   baseSupply: { wood: number; rock: number };
   // plan 049: the three equip slots. Each slot is `{ id, durability }` (durability null = permanent
-  // gear, a number = the brand) or null. Mirrors `Equipment.snapshot()` / EquipmentState.
+  // gear, a number = the torch) or null. Mirrors `Equipment.snapshot()` / EquipmentState.
   equipment: {
     mainHand: { id: string; durability: number | null } | null;
     ranged: { id: string; durability: number | null } | null;
     offHand: { id: string; durability: number | null } | null;
   };
-  // plan 049: the player's personal-light radius (world px) — base, or brand-raised while a lit brand
+  // plan 049: the player's personal-light radius (world px) — base, or torch-raised while a lit torch
   // is in the off hand.
   playerLightRadius: number;
 }
@@ -180,7 +180,7 @@ export function equip(page: Page, itemId: string): Promise<void> {
   return page.evaluate((id) => (window as any).game.__test.equip(id), itemId);
 }
 
-/** Set an equipped consumable's durability by item id (plan 049) — fast-forward a brand toward empty. */
+/** Set an equipped consumable's durability by item id (plan 049) — fast-forward a torch toward empty. */
 export function setEquipDurability(page: Page, itemId: string, value: number): Promise<void> {
   return page.evaluate(
     ({ itemId, value }) => (window as any).game.__test.setEquipDurability(itemId, value),

@@ -305,6 +305,22 @@ for items from a predefined set instead of a single fixed yield.
   (forage/rummage/dismantle) motion via `harvestAnimMotion` (`systems/nodeDefs.ts`), the reskin-stand-in
   pattern chop/mine/punch already use. Swap in a real strip by editing that one mapper.
 
+### Workbench sprite (Gemini, plan 051) + the held torch
+
+- **Bigger workbench** — the crafting station's prop is a **bespoke Gemini-generated** wooden bench
+  (`_derived/workbench/Workbench.png`, 23×32), replacing the small pack-region crop. Same static
+  world-prop playbook as the tents: **image-to-image anchored on the OLD workbench region crop** (so the
+  new one keeps the top-down oblique camera + flat wooden palette), post-processed magenta-key → autocrop
+  → LANCZOS to 32px tall → 10-colour median-cut flatten → 1px dark outline. Baked to **exactly 32px tall**
+  so at `tilesTall:2` the render scale lands at **1.0** (pixel-perfect). Wired in `buildables.ts`
+  (`workbench.objectSprite.asset` + full-image region + `tilesTall:2`); footprint/mechanics unchanged
+  (render-only). Regenerate: export `GEMINI_API_KEY` (guppi, over Tailscale — see the tent section),
+  `python3 scripts/pixel-crawler/gen_workbench_gemini.py` (`--samples` / `--reprocess` / `--commit RAW`).
+- **Held-torch overlay** — the in-hand torch (plan 051) **reuses the existing `torch.png` item icon** at
+  hand scale (no new art); `HeldItemOverlay` pins it to the player's hand while worn. No new asset to
+  regenerate — if the icon ever reads poorly at hand-scale, generate a dedicated `held_torch` via the
+  same pipeline.
+
 > **Sourcing / generating new art?** The tileset candidates weighed up, the AI-gen service trials
 > (Retro Diffusion / PixelLab), the Gemini bespoke-asset pipeline, and **`style_match.py`** (snaps
 > off-palette gen art onto the pack's look — reach for it whenever generated art's shape is right but

@@ -12,13 +12,13 @@ import { ATTACK_COOLDOWN_MS } from '../../src/config';
 
 // Plan 049 — equippable items + equip slots. Exercises the real bag↔slot toggle path (`equip:toggle`,
 // not the force-equip scenario seam) and the three combat/light hooks: ranged is gated on an equipped
-// bow, the main-hand item drives melee damage, and the off-hand brand grows the player light + drains
+// bow, the main-hand item drives melee damage, and the off-hand torch grows the player light + drains
 // in real time to destruction. Light is asserted via `playerLightRadius` (the render union isn't
 // otherwise queryable); drain via `equipment.offHand.durability`.
 
 const PLAYER_LIGHT = 20; // PLAYER_LIGHT_RADIUS: TILE_SIZE 16 × 1.25
-const BRAND_LIGHT = 56; // BRAND_LIGHT_RADIUS: TILE_SIZE 16 × 3.5
-const BRAND_START = 100; // BRAND_DURABILITY
+const TORCH_LIGHT = 56; // TORCH_LIGHT_RADIUS: TILE_SIZE 16 × 3.5
+const TORCH_START = 100; // TORCH_DURABILITY
 
 test('unarmed default: no bow equipped ⇒ combat:bow is a no-op, and the light is the base radius', async ({
   page,
@@ -33,7 +33,7 @@ test('unarmed default: no bow equipped ⇒ combat:bow is a no-op, and the light 
   });
   let s = await state(page);
   expect(s.equipment).toEqual({ mainHand: null, ranged: null, offHand: null });
-  expect(s.playerLightRadius).toBe(PLAYER_LIGHT); // no brand → base light
+  expect(s.playerLightRadius).toBe(PLAYER_LIGHT); // no torch → base light
 
   await emit(page, 'combat:bow');
   await step(page, 100);
@@ -89,40 +89,75 @@ test('equipping a crafted sword upgrades melee damage (2 hits kill a kidZombie, 
   expect((await state(page)).enemies).toBe(0);
 });
 
-test('equipping a brand grows the player light, drains in real time, and is destroyed at zero', async ({
+test('equipping a torch grows the player light, drains in real time, and is destroyed at zero', async ({
   page,
 }) => {
   await startGame(page);
   await applyScenario(page, {
     player: [10, 10],
-    inventory: { brand: 1 }, // a crafted brand in the pack
+    inventory: { torch: 1 }, // a crafted torch in the pack
   });
-  expect(await itemCount(page, 'brand')).toBe(1);
+  expect(await itemCount(page, 'torch')).toBe(1);
   expect((await state(page)).playerLightRadius).toBe(PLAYER_LIGHT);
 
   // Equip it: bag→off hand, seeded with full durability; the light disc grows immediately. (Durability
-  // reads a hair under BRAND_START — the DEV clock's brief pre-first-step RAF window drains one frame.)
-  await emit(page, 'equip:toggle', { itemId: 'brand' });
+  // reads a hair under TORCH_START — the DEV clock's brief pre-first-step RAF window drains one frame.)
+  await emit(page, 'equip:toggle', { itemId: 'torch' });
   let s = await state(page);
-  expect(s.equipment.offHand?.id).toBe('brand');
-  expect(s.equipment.offHand!.durability!).toBeGreaterThan(BRAND_START - 1);
-  expect(s.equipment.offHand!.durability!).toBeLessThanOrEqual(BRAND_START);
-  expect(await itemCount(page, 'brand')).toBe(0); // equip-to-consume: spent out of the bag
-  expect(s.playerLightRadius).toBe(BRAND_LIGHT); // brand raises the disc
+  expect(s.equipment.offHand?.id).toBe('torch');
+  expect(s.equipment.offHand!.durability!).toBeGreaterThan(TORCH_START - 1);
+  expect(s.equipment.offHand!.durability!).toBeLessThanOrEqual(TORCH_START);
+  expect(await itemCount(page, 'torch')).toBe(0); // moved out of the bag while worn
+  expect(s.playerLightRadius).toBe(TORCH_LIGHT); // torch raises the disc
 
   // Burns down in real time while equipped: a couple seconds of drive drops it below full but not out.
   await step(page, 2000);
   s = await state(page);
   expect(s.equipment.offHand).not.toBeNull();
-  expect(s.equipment.offHand!.durability!).toBeLessThan(BRAND_START);
+  expect(s.equipment.offHand!.durability!).toBeLessThan(TORCH_START);
   expect(s.equipment.offHand!.durability!).toBeGreaterThan(0);
 
   // Fast-forward to the edge (a seam, like setHunger — driving the full ~90s lifetime frame-by-frame
   // would blow the test budget), then let the REAL per-frame drain cross zero over a short drive.
-  await setEquipDurability(page, 'brand', 1);
-  await step(page, 2000); // ~2.2 durability drained > 1 → tickBrand destroys it
+  await setEquipDurability(page, 'torch', 1);
+  await step(page, 2000); // ~2.2 durability drained > 1 → tickTorch destroys it
   s = await state(page);
   expect(s.equipment.offHand).toBeNull(); // destroyed at zero by the per-frame drain
   expect(s.playerLightRadius).toBe(PLAYER_LIGHT); // light reverts to base
-  expect(await itemCount(page, 'brand')).toBe(0); // NOT restashed — equip-to-consume, gone for good
+  expect(await itemCount(page, 'torch')).toBe(0); // drain-to-0 destroys it — gone for good (only an
+  // UNEQUIP returns it to the pack; see the next test)
+});
+
+test('unequipping a partially-drained torch returns it to the pack; re-equip resumes its charge (plan 051)', async ({
+  page,
+}) => {
+  await startGame(page);
+  await applyScenario(page, {
+    player: [10, 10],
+    inventory: { torch: 1 },
+  });
+  // Equip → drain partway (a real drive, not the seam) → the worn torch is below full but alive.
+  await emit(page, 'equip:toggle', { itemId: 'torch' });
+  await step(page, 3000);
+  let s = await state(page);
+  const worn = s.equipment.offHand!.durability!;
+  expect(worn).toBeLessThan(TORCH_START);
+  expect(worn).toBeGreaterThan(0);
+  expect(await itemCount(page, 'torch')).toBe(0); // out of the bag while worn
+
+  // Unequip: it returns to the pack (plan 051 reverses 049's discard), the slot clears, and the light
+  // reverts — nothing destroyed.
+  await emit(page, 'equip:toggle', { itemId: 'torch' });
+  s = await state(page);
+  expect(s.equipment.offHand).toBeNull();
+  expect(s.playerLightRadius).toBe(PLAYER_LIGHT);
+  expect(await itemCount(page, 'torch')).toBe(1); // back in the pack, NOT discarded
+
+  // Re-equip: it resumes from the STASHED charge (~what it had when unequipped), not a fresh full torch.
+  await emit(page, 'equip:toggle', { itemId: 'torch' });
+  s = await state(page);
+  const resumed = s.equipment.offHand!.durability!;
+  expect(resumed).toBeLessThan(TORCH_START); // not reset to full
+  expect(resumed).toBeLessThanOrEqual(worn); // at (or just under) the charge it was stashed at
+  expect(resumed).toBeGreaterThan(worn - 5); // and not meaningfully more drained than the stash
 });

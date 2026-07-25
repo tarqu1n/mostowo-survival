@@ -6,6 +6,29 @@ Part of the [decision log index](../DECISIONS.md). Newest first.
 
 ---
 
+## 2026-07-25 — [DECIDED] Equip polish (plan 051): torch rename supersedes 049 #7, unequip-returns-with-durability reverses 049's discard, held-torch overlay = first paper-doll sliver
+
+Six follow-ups to the 049 equip slice. Full detail in
+[plan 051](../../plans/051-torch-sprite-equipment-ui.md); the settled calls that reverse or supersede
+earlier decisions:
+
+- **`torch`, not `brand`** — the off-hand item id + config consts are renamed `brand`→`torch`/`BRAND_*`→
+  `TORCH_*`. This **intentionally supersedes plan-049 decision #7**, which had reserved `torch` for a
+  future perimeter-light buildable. That future light, if built, now takes **`torch_post`** (renamed in
+  GAME-DESIGN.md/ROADMAP.md so the id isn't double-booked).
+- **Unequip returns the torch to the pack, charge preserved** — **reverses 049's equip-to-consume
+  discard.** A scene-side `equipCharge` map (itemId→remaining charge) stashes the worn durability;
+  re-equip resumes from it; only **drain-to-0 destroys**. The pure `Inventory`/`Slot` stay count-only —
+  the stash is a minimal per-id `GameScene` map, NOT a general bag-durability model. Guard: **add-first/
+  commit-after** — a bag-full unequip is denied (leave it worn) so no charge is ever orphaned.
+- **Held-torch overlay = the first paper-doll sliver.** A single hand-pinned sprite (not a re-animated
+  player) shows the worn torch, following movement + facing. Full per-pose body equipment rendering stays
+  **deferred to plan 010**; this is deliberately the minimal generic overlay.
+- **Equipment panel shows only the 3 live slots** — a paper-doll silhouette, no head/chest/legs
+  placeholders. Equip is still driven from the pack; the panel only unequips.
+
+---
+
 ## 2026-07-24 — [DECIDED] Equippable items + equip slots (plan 049): 3 slots, empty default loadout, durability on Equipment only, brand-via-playerLight, bow-not-default gate
 
 The first equippable items + the equip-slot system the HUD stubbed out since plan 046 (plan 049 —

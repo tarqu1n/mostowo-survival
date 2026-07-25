@@ -34,7 +34,7 @@ export interface ScenarioSpec {
    *  mirrors an enemy's `weaponId`, for deterministic reach/arc specs (plan 036). */
   melee?: string;
   /** Force-equip these equippable item ids into their declared slots (plan 049), bypassing the bag —
-   *  e.g. `['bow']` to enable ranged, `['brand']` for the off-hand light/drain. Deterministic setup
+   *  e.g. `['bow']` to enable ranged, `['torch']` for the off-hand light/drain. Deterministic setup
    *  seam paralleling `melee`; the real bag↔slot toggle path is `equip:toggle`. */
   equip?: string[];
   trees?: Array<[number, number]>;
@@ -184,7 +184,7 @@ export interface GameTestApi {
    *  ranged gate / off-hand light without the bag→toggle path. A non-equippable id is a no-op. */
   equip(itemId: string): void;
   /** DEV/test-only: set an equipped consumable's durability by item id (plan 049) — fast-forward a
-   *  brand toward empty without driving its whole real-time lifetime. No-op if not equipped. */
+   *  torch toward empty without driving its whole real-time lifetime. No-op if not equipped. */
   setEquipDurability(itemId: string, value: number): void;
   /** DEV/test-only: set the companion's day role — round-trips to `debugState().companion.dayRole`
    *  (plan 042 Step 2). No-op if no companion is spawned; the behaviour it drives lands in later steps. */

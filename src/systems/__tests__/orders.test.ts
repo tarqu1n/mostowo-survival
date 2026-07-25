@@ -23,7 +23,7 @@ describe('orderTargetId', () => {
     expect(orderTargetId(deconstruct('w1'))).toBe('w1');
     expect(orderTargetId(rearm('r1'))).toBe('r1');
     expect(orderTargetId({ kind: 'repair', structureId: 'w9' })).toBe('w9');
-    expect(orderTargetId(craft('b1', 'brand'))).toBe('b1'); // the bench, not the recipe
+    expect(orderTargetId(craft('b1', 'torch'))).toBe('b1'); // the bench, not the recipe
   });
 
   it('is null for a move (no target)', () => {
@@ -73,12 +73,12 @@ describe('ORDER_META', () => {
 describe('craft order (plan 048)', () => {
   it('targets the bench (so two recipes at one bench share a target id) but never de-dupes', () => {
     // orderTargetId is the bench, so two DIFFERENT recipes at the SAME bench are "same target"…
-    expect(sameOrderTarget(craft('b1', 'brand'), craft('b1', 'sword'))).toBe(true);
+    expect(sameOrderTarget(craft('b1', 'torch'), craft('b1', 'sword'))).toBe(true);
     // …yet because craft does NOT de-dupe on enqueue, both still queue (append, never toggle off).
     const q = new TaskQueue();
-    q.append(craft('b1', 'brand'));
+    q.append(craft('b1', 'torch'));
     q.append(craft('b1', 'sword'));
-    expect(q.all()).toEqual([craft('b1', 'brand'), craft('b1', 'sword')]);
+    expect(q.all()).toEqual([craft('b1', 'torch'), craft('b1', 'sword')]);
   });
 });
 

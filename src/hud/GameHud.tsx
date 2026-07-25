@@ -28,6 +28,7 @@ import { RotationRing } from './components/RotationRing';
 import { CommitBar } from './components/CommitBar';
 import { PackDrawer } from './components/PackDrawer';
 import { StatusDrawer } from './components/StatusDrawer';
+import { EquipPanel } from './components/EquipPanel';
 import { InspectCard } from './components/InspectCard';
 import { CompanionMenu } from './components/CompanionMenu';
 import { CraftMenu } from './components/CraftMenu';
@@ -114,7 +115,7 @@ export function GameHud() {
  * The scavenge morph's Build/Pack/Status buttons open the Tier-2 bottom-sheet drawers (Step 11); only
  * one is open at a time, tracked here. Build additionally toggles build mode (handled in CommandBar).
  */
-type OpenDrawer = 'build' | 'pack' | 'status' | null;
+type OpenDrawer = 'build' | 'pack' | 'status' | 'equip' | null;
 
 function ActionLayer() {
   const gameMode = useHudStore((s) => s.mode);
@@ -153,11 +154,13 @@ function ActionLayer() {
         onBuild={() => setOpenDrawer('build')}
         onPack={() => setOpenDrawer('pack')}
         onStatus={() => setOpenDrawer('status')}
+        onEquip={() => setOpenDrawer('equip')}
         onMoveHeldChange={(held) => hudBridge()?.setMovepadHeld(held)}
       />
       <BuildCatalog open={openDrawer === 'build'} onOpenChange={toggle('build')} />
       <PackDrawer open={openDrawer === 'pack'} onOpenChange={toggle('pack')} />
       <StatusDrawer open={openDrawer === 'status'} onOpenChange={toggle('status')} />
+      <EquipPanel open={openDrawer === 'equip'} onOpenChange={toggle('equip')} />
     </div>
   );
 }

@@ -139,6 +139,6 @@ test('golden debugState() snapshot survives a scripted world + combat sequence',
     baseSupply: { wood: 0, rock: 0 }, // plan 042 Step 2: appended to DebugState; no baseSupply seeded
     // plan 049 Step 6: appended to DebugState; this scenario equips nothing → all three slots empty
     equipment: { mainHand: null, ranged: null, offHand: null },
-    playerLightRadius: 20, // plan 049: no brand → PLAYER_LIGHT_RADIUS (TILE_SIZE 16 × 1.25)
+    playerLightRadius: 20, // plan 049: no torch → PLAYER_LIGHT_RADIUS (TILE_SIZE 16 × 1.25)
   });
 });

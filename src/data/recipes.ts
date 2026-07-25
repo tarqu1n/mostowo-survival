@@ -15,12 +15,12 @@ import type { RecipeDef } from './types';
 import { CRAFT_BASE_MS } from '../config';
 
 export const RECIPES: Record<string, RecipeDef> = {
-  brand: {
-    id: 'brand',
-    name: 'Brand',
+  torch: {
+    id: 'torch',
+    name: 'Torch',
     station: 'workbench',
     cost: { wood: 1, cloth: 1 },
-    output: { itemId: 'brand', count: 1 },
+    output: { itemId: 'torch', count: 1 },
     craftMs: CRAFT_BASE_MS,
   },
   bow: {

@@ -48,11 +48,11 @@ describe('ITEMS', () => {
     }
   });
 
-  it('the plan-049 equippables map to their slots (sword→mainHand, bow→ranged, brand→offHand+durability)', () => {
+  it('the plan-049 equippables map to their slots (sword→mainHand, bow→ranged, torch→offHand+durability)', () => {
     expect(ITEMS.sword.equip).toBe('mainHand');
     expect(ITEMS.bow.equip).toBe('ranged');
-    expect(ITEMS.brand.equip).toBe('offHand');
-    expect(ITEMS.brand.durability).toBeGreaterThan(0);
+    expect(ITEMS.torch.equip).toBe('offHand');
+    expect(ITEMS.torch.durability).toBeGreaterThan(0);
     expect(ITEMS.bow.durability).toBeUndefined(); // permanent
     expect(ITEMS.sword.durability).toBeUndefined(); // permanent
   });
@@ -209,9 +209,9 @@ describe('RECIPES', () => {
     }
   });
 
-  it('brand costs wood+cloth, bow costs rope+wood, sword costs wood+stone', () => {
-    expect(RECIPES.brand.cost).toEqual({ wood: 1, cloth: 1 });
-    expect(RECIPES.brand.output).toEqual({ itemId: 'brand', count: 1 });
+  it('torch costs wood+cloth, bow costs rope+wood, sword costs wood+stone', () => {
+    expect(RECIPES.torch.cost).toEqual({ wood: 1, cloth: 1 });
+    expect(RECIPES.torch.output).toEqual({ itemId: 'torch', count: 1 });
     expect(RECIPES.bow.cost).toEqual({ rope: 2, wood: 2 });
     expect(RECIPES.bow.output).toEqual({ itemId: 'bow', count: 1 });
     expect(RECIPES.sword.cost).toEqual({ wood: 2, stone: 1 });

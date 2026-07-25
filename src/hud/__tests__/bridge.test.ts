@@ -100,10 +100,17 @@ describe('outbound event → store mapping', () => {
     const loadout = {
       mainHand: { id: 'sword', durability: null },
       ranged: null,
-      offHand: { id: 'brand', durability: 80 },
+      offHand: { id: 'torch', durability: 80 },
     };
     bus.emit('equipment:changed', loadout);
     expect(s().equipment).toEqual(loadout);
+
+    // The bag-side durability stash (plan 051): an unequipped torch's remaining charge mirrors in so the
+    // pack can draw its bar. A later empty payload (all stashes cleared/consumed) mirrors straight in too.
+    bus.emit('equipCharge:changed', { torch: 55 });
+    expect(s().equipCharge).toEqual({ torch: 55 });
+    bus.emit('equipCharge:changed', {});
+    expect(s().equipCharge).toEqual({});
 
     bus.emit('time:changed', { phase: 'night', dayCount: 2, cycleMs: 1, tNorm: 0.5 });
     expect(s().dayPhase).toBe('night');
@@ -227,8 +234,8 @@ describe('emit passthrough', () => {
     // equip:toggle carries the tapped item id back to the world (plan 049).
     const equipToggle = vi.fn();
     bus.on('equip:toggle', equipToggle);
-    bridge.emit({ type: 'equip:toggle', payload: { itemId: 'brand' } });
-    expect(equipToggle).toHaveBeenCalledWith({ itemId: 'brand' });
+    bridge.emit({ type: 'equip:toggle', payload: { itemId: 'torch' } });
+    expect(equipToggle).toHaveBeenCalledWith({ itemId: 'torch' });
   });
 });
 

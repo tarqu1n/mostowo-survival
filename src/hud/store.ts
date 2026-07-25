@@ -140,6 +140,10 @@ export interface HudState {
   /** The player's three equip slots (plan 049) — the `Equipment.snapshot()` shape, each slot an
    *  `{ id, durability }` or `null`. Drives the toolbar/pack equip outline + durability bar. */
   equipment: EquipmentState;
+  /** Bag-side durability of unequipped durability items (plan 051), itemId → remaining charge. A torch
+   *  unequipped with charge left sits in the pack keyed here, so the pack can draw its durability bar
+   *  (not a bare "×1"). Mirrors the `equipCharge:changed` payload. */
+  equipCharge: Record<string, number>;
   hotbar: HotbarSlot[];
   following: boolean;
   zoom: number;
@@ -203,6 +207,8 @@ export interface HudActions {
   setInventory(inventory: Record<string, number>): void;
   /** Mirror the player's equip loadout (from `equipment:changed`). */
   setEquipment(equipment: EquipmentState): void;
+  /** Mirror the bag-side durability stash (from `equipCharge:changed`, plan 051). */
+  setEquipCharge(equipCharge: Record<string, number>): void;
   setHotbar(hotbar: HotbarSlot[]): void;
   /** Pin an item/buildable into the loadout — used by the long-press "pin" affordance on catalog/pack
    *  entries (plan 046). Fills the first empty slot, no-op if already pinned or the bar is full. The
@@ -262,6 +268,7 @@ const initialState: HudState = {
   playerStats: null,
   inventory: {},
   equipment: { mainHand: null, ranged: null, offHand: null },
+  equipCharge: {},
   hotbar: new Array<HotbarSlot>(HOTBAR_SLOTS).fill(null),
   following: true,
   zoom: 1,
@@ -308,6 +315,7 @@ export const useHudStore = create<HudState & HudActions>()(
     setPlayerStats: (playerStats) => set({ playerStats }),
     setInventory: (inventory) => set({ inventory }),
     setEquipment: (equipment) => set({ equipment }),
+    setEquipCharge: (equipCharge) => set({ equipCharge }),
     setHotbar: (hotbar) => set({ hotbar }),
     pinToHotbar: (entry) =>
       set((s) => {
