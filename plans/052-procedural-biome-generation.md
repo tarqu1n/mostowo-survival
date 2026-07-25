@@ -48,7 +48,12 @@ forest with a pond+mud patch, edged correctly, re-rollable by seed, applied as o
   edges would bake onto a **layer above** the base and composite over grass/mud. **This is asserted by
   a code comment, not yet verified against the PNG** — Step 2 confirms it or takes the documented
   fallback. **Mud = the existing `dirt` terrain** (opaque, `Floors_Tiles.png`), baked into the base
-  layer.
+  layer. **Mud's own layering direction (Step 2 follow-up finding, confirmed against the hand-authored
+  map):** mud is NOT drawn as its own edge-tiled patch onto a grass base layer — it's the reverse. Mud
+  is a flat, opaque **base** fill everywhere; `grass`'s own alpha-cutout blob tiles are the **overlay**,
+  autotiled against a mask, and a "mud patch" is simply a hole in the grass coverage that lets the mud
+  base show through. Step 7/9's mud band should bake this way (mud base layer, grass overlay layer with
+  a hole), not the naively-symmetric way.
 - **Density model:** two knobs — **per-layer density/spacing** (min-distance for node/foliage layers,
   coverage % for ground detail) + **per-entry weight** (`pickWeighted`).
 - **Scatter:** **Poisson-disk (Bridson)** + a **value/fbm noise density field**, **seeded /
@@ -191,6 +196,31 @@ or the **one** guarding spec — never the full `npm run e2e`/`check:all` mid-wo
     coast (no halo). **Full reusable onboarding pipeline documented in [docs/BIOMES.md](../docs/BIOMES.md)**
     (so a fresh session can onboard the next sheet, e.g. muddy patches). Steps 6/7/10 (TS runtime/editor
     generator) still consume this data. **Original spike outcome + superseded checklist below, for record:**
+  - **Follow-up landed same day, same file:** fixed a residual hard-edge bug in fill VARIANTS (a
+    ripple/swirl decoration reaching a tile border, not just failing the 4-corner check —
+    `is_solid_fill` now samples the border lines too). Along the way, found "looks plain" and "is
+    perfectly self-tileable" are DIFFERENT, uncorrelated tile properties — chasing both by tightening a
+    colour tolerance just swaps which tile wins, it never finds one that's both; the fix is
+    **`fillAuthored`**, a synthesized flat default background (like a whole `authored` depth level, but
+    keeping the level's normal scattered `variants`) — shipped on water's `shallow` level. **Then
+    onboarded `mud` as a `blob` set** (NOT `depth` — it's alpha-cutout patches on grass, same method as
+    `grass`; sheet box `(11,15,0,12)` in `Floors_Tiles.png`, the same region `gen_terrains.py` already
+    calls `"dirt"` for the editor paintbrush). **Key finding for Step 7/9's terrain-patch generator:**
+    the hand-authored map does NOT draw mud's own edge tiles onto a grass base — it's the other way
+    round: **mud is always the flat opaque background** (painted everywhere, no edge art of its own
+    needed), and **grass's own alpha-cutout blob tiles are always the layer on top**, autotiled against
+    a mask; a mud patch is simply a hole in the grass coverage. Getting this backwards (mud cutting into
+    grass) renders without error and looks *plausible* but isn't what the map actually does — check
+    which terrain's tiles carry the real alpha before assuming a direction. Also generalized the blob
+    method's corner/edge variety the same way water's transitions already had it (a case gets a LIST of
+    `[frame,rot]` options, randomly chosen) for both `grass`'s blob edges and water's `coast` — BUT found
+    `build_blob`'s own native classification already groups visually-inconsistent frames under one key
+    (e.g. one copy has a baked-in edge shadow, a "duplicate" doesn't), so variety must stay to **one
+    canonical frame per native key, then rotated** — mixing distinct native frames (even ones the
+    classifier calls equivalent) reintroduces visible inconsistency. Coast corners now pool + rotate
+    across cases that are true rotations of each other too, trading some lighting consistency (tufts
+    can end up sideways on a rotated placement) for far less repetition — an explicit, owner-confirmed
+    call, not an oversight. All of this is captured in `docs/BIOMES.md` gotchas for the next sheet.
   - **SPIKE OUTCOME (recorded 2026-07-25 — steps below to be rewritten around it before ticking):**
     All three unknowns resolved against the actual `Water_tiles.png`: (1) the water fill box isolates
     cleanly (`(0,4,5,13)`, colour-gated); (2) grid width is **`cols=25`** — *same* as Floors, NOT
