@@ -249,7 +249,22 @@ and re-use); held-item rendering is the first sliver of the deferred paper-doll.
   - Done when: equipping the torch shows it in the player's hand, following movement + flipping with
     facing; unequip/burn-out hides it; no leak across a death restart; build + smoke green.
 
-- [ ] **Step 6: Generate the new (bigger) workbench sprite** `[inline]`
+- [x] **Step 6: Generate the new (bigger) workbench sprite** `[inline]`
+  - Outcome: pulled `GEMINI_API_KEY` off guppi over Tailscale (userspace-networking + SOCKS5 + `gssh`,
+    per MOBILE-EDITOR-ACCESS.md; key in-memory only, never committed/echoed). New reproducible pipeline
+    script `scripts/pixel-crawler/gen_workbench_gemini.py` (image-to-image off the CURRENT workbench crop
+    as the orientation/palette anchor, per the static-world-prop playbook → magenta-key → autocrop →
+    LANCZOS to 32px tall → hard alpha → median-cut flatten to ~10 colours → 1px dark outline; `--samples`
+    to generate, `--reprocess`/`--commit RAW` to re-bake free). Generated 3 candidates; owner picked #1
+    (`workbench_0`). Committed derived sprite `public/assets/tilesets/pixel-crawler/_derived/workbench/Workbench.png`
+    (23×32 — baked to 32px tall so `TILE_SIZE*tilesTall` render scale == 1.0, pixel-perfect). Wired
+    `buildables.ts`: `objectSprite.asset` → the new `_derived` path, `region` → full image `{0,0,23,32}`,
+    `tilesTall: 1 → 2` (originY:1 unchanged). PreloadScene auto-loads it (its generic objectSprite loop)
+    and `WorkbenchBehavior` bakes the region — no code change needed. Footprint still ONE logical tile
+    (blocksPath unchanged); only the render grew (the tile-above overlap is the same y-sort convention
+    trees use). Verified: typecheck + `npm run build` green; boot canary PASSED (asset loads clean, no
+    console errors); **workbench.spec.ts 5/5 pass** (mechanics unchanged); in-game screenshot confirms a
+    visibly larger ~2-tile bench beside the player.
   - Pull `GEMINI_API_KEY` off guppi over Tailscale (see `CLAUDE.md` guppi section +
     `docs/MOBILE-EDITOR-ACCESS.md`); keep it in-memory only, never commit/echo it.
   - Follow the **static world-prop playbook** (`docs/AI-SPRITE-PIPELINE.md` § Static world-prop sprites;
