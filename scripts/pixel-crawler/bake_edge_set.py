@@ -388,8 +388,16 @@ def build_depth_set(cfg):
         cand = [f for f in all_solids if level_of(f) == i]
         base = min(cand, key=lambda f: tile_stats(arr, f)[1]) if cand else None
         vs = ([base] if base is not None else []) + [f for f in decor[i] if f != base]
-        levels.append({"name": meta["name"], "walkable": meta["walkable"], "rgb": rgb,
-                       "fill": base, "variants": vs})
+        if meta.get("fillAuthored"):
+            # the DEFAULT background is a pure synthesized flat tile of the level's shade (same idea as
+            # a whole `authored` level, just for the fill only) — its decorative candidates (ripple/ring,
+            # including whatever frame would otherwise have been `fill`) stay in `variants` as occasional
+            # scattered accents instead of being the everyday background.
+            levels.append({"name": meta["name"], "walkable": meta["walkable"], "rgb": rgb,
+                           "fill": None, "fillAuthored": True, "variants": vs})
+        else:
+            levels.append({"name": meta["name"], "walkable": meta["walkable"], "rgb": rgb,
+                           "fill": base, "variants": vs})
     doc = {
         "id": cfg["id"], "name": cfg["name"], "pack": PACK_ID, "sheet": cfg["sheet"], "cols": COLS,
         "method": "depth",
@@ -425,7 +433,7 @@ SETS = [
      ],
      "variant_rows": (0, 2),                                # surface decorations (ripple/swirl) live in rows 0-1
      "level_meta": [
-         {"name": "shallow", "walkable": True},
+         {"name": "shallow", "walkable": True, "fillAuthored": True},
          {"name": "mid", "walkable": False},
          {"name": "deep", "walkable": False, "authored": True},
      ],
@@ -532,8 +540,10 @@ def render_depth_lake(root, grass_doc, depth_doc):
         meta = levels[i]
         if meta.get("authored"):
             return solid[i]
-        pool = meta["variants"] or [meta["fill"]]
-        f = meta["fill"] if rng.random() > gen["scatterRate"] else rng.choice(pool)
+        pool = meta["variants"] or ([meta["fill"]] if meta.get("fill") is not None else [])
+        if rng.random() > gen["scatterRate"] or not pool:
+            return solid[i] if meta.get("fillAuthored") else frame_tile(wim, meta["fill"], rng.randrange(4))
+        f = rng.choice(pool)
         return frame_tile(wim, f, rng.randrange(4))
 
     def lvl(x, y):
@@ -596,8 +606,14 @@ def main():
             s = doc["surfaces"][0]
             print(f"wrote {rel}: blob {s['role']} base={s['base']} {len(s['accents'])}acc {len(s['variants'])}open-rot")
         else:
+            def fill_desc(lv):
+                if lv.get("authored"):
+                    return "authored"
+                if lv.get("fillAuthored"):
+                    return "fillAuthored"
+                return f"fill={lv.get('fill')}"
             lvls = " ".join(
-                f"{lv['name']}({'authored' if lv.get('authored') else 'fill=' + str(lv.get('fill'))},"
+                f"{lv['name']}({fill_desc(lv)},"
                 f"{len(lv['variants'])}var,{'walk' if lv['walkable'] else 'solid'})" for lv in doc["levels"])
             miss = "; ".join(f"{k} miss={v}" for k, v in diag["missing"].items() if v) or "all cases covered"
             print(f"wrote {rel}: depth [{lvls}] | coast {len(doc['coast']['cases'])} cases | transitions {miss}")
