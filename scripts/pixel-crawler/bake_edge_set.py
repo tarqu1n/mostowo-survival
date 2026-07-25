@@ -39,12 +39,29 @@ WATER = "Environment/Tilesets/Water_tiles.png"
 COLS = 25  # both sheets are 25 tiles wide; frame = row*COLS + col
 COLOR_TH = 40   # per-pixel RGB distance counting two edge pixels as "different"
 FRAC_TH = 0.85  # > this fraction of a seam's pixel pairs differing => the two tiles do NOT fit
+EDGE_TH = 12    # max per-pixel RGB dist between two 1px borders for them to be the SAME edge class
+                # (the seam knob: tiles only sit adjacent if their touching edges share a class)
 
 
 # ----- shared pixel helpers -------------------------------------------------
-def frame_tile(im, f):
+def frame_tile(im, f, rot=0):
     c, r = f % COLS, f // COLS
-    return im.crop((c * TILE, r * TILE, (c + 1) * TILE, (r + 1) * TILE))
+    t = im.crop((c * TILE, r * TILE, (c + 1) * TILE, (r + 1) * TILE))
+    return t if rot == 0 else Image.fromarray(np.rot90(np.asarray(t), rot))
+
+
+def frame_arr(arr, f, rot=0):
+    c, r = f % COLS, f // COLS
+    t = arr[r * TILE : (r + 1) * TILE, c * TILE : (c + 1) * TILE]
+    return t if rot == 0 else np.rot90(t, rot)
+
+
+def edge_lines(t):
+    """The 4 one-pixel borders of a tile as RGB int arrays, oriented so a shared seam compares
+    directly: East (top->bottom) meets a right-neighbour's West; South (left->right) meets a
+    bottom-neighbour's North. So A is placeable left-of B iff A.E == B.W, above B iff A.S == B.N."""
+    t = t[:, :, :3].astype(int)
+    return {"N": t[0, :], "S": t[15, :], "W": t[:, 0], "E": t[:, 15]}
 
 
 def is_water_block(px):
@@ -94,6 +111,64 @@ def pick_base_and_accents(arr, frames, accent_tol):
     return base, accents, dropped
 
 
+def edge_contiguity(arr, base, frames, edge_th):
+    """Map every (tile, rotation)'s four borders to EDGE CLASSES so contiguity is 'equal class ==
+    joins seamlessly'. Classes are greedy-clustered by max per-pixel RGB distance <= edge_th, seeded
+    from the base's own border so class 0 is the plain-water 'open' edge. Returns:
+      - variants: [[frame, rot], ...] — the OPEN placements (all 4 borders class 0). Any two are
+        mutually adjacent-safe in any rotation, so scattering these (rotations included) can never
+        make a border shade-step — the fix for the whole-tile-shade seams a 1px test alone misses.
+      - edged:    [[frame, rot, [n,e,s,w]], ...] — placements with a non-open border (a shade/foam
+        edge), carrying their per-side classes for a future edge-MATCHED (Wang) generator.
+      - classes:  total distinct edge classes seen.
+    Rotations use np.rot90(k) so N/E/S/W are recomputed from the rotated tile — no manual permutation.
+    """
+    reps = [edge_lines(frame_arr(arr, base))["N"]]  # class 0 = base's plain border
+
+    def classify(line):
+        for i, rep in enumerate(reps):
+            if np.max(np.sqrt(((line - rep) ** 2).sum(1))) <= edge_th:
+                return i
+        reps.append(line)
+        return len(reps) - 1
+
+    variants, edged = [], []
+    for f in frames:
+        for rot in range(4):
+            e = edge_lines(frame_arr(arr, f, rot))
+            ids = [classify(e[s]) for s in ("N", "E", "S", "W")]
+            if all(i == 0 for i in ids):
+                variants.append([f, rot])
+            else:
+                edged.append([f, rot, ids])
+    return variants, edged, len(reps)
+
+
+def with_edges(arr, surface, edge_th):
+    """Augment a fill surface with its rotation-aware edge-contiguity map (see edge_contiguity).
+
+    edge_th is a FLOOR, auto-relaxed per sheet: water borders are uniform (a tight 12 cleanly
+    separates the blue shade-steps), but grass borders carry blade texture that a tight threshold
+    shatters — so we widen edge_th until the base itself is 'open' (its own four borders collapse to
+    one class) and a healthy open set exists. Records the effective threshold in `_edgeTh`."""
+    frames = [surface["base"]] + surface["accents"]
+    th = edge_th
+    while True:
+        variants, edged, classes = edge_contiguity(arr, surface["base"], frames, th)
+        base_open = any(v[0] == surface["base"] for v in variants)  # base appears in some rotation
+        if (base_open and len(variants) >= max(4, len(frames))) or th >= 60:
+            break
+        th += 6
+    if not variants:  # last-ditch: scatter the base unrotated so downstream never sees an empty pool
+        variants = [[surface["base"], 0]]
+    surface["rotations"] = True
+    surface["variants"] = variants  # open (seam-safe) placements to scatter, [frame, rot]
+    surface["edged"] = edged        # non-open placements + their edge classes, for matched placement
+    surface["_edgeClasses"] = classes
+    surface["_edgeTh"] = th
+    return surface
+
+
 def diff_frac(line_a, line_b):
     d = np.sqrt(((line_a[:, :3].astype(float) - line_b[:, :3]) ** 2).sum(1))
     return float((d > COLOR_TH).mean())
@@ -133,6 +208,7 @@ def build_blob_set(cfg):
     arr = np.asarray(sheet(cfg["sheet"])).astype(float)
     base, accents, dropped = pick_base_and_accents(arr, fills, cfg["accent_tol"])
     surface = {"role": cfg["role"], "walkable": cfg["walkable"], "base": base, "accents": accents}
+    with_edges(arr, surface, cfg["edge_th"])
     doc = {
         "id": cfg["id"], "name": cfg["name"], "pack": PACK_ID, "sheet": cfg["sheet"], "cols": COLS,
         "method": "blob",
@@ -162,17 +238,20 @@ def build_coast_cases(arr, rows, cols):
     return case2frame
 
 
-def water_surface(arr, frames, role, walkable, accent_tol):
+def water_surface(arr, frames, role, walkable, accent_tol, edge_th):
     """Base = flat shade-centroid; accents = same-shade tiles (within accent_tol) that also seam
     cleanly vs the base. The colour gate kills the tile-boundary shade jumps; the seam gate is a
-    belt-and-braces adjacency check (fills tile seamlessly, so it rarely bites)."""
+    belt-and-braces adjacency check (fills tile seamlessly, so it rarely bites). Then the surface is
+    given its rotation-aware edge-contiguity map (with_edges)."""
     base, near, dropped = pick_base_and_accents(arr, frames, accent_tol)
     accents, rejected = [], list(dropped)
     for f in near:
         worst = max(seam_fit(arr, base, f, "E"), seam_fit(arr, f, base, "E"),
                     seam_fit(arr, base, f, "S"), seam_fit(arr, f, base, "S"))
         (accents if worst <= FRAC_TH else rejected).append(f if worst <= FRAC_TH else (f, round(worst, 2)))
-    return {"role": role, "walkable": walkable, "base": base, "accents": accents}, rejected
+    surface = {"role": role, "walkable": walkable, "base": base, "accents": accents}
+    with_edges(arr, surface, edge_th)
+    return surface, rejected
 
 
 def build_water_set(cfg):
@@ -197,8 +276,8 @@ def build_water_set(cfg):
     if mean_light <= mean_dark + 5:
         raise SystemExit(f"water pools not brightness-separated (mean light={mean_light:.0f} "
                          f"dark={mean_dark:.0f}) — re-check light_cols/dark_cols before trusting walkability")
-    shallow, rej_s = water_surface(arr, light, "shallow", True, cfg["accent_tol"])
-    deep, rej_d = water_surface(arr, dark, "deep", False, cfg["accent_tol"])
+    shallow, rej_s = water_surface(arr, light, "shallow", True, cfg["accent_tol"], cfg["edge_th"])
+    deep, rej_d = water_surface(arr, dark, "deep", False, cfg["accent_tol"], cfg["edge_th"])
     doc = {
         "id": cfg["id"], "name": cfg["name"], "pack": PACK_ID, "sheet": cfg["sheet"], "cols": COLS,
         "method": "dualgrid",
@@ -215,10 +294,10 @@ def build_water_set(cfg):
 # coherent shade. Water looser (9): keeps the subtle foam variety while cutting the worst patchwork.
 SETS = [
     {"kind": "blob", "id": "grass", "name": "Grass", "sheet": FLOORS, "box": (0, 4, 0, 12),
-     "role": "ground", "walkable": True, "accent_tol": 8},
+     "role": "ground", "walkable": True, "accent_tol": 8, "edge_th": EDGE_TH},
     {"kind": "dualgrid", "id": "water", "name": "Water", "sheet": WATER,
      "coast_rows": (0, 5), "coast_cols": (0, 25), "fill_rows": (5, 15),
-     "light_cols": (0, 5), "dark_cols": (5, 10), "accent_tol": 9},
+     "light_cols": (0, 5), "dark_cols": (5, 10), "accent_tol": 9, "edge_th": EDGE_TH},
 ]
 
 
@@ -243,11 +322,18 @@ def render_demo(root, sets):
 
     rng = random.Random(5)
     cv = Image.new("RGBA", (W * TILE, H * TILE))
+    def scatter(surf, calm):
+        """Pick a seam-safe open (frame, rot): mostly the base (rotated for variety), occasionally an
+        open accent. Every option shares the plain border class, so no placement makes an edge step."""
+        if rng.random() < calm:
+            return surf["base"], rng.randrange(4)
+        return tuple(rng.choice(surf["variants"]))
+
     ga = grass["surfaces"][0]
     for y in range(H):
         for x in range(W):
-            f = ga["base"] if rng.random() > 0.1 else rng.choice(ga["accents"])
-            cv.alpha_composite(frame_tile(fim, f), (x * TILE, y * TILE))
+            f, rot = scatter(ga, 0.75)
+            cv.alpha_composite(frame_tile(fim, f, rot), (x * TILE, y * TILE))
     shallow = next(s for s in water["surfaces"] if s["role"] == "shallow")
     deep = next(s for s in water["surfaces"] if s["role"] == "deep")
     cases = {int(k): v for k, v in water["coast"]["cases"].items()}
@@ -256,14 +342,15 @@ def render_demo(root, sets):
             corners = (wet(x - 1, y - 1) << 3) | (wet(x, y - 1) << 2) | (wet(x - 1, y) << 1) | wet(x, y)
             if corners == 0:
                 continue
+            rot = 0
             if corners == 15:
                 surf = deep if deep_at(x, y) and deep_at(x - 1, y - 1) else shallow
-                f = surf["base"] if rng.random() > 0.14 else rng.choice(surf["accents"])
+                f, rot = scatter(surf, 0.6)
             else:
                 f = cases.get(corners if corners not in (6, 9) else 15)
                 if f is None:
                     f = shallow["base"]
-            cv.alpha_composite(frame_tile(wim, f), (x * TILE, y * TILE))
+            cv.alpha_composite(frame_tile(wim, f, rot), (x * TILE, y * TILE))
     out = os.path.join(root, "scripts", "pixel-crawler", "bake_edge_set_demo.png")
     cv.resize((W * TILE * 5, H * TILE * 5), Image.NEAREST).save(out)
     return out
@@ -288,7 +375,8 @@ def main():
             json.dump(doc, fh, indent=2)
             fh.write("\n")
         built.append(doc)
-        surf = " ".join(f"{s['role']}(base={s['base']},{len(s['accents'])}acc," +
+        surf = " ".join(f"{s['role']}(base={s['base']},{len(s['accents'])}acc,"
+                        f"{len(s['variants'])}open-rot,{s['_edgeClasses']}cls@th{s['_edgeTh']},"
                         f"{'walk' if s['walkable'] else 'solid'})" for s in doc["surfaces"])
         extra = ""
         if doc["method"] == "dualgrid":
