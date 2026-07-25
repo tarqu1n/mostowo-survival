@@ -1,4 +1,5 @@
 import type { PointerEvent as ReactPointerEvent } from 'react';
+import { Shield } from 'lucide-react';
 import { useHudStore } from '../store';
 import { hudBridge } from '../hooks/useBridge';
 import type { InboundEvent } from '../bridge';
@@ -36,6 +37,8 @@ interface CommandBarProps {
   onPack?: () => void;
   /** Open the status/wellbeing drawer (Step 7). */
   onStatus?: () => void;
+  /** Open the equipment paper-doll panel (plan 051 Step 4). */
+  onEquip?: () => void;
   /** Passed through to the fight-mode {@link Movepad}: reports its held-state up (Step 10 wiring). */
   onMoveHeldChange?: (held: boolean) => void;
   className?: string;
@@ -67,6 +70,7 @@ export function CommandBar({
   onBuild,
   onPack,
   onStatus,
+  onEquip,
   onMoveHeldChange,
   className,
 }: CommandBarProps) {
@@ -142,6 +146,17 @@ export function CommandBar({
           </Button>
           <Button variant="secondary" className="h-10 flex-1" onClick={onStatus}>
             Status
+          </Button>
+          {/* Equipment paper-doll (plan 051) — icon-only so the 4th control stays compact on a narrow
+              rail without squeezing the three text buttons. */}
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-10 w-10 shrink-0"
+            aria-label="Gear"
+            onClick={onEquip}
+          >
+            <Shield />
           </Button>
         </div>
       )}

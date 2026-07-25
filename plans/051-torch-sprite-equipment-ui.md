@@ -176,7 +176,20 @@ and re-use); held-item rendering is the first sliver of the deferred paper-doll.
   - Done when: long-pressing a pack/hotbar item pins it (app gesture) with NO browser image menu;
     `npm run smoke` green.
 
-- [ ] **Step 4: Diablo-style equipment panel (paper-doll, 3 live slots)** `[inline]`
+- [x] **Step 4: Diablo-style equipment panel (paper-doll, 3 live slots)** `[inline]`
+  - Outcome: new `src/hud/components/EquipPanel.tsx` — a bottom `Sheet` (mirrors `PackDrawer`) holding an
+    inline-SVG humanoid silhouette with three absolutely-positioned slot boxes (`ranged` top-centre/back,
+    `mainHand` right hand, `offHand` left hand). Each `SlotBox` reads `store.equipment[slot]`, shows the
+    worn icon + a gold durability bar (via `equipViewOf`) or a dimmed dashed glyph/label when empty; a
+    filled box taps to emit `equip:toggle` (unequip → torch returns to pack per Step 2), an empty box is
+    inert. No new bridge event/store field — reads the already-mirrored `equipment`. Wired via a compact
+    icon-only **Gear** (`Shield`) button appended to `CommandBar`'s scavenge rail (`onEquip` prop, kept
+    icon-only so the 3 text buttons don't overflow) + a new `'equip'` member of `GameHud`'s `OpenDrawer`
+    union rendering `<EquipPanel>` (mirrors Pack/Status). Icons carry the Step-3 no-callout guard.
+    Typecheck + `npm run build` green; smoke canary PASSED; visually verified the empty paper-doll via a
+    Playwright screenshot (silhouette + 3 placed slots read clearly). Filled state (icon+ring+bar) reuses
+    proven pack markup; its equip/unequip round-trip gets an e2e in Step 7. NB: `window.game.__test` isn't
+    exposed in the prod preview build, so the screenshot showed the empty panel only.
   - New `src/hud/components/EquipPanel.tsx`: a `Sheet` (bottom drawer, mirror `PackDrawer`) OR a
     centred panel, containing a **body silhouette** with three slot boxes positioned over the body —
     `mainHand` (right hand), `offHand` (left hand), `ranged` (across the back/shoulder). Each box:
