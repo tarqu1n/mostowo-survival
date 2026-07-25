@@ -45,3 +45,4 @@ __pycache__/
 # throwaway local screenshot scripts
 _shot.mjs
 scripts/pixel-crawler/biome_lake_poc.png
+scripts/pixel-crawler/bake_edge_set_demo.png
