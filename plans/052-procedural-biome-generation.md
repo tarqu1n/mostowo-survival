@@ -145,7 +145,21 @@ or the **one** guarding spec — never the full `npm run e2e`/`check:all` mid-wo
 
 ## Steps
 
-- [ ] **Step 1: Prove the tiling — generalise `gen_terrains.py` (per-sheet COLS), onboard `dirt`** `[inline]`
+- [x] **Step 1: Prove the tiling — generalise `gen_terrains.py` (per-sheet COLS), onboard `dirt`** `[inline]`
+  - Outcome: `gen_terrains.py` refactored to a `TERRAINS` config list `(id,name,sheet,box,cols)` with a
+    per-sheet `cols` field threaded into `canonical_mapping(table,cols)` (`frame=r*cols+c`); a
+    `build_terrain()` helper emits one `TerrainDef` + one `<id>-terrain-parity.json` per terrain. Dirt
+    onboarded (box `(11,15,0,12)`, `cols=25`, `fillFrame=11`, 10 mapping keys). Grass block is
+    **byte-identical** to before the refactor (verified). Added hand-committed
+    `fixtures/grass-terrain-def.snapshot.json` (NOT script-emitted) + a grass-invariance test asserting
+    `terrains.json`'s grass entry deep-equals it. Parity test parameterised via `it.each` over
+    `[grass,dirt]`. `npm test terrainOps` → 7 passed (2 parity + grass-invariance + 4 existing).
+    Files touched: `scripts/pixel-crawler/gen_terrains.py`, `public/assets/.../terrains.json`
+    (regenerated, +dirt), `src/editor/__tests__/fixtures/dirt-terrain-parity.json` (new),
+    `src/editor/__tests__/fixtures/grass-terrain-def.snapshot.json` (new),
+    `src/editor/__tests__/terrainOps.test.ts`. Editor Library auto-lists dirt (catalog maps `terrains[]`
+    generically). Dirt fixture bakes 13/13 cells with 9 distinct frames = coherent edges/corners resolve
+    (headless-equivalent of the "arm Dirt in editor" visual check).
   - Refactor `scripts/pixel-crawler/gen_terrains.py` to loop over a **list** of terrain configs
     `(id, name, sheet, box, cols)` — note the new **`cols`** field, so `frame = row*cols + col` is
     correct per sheet (Finding #1) — instead of the single hardcoded `GRASS_BOX`/`SHEET`/`COLS`.
@@ -167,7 +181,39 @@ or the **one** guarding spec — never the full `npm run e2e`/`check:all` mid-wo
   - Done when: `npm test terrainOps` passes for grass **and** dirt; the grass-invariance check confirms
     grass is byte-identical; arming **Dirt** in the editor paints coherent edges + inner/outer corners.
 
-- [ ] **Step 2: Water-terrain SPIKE — verify overlay assumptions, onboard or fall back** `[inline]`
+- [x] **Step 2: Water tile edge set — depth dual-grid tiler + reusable baker/pipeline (LANDED)** `[inline]`
+  - **LANDED 2026-07-25.** Went far beyond the original spike: the water sheet is a **depth ramp**
+    (shallow/mid/deep opaque shade levels) joined by **corner dual-grid transition autotiles** + a coast
+    autotile + surface-decoration fill variants. Baked by `scripts/pixel-crawler/bake_edge_set.py`
+    (`method: "depth"`) → `edge-sets/water.json`, with a distance+noise depth-field generator (repaired
+    to be always-tileable: king-Lipschitz erode + saddle-break) as the demo/guard (`invalid tiles = 0`).
+    Corner/edge variety (all `[frame,rot]` options per case), authored solid deep, grass shade matched to
+    coast (no halo). **Full reusable onboarding pipeline documented in [docs/BIOMES.md](../docs/BIOMES.md)**
+    (so a fresh session can onboard the next sheet, e.g. muddy patches). Steps 6/7/10 (TS runtime/editor
+    generator) still consume this data. **Original spike outcome + superseded checklist below, for record:**
+  - **SPIKE OUTCOME (recorded 2026-07-25 — steps below to be rewritten around it before ticking):**
+    All three unknowns resolved against the actual `Water_tiles.png`: (1) the water fill box isolates
+    cleanly (`(0,4,5,13)`, colour-gated); (2) grid width is **`cols=25`** — *same* as Floors, NOT
+    "≠25" as the plan assumed; (3) **land-side transparency FAILS** — the sheet is opaque water fills +
+    land-islands-on-opaque-water, and `water_diagonal.png` is a tiny all-opaque coast strip, so **no
+    water blob with transparent land-facing edges exists**. The **overlay-pond model is dead**, and so
+    is the opaque flat-fill fallback (hard blocky edges — owner rejected on sight).
+  - **New direction (owner-directed, replaces the blob approach for water):** a **dual-grid /
+    marching-squares** coast tiler, **not** the alpha blob autotiler (which can't key on opaque
+    colour-transition tiles). Each display tile sits over a world-grid *vertex* and is chosen by its 4
+    **corners** (water/land) sampled from the mask → 16 cases; the case→tile map is auto-derived by
+    classifying each island tile's 4 corner blocks. Seam correctness validated by a **pixel-adjacency
+    (Wang) test** — two tiles fit iff their touching pixel lines mostly agree (`>0.85` different ⇒ no
+    fit); known-good seams ~0–0.31, mismatches 1.0. **Adjacency arrays + case map are precomputed
+    offline and committed as JSON** (like `terrains.json`); the editor does O(1) lookups, never touches
+    pixels at runtime. Grass/dirt stay on the existing blob autotiler. Fills (grass, water interior)
+    are all mutually edge-compatible, so the natural look comes from a **clean base tile + sparse
+    noise-driven accents**, not adjacency. Proven end-to-end (organic lake, real grass base, correct
+    internal/external corners) in **`scripts/pixel-crawler/biome_lake_poc.py`** (run it → demo PNG).
+  - **Scope note:** this adopts a *second* autotile engine (dual-grid), which the plan's Out-of-scope
+    listed as v2. Owner-approved as the v1 water tiler. Steps 1/6/7/10 + Out-of-scope + DECISIONS to be
+    updated when this step is formally rewritten; keeping the spike prototype committed as the checkpoint.
+  - **Original spike checklist (below) — superseded by the outcome above:**
   - **This is a de-risking spike, not routine execution (Finding #1).** Before any generator/editor
     work depends on the overlay-pond model, knock down three unknowns for `Water_tiles.png`:
     1. **Box isolation** — find the water blob's bounding box via `scripts/pixel-crawler/gridoverlay.py`
