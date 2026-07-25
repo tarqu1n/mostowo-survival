@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { ITEMS } from '@/data/items';
 import { useHudStore } from '@/hud/store';
 import { hudBridge } from '@/hud/hooks/useBridge';
-import { cn } from '@/hud/lib/utils';
+import { cn, noImageCallout, preventImageCallout } from '@/hud/lib/utils';
 import { iconUrl } from '@/hud/lib/icons';
 import { equipViewOf, isEquippable, type EquipView } from '@/hud/lib/equip';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/hud/ui/sheet';
@@ -97,16 +97,20 @@ function PackSlot({
       aria-pressed={equippable ? equip.equipped : selected}
       className={cn(
         'relative flex aspect-square flex-col items-center justify-center gap-1 rounded-md border border-border bg-secondary p-1 text-center transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+        noImageCallout, // long-press pins (app gesture) — no native "Save image" sheet (plan 051)
         selected && 'ring-2 ring-ring',
         equip.equipped && 'ring-2 ring-gold', // equipped (plan 049) → yellow outline (wins over select)
       )}
+      onContextMenu={preventImageCallout}
       {...press}
     >
       {def?.icon ? (
         <img
           src={iconUrl(def.icon)}
           alt=""
-          className="size-12 [image-rendering:pixelated]"
+          className={cn('size-12 [image-rendering:pixelated]', noImageCallout)}
+          draggable={false}
+          onContextMenu={preventImageCallout}
           aria-hidden
         />
       ) : (

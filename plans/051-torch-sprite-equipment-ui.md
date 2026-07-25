@@ -150,7 +150,16 @@ and re-use); held-item rendering is the first sliver of the deferred paper-doll.
     re-equip resumes at that charge (bar not full); a bag-already-full unequip is denied (item stays
     worn, nothing lost); drain-to-0 still destroys with no bag return. Build + tests green.
 
-- [ ] **Step 3: Suppress the native image context-menu / drag on HUD item slots** `[delegate]`
+- [x] **Step 3: Suppress the native image context-menu / drag on HUD item slots** `[inline]`
+  - Outcome: added a shared `noImageCallout` class (`select-none [-webkit-touch-callout:none]`) + a
+    `preventImageCallout` onContextMenu guard to `src/hud/lib/utils.ts`. Applied to every long-pressable
+    item-art site: `PackDrawer` PackSlot (the reported bug — now `draggable={false}` + guard on both the
+    `<img>` and its `<button>`), `Hotbar` SlotContent img + its slot button, and the shared `BuildableIcon`
+    (covers BuildCatalog/CommandBar/Hotbar buildable art). `ResourceChips` (lucide SVG, no `<img>`) and
+    `CraftMenu` (no icon art) correctly needed nothing. Only the browser default is stopped — the app's
+    `useLongPress` pin still fires; no global `contextmenu` blocker (would break the editor). Done inline
+    rather than delegated (plan tag was `[delegate]`) — tiny mechanical edit. Typecheck green; `npm run smoke`
+    (against the prod preview, pinned chromium) BOOT CANARY PASSED.
   - `PackDrawer.tsx` `PackSlot`: add `draggable={false}` to the `<img>` (mirror `Hotbar`'s
     `SlotContent`), and add `onContextMenu={(e) => e.preventDefault()}` + the CSS
     `[-webkit-touch-callout:none] select-none` to the slot `<button>` (and the img) so a long-press

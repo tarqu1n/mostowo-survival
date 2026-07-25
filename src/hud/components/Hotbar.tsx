@@ -5,7 +5,7 @@ import { hudBridge } from '../hooks/useBridge';
 import { HUD_HOTBAR_SLOTS, LONGPRESS_MS } from '@/config';
 import { ITEMS } from '@/data/items';
 import { BUILDABLES } from '@/data/buildables';
-import { cn } from '@/hud/lib/utils';
+import { cn, noImageCallout, preventImageCallout } from '@/hud/lib/utils';
 import { iconUrl } from '@/hud/lib/icons';
 import { equipViewOf, isEquippable } from '@/hud/lib/equip';
 import { BuildableIcon } from './BuildableIcon';
@@ -147,8 +147,10 @@ function SlotButton({ slot }: { slot: HotbarSlot }) {
       onPointerUp={onPointerUp}
       onPointerLeave={clearTimer}
       onPointerCancel={clearTimer}
+      onContextMenu={preventImageCallout} // long-press pins (app gesture) — no native "Save image" (plan 051)
       className={cn(
         'relative grid size-11 place-items-center overflow-hidden rounded-lg border border-border bg-surface-subtle/95',
+        noImageCallout,
         !slot && 'opacity-40',
         depleted && 'opacity-50', // out of stock — dim but keep it pinned (refills on next forage)
         equip?.equipped && 'ring-2 ring-gold', // equipped in a slot (plan 049) → yellow outline
@@ -207,8 +209,9 @@ function SlotContent({ slot }: { slot: NonNullable<HotbarSlot> }) {
         <img
           src={iconUrl(def.icon)}
           alt={def.name}
-          className="size-9 [image-rendering:pixelated]"
+          className={cn('size-9 [image-rendering:pixelated]', noImageCallout)}
           draggable={false}
+          onContextMenu={preventImageCallout}
         />
       );
     }

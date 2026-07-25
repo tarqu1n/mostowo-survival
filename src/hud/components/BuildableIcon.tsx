@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { BuildableDef } from '@/data/types';
-import { cn } from '@/hud/lib/utils';
+import { cn, noImageCallout, preventImageCallout } from '@/hud/lib/utils';
 import { iconUrl } from '@/hud/lib/icons';
 
 /**
@@ -35,7 +35,8 @@ export function BuildableIcon({
         alt=""
         aria-hidden
         draggable={false}
-        className={cn(className, '[image-rendering:pixelated]')}
+        onContextMenu={preventImageCallout}
+        className={cn(className, '[image-rendering:pixelated]', noImageCallout)}
       />
     );
   }
