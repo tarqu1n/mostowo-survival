@@ -337,7 +337,48 @@ or the **one** guarding spec — never the full `npm run e2e`/`check:all` mid-wo
   - Docs: none.
   - Done when: `npm test poisson` passes.
 
-- [ ] **Step 6: `BiomeDef` schema, catalog (public/assets) + Forest preset** `[inline]`
+- [x] **Step 6: `BiomeDef` schema, catalog (public/assets) + Forest preset** `[inline]`
+  - Outcome: **Schema reworked around Step 2's actual landed outcome, not the pre-Step-2 proposal**
+    (executors are explicitly authorized to refine field names here). Step 2 replaced the
+    "TerrainDef overlay on a higher layer" model entirely with per-edge-set methods (`depth` for
+    water — its own embedded lake generator + dual-grid coast/transition tiling; `blob` for
+    grass/mud — plain alpha-cutout autotile, with mud's hard-won finding that it paints as a hole in
+    the *overlying* grass coverage, not the reverse). So `BiomeTerrainBand` dropped the dead
+    `layer: 'base'|'overlay'` field and `bands[].terrainId`/`base` now name a **tile-edge-set id**
+    (`edge-sets/<id>.json`, `docs/BIOMES.md`) — NOT a `terrains.json` `TerrainDef` id — since the
+    layering mechanics per method are Step 7 (the generator)'s job, not the schema's. `src/systems/
+    biomeDefs.ts` (new): `BiomeDef{id,name,seed?,terrain,scatter}`, `BiomeTerrain{base,field:{scale,
+    octaves},bands:BiomeTerrainBand[]}` (bands sorted strictly ascending by `maxHeight∈(0,1]`),
+    `BiomeScatterLayer{id,kind:'decor'|'node',spacing,density,members,avoidTerrains?,clump?}`,
+    `parseBiomeDefs(raw, ctx?)` mirrors `parseNodeDefs`'s strict `fail`/`expect*`/no-extra-keys style.
+    Cross-validation is layered by what a PURE module can actually check: `kind:'node'` member `ref`s
+    (+ optional `skin`) validate against the bundled/compile-time `NODES` import directly (like
+    `nodeDefs.ts` checks `ITEMS`); `kind:'decor'` refs and `terrain.base`/`bands[].edgeSetId` validate
+    against an **optional** injected `BiomeValidationContext{decorAssetIds?,edgeSetIds?}` — omitting
+    it (unit tests) just skips that check rather than failing closed. `src/editor/
+    biomeCatalogSource.ts` (new) mirrors `terrainCatalogSource.ts`: fetches `biomes.json` cache-busted,
+    passes the already-loaded asset catalog's ids as `decorAssetIds` (best-effort — `undefined` if the
+    Library hasn't fetched it yet). It does **not** install into the Zustand store (no `biomeSlice`
+    exists yet — that's Step 10) and doesn't thread `edgeSetIds` (no typed edge-set-catalog loader
+    exists yet either — naturally Step 7's job, the first consumer that actually loads `edge-sets/
+    *.json`); `terrain.base`/`bands[].edgeSetId` get shape validation only until then. `public/assets/
+    tilesets/pixel-crawler/biomes.json` (new): the Forest preset — `base:'grass'`, `bands:[
+    {water,0.22},{mud,0.38}]`; **4** scatter layers (the plan's 3-category description doesn't map
+    1:1 onto the schema's one-`clump`-per-layer constraint, so `berries` split out from `nodes`):
+    `groundDetail` (decor: 10 real, already-in-the-hand-authored-map `craftpix-nature/Bushes/
+    Fern*`/`Bush_simple*` assets, spacing 1, density 0.7), `foliage` (node: `tree` with 5 different
+    `ff_*` forest-floor skins — small/dense sapling dressing, spacing 2, density 0.5), `nodes` (node:
+    `tree`(no skin override, rolls its own default skins) + `rock`, big spacing 5, density 0.35),
+    `berries` (node: `berryBush`/`berryBushMed`/`berryBushBig`, spacing 8, density 0.15, `clump`).
+    All four avoid `water`. `src/systems/__tests__/biomeDefs.test.ts` (new, 16 tests): valid-parse,
+    every strict-rejection path (bad version/unknown key/duplicate id/band ordering/height bounds/
+    weight/unknown node ref/unknown skin/skin-on-decor), both injected-context checks, and a real
+    integration test statically importing the committed `biomes.json` and parsing it end-to-end.
+    `npm test biomeDefs` → 16/16 pass; `tsc --noEmit` + eslint clean; manually confirmed `biomes.json`
+    is servable at `/assets/tilesets/pixel-crawler/biomes.json` via a throwaway dev-server curl (no UI
+    yet to click through — Step 11 adds that). Files touched: `src/systems/biomeDefs.ts` (new),
+    `src/systems/__tests__/biomeDefs.test.ts` (new), `src/editor/biomeCatalogSource.ts` (new),
+    `public/assets/tilesets/pixel-crawler/biomes.json` (new).
   - Put the **type + strict validator** in `src/systems/biomeDefs.ts` (pure, mirroring
     `src/systems/nodeDefs.ts` `parseNodeDefs` — fail loudly on bad refs/shape; keeps the pure generator
     free of editor imports). Put the **catalog JSON in `public/assets/tilesets/pixel-crawler/

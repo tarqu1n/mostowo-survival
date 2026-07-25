@@ -1,0 +1,78 @@
+{
+  "_comment": "Biome catalog for the Map Builder's biome-paint tool (plan 052 step 6). Editor-only, fetched — not bundled into the game (see src/editor/biomeCatalogSource.ts). Shape + validation: src/systems/biomeDefs.ts. `terrain.base`/`bands[].edgeSetId` name a tile-edge-set id (edge-sets/<id>.json, docs/BIOMES.md), NOT a terrains.json TerrainDef id.",
+  "version": 1,
+  "biomes": [
+    {
+      "id": "forest",
+      "name": "Forest",
+      "seed": 1,
+      "terrain": {
+        "base": "grass",
+        "field": { "scale": 0.06, "octaves": 3 },
+        "bands": [
+          { "edgeSetId": "water", "maxHeight": 0.22 },
+          { "edgeSetId": "mud", "maxHeight": 0.38 }
+        ]
+      },
+      "scatter": [
+        {
+          "id": "groundDetail",
+          "kind": "decor",
+          "spacing": 1,
+          "density": 0.7,
+          "avoidTerrains": ["water"],
+          "members": [
+            { "ref": "craftpix-nature/Bushes/Fern1_1.png", "weight": 1 },
+            { "ref": "craftpix-nature/Bushes/Fern1_2.png", "weight": 1 },
+            { "ref": "craftpix-nature/Bushes/Fern1_3.png", "weight": 1 },
+            { "ref": "craftpix-nature/Bushes/Fern2_1.png", "weight": 1 },
+            { "ref": "craftpix-nature/Bushes/Fern2_2.png", "weight": 1 },
+            { "ref": "craftpix-nature/Bushes/Fern2_3.png", "weight": 1 },
+            { "ref": "craftpix-nature/Bushes/Bush_simple1_1.png", "weight": 1 },
+            { "ref": "craftpix-nature/Bushes/Bush_simple1_2.png", "weight": 1 },
+            { "ref": "craftpix-nature/Bushes/Bush_simple2_1.png", "weight": 1 },
+            { "ref": "craftpix-nature/Bushes/Bush_simple2_2.png", "weight": 1 }
+          ]
+        },
+        {
+          "id": "foliage",
+          "kind": "node",
+          "spacing": 2,
+          "density": 0.5,
+          "avoidTerrains": ["water"],
+          "members": [
+            { "ref": "tree", "weight": 1, "skin": "ff_green_1" },
+            { "ref": "tree", "weight": 1, "skin": "ff_olive_1" },
+            { "ref": "tree", "weight": 1, "skin": "ff_fern_1" },
+            { "ref": "tree", "weight": 1, "skin": "ff_moss_1" },
+            { "ref": "tree", "weight": 1, "skin": "ff_pine_1" }
+          ]
+        },
+        {
+          "id": "nodes",
+          "kind": "node",
+          "spacing": 5,
+          "density": 0.35,
+          "avoidTerrains": ["water"],
+          "members": [
+            { "ref": "tree", "weight": 4 },
+            { "ref": "rock", "weight": 1 }
+          ]
+        },
+        {
+          "id": "berries",
+          "kind": "node",
+          "spacing": 8,
+          "density": 0.15,
+          "avoidTerrains": ["water"],
+          "clump": { "chance": 0.5, "radius": 2, "count": [1, 3] },
+          "members": [
+            { "ref": "berryBush", "weight": 3 },
+            { "ref": "berryBushMed", "weight": 2 },
+            { "ref": "berryBushBig", "weight": 1 }
+          ]
+        }
+      ]
+    }
+  ]
+}
