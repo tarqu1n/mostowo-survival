@@ -105,6 +105,13 @@ describe('outbound event → store mapping', () => {
     bus.emit('equipment:changed', loadout);
     expect(s().equipment).toEqual(loadout);
 
+    // The bag-side durability stash (plan 051): an unequipped torch's remaining charge mirrors in so the
+    // pack can draw its bar. A later empty payload (all stashes cleared/consumed) mirrors straight in too.
+    bus.emit('equipCharge:changed', { torch: 55 });
+    expect(s().equipCharge).toEqual({ torch: 55 });
+    bus.emit('equipCharge:changed', {});
+    expect(s().equipCharge).toEqual({});
+
     bus.emit('time:changed', { phase: 'night', dayCount: 2, cycleMs: 1, tNorm: 0.5 });
     expect(s().dayPhase).toBe('night');
     expect(s().dayCount).toBe(2);

@@ -102,7 +102,25 @@ and re-use); held-item rendering is the first sliver of the deferred paper-doll.
   - Done when: `grep -ri "\bbrand\b" src scripts tests` returns only plan-049 history; `npm run build`
     - `npm test` green; the item shows as "Torch" with `torch.png`.
 
-- [ ] **Step 2: Unequip returns the torch to the pack (partial durability persists)** `[inline]`
+- [x] **Step 2: Unequip returns the torch to the pack (partial durability persists)** `[inline]`
+  - Outcome: `GameScene` gains an `equipCharge: Record<string,number>` stash (reset each (re)start beside
+    the `Equipment` rebuild). `toggleEquip` is now add-first/commit-after: unequip does `inv.add(id,1)` and
+    **denies (leaves worn, writes nothing) if it returns <1** (bag full) — same guard refuses an incoming
+    equip whose displaced item can't be re-stashed; on success it `unequip`s and stashes the slot's
+    pre-unequip durability. Equip seeds the slot from `equipCharge[id] ?? def.durability` then clears the
+    stash; guarded to `def.durability != null` so permanents are untouched. `tickTorch` deletes the stash on
+    `'destroyed'` (burnt-out torch leaves nothing, no bag return). `emitEquipment` now also emits
+    `equipCharge:changed` (a copy). HUD: `store.ts` gains `equipCharge` + `setEquipCharge`; `bridge.ts`
+    mirrors `equipCharge:changed`; `PackDrawer` draws the gold durability bar for a **bagged** partial torch
+    via a new `baggedFrac` (frac = `equipCharge[id]/ITEMS[id].durability`, suppressed while equipped).
+    Verified `Inventory.add` returns the amount placed (so `<1` ⇒ full bag). Tests: `bridge.test.ts` gains an
+    `equipCharge:changed` round-trip (set + clear); the bag-full primitive the guard checks is already
+    covered by `Inventory.test.ts:153` (add returns 0 / leftover on a full bag). NB: `toggleEquip`'s guard
+    isn't unit-tested in isolation — `GameScene` is a Phaser scene with no unit-instantiation seam; the
+    end-to-end unequip-returns-to-pack + deny path is exercised by `equip.spec.ts` (updated in Step 7).
+    `npm run build` green; full vitest suite green (1010 passed).
+    NB2: recovered from a mid-step sub-agent hang — the agent completed the `GameScene`+`store` logic; the
+    bridge listener, PackDrawer bar, and the test were finished inline.
   - `GameScene`: add a scene field `equipCharge: Record<string, number>` (itemId → remaining
     durability), reset in `resetWorld`/on (re)start. In `toggleEquip`:
     - **Unequip a durability item — BAG-FULL GUARD (finding #1):** `Inventory.add` caps at `maxStack`

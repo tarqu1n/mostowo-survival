@@ -62,14 +62,20 @@ function PackSlot({
   count,
   selected,
   equip,
+  baggedFrac,
   onSelect,
 }: {
   id: string;
   count: number;
   selected: boolean;
   equip: EquipView;
+  /** For a partially-drained durability item sitting in the pack (unequipped, plan 051), its remaining
+   *  charge as a 0..1 fraction; `null` when equipped (the `equip` bar shows instead) or not applicable. */
+  baggedFrac: number | null;
   onSelect: (id: string) => void;
 }): React.JSX.Element {
+  // A worn item draws its live slot bar; an unequipped-but-partially-drained torch draws its stash bar.
+  const durabilityFrac = equip.durabilityFrac ?? baggedFrac;
   const def = ITEMS[id];
   const edible = isEdible(id);
   const equippable = isEquippable(id);
@@ -117,8 +123,9 @@ function PackSlot({
       <span className="absolute right-1 bottom-0.5 text-[10px] text-muted-foreground">
         {equip.equipped ? 'equipped' : `×${count}`}
       </span>
-      {/* Durability bar for an equipped consumable (the torch, plan 049) — shrinks as it drains (Step 6). */}
-      {equip.durabilityFrac !== null && (
+      {/* Durability bar for a consumable — worn (plan 049, shrinks as it drains) or a partially-drained
+          torch sitting in the pack (plan 051, its stashed charge). */}
+      {durabilityFrac !== null && (
         <span
           data-testid="hud-pack-durability"
           className="pointer-events-none absolute inset-x-1 bottom-1 h-1 overflow-hidden rounded-full bg-black/50"
@@ -126,7 +133,7 @@ function PackSlot({
           <span
             className="block h-full rounded-full"
             style={{
-              width: `${equip.durabilityFrac * 100}%`,
+              width: `${durabilityFrac * 100}%`,
               backgroundColor: 'var(--color-gold)',
             }}
           />
@@ -139,7 +146,17 @@ function PackSlot({
 export function PackDrawer({ open, onOpenChange }: PackDrawerProps): React.JSX.Element {
   const inventory = useHudStore((s) => s.inventory);
   const equipment = useHudStore((s) => s.equipment);
+  const equipCharge = useHudStore((s) => s.equipCharge);
   const [selected, setSelected] = useState<string | null>(null);
+
+  // A bagged, partially-drained torch (plan 051): its stashed charge as a 0..1 fraction, or null when the
+  // item is equipped (its live bar shows instead) / has no stash / lacks a starting durability.
+  const baggedFracOf = (id: string): number | null => {
+    const charge = equipCharge[id];
+    const max = ITEMS[id]?.durability;
+    if (charge == null || max == null || equipViewOf(equipment, id).equipped) return null;
+    return Math.max(0, Math.min(1, charge / max));
+  };
 
   // The store's inventory is an aggregate {id: count} snapshot; render one slot per stocked item, PLUS
   // any currently-equipped item (equipping spends it out of the bag, so it'd otherwise vanish from the
@@ -173,6 +190,7 @@ export function PackDrawer({ open, onOpenChange }: PackDrawerProps): React.JSX.E
                   count={count}
                   selected={selected === id}
                   equip={equipViewOf(equipment, id)}
+                  baggedFrac={baggedFracOf(id)}
                   onSelect={setSelected}
                 />
               ))}

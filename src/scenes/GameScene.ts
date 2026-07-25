@@ -172,6 +172,12 @@ export class GameScene extends Phaser.Scene {
   // Step 6) — so the HUD durability bar animates at ~TORCH_DRAIN_EMIT_MS cadence, not every frame.
   private torchEmitAccumMs = 0;
 
+  // Bag-side durability stash for unequipped durability items (plan 051): itemId → the charge it had
+  // when returned to the pack. Unequipping a torch preserves its remaining durability here (not on the
+  // pure Inventory/Slot, which stays count-only), and re-equipping resumes from it. Only drain-to-0
+  // destroys the torch (and clears its stash). Reset fresh each (re)start in buildWorld().
+  private equipCharge: Record<string, number> = {};
+
   private readonly queue = new TaskQueue();
   private actionGoal: Cell | null = null; // the tile we're currently pathing to (for re-pathing)
   private chopElapsed = 0;
@@ -418,6 +424,8 @@ export class GameScene extends Phaser.Scene {
     // each (re)start, so the old instance + this listener are dropped on restart (mirrors baseSupply).
     this.equipment = new Equipment();
     this.equipment.on('change', () => this.syncMeleeFromEquipment());
+    // Fresh bag-side durability stash each (re)start (plan 051) — a death-restart carries no held charge.
+    this.equipCharge = {};
 
     // Shared base-supply pool (plan 042 Step 3) — fresh each (re)start (so a death-restart starts
     // empty). Bridge its 'change' to a `supply:changed` game event so the HUD reflects
@@ -2022,9 +2030,12 @@ export class GameScene extends Phaser.Scene {
 
   /** Emit the current equip loadout to the HUD (plan 049). The single forward point for
    *  `equipment:changed`, called after {@link toggleEquip} and on (re)start; Step 6's drain loop also
-   *  calls it (throttled) so the durability bar animates without a per-frame flood. */
+   *  calls it (throttled) so the durability bar animates without a per-frame flood. Also forwards the
+   *  bag-side `equipCharge` stash (plan 051) so a partially-drained torch sitting in the pack shows its
+   *  remaining charge, not a bare "×1"; a copy is sent so the HUD never holds the live map. */
   private emitEquipment(): void {
     this.game.events.emit('equipment:changed', this.equipment.snapshot());
+    this.game.events.emit('equipCharge:changed', { ...this.equipCharge });
   }
 
   /** Re-derive the player's active melee weapon from the main-hand slot (plan 049): the equipped item
@@ -2050,6 +2061,8 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (this.equipment.drain('offHand', TORCH_DRAIN_PER_SEC * (delta / 1000)) === 'destroyed') {
+      // A burnt-out torch leaves no bag-side stash and is not returned to the pack (plan 051).
+      delete this.equipCharge[off.id];
       this.torchEmitAccumMs = 0;
       this.emitEquipment();
       return;
@@ -2062,35 +2075,53 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Toggle-equip an item from the toolbar/pack (plan 049): tapping an equippable item equips it into
-   * its declared slot, or unequips it if it's already worn. Non-equippable ids are a silent no-op.
+   * Toggle-equip an item from the toolbar/pack (plan 049; unequip reworked in plan 051): tapping an
+   * equippable item equips it into its declared slot, or unequips it if it's already worn.
+   * Non-equippable ids are a silent no-op.
    *
-   * Bag bookkeeping mirrors the two durability models (decision #6): a **permanent** item (bow/sword,
-   * no `durability`) moves bag↔slot — equipping spends one from the bag, unequipping returns it. The
-   * **torch** is **equip-to-consume** — equipping spends one and seeds the slot's durability;
-   * unequipping (or draining to 0, Step 6) discards it with no restash. Equipping into an occupied slot
-   * first vacates it under the same rules (a displaced permanent returns to the bag; a displaced torch
-   * is discarded).
+   * Bag bookkeeping: BOTH a **permanent** item (bow/sword, no `durability`) and the **torch**
+   * (durability-bearing) move bag↔slot — equipping spends one from the bag, unequipping returns it. The
+   * torch's remaining durability is preserved in the bag-side `equipCharge` stash (plan 051), so
+   * re-equipping resumes from that charge; only draining to 0 (see {@link tickTorch}) destroys it.
+   *
+   * Return-to-bag is **add-first / commit-after** (finding #1): `Inventory.add` caps at the item's
+   * `maxStack` (torch/tools = 1) and returns the amount it fit, so a full bag would otherwise orphan the
+   * torch's charge on a discarded return. If the item can't fit the bag we DENY the unequip (leave it
+   * worn, write nothing) — and refuse an incoming equip whose displaced item can't be re-stashed.
    */
   private toggleEquip(p: { itemId: string }): void {
     const def = ITEMS[p.itemId];
     if (!def?.equip) return; // not an equippable item
     const worn = this.equipment.slotOf(p.itemId);
     if (worn) {
+      // Unequip → back to the bag. Add-first: if the torch/tool can't fit (bag already holds one), the
+      // add is a no-op (returns 0) and we deny — nothing is lost, the item stays worn.
+      const slotItem = this.equipment.get(worn);
+      if (this.inv.add(p.itemId, 1) < 1) return; // bag full → deny the unequip
       this.equipment.unequip(worn);
-      if (def.durability === undefined) this.inv.add(p.itemId, 1); // permanent → back to bag; torch → discarded
+      // Preserve a durability item's remaining charge in the bag-side stash so a re-equip resumes it.
+      if (def.durability != null)
+        this.equipCharge[p.itemId] = slotItem?.durability ?? def.durability;
       this.emitEquipment();
       return;
     }
     if (!this.inv.has(p.itemId, 1)) return; // nothing to equip
-    // Vacate the target slot first, restashing a displaced permanent (a displaced torch is discarded).
+    // Vacate the target slot first, returning any displaced item to the bag under the same add-first
+    // guard: if it can't fit, refuse the incoming equip and leave everything untouched.
     const displaced = this.equipment.get(def.equip);
     if (displaced) {
+      if (this.inv.add(displaced.id, 1) < 1) return; // bag full → refuse the equip
       this.equipment.unequip(def.equip);
-      if (ITEMS[displaced.id]?.durability === undefined) this.inv.add(displaced.id, 1);
+      const displacedDef = ITEMS[displaced.id];
+      if (displacedDef?.durability != null)
+        this.equipCharge[displaced.id] = displaced.durability ?? displacedDef.durability;
     }
     this.inv.spend({ [p.itemId]: 1 });
-    this.equipment.equip(def.equip, p.itemId, def.durability ?? null);
+    // Seed a durability item's slot from its stashed charge (resume) or its full starting charge, then
+    // clear the stash; a permanent item seeds `null`.
+    const seed = def.durability != null ? (this.equipCharge[p.itemId] ?? def.durability) : null;
+    delete this.equipCharge[p.itemId];
+    this.equipment.equip(def.equip, p.itemId, seed);
     this.emitEquipment();
   }
 
