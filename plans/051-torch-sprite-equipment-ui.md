@@ -1,6 +1,6 @@
 # Torch Rename · Held-Item Overlay · Equipment Panel · Workbench Sprite (plan-049 polish)
 
-> Status: in review
+> Status: deployed
 
 ## Summary
 
