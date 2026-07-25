@@ -27,7 +27,8 @@
         23,
         36,
         42
-      ]
+      ],
+      "fillAsset": "water-shallow-fill.png"
     },
     {
       "name": "mid",
@@ -51,7 +52,8 @@
         194
       ],
       "authored": true,
-      "variants": []
+      "variants": [],
+      "fillAsset": "water-deep-fill.png"
     }
   ],
   "coast": {

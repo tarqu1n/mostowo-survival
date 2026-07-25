@@ -396,20 +396,73 @@ or the **one** guarding spec — never the full `npm run e2e`/`check:all` mid-wo
   - Done when: `npm test biomeDefs` passes (valid Forest parses; a malformed def throws with a clear
     path); the editor can fetch + list the Forest preset.
 
-- [ ] **Step 7: Generator — terrain + height-band patches (`src/systems/biomeGen/terrain.ts`)** `[inline]`
-  - Given `(region, biomeDef, seed)`: build the shared height field (Step-4 noise, `biomeDef.terrain.
-    field`), assign each in-region cell the first band whose `maxHeight ≥ noise` (else base terrain),
-    producing a **0/1 mask per terrain**. Autotile each mask via its `TerrainDef.mapping` using
-    `autotile.paintMask` → per-cell frames, tagged with the band's `layer` role. Pure — return a
-    structured terrain result (frames per layer role), no map mutation. (If Step 2 chose opaque water,
-    all bands target `base` and there is no `overlay` role.)
-  - Files: `src/systems/biomeGen/terrain.ts` + `__tests__/terrain.test.ts` (new). Uses `noise.ts`,
-    `autotile.paintMask`, and injected `terrains.json` mappings (don't fetch inside the pure module).
-  - Side effects: none. The `overlay` role is a logical tag; Step 10 resolves it to a real layer.
-  - Docs: none.
-  - Done when: deterministic unit test — fixed seed → stable masks; the water band forms a contiguous
-    low pool ringed by the mud band (concentric); edge frames resolve (no unmapped cells beyond
-    fallback tiers).
+- [x] **Step 7: Generator — terrain + height-band patches (`src/systems/biomeGen/terrain.ts`)** `[inline]`
+  - Outcome: **This step's original text (above, kept for history) predates Steps 2/6's actual findings
+    and was substantially stale** — there's no `TerrainDef.mapping`/`autotile.paintMask` path for bands
+    any more (Step 6 replaced it with edge-set ids), and water's real `depth` method needed a genuine
+    algorithm port, not a mask-autotile call. Landed, in order:
+    1. **No typed edge-set loader existed yet** (`biomeDefs.ts`'s own module doc flagged this as Step
+       7's job). New `src/systems/edgeSets.ts`: `BlobEdgeSet`/`DepthEdgeSet`/`EdgeSet` types +
+       `parseEdgeSet`, a light structural narrow (mirrors `terrainCatalog.ts`'s posture, not
+       `biomeDefs.ts`'s strict no-extra-keys style — these files are baker-generated, not hand-authored).
+    2. **Production asset gap found + fixed at the source.** `water.json`'s `shallow`/`deep` levels
+       (`fillAuthored`/`authored`) had NO real sheet frame — the offline demo only ever synthesized an
+       in-memory flat-colour rectangle, never committed anywhere a real `TileSource` could reference.
+       Extended `scripts/pixel-crawler/bake_edge_set.py` (`write_fill_asset` + a `main()` hook) to
+       commit a real flat-colour PNG per authored/fillAuthored depth level
+       (`edge-sets/<id>-<levelName>-fill.png`) and record it as the level's new `fillAsset` field,
+       consumed via `TileSource{kind:'image'}` (no map-schema change needed — that `TileSource` variant
+       already existed). Re-ran the baker: `water.json`'s diff is exactly the two new `fillAsset` fields
+       (`grass.json`/`mud.json` byte-identical, `invalid tiles = 0` unchanged) — confirmed with the user
+       before touching the Python pipeline (owner decision: extend the baker now, not defer).
+    3. **`generateTerrain(region, terrain, seed, edgeSets)`** in the new `terrain.ts`: shared-noise band
+       assignment (`noise.ts` `fbm`, first band whose `maxHeight >= n` else `terrain.base`) →
+       `cellEdgeSet` (per-cell edge-set id, region-local row-major — Step 8's `avoidTerrains` input) →
+       two layers. **The base terrain is always the OVERLAY, every band is always `base` role** — the
+       "hole" technique confirmed in `docs/BIOMES.md` (mud paints as a flat opaque fill, no autotiling;
+       the base terrain's own alpha-cutout blob mask has a hole wherever a band claims the cell)
+       generalises past mud to ANY band regardless of its edge-set method: a `depth` band (water) is
+       fully opaque and self-contained (own baked-in coast shore art), so it also just paints straight
+       onto `base`, no hole needed for it specifically. Reused `autotile.ts`'s `blobKey`/`FULL_KEY` for
+       the overlay's mask classification (same bit algorithm as the committed `mapping`'s keys); could
+       NOT reuse `paintMask`/`pickFrame` (built for a different, simpler `terrains.json` mapping shape —
+       the real `edge-sets/*.json` `mapping` is `blobKey -> [frame,rot][]`, weighted-random per option,
+       not one canonical frame), so `terrain.ts` has its own picker (`pickOption`, `paintBlobOverlay`).
+    4. **Water's `depth_field` + dual-grid coast/transition/fill placement ported from
+       `bake_edge_set.py`** (BFS distance-from-shore, value-noise wobble, the erode/de-saddle repair
+       loop, exact King-neighbour iteration order preserved since the repair mutates in place mid-scan)
+       — see `terrain.ts`'s module doc "RNG note" for the explicit, user-confirmed scope of "port it
+       faithfully": the ALGORITHM and its invariants are ported 1:1, but the randomness underneath uses
+       this codebase's own seeded `rng.ts`/`noise.ts` (one `Rng` threaded through the whole call in a
+       fixed order), not a re-implementation of NumPy's PCG64 — reproducing that bit-for-bit was judged
+       impractical and beside the point (the whole point of Steps 3-5 was one shared seeded-RNG path).
+       Water's dual-grid output is genuinely `(region.cols+1) x (region.rows+1)` tiles (one wider/taller
+       than the mask — each rendered tile sits over a mask VERTEX) — per the user's confirmed call,
+       `TerrainCell.col`/`.row` return these RAW overhang coordinates (`0..cols`/`0..rows` inclusive,
+       region-local), left for Step 9/10 to clamp/translate, not clipped away here.
+    5. **Known visual caveat, not a bug** (documented prominently in `terrain.ts`'s module doc): the
+       Forest preset's band order (water's `maxHeight` below mud's) means the pond's shore always
+       borders MUD, never grass directly — but water's `coast` tiles are baked to colour-match GRASS
+       (`docs/BIOMES.md`'s own gotcha). Every corner case still resolves to a real frame (no tiling
+       bug), but the shore's baked-in shade may read as a slight mismatch against mud — flagged for
+       whoever eyeballs the rendered Forest preset (Step 11) to tune (reorder bands, or a mud shade
+       closer to grass) rather than silently living with it.
+    - Files: `src/systems/edgeSets.ts` + `__tests__/edgeSets.test.ts` (new), `src/systems/biomeGen/
+      terrain.ts` + `__tests__/terrain.test.ts` (new), `scripts/pixel-crawler/bake_edge_set.py` (small
+      addition), `public/assets/tilesets/pixel-crawler/edge-sets/water.json` (regenerated — `fillAsset`
+      fields only), `edge-sets/water-shallow-fill.png` + `edge-sets/water-deep-fill.png` (new, committed
+      assets).
+    - Side effects: none at runtime (dev-only generator, not yet wired to the editor — Step 11). The
+      two new PNGs ship in `public/assets`, same as every other tile sheet asset.
+    - `npm test edgeSets terrain` → 16/16 pass (6 + 10); full suite `npx vitest run` → 1067/1067 pass;
+      `tsc --noEmit` + eslint + prettier clean. Acceptance bar verified directly: fixed-seed determinism
+      (`toEqual` on two full runs), the real Forest preset at a region/seed sampled to have all three
+      terrains present shows water never directly adjacent to grass (concentric, confirmed 0/N such
+      adjacencies) and dominated by one contiguous pool (>80% of water cells in the largest connected
+      component — noise-thresholded bands can legitimately carve a second small puddle, so "predominantly
+      one pool" is the honest bar, not "exactly one" for every seed), every painted cell across both
+      layers resolves to exactly one of `frame`/`imageAsset` (no unmapped cells), plus targeted synthetic
+      cases (fully-mud band, empty-bands flat biome, missing edge-set id, non-blob `terrain.base`).
 
 - [ ] **Step 8: Generator — scatter (`src/systems/biomeGen/scatter.ts`)** `[inline]`
   - Per `scatter` layer: `poissonSample` at the layer's `spacing`, accept points against the noise
