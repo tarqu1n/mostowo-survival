@@ -355,7 +355,7 @@ stations carry a kind + level; the UI filters recipes by which stations/levels a
 > — light (fires + a tiny player light) is the only thing that reveals, via a soft gradient that dims to
 > black (see [STATUS.md](STATUS.md) "Light-only night"). This resolves the deferred plan-012 enemy
 > fog-gating for free: unlit enemies and their tells are simply unrendered under the overlay. Still
-> pending: multiple-hearth unioned claims (staging 2), walls extending the claim (staging 3), torches.
+> pending: multiple-hearth unioned claims (staging 2), walls extending the claim (staging 3), torch posts.
 
 Replaces the placeholder fixed base rect (`BASE_ZONE_SIZE` centred on spawn — plan 018 A8, always a
 stopgap). **Decided 2026-07-19: your base is everywhere your fire's light reaches** — the hearth *is*
@@ -369,10 +369,12 @@ campfire light/vision/fuel systems (`CampfireBehavior` under the `StructureManag
   **and** more perimeter to defend. Growth has a *running* cost (fuel) + a defense cost (perimeter), not
   just a build price. Light a **second hearth** to push the claim toward the treeline you must hold — a
   network of fires, each its own fuel sink.
-- **Torches — cheap perimeter/wall lighting.** A small-radius light source (its own buildable) that also
-  needs refuelling. Hearths are the expensive *anchors* of the claim; torches cheaply light the walls,
-  perimeter, and gaps the fires don't reach — so you light a wall line without paying for a whole hearth.
-  Both fires and torches are what NPCs keep lit at night (the fire-tending night role).
+- **Torch posts — cheap perimeter/wall lighting.** A small-radius light source (its own buildable) that
+  also needs refuelling. Hearths are the expensive *anchors* of the claim; torch posts cheaply light the
+  walls, perimeter, and gaps the fires don't reach — so you light a wall line without paying for a whole
+  hearth. Both fires and torch posts are what NPCs keep lit at night (the fire-tending night role).
+  *(Naming: this future buildable is `torch_post`. The `torch` id itself is now the equippable **hand
+  torch** — plan 051, superseding plan-049 decision #7 which had reserved `torch` for this light.)*
 - **The dark reclaims ground.** A fire that burns out at night → that area goes dark → vision lost →
   enemies pour through the unlit gap. "Hold the fireline" is literal; night refuelling is a live
   defensive task (a companion job), and the fuel economy becomes the base's load-bearing strategic resource.
@@ -487,7 +489,7 @@ Design calls to stake out:
 - **Assignment is a day-role AND a night-role, hot-swappable at any time.** Each companion holds a
   standing job per phase that you can reassign on the fly. **Day roles** are worker-queue tasks (arm/
   re-arm traps, cook food, gather, operate a crafting station). **Night roles** are defense postures
-  (feed the fires/torches, **hold the north wall** or a named segment, or follow you as a mobile squad).
+  (feed the fires/torch posts, **hold the north wall** or a named segment, or follow you as a mobile squad).
   Getting the night assignment right — bodies on the segments your walls funnelled toward — is the payoff
   of the whole prep phase. Reuses the worker task queue (day) + the hold-segment posture (night).
 - **Start with one trait axis, not a matrix.** Each companion is *better at one thing* (a strong fighter

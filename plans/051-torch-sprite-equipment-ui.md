@@ -1,6 +1,6 @@
 # Torch Rename · Held-Item Overlay · Equipment Panel · Workbench Sprite (plan-049 polish)
 
-> Status: planned — run /execute-plan to begin.
+> Status: in review
 
 ## Summary
 
@@ -285,7 +285,25 @@ and re-use); held-item rendering is the first sliver of the deferred paper-doll.
   - Done when: the placed workbench renders visibly larger (~2 tiles) with the new sprite; build green;
     e2e `workbench.spec.ts` still passes (mechanics unchanged).
 
-- [ ] **Step 7: Tests + docs** `[inline]`
+- [x] **Step 7: Tests + docs** `[inline]`
+  - Outcome: **Tests** — `equip.spec.ts`: fixed the stale "equip-to-consume" comments and added a new
+    spec `unequipping a partially-drained torch returns it to the pack; re-equip resumes its charge`
+    (equip → drain → unequip → back in pack at reduced charge → re-equip resumes, not reset). equip 5/5 +
+    workbench 5/5 pass. The equipment panel is covered at its seams (the `equipCharge`/`equipment` store
+    mirror unit test + the `equip:toggle` e2e) and the held overlay's show/hide mirrors `playerLight`
+    (e2e via `playerLightRadius`) + was screenshot-verified — no React render-test infra exists and
+    `DebugState` is golden-locked, so dedicated seams for those presentational bits were judged
+    disproportionate (noted rather than added). **Docs** — brand→torch + return-to-pack pass across
+    `STATUS.md` (equip section reworded + new plan-051 subsection), `GAME-MECHANICS.md` (torch section +
+    equip panel), `docs/decisions/gameplay.md` (new 2026-07-25 plan-051 entry; 049/048 history left
+    intact), `CLAUDE.md` status one-liner + crafting line. Freed the `torch` name (finding #2):
+    `GAME-DESIGN.md`/`ROADMAP.md` rename the future perimeter light to **torch_post** with a note the hand
+    item took `torch` (supersedes 049 #7). Art origins: `wired-art.md` new "Workbench sprite + held torch"
+    subsection; `ASSETS.md` routing row cites `gen_workbench_gemini.py`. Gates: typecheck + lint (0 errors)
+    - lint:md + unit (1010) + smoke + build all green; my changed files pass `prettier --check`. NB: full
+    `check:all` is red ONLY on pre-existing prettier drift in two unrelated design-mockup HTMLs
+    (`docs/build-ui-options.html`, `docs/ui-overhaul/pitch.html` — a 3.6k-line reformat) left untouched.
+    Status set to `in review` (not `deployed` — that awaits an explicit deploy step, per the workflow).
   - Tests: update `equip.spec.ts` for the rename + the **unequip-returns-to-pack** behaviour (equip →
     drain → unequip → still in pack at reduced charge → re-equip resumes); a unit/e2e check that the
     **equipment panel** reflects + toggles slots; a smoke check that the **held overlay** appears/hides

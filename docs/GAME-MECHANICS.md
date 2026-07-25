@@ -62,7 +62,7 @@ above-bench progress bar fills as it works; progress persists on the bench (re-q
 completion the **cost is spent + the output added to the bag**; if unaffordable / bag-full **at completion**
 the craft **fizzles** (red flash, no item). Several crafts can queue (append, not de-dupe).
 
-**Recipes** ([src/data/recipes.ts](../src/data/recipes.ts)): `brand` (1 wood + 1 cloth) · `bow` (2 rope +
+**Recipes** ([src/data/recipes.ts](../src/data/recipes.ts)): `torch` (1 wood + 1 cloth) · `bow` (2 rope +
 2 wood) · `sword` (2 wood + 1 stone) → 1 item each. Now **equippable** (plan 049, below); **`rope`** is a
 new material dropped by `salvagedTent` salvage. The `CraftMenu` also offers a **Repair** action when the
 bench is damaged.
@@ -74,7 +74,7 @@ Numbers: `CRAFT_BASE_MS`/`CRAFT_DAMAGED_MIN_FRAC`/`WORKBENCH_REPAIR_INTERVAL_MS`
 [ScenePicker](../src/scenes/input/ScenePicker.ts); menu UI in
 [src/hud/components/CraftMenu.tsx](../src/hud/components/CraftMenu.tsx).
 
-## Equipping & the brand (plan 049)
+## Equipping & the torch (plans 049, 051)
 
 Three equip slots — **mainHand · ranged · offHand** — with an **empty default loadout** (unarmed melee,
 no ranged, empty off hand). Tap an equippable item (one with an `equip` slot) in the **toolbar or pack**
@@ -83,22 +83,28 @@ a **durability bar**. State lives in the pure [`Equipment`](../src/systems/Equip
 `Inventory`); durability lives only there.
 
 - **Permanent gear (bow/sword)** moves bag↔slot freely — equip spends one from the pack, unequip returns
-  it. **The brand is equip-to-consume:** equipping spends one and seeds its durability; unequipping (or
-  draining to 0) **discards it** — no partial restash.
+  it. **The torch keeps its charge (plan 051):** equipping spends one and seeds its durability (resuming a
+  stashed charge if it was worn before); **unequipping returns it to the pack** with the remaining charge
+  preserved (a bag-full unequip is denied so nothing is lost); only **draining to 0 destroys it**.
 - **Main hand → melee:** the equipped item maps (via `ITEM_MELEE_WEAPON`) to its `MELEE_WEAPONS` stats —
   the **`sword`** is a `{reach:1, arc:'wide'}` 2-damage swing (vs unarmed's 1-damage single front tile).
   Empty main hand = unarmed (unchanged).
 - **Ranged needs a bow:** with no bow in the ranged slot, `combat:bow` does nothing and the **Bow button
   is hidden** — the crafted bow is the first ranged weapon (see the bow bullet below).
-- **The brand** (off-hand hand-torch): while equipped it **raises the player's night light** to
-  `BRAND_LIGHT_RADIUS` (**TILE×3.5**, vs base `PLAYER_LIGHT_RADIUS` TILE×1.25) by growing the same disc
-  the night overlay already draws — fog/sight is unchanged. It **drains in real time** (`BRAND_DURABILITY`
-  **100** over `BRAND_LIFETIME_SEC` **90**s) whenever equipped and is **destroyed at 0**.
+- **The torch** (off-hand hand-torch): while equipped it **raises the player's night light** to
+  `TORCH_LIGHT_RADIUS` (**TILE×3.5**, vs base `PLAYER_LIGHT_RADIUS` TILE×1.25) by growing the same disc
+  the night overlay already draws — fog/sight is unchanged. It **drains in real time** (`TORCH_DURABILITY`
+  **100** over `TORCH_LIFETIME_SEC` **90**s) whenever equipped and is **destroyed at 0**. A small
+  **held-torch sprite** shows in the player's hand while worn (plan 051), following movement + facing.
+- **Equipment panel (plan 051):** the **Gear** button on the scavenge rail opens a paper-doll with the
+  three live slots (icon + durability bar); tap a worn slot to unequip.
 
-Tunables `BRAND_*` in [src/config.ts](../src/config.ts); wiring (`toggleEquip`/`tickBrand`/`playerLight`)
-in [src/scenes/GameScene.ts](../src/scenes/GameScene.ts); HUD in
-[Hotbar.tsx](../src/hud/components/Hotbar.tsx)/[PackDrawer.tsx](../src/hud/components/PackDrawer.tsx) off
-the shared [hud/lib/equip.ts](../src/hud/lib/equip.ts) read-model.
+Tunables `TORCH_*`/`HELD_TORCH_*` in [src/config.ts](../src/config.ts); wiring (`toggleEquip`/`tickTorch`/
+`playerLight`/`syncHeldOverlay`) in [src/scenes/GameScene.ts](../src/scenes/GameScene.ts) +
+[HeldItemOverlay.ts](../src/scenes/world/HeldItemOverlay.ts); HUD in
+[Hotbar.tsx](../src/hud/components/Hotbar.tsx)/[PackDrawer.tsx](../src/hud/components/PackDrawer.tsx)/
+[EquipPanel.tsx](../src/hud/components/EquipPanel.tsx) off the shared
+[hud/lib/equip.ts](../src/hud/lib/equip.ts) read-model.
 
 ## Combat feel & the bow (plan 035a)
 

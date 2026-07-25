@@ -107,7 +107,7 @@ test('equipping a torch grows the player light, drains in real time, and is dest
   expect(s.equipment.offHand?.id).toBe('torch');
   expect(s.equipment.offHand!.durability!).toBeGreaterThan(TORCH_START - 1);
   expect(s.equipment.offHand!.durability!).toBeLessThanOrEqual(TORCH_START);
-  expect(await itemCount(page, 'torch')).toBe(0); // equip-to-consume: spent out of the bag
+  expect(await itemCount(page, 'torch')).toBe(0); // moved out of the bag while worn
   expect(s.playerLightRadius).toBe(TORCH_LIGHT); // torch raises the disc
 
   // Burns down in real time while equipped: a couple seconds of drive drops it below full but not out.
@@ -124,5 +124,40 @@ test('equipping a torch grows the player light, drains in real time, and is dest
   s = await state(page);
   expect(s.equipment.offHand).toBeNull(); // destroyed at zero by the per-frame drain
   expect(s.playerLightRadius).toBe(PLAYER_LIGHT); // light reverts to base
-  expect(await itemCount(page, 'torch')).toBe(0); // NOT restashed — equip-to-consume, gone for good
+  expect(await itemCount(page, 'torch')).toBe(0); // drain-to-0 destroys it — gone for good (only an
+  // UNEQUIP returns it to the pack; see the next test)
+});
+
+test('unequipping a partially-drained torch returns it to the pack; re-equip resumes its charge (plan 051)', async ({
+  page,
+}) => {
+  await startGame(page);
+  await applyScenario(page, {
+    player: [10, 10],
+    inventory: { torch: 1 },
+  });
+  // Equip → drain partway (a real drive, not the seam) → the worn torch is below full but alive.
+  await emit(page, 'equip:toggle', { itemId: 'torch' });
+  await step(page, 3000);
+  let s = await state(page);
+  const worn = s.equipment.offHand!.durability!;
+  expect(worn).toBeLessThan(TORCH_START);
+  expect(worn).toBeGreaterThan(0);
+  expect(await itemCount(page, 'torch')).toBe(0); // out of the bag while worn
+
+  // Unequip: it returns to the pack (plan 051 reverses 049's discard), the slot clears, and the light
+  // reverts — nothing destroyed.
+  await emit(page, 'equip:toggle', { itemId: 'torch' });
+  s = await state(page);
+  expect(s.equipment.offHand).toBeNull();
+  expect(s.playerLightRadius).toBe(PLAYER_LIGHT);
+  expect(await itemCount(page, 'torch')).toBe(1); // back in the pack, NOT discarded
+
+  // Re-equip: it resumes from the STASHED charge (~what it had when unequipped), not a fresh full torch.
+  await emit(page, 'equip:toggle', { itemId: 'torch' });
+  s = await state(page);
+  const resumed = s.equipment.offHand!.durability!;
+  expect(resumed).toBeLessThan(TORCH_START); // not reset to full
+  expect(resumed).toBeLessThanOrEqual(worn); // at (or just under) the charge it was stashed at
+  expect(resumed).toBeGreaterThan(worn - 5); // and not meaningfully more drained than the stash
 });

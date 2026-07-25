@@ -22,7 +22,7 @@ being knocked out is a dire, recoverable setback (relight it), **not** a loss (o
 - **Campfire-heart is IN (stage 1).** The central fire's **lit radius is the base/claim** (replaces the
   fixed base rect for the one starting fire). Its light is **sustained by fuel and reduced by mob
   attacks** — mobs target the fire to **knock the light out**. *(Multiple hearths, walls extending the
-  claim, and torches stay post-MVP.)*
+  claim, and torch posts stay post-MVP.)*
 - **Defend target = keep yourself alive; keep the fire lit if you can.** Lose = **player dies only**
   (the 2026-07-19 open detail settled 2026-07-20, owner): the fire being knocked out is **not** a loss
   but a dire dark-flooded-in state you claw back from by relighting. Mobs still target the fire — knocking
@@ -174,15 +174,17 @@ else builds on a foundation that's already fun.
 Full designs in [GAME-DESIGN.md](GAME-DESIGN.md) / [DECISIONS.md](DECISIONS.md). Not on the MVP path:
 
 > **Post-MVP progress:** **crafting** is underway (✅ workbench station plan 048 → ✅ equippable items +
-> brand/durability plan 049), and the **build experience** is the chosen next focus — the **Blueprint
-> Mode overhaul** (✅ plan 050: pointer-up placement, a drag-to-paint line-tool run + commit bar,
-> per-buildable build time, rotation ring; buildable-icon art deferred). Directions explored in
+> torch/durability plan 049 → ✅ equip polish plan 051: torch rename, unequip-returns-to-pack, held-torch
+> overlay, equipment paper-doll panel, bigger workbench sprite), and the **build experience** is the
+> chosen next focus — the **Blueprint Mode overhaul** (✅ plan 050: pointer-up placement, a drag-to-paint
+> line-tool run + commit bar, per-buildable build time, rotation ring; buildable-icon art deferred). Directions explored in
 > [build-ui-options.html](build-ui-options.html); see [STATUS.md](STATUS.md#blueprint-mode--build-experience-overhaul-plan-050).
 
 - **Crafting stations** (hybrid-tier tech tree) + deeper item recipes.
 - **NPC recruitment quests** (Litrandil the drunk wizard) + traits, morale, permadeath nuance.
 - **Campfire-heart extensions:** multiple hearths + unioned claims, walls extending the claim, and
-  **torches** (MVP has only the single central hearth — stage 1; see step 2).
+  **torch posts** (MVP has only the single central hearth — stage 1; see step 2). *(The `torch` id is
+  now the equippable hand torch — plan 051; this perimeter light takes `torch_post`.)*
 - **Daily narrative events** + the structured **wave contract** (HUD card, invest-to-sharpen fidelity).
 - **Multi-map world** + car/boat fast travel; the escape-arc campaign spine; endgame challenges.
 - Richer enemy roster (beasts, cursed locals, named mini-bosses) beyond the skeleton.

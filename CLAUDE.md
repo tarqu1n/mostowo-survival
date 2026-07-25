@@ -87,16 +87,18 @@ dev-spawned ally — day gather/repair off a separate `baseSupply` stockpile, 3 
 content — a buildable, mob-bashable/player-repairable HP bench that runs a player-queued `craft` worker
 order at an HP-scaled rate to deliver items; the 4th `StructureManager` module, plan 048), and the
 **equip system** (three slots — mainHand/ranged/offHand — off a pure `Equipment` system; the crafted
-sword/bow/brand equip via the toolbar/pack; main hand drives melee, ranged gates the bow, and the
-off-hand brand casts light + drains to destruction, plan 049) have all landed. **Full feature/plan
-history:** [docs/STATUS.md](docs/STATUS.md).
+sword/bow/torch equip via the toolbar/pack; main hand drives melee, ranged gates the bow, and the
+off-hand torch casts light + drains to destruction, plan 049), and its **equip polish** (plan 051 — the
+`brand`→`torch` rename, unequip-returns-to-pack with charge preserved, an in-hand held-torch overlay
+sprite, a Diablo-style equipment paper-doll panel, and a bigger bespoke workbench sprite) have all
+landed. **Full feature/plan history:** [docs/STATUS.md](docs/STATUS.md).
 
 **Next:** the first-playable **MVP path is complete** (see [docs/ROADMAP.md](docs/ROADMAP.md): ✅ combat
 rework → ✅ night wave + campfire defense → ✅ base-defence walls → ✅ trap (plan 040) → ✅ hunger (plan 041) →
 ✅ NPC (plan 042)); post-MVP **crafting** is underway (✅ workbench station, plan 048 → ✅ equippable items +
-brand/durability/combat, plan 049), and the **Blueprint Mode** build-UX overhaul landed (✅ plan 050 —
-pointer-up placement, line-tool run + commit bar, per-buildable build time, rotation ring; buildable-icon
-art deferred). Full vision in
+torch/durability/combat, plan 049 → ✅ equip polish, plan 051), and the **Blueprint Mode** build-UX overhaul
+landed (✅ plan 050 — pointer-up placement, line-tool run + commit bar, per-buildable build time, rotation
+ring; buildable-icon art deferred). Full vision in
 [docs/GAME-DESIGN.md](docs/GAME-DESIGN.md); [docs/DECISIONS.md](docs/DECISIONS.md) for settled vs open.
 
 ## The game in one line

@@ -144,7 +144,7 @@ that each frame `clear`s → fills the night colour at `tintAlphaAt()` → `eras
 (replaced the old inverted-geometry-mask `Rectangle`). Render lights = the lit hearths (unioned by
 `StructureManager`) **plus the player's tiny personal light** (`PLAYER_LIGHT_RADIUS`, ~1.25 tiles) so the
 player is never fully blind. `VisionController`'s day fog (its own geometry mask + `VISION_RADIUS`) is
-unchanged — invisible under full-black night anyway. A future torch just adds a source to the render seam.
+unchanged — invisible under full-black night anyway. A future light source (a torch post) just adds a source to the render seam.
 
 **Hunger** (`src/systems/needs.ts`, pure) drains continuously and at zero cascades into combat-owned
 `playerHp` (`damagePlayer`) on a fixed interval, reusing combat's death/restart path. A forageable
@@ -403,7 +403,7 @@ live HP structure like a wall.
   — the `repair` order (field generalised `wallId`→`structureId`) now runs on the player queue for a
   bench (walk-adjacent → tend on a cadence → full HP, worker-time only), alongside the companion's wall
   repair.
-- **Recipes** (`data/recipes.ts`, `RECIPES`): `brand` (wood+cloth) · `bow` (rope+wood) · `sword`
+- **Recipes** (`data/recipes.ts`, `RECIPES`): `torch` (wood+cloth) · `bow` (rope+wood) · `sword`
   (wood+stone) — all craft at the workbench over `CRAFT_BASE_MS`; delivered as **inert bag items**
   (equip/function land in plan 049). New **`rope`** material drops from the `salvagedTent` salvage loot.
 - **`craft` order** (`beginCraft`/`runCraft`): walk adjacent, accumulate progress at a rate **scaled by
@@ -422,7 +422,9 @@ equip/durability/torch-light/combat for the crafted items; NPC crafting.
 
 ## Equippable items + equip slots (plan 049)
 
-The first **equippable items** and the equip-slot system, giving the 048-crafted brand/bow/sword a use.
+The first **equippable items** and the equip-slot system, giving the 048-crafted torch/bow/sword a use.
+*(The `brand` item was renamed `torch` in plan 051 — this section reflects the current names + behaviour;
+the plan-051 addendum below covers the return-to-pack + held-overlay + panel changes.)*
 Three slots — **mainHand · ranged · offHand** — with an **empty default loadout** (unarmed melee, no
 ranged, empty off hand). Tapping an equippable in the toolbar/pack **toggles equip** (`equip:toggle`);
 the worn slot gets a **gold outline**.
@@ -432,23 +434,49 @@ the worn slot gets a **gold outline**.
   `unequip`/`drain`→`'ok'|'destroyed'`/`slotOf`/`snapshot`, emits `'change'`. Durability lives **only
   here**, never on the bag `Slot`.
 - **Bag↔slot (`GameScene.toggleEquip`)** — permanent gear (bow/sword, no `durability`) moves bag↔slot;
-  the **brand is equip-to-consume** (equip spends 1 + seeds durability; unequip/destroy discards, no
-  restash). Equip fields are data on `ItemDef` (`equip?`/`durability?`); `ITEM_MELEE_WEAPON` maps a
-  main-hand id → its `MELEE_WEAPONS` entry.
+  the **torch** does too now (plan 051, reversing 049's discard): unequip returns it to the pack with its
+  remaining charge preserved in a scene-side `equipCharge` stash, re-equip resumes from it, only drain-to-0
+  destroys it. Add-first/commit-after: a bag-full unequip is denied (nothing lost). Equip fields are data
+  on `ItemDef` (`equip?`/`durability?`); `ITEM_MELEE_WEAPON` maps a main-hand id → its `MELEE_WEAPONS` entry.
 - **Combat** — main-hand item → active melee weapon (`syncMeleeFromEquipment` off `Equipment` `'change'`;
   empty → unarmed). **Ranged gated on an equipped bow**: `combat:bow` no-ops without one and the HUD
   hides the Bow button (the crafted bow is the first ranged weapon).
-- **Brand** (off-hand hand-torch) — while equipped, `playerLight()` raises the night disc to
-  `BRAND_LIGHT_RADIUS`, and it **drains in real time** (`tickBrand`, throttled HUD forward), **destroyed
-  at 0**. A **durability bar** renders in the toolbar + pack.
-- **Seam** — `bridge.ts` `equip:toggle`(in)/`equipment:changed`(out) → store `equipment`; shared HUD
-  read-model `hud/lib/equip.ts`. `DebugState.equipment`/`playerLightRadius` + `__test.equip`/
-  `setEquipDurability` + `ScenarioSpec.equip[]` for specs.
+- **Torch** (off-hand hand-torch) — while equipped, `playerLight()` raises the night disc to
+  `TORCH_LIGHT_RADIUS`, and it **drains in real time** (`tickTorch`, throttled HUD forward), **destroyed
+  at 0**. A **durability bar** renders in the toolbar + pack (also for a partially-drained torch sitting
+  *in* the pack, plan 051). A **held-torch overlay sprite** follows the player's hand while it's worn.
+- **Seam** — `bridge.ts` `equip:toggle`(in)/`equipment:changed` + `equipCharge:changed`(out) → store
+  `equipment`/`equipCharge`; shared HUD read-model `hud/lib/equip.ts`. `DebugState.equipment`/
+  `playerLightRadius` + `__test.equip`/`setEquipDurability` + `ScenarioSpec.equip[]` for specs.
 
-Tuning: `BRAND_DURABILITY`/`BRAND_LIFETIME_SEC`/`BRAND_DRAIN_PER_SEC`/`BRAND_LIGHT_RADIUS`/
-`BRAND_DRAIN_EMIT_MS` + `MELEE_WEAPONS.sword` in `config.ts`/`data/weapons.ts`. E2e:
-`tests/e2e/equip.spec.ts` (no-bow gate, bow ranged-fire, sword melee upgrade, brand light+drain+destroy).
-Out of scope: equipment rendering on the body (→ plan 010), armour/tool/shield slots, NPC equipment, ammo.
+Tuning: `TORCH_DURABILITY`/`TORCH_LIFETIME_SEC`/`TORCH_DRAIN_PER_SEC`/`TORCH_LIGHT_RADIUS`/
+`TORCH_DRAIN_EMIT_MS` + `MELEE_WEAPONS.sword` in `config.ts`/`data/weapons.ts`. E2e:
+`tests/e2e/equip.spec.ts` (no-bow gate, bow ranged-fire, sword melee upgrade, torch light+drain+destroy,
+unequip-returns-to-pack). Out of scope: full body equipment rendering (→ plan 010; plan 051 ships only the
+single held-torch overlay), armour/tool/shield slots, NPC equipment, ammo.
+
+## Equip polish + torch/panel/held-overlay (plan 051)
+
+Six follow-ups to the 049 equip slice:
+
+- **Torch rename** — the off-hand `brand` item + its `BRAND_*` config consts are renamed to `torch`/
+  `TORCH_*` (id, name, `torch.png` icon, recipe). Supersedes plan-049 decision #7, which had reserved
+  `torch` for a future perimeter-light buildable — that light, if built, now takes `torch_post`.
+- **Unequip returns the torch to the pack** — reverses 049's discard (see the toggleEquip bullet above):
+  a scene-side `equipCharge` stash preserves the worn charge, re-equip resumes it, drain-to-0 still
+  destroys. A bagged partial torch draws its durability bar (via forwarded `equipCharge`).
+- **Held-torch overlay** (`scenes/world/HeldItemOverlay.ts`) — one depth-11 sprite pinned to the player's
+  hand while the torch is worn, following movement + flipping with facing (the visible torch; the light
+  stays `playerLight()`). The first sliver of the deferred paper-doll (plan 010). Tuning:
+  `HELD_TORCH_OFFSET_X/Y`/`HELD_TORCH_SCALE`.
+- **Equipment panel** (`hud/components/EquipPanel.tsx`) — a Diablo-style paper-doll (Gear button on the
+  scavenge rail): a body silhouette with the three live slots, each showing the worn icon + durability
+  bar; tap to unequip. Reads the mirrored `equipment`, reuses `equip:toggle` — no new plumbing.
+- **No native image callout** — long-press on HUD item art no longer opens the browser "Save image"
+  sheet (shared `noImageCallout`/`preventImageCallout` in `hud/lib/utils.ts`).
+- **Bigger workbench sprite** — bespoke Gemini-generated bench (`_derived/workbench/Workbench.png`,
+  `tilesTall:2`), repro via `scripts/pixel-crawler/gen_workbench_gemini.py`. Render-only; mechanics + the
+  one-tile footprint unchanged.
 
 ## Blueprint Mode — build experience overhaul (plan 050)
 

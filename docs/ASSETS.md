@@ -15,7 +15,7 @@ exception**, not the norm. Route by what you're making:
 |---|---|---|
 |An **inventory/item icon** (32×32)|Gemini|[gemini-pipeline.md](gemini-pipeline.md) · [`scripts/gen-icons/`](../scripts/gen-icons/)|
 |A **character animation strip** (missing pose on a pack actor)|Gemini image-to-image + cel-shade|[AI-SPRITE-PIPELINE.md](AI-SPRITE-PIPELINE.md) · [`scripts/pixel-crawler/gen_*_gemini.py`](../scripts/pixel-crawler/)|
-|A **static world prop / structure / decorative tile** (jetty, dock, furniture, wreckage, a themed one-off tile)|Gemini + the static-prop playbook|[AI-SPRITE-PIPELINE.md § Static world-prop sprites](AI-SPRITE-PIPELINE.md#static-world-prop-sprites-the-destroyed-tents--a-reusable-playbook) · `scripts/gen-tents.py` pattern|
+|A **static world prop / structure / decorative tile** (jetty, dock, furniture, wreckage, a themed one-off tile)|Gemini + the static-prop playbook|[AI-SPRITE-PIPELINE.md § Static world-prop sprites](AI-SPRITE-PIPELINE.md#static-world-prop-sprites-the-destroyed-tents--a-reusable-playbook) · `scripts/gen-tents.py` / `scripts/pixel-crawler/gen_workbench_gemini.py` (image-to-image off an existing prop) pattern|
 |A whole art set that a **stock pack already ships**|Import, don't generate|[CRAFTPIX.md](CRAFTPIX.md)|
 |A **seamless terrain transition / Wang tile** that must tile edge-to-edge AND survive editor rotation with zero seams (coast, multi-tile fills)|**Pure synthesis** (the exception)|[TILE-AUTHORING.md](TILE-AUTHORING.md)|
 
