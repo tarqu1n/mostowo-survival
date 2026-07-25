@@ -882,10 +882,14 @@ export const SPIKE_TRAP_SETTLE_FRAME = 4;
 /** Texture key for an item's icon image (loaded from `public/assets/icons/<icon>`). */
 export const iconKey = (id: string): string => `icon:${id}`;
 
-/** Weighted-random pick over `items` — used for ground variety (see `tiles.ground` doc above). */
-export function pickWeighted<T extends { weight: number }>(items: T[]): T {
+/** Weighted-random pick over `items` — used for ground variety (see `tiles.ground` doc above).
+ *  `rng` defaults to `Math.random`; pass a seeded one (see `systems/rng.ts`) for reproducible picks. */
+export function pickWeighted<T extends { weight: number }>(
+  items: T[],
+  rng: () => number = Math.random,
+): T {
   const total = items.reduce((sum, it) => sum + it.weight, 0);
-  let r = Math.random() * total;
+  let r = rng() * total;
   for (const item of items) {
     if (r < item.weight) return item;
     r -= item.weight;

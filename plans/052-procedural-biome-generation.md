@@ -267,7 +267,21 @@ or the **one** guarding spec — never the full `npm run e2e`/`check:all` mid-wo
   - Done when: water is onboarded with a passing parity test **and** the overlay-vs-opaque decision is
     recorded; if overlay, painting water on a higher layer shows grass through the coast (visual smoke).
 
-- [ ] **Step 3: Shared seeded PRNG (`src/systems/rng.ts`) + optional-RNG `pickWeighted`** `[delegate]`
+- [x] **Step 3: Shared seeded PRNG (`src/systems/rng.ts`) + optional-RNG `pickWeighted`** `[delegate]`
+  - Outcome: `src/systems/rng.ts` (new) exports `Rng{nextFloat,nextInt,pick}` + `makeRng(seed)`,
+    byte-for-byte the same mulberry32 core as the old private `monsterAI.test.ts` function;
+    `nextFloat` is a plain `() => number` so it drops into any existing `rng: () => number` param
+    (e.g. `stepMonster`) with no signature changes. `src/systems/__tests__/rng.test.ts` (new, 8 tests):
+    determinism, per-seed divergence, `nextFloat`/`nextInt` bounds, `pick` (incl. throw on empty), a
+    pinned regression value guarding the algorithm. `pickWeighted` (`src/data/tileset.ts`) took an
+    optional `rng: () => number = Math.random` param, threaded in place of the internal `Math.random()`
+    call — existing single-arg callers (e.g. `objectsSlice.ts:97`) untouched. `monsterAI.test.ts`'s
+    private `mulberry32` now delegates to `makeRng(seed).nextFloat` (dupe algorithm removed); its ~30
+    `mulberry32(seed)` call sites were left as-is (kept the wrapper name) — a mechanical rewrite across
+    all of them was judged unnecessary churn. `npm test rng` → 8/8 pass; `npm test data` (41+5, covers
+    `pickWeighted` callers) and `npm test monsterAI` (29) still green; `tsc --noEmit` + eslint clean on
+    touched files. Files touched: `src/systems/rng.ts` (new), `src/systems/__tests__/rng.test.ts` (new),
+    `src/data/tileset.ts`, `src/systems/__tests__/monsterAI.test.ts`.
   - Add a pure seeded PRNG as `makeRng(seed): Rng` with `nextFloat()` (`[0,1)`), `nextInt(nExcl)`,
     `pick(array)` — **consolidating the existing private `mulberry32` from `monsterAI.test.ts`**
     (Finding #6) and matching the `rng: () => number` shape `stepMonster` already threads. No Phaser
