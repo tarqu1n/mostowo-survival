@@ -297,12 +297,13 @@ shows as a hard edge on the alpha-cutout sheets.
   magenta. `--seed` re-rolls, `--preset` narrows. Outputs to `.biome-tests/` (gitignored).
   **Acceptance bar: `hard edges = 0` on every preset** (currently holds for all four across seeds).
 
-> **Not yet ported to TypeScript.** `src/systems/biomeGen/terrain.ts` (plan 052 Step 7) still has the
-> pre-audit composition: it holes the base overlay out under depth bands, has no shore collar, and no
-> smoothing/thin-strip/small-body repair — i.e. the defects listed above are still live in the editor's
-> biome tool. Port the field repairs + the "base under depth bands" ordering there before Step 11's tool
-> is judged on looks. Placement-time matching needs the pixels, so the TS side wants the *pruned* option
-> lists the baker now emits rather than its own matcher.
+> **Not yet ported to TypeScript** — tracked as **plan 052 Step 10a**. `src/systems/biomeGen/terrain.ts`
+> (Step 7) still has the pre-audit composition: it holes the base overlay out under depth bands, has no
+> shore collar, and no smoothing/thin-strip/small-body repair — i.e. the defects listed above are still
+> live in the editor's biome tool, and Step 11's UI shouldn't be judged on looks until Step 10a lands.
+> Placement-time matching needs the pixels, so the TS side wants the *pruned* option lists the baker now
+> emits rather than its own matcher; what it does need is the composition ORDER and the FIELD REPAIRS,
+> which are pure mask work.
 
 ## Files
 

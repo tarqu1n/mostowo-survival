@@ -617,9 +617,42 @@ or the **one** guarding spec — never the full `npm run e2e`/`check:all` mid-wo
     cardinal fallback, unmappable 1-wide strips, relative interior-border scoring) are all written up in
     **docs/BIOMES.md → "The 1px edge test"**.
   - **Follow-up owed to Step 11:** the same composition fixes are NOT yet in
-    `src/systems/biomeGen/terrain.ts` (it still holes the base overlay under water, and has no field
-    repairs), so the editor's biome tool will show the old seams until they're ported. See the note at
-    the end of that docs section.
+    `src/systems/biomeGen/terrain.ts`, so the editor's biome tool would still paint the old seams. Made
+    an explicit step below (Step 10a) rather than left as a note.
+
+- [ ] **Step 10a: Port the seam fixes into `biomeGen/terrain.ts` (composition + field repairs)** `[inline]`
+  - Why now, before Step 11: the TS generator is a faithful port of the *pre-audit* Python composition,
+    so Step 11's UI would be judged on a render carrying every defect the Interlude just found and fixed
+    offline. The pixels-side rules stay in the baker (the committed JSON already carries the pruned,
+    shore-compatible option lists) — what the TS needs is the **composition order** and the **field
+    repairs**, which are pure `Mask`/claim-array work and need no pixel access at runtime.
+  - Port, each already implemented + measured in `scripts/pixel-crawler/gen_biome_tests.py`:
+    1. **Base terrain stays UNDER a depth band, not holed out.** `generateTerrain`'s `overlayMask`
+       (`maskFor(cellEdgeSet, terrain.base)`) must ALSO include cells claimed by a `'depth'`-method band,
+       and the depth band must be emitted after/over it. Today's hole makes the base cut its own alpha
+       shore round every pond, which no coast tile can butt — 52 of the 56 hard edges on the `marsh`
+       preset. Biggest single win; do this one first and re-measure before the rest.
+    2. **Shore collar.** Force a 2-cell collar of the depth set's shore terrain around every water cell
+       (radius 2 because the dual grid overhangs by one). The shore terrain is *derived from pixels* in
+       the baker (`shore_terrain`: 192 coast borders fit `grass`, 0 fit `mud`) — so it should be BAKED
+       INTO the edge-set JSON as e.g. `coast.shore: "grass"` for the TS to read, not re-derived or
+       hardcoded (small baker change, `SETS` already carries the `shore` id).
+    3. **Field repairs before placement:** majority-smooth each band's cumulative footprint
+       (`smoothMask`, mirroring `autotile.py`'s rule, keeping the bands nested), drop water bodies under
+       ~8 cells (4-connected flood fill), and absorb 1-cell-wide base strips (`remove_thin_strips` —
+       the three cardinal combinations `autotile.ts`'s `pickFrame` cannot resolve).
+  - Files: `src/systems/biomeGen/terrain.ts` (composition + repairs), possibly a small pure helper module
+    beside it (`biomeGen/repair.ts`) so the repairs unit-test on their own; `src/systems/edgeSets.ts` +
+    `scripts/pixel-crawler/bake_edge_set.py` for the `coast.shore` field; re-bake the edge sets.
+  - Side effects: changes generated output for a given seed (not bit-compatible with Step 7/9's current
+    results) — update any snapshot-ish expectations in `biomeGen/__tests__/*` accordingly.
+  - Docs: `docs/BIOMES.md`'s "The 1px edge test" section already documents the rules and carries the
+    "not yet ported to TypeScript" caveat at the end — delete that caveat as part of this step.
+  - Done when: unit tests cover each repair (thin strip absorbed, sub-min-area body removed, collar
+    present around water, base mask covers depth cells); and, as the real acceptance bar, a Python and a
+    TS run of the **same preset + seed** agree on the terrain *claim* field, so
+    `gen_biome_tests.py`'s `hard edges = 0` result transfers (compare claim coverage percentages via a
+    small dev dump rather than pixel-diffing — the RNGs are deliberately not bit-identical, see Step 7).
 
 - [ ] **Step 11: Editor — `biome` tool + apply-only UI (region + preset + seed + re-roll + apply)** `[inline]`
   - Add `'biome'` to the `EditorTool` union; store state (active biome id, current seed, last-apply
