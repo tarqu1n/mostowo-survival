@@ -10,7 +10,9 @@
  * `kind: 'node'` placements carry integer `col`/`row` (tile-addressed, matching `NodeObject`); Step 9
  * adds the region rect's own `col`/`row` origin. `kind: 'decor'` placements carry `x`/`y` already
  * converted to PIXELS (`TILE_SIZE`-scaled, sub-tile precision kept — matching `DecorObject.x`/`y`); Step
- * 9 adds the region rect's origin in pixels (`rect.col * TILE_SIZE`, `rect.row * TILE_SIZE`).
+ * 9 adds the region rect's origin in pixels (`rect.col * TILE_SIZE`, `rect.row * TILE_SIZE`). Every
+ * placement also carries its originating `layerId` (`BiomeScatterLayer.id`) — added for Step 9's
+ * per-layer `meta.counts`, otherwise unused here.
  *
  * **Field-seeding note (why this reproduces the SAME noise field as `terrain.ts`, not just a
  * similarly-tuned one):** `generateTerrain`'s `assignBands` does `makeRng(seed)` then `makeNoise2D(rng)`
@@ -34,8 +36,8 @@ import { TILE_SIZE } from '../../config';
 import type { BiomeScatterLayer, BiomeScatterMember } from '../biomeDefs';
 
 export type ScatterPlacement =
-  | { kind: 'node'; ref: string; col: number; row: number; skin?: string }
-  | { kind: 'decor'; asset: string; x: number; y: number };
+  | { kind: 'node'; layerId: string; ref: string; col: number; row: number; skin?: string }
+  | { kind: 'decor'; layerId: string; asset: string; x: number; y: number };
 
 export interface ScatterGenInput {
   region: Dims;
@@ -87,13 +89,20 @@ function toPlacement(
   if (layer.kind === 'node') {
     return {
       kind: 'node',
+      layerId: layer.id,
       ref: member.ref,
       col: Math.floor(x),
       row: Math.floor(y),
       ...(member.skin === undefined ? {} : { skin: member.skin }),
     };
   }
-  return { kind: 'decor', asset: member.ref, x: x * TILE_SIZE, y: y * TILE_SIZE };
+  return {
+    kind: 'decor',
+    layerId: layer.id,
+    asset: member.ref,
+    x: x * TILE_SIZE,
+    y: y * TILE_SIZE,
+  };
 }
 
 /** Rolls the parent→children `clump` (if the layer has one): a `chance` roll, then `count[0]..count[1]`

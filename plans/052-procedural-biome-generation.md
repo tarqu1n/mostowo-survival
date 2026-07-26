@@ -499,7 +499,34 @@ or the **one** guarding spec — never the full `npm run e2e`/`check:all` mid-wo
   - Done when: deterministic unit test — min-spacing honoured per layer; density field thins points in
     low-density areas; zero placements on `avoidTerrains` cells; clumping produces child clusters.
 
-- [ ] **Step 9: Generator orchestrator + `BiomeResult` (`src/systems/biomeGen/index.ts`)** `[inline]`
+- [x] **Step 9: Generator orchestrator + `BiomeResult` (`src/systems/biomeGen/index.ts`)** `[inline]`
+  - Outcome: `generateBiome({region, biome, seed, edgeSets, existing?}): BiomeResult` in the new
+    `index.ts`, `BiomeResult` in the new `types.ts` (deviates from the plan's pre-Step-7/8 sketch —
+    `tileEdits` reuses Step 7's own `TerrainLayer[]` and `objects` reuses Step 8's own
+    `ScatterPlacement[]`, now carrying `layerId`, added specifically so `meta.counts` can be computed
+    per scatter layer — rather than inventing a redundant near-identical shape; also takes an object
+    param + explicit `edgeSets` rather than the plan's stale positional sketch, since Step 7 needs the
+    edge-set catalog and a pure module can't synthesize it). Composes `generateTerrain` +
+    `generateScatter` (same `seed`/`region`/`terrain.field` into both, preserving Step 8's "shared
+    field" property), then applies: **exclusion** via an optional, region-local
+    `BiomeGenExisting{isInside?,isOccupied?}` predicate pair (both default fully permissive) filtering
+    both `tileEdits` cells and scatter objects — deliberately NOT a `MapFile` import (keeps this pure;
+    Step 10 supplies closures translating region-local coords to its real map) and deliberately NOT
+    clamping water's dual-grid overhang cells either (mirrors Step 7's own "not clipped away here" —
+    the caller's `isInside`, evaluated at true absolute position, is what correctly rejects genuinely
+    out-of-map cells); **edge-falloff** applied to SCATTER placements only (terrain is a deterministic
+    threshold fill, not a density concept) — a `FALLOFF_BAND_TILES=3` linear taper from 0 at the
+    region's edge to full density 3+ tiles in, rolled via an independent seeded `Rng`
+    (`seed XOR 0x9e3779b9`, never the terrain/scatter generators' own streams). `src/systems/biomeGen/
+    __tests__/index.test.ts` (new, 5 tests): determinism, `meta.counts` sums to `objects.length` per
+    layer, edge-falloff retains >90% of interior placements vs a materially lower border-band retention
+    rate (compared directly against Steps 7+8's raw pre-falloff output), `isInside` exclusion, and
+    `isOccupied` exclusion (a blanket "everything occupied" existing wipes out all edits/objects).
+    `npm test biomeGen` (`npx vitest run biomeGen`) → 20/20 pass (5 new + 5 scatter + 10 terrain);
+    `tsc --noEmit` + eslint + prettier clean. Files touched: `src/systems/biomeGen/index.ts` (new),
+    `src/systems/biomeGen/types.ts` (new), `src/systems/biomeGen/__tests__/index.test.ts` (new),
+    `src/systems/biomeGen/scatter.ts` (amended — added `layerId` to `ScatterPlacement`, additive only,
+    existing Step-8 tests unaffected).
   - Compose Steps 7+8 into `generateBiome(region, biomeDef, seed, existing): BiomeResult` where
     `BiomeResult = { tileEdits: Array<{layerRole:'base'|'overlay', frames}>, objects: id-less
     placements, meta:{seed, counts} }`. Apply **edge-falloff** (taper density near the region border)
