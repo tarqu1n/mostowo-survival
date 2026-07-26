@@ -37,8 +37,8 @@
         {
           "id": "foliage",
           "kind": "node",
-          "spacing": 2,
-          "density": 0.5,
+          "spacing": 6,
+          "density": 0.35,
           "avoidTerrains": ["water"],
           "members": [
             { "ref": "tree", "weight": 1, "skin": "ff_green_1" },
