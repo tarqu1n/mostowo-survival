@@ -598,6 +598,29 @@ or the **one** guarding spec — never the full `npm run e2e`/`check:all` mid-wo
     (void-consistency, palette validity, no object on void), and a single **undo** fully reverts it
     (including any created overlay layer).
 
+- [x] **Interlude (direct request, between Steps 10 and 11): restore the 1px edge-compatibility test +
+  tiles-only test biome maps** `[inline]`
+  - Why: the rendered tiling looked a mess, and the pairwise **1px touching-border** test from the Step-2
+    spike (`biome_lake_poc.py`'s `COLOR_TH`/`FRAC_TH` seam validation) had never been promoted out of the
+    POC — the baker only had a weaker single-representative "edge class" proxy, and nothing audited a
+    finished render at all.
+  - Outcome: `scripts/pixel-crawler/edge_compat.py` (new) is now the shared rule — tight thresholds build
+    **compatibility groups** (mutually-placeable `[frame, rot]` sets; `variants` is the base tile's group,
+    `groups` carries the rest), loose thresholds power `audit_canvas` (hard-edge scoring of finished
+    pixels). Wired into the baker three ways (pool/option filtering incl. a coast **shore filter** +
+    **arc-consistency prune**; edge-**matched placement**; per-render audit) and into two new tools:
+    `gen_tile_groups.py` (sheet-wide "which tiles go together", with preview + contact sheet — finds
+    grass/dirt×2/sand/snow/stone palettes on the Floors sheet) and `gen_biome_tests.py` (**tiles-only
+    test biome maps** mirroring `biomeGen/terrain.ts`'s composition, with a hard-edge tally + audit
+    overlay). Four presets now render `hard edges = 0` across seeds; the defects it found and fixed
+    (base terrain must stay UNDER depth bands, water's measured shore terrain + collar, the `pickFrame`
+    cardinal fallback, unmappable 1-wide strips, relative interior-border scoring) are all written up in
+    **docs/BIOMES.md → "The 1px edge test"**.
+  - **Follow-up owed to Step 11:** the same composition fixes are NOT yet in
+    `src/systems/biomeGen/terrain.ts` (it still holes the base overlay under water, and has no field
+    repairs), so the editor's biome tool will show the old seams until they're ported. See the note at
+    the end of that docs section.
+
 - [ ] **Step 11: Editor — `biome` tool + apply-only UI (region + preset + seed + re-roll + apply)** `[inline]`
   - Add `'biome'` to the `EditorTool` union; store state (active biome id, current seed, last-apply
     handle). Reuse the Select-tool **marquee** (`regionGeometry`/`RegionRect`) for the region. Add a

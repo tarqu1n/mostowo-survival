@@ -226,9 +226,91 @@ depth ramp at all, it's **irregular alpha-cutout blobs on grass**, i.e. the SAME
   plain" gotcha above) — irrelevant to the patch technique above (which never draws mud's edge tiles),
   but matters if mud's own `mapping` gets used directly elsewhere.
 
+## The 1px edge test — tile compatibility, groups, and the seam audit
+
+Everything above decides which tile goes where by **shape** (alpha blob keys, 4-corner depth cases).
+That's necessary but not sufficient: two shape-correct neighbours can still have touching borders that
+don't continue each other, which is what a "hard edge" is. The rule that catches it is one comparison,
+in [`scripts/pixel-crawler/edge_compat.py`](../scripts/pixel-crawler/edge_compat.py): lay the two tiles'
+**touching 1px borders** side by side and count how many of the 16 pixel pairs disagree
+(`A` may sit left of `B` iff `A.E ≈ B.W`; above iff `A.S ≈ B.N`).
+
+Two thresholds, because "may these be interchangeable fill?" and "is this rendered seam a cut?" are
+different questions:
+
+|rule|knobs|used for|
+|---|---|---|
+|**tight / group**|`COLOR_TH=8`, `FIT_TH=0` (every pixel must match)|compatibility **groups** — a set of `(frame, rot)` placements that are mutually placeable in *any* arrangement, so scattering them can't seam. `variants` in every baked set is now the group containing that set's base tile; `groups` carries the rest.|
+|**loose / audit**|`BREAK_COLOR_TH=40`, `BREAK_TH=0.85`|`audit_canvas` — scores every internal seam of a FINISHED render and counts **hard edges**. Authored boundaries (a coastline, a grass edge into mud) score ≲0.5; a wrong neighbour scores 1.00, so 0.85 separates them with a wide margin (the spike measured known-good island seams at 0.00–0.31).|
+
+Both are per-pixel RGB**A** — "opaque here, transparent there" is exactly the kind of disagreement that
+shows as a hard edge on the alpha-cutout sheets.
+
+**Three places it's applied.** Together these are what got the test biome maps to `hard edges = 0`:
+
+1. **Bake time — pool + option filtering.** `compat_pool`/`compat_frames` build the scatter pools as
+   groups (auto-relaxing `colorTh` per sheet, as the old edge-class floor did). `filter_coast_by_shore`
+   drops coast options whose LAND-facing borders don't fit the shore terrain's fill; `prune_coast_arcs`
+   then runs arc consistency over the case map (drop any option some border no legal neighbour can
+   answer); `filter_blob_mapping` drops options whose interior-facing borders carry boundary art.
+2. **Placement time — `edge_compat.pick_placement`.** Among a case's options, pick one that also seams
+   against the already-final neighbours (composited first, so alpha tiles are judged on the pixels they
+   actually produce), at random among ties so variety survives. Counts `forced`/`no-fit` when nothing
+   fits — don't hide those, they measure a set's real coverage.
+3. **Field repair — before anything is drawn.** Some shapes have no tiling at all in this art, so the
+   FIELD is repaired rather than the tolerance loosened (same posture as `depth_field`'s erode/de-saddle):
+   majority-smooth every band footprint, delete water bodies under ~8 cells, force a **shore collar** of
+   the coast's own shore terrain around water, and absorb 1-cell-wide base strips.
+
+### Hard-won lessons from the audit (each was a visible defect)
+
+- **A depth band must keep the base terrain UNDER it, not a hole.** Holing water out of the base
+  overlay makes the base cut its own alpha edge round the pond — dirt lip and all — and the coast tile
+  then has to butt that. Nothing in the coast art can; it seams all the way round (52 hard edges on the
+  marsh preset). Paint plain base everywhere, opaque depth tiles on top (what `render_depth_lake` always
+  did). Blob bands DO get the hole — that's the mud-patch technique.
+- **Water can only shore onto the terrain its coast art was drawn against.** Measured, not assumed
+  (`shore_terrain`): 192 of this sheet's coast borders fit `grass`, 0 fit `mud`. A pond dropped into a
+  mud band gets a green ring. Hence the collar.
+- **The `pickFrame` fallback chain matters.** exact key → same cardinals → FULL. Skip the middle step and
+  a boundary becomes a plain interior tile: a dead-straight, unblended terrain edge.
+- **Three cardinal combinations have no tile at all** (E|W, N|S, isolated) — the 1-wide strips. Repair
+  the field; there is nothing to place there.
+- **Interior-border fidelity has to be scored RELATIVELY.** No edge tile in this pack has a perfectly
+  plain interior border (best scores 0.25–0.56 — the lip is drawn to run across tile boundaries), so an
+  absolute rule empties every key and collapses edge variety to one option.
+- **Dual-grid tiles overhang their mask** by one cell right/bottom. That's why the collar is 2 cells,
+  why the biome renderer paints depth bands last, and why placement checks E/S only where this pass
+  won't repaint them.
+
+### Tools
+
+- **`gen_tile_groups.py`** — sweeps a whole sheet with the tight rule and reports the **groups of tiles
+  that go together**, largest first, with a rendered field per group (a group is a clique, so any
+  arrangement of it is seam-free) plus a labelled contact sheet. This is how to find a new biome's
+  palette from pixels instead of by eye: at `--color-th 14` the Floors sheet resolves into grass, two
+  dirt shades, sand, snow/ice and stone-floor palettes. Outputs to `.tile-groups/` (gitignored).
+- **`gen_biome_tests.py`** — renders whole **test biome maps, tiles only** (height field → bands →
+  autotiled boundaries → scatter; no nodes, no decor), mirroring `biomeGen/terrain.ts`'s composition.
+  Each map prints coverage, the field repairs applied, `invalid`/`no-fit`, and the seam audit, plus a
+  per-pairing tally of any hard edges and a `<preset>-audit.png` with every hard seam struck through in
+  magenta. `--seed` re-rolls, `--preset` narrows. Outputs to `.biome-tests/` (gitignored).
+  **Acceptance bar: `hard edges = 0` on every preset** (currently holds for all four across seeds).
+
+> **Not yet ported to TypeScript.** `src/systems/biomeGen/terrain.ts` (plan 052 Step 7) still has the
+> pre-audit composition: it holes the base overlay out under depth bands, has no shore collar, and no
+> smoothing/thin-strip/small-body repair — i.e. the defects listed above are still live in the editor's
+> biome tool. Port the field repairs + the "base under depth bands" ordering there before Step 11's tool
+> is judged on looks. Placement-time matching needs the pixels, so the TS side wants the *pruned* option
+> lists the baker now emits rather than its own matcher.
+
 ## Files
 
 - Baker: [`scripts/pixel-crawler/bake_edge_set.py`](../scripts/pixel-crawler/bake_edge_set.py) —
   derivation (blob + depth) + the reference generator/guard.
-- Output: `public/assets/tilesets/pixel-crawler/edge-sets/{grass,water}.json` + `bake_edge_set_demo.png`.
+- Edge test: [`scripts/pixel-crawler/edge_compat.py`](../scripts/pixel-crawler/edge_compat.py) — the
+  pairwise 1px-border rule, groups, matched placement, canvas audit (shared by everything below).
+- Group discovery: [`scripts/pixel-crawler/gen_tile_groups.py`](../scripts/pixel-crawler/gen_tile_groups.py).
+- Test biome maps: [`scripts/pixel-crawler/gen_biome_tests.py`](../scripts/pixel-crawler/gen_biome_tests.py).
+- Output: `public/assets/tilesets/pixel-crawler/edge-sets/{grass,mud,water}.json` + `bake_edge_set_demo*.png`.
 - Blob terrains for the older `terrains.json` path: `scripts/pixel-crawler/gen_terrains.py`.

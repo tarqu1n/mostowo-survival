@@ -10,8 +10,9 @@
  * - **blob** (`grass`, `mud`): alpha-cutout autotile. `mapping[blobKey]` is a LIST of `[frame, rot]`
  *   OPTIONS (unlike the older, simpler `terrains.json`/`autotile.ts` `TerrainMapping`, which is one
  *   canonical frame per key with no rotation) — the baker keeps every rotation/option for edge variety,
- *   picked randomly at bake time (`biomeGen/terrain.ts`, Step 7). `surfaces[0].edged` is reserved for a
- *   future edge-matched (Wang) generator and unused by anything today — not modelled here.
+ *   picked randomly at bake time (`biomeGen/terrain.ts`, Step 7). `surfaces[0].groups` (every
+ *   compatibility group the baker's 1px-edge test found, of which `variants` is the one containing the
+ *   base tile) is reserved for a future edge-matched (Wang) generator — not modelled here.
  * - **depth** (`water`): opaque colour-ramp levels joined by dual-grid corner autotiles (`transitions`,
  *   one per adjacent level pair) + a land/water `coast` autotile + per-level `variants`. `generate`
  *   carries the lake generator's tuning (BFS distance bands, noise amp/scale/seed, scatter rate) — the
@@ -33,8 +34,10 @@ export interface BlobSurface {
   /** The plain/default interior frame (drawn at rot 0 for a fully-surrounded cell most of the time). */
   base: number;
   accents: number[];
-  /** Open (seam-safe in any rotation) `[frame, rot]` options — scattered as occasional accents over
-   *  `base` for texture, and as the fallback pool for the fully-surrounded (`FULL_KEY`) case. */
+  /** The base tile's **compatibility group**: `[frame, rot]` options the baker's pairwise 1px-border
+   *  test proved mutually placeable in any arrangement, so scattering them in any order/rotation
+   *  cannot make a seam. Scattered as occasional accents over `base` for texture, and used as the
+   *  fallback pool for the fully-surrounded (`FULL_KEY`) case. */
   variants: FrameOption[];
 }
 

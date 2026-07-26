@@ -46,3 +46,8 @@ __pycache__/
 _shot.mjs
 scripts/pixel-crawler/biome_lake_poc.png
 scripts/pixel-crawler/bake_edge_set_demo*.png
+
+# tile-compatibility group previews + test biome map renders (eyeball artifacts, regenerate on demand:
+# scripts/pixel-crawler/gen_tile_groups.py / gen_biome_tests.py — see docs/BIOMES.md)
+scripts/pixel-crawler/.tile-groups/
+scripts/pixel-crawler/.biome-tests/
