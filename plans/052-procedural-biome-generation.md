@@ -464,7 +464,29 @@ or the **one** guarding spec — never the full `npm run e2e`/`check:all` mid-wo
       layers resolves to exactly one of `frame`/`imageAsset` (no unmapped cells), plus targeted synthetic
       cases (fully-mud band, empty-bands flat biome, missing edge-set id, non-blob `terrain.base`).
 
-- [ ] **Step 8: Generator — scatter (`src/systems/biomeGen/scatter.ts`)** `[inline]`
+- [x] **Step 8: Generator — scatter (`src/systems/biomeGen/scatter.ts`)** `[inline]`
+  - Outcome: `generateScatter({region, layers, field, seed, cellEdgeSet})` in the new `scatter.ts`.
+    Reproduces the plan's "shared height/moisture field drives clearings vs. thickets" literally, not
+    just conceptually: it does `makeRng(seed)` → `makeNoise2D(rng)` as its very first action — exactly
+    what `terrain.ts`'s `assignBands` does — so passing the SAME `seed` (and `terrain.field` params, via
+    the new `field` input) as `generateTerrain` reproduces a byte-identical noise lattice; the two calls
+    then diverge into independent `Rng` streams so scatter's own draws never disturb terrain's. Per
+    layer (processed in array order = "layer stack order"): `poissonSample` at `layer.spacing`, with an
+    `accept(x,y)` that hard-rejects cells whose Step-7 `cellEdgeSet` entry is in `avoidTerrains` and
+    otherwise returns `noise.fbm(x,y,field) * layer.density` as a keep-probability; each accepted point
+    picks a member via `pickWeighted(layer.members, rng.nextFloat)` and, if `layer.clump` is set, rolls
+    a `chance` and scatters `count[0]..count[1]` children at a random angle/distance within `radius`
+    tiles (dropped, not retried, if out of region bounds or on an avoided cell). Output is `ScatterPlacement`
+    (`{kind:'node',ref,col,row,skin?}` int tile-addressed, or `{kind:'decor',asset,x,y}` PIXELS —
+    `TILE_SIZE`-scaled from the continuous Poisson coordinate, sub-tile precision kept) — both
+    **region-local**; Step 9 adds the region rect's own origin (tiles for node, `* TILE_SIZE` for decor).
+    `src/systems/biomeGen/__tests__/scatter.test.ts` (new, 5 tests): determinism, min-spacing honoured
+    (decor placements converted back to tile units), density thinning (0.05 vs 1.0 density, same seed),
+    zero placements on an `avoidTerrains` cell region, and clumping (every non-parent placement lies
+    within `radius` + flooring slack of a Poisson parent). `npm test biomeGen` (`npx vitest run
+    biomeGen`) → 15/15 pass (5 new + 10 existing terrain tests); `tsc --noEmit` + eslint + prettier
+    clean. Files touched: `src/systems/biomeGen/scatter.ts` (new),
+    `src/systems/biomeGen/__tests__/scatter.test.ts` (new).
   - Per `scatter` layer: `poissonSample` at the layer's `spacing`, accept points against the noise
     density field × `layer.density`, choose a member with `pickWeighted(members, rng)`, honour
     `avoidTerrains` (skip cells whose band terrain is excluded — e.g. no trees in the pond) and `clump`
