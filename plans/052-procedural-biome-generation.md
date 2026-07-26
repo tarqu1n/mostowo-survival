@@ -538,7 +538,44 @@ or the **one** guarding spec — never the full `npm run e2e`/`check:all` mid-wo
   - Done when: `npm test biomeGen` passes — same `(region,def,seed)` → identical `BiomeResult`; falloff
     reduces near-border density; excluded cells never receive edits/objects.
 
-- [ ] **Step 10: Editor — apply a `BiomeResult` as one undoable batch (`store/slices/biomeSlice.ts`)** `[inline]`
+- [x] **Step 10: Editor — apply a `BiomeResult` as one undoable batch (`store/slices/biomeSlice.ts`)** `[inline]`
+  - Outcome: `biomeSlice.ts` (new) exports one action, `applyBiomeResult(result: BiomeResult, origin:
+    {col,row}, edgeSets: Record<string,EdgeSet>): boolean` — deviates from the plan's `(result)`-only
+    sketch by taking `origin` (where the region-local `result` sits in the real map — Steps 7-9 never
+    had map placement, so someone has to translate) and an explicit `edgeSets` (needed to resolve each
+    `TerrainCell.edgeSetId` to a real `{pack,sheet}`, same catalog Step 9 needed to generate `result`).
+    `'base'`-role tile edits (bands — mud/water) bake onto the CURRENT active layer (falls back to
+    `map.layers[0]`); `'overlay'`-role edits (the biome's base terrain, e.g. grass) bake onto a
+    freshly-added higher-index `TileLayer` named "Biome Overlay" — but ONLY when `result` actually
+    carries overlay cells (in practice, for the landed Forest preset, always — Step 7's "overlay =
+    the base terrain, painted everywhere except band holes" model means this is basically never empty;
+    the plan's "only if the biome uses an overlay band" phrasing predates that landing and is
+    reinterpreted accordingly, documented as a KNOWN SCOPE LIMIT: repeated non-reroll applies each add
+    their own overlay layer — no cross-apply reuse, since that would need new persisted state outside
+    this step's scope). Added a local `opFromBakeChanges` (mirrors `store/shared.ts`'s
+    `commandFromChanges` but supports a DIFFERENT `next` value per cell, reusing `terrainOps.ts`'s
+    already-exported `TerrainBakeChange` type, since one biome bake paints many distinct frames, unlike
+    a uniform-value paint stroke) and a duplicated private `nextLayerId` (mirrors `layersSlice.ts`'s own
+    unexported helper, same precedent `objectOps.ts` already set for small single-purpose duplicates).
+    Every `ScatterPlacement` becomes a real `NodeObject`/`DecorObject` (auto id via `nextObjectId`,
+    `mintedIds` threaded like `duplicateObjects` does), gated on `footprintIsValid` (which itself checks
+    `isInside`) — a placement that would land on void/out-of-bounds is DROPPED, not fatal to the rest of
+    the apply. Tile edits (both roles) + the optional new-layer op + the object-insert op are one
+    `batchCommand` → one `applyCommand` call → one atomic undo entry. Sets `pendingDirty: null` before
+    applying (full rebake) — mirrors `terrainSlice.ts`'s own precedent for a bulk multi-cell edit rather
+    than computing precise per-chunk dirt (the plan's original "set pendingDirty for touched chunks"
+    language). `src/editor/store/__tests__/editorStoreBiome.test.ts` (new, 6 tests): returns `false`
+    with no map open; a real Forest `generateBiome` output bakes in, round-trips through
+    `parseMap(JSON.parse(serializeMap(map)))` with zero errors, and a single `undo()` fully reverts
+    (layer count, object count, `canUndo`); `origin` correctly translates region-local coordinates to
+    absolute map coordinates for both node (col/row) and decor (px) placements; no overlay layer is
+    created when the result has no overlay cells; an object placement on a void cell is dropped without
+    crashing the rest of the batch; base-role cells bake onto the existing `ground` layer, not a new
+    one. `npx vitest run` (full suite) → 1083/1083 pass (6 new); `tsc --noEmit` + eslint (0 errors, only
+    pre-existing unrelated e2e-file warnings) + prettier clean. Files touched:
+    `src/editor/store/slices/biomeSlice.ts` (new), `src/editor/store/__tests__/editorStoreBiome.test.ts`
+    (new), `src/editor/store/types.ts` (added `applyBiomeResult` to `EditorState` + its imports),
+    `src/editor/store/editorStore.ts` (composed `biomeSlice`).
   - Add a `biomeSlice` with `applyBiomeResult(result)`: resolve each `layerRole` to a real layer id
     (base = active/`ground` layer; **overlay** = a dedicated higher-index `TileLayer` via the editor's
     `addLayer`, created above the base only if the biome uses an overlay band), convert `frames` →

@@ -19,6 +19,8 @@ import type {
 } from '../../systems/mapFormat';
 import type { WorldLayout } from '../../systems/worldLayout';
 import type { AuthoredNodeDef, NodeSkinDef, ParsedNodeDef } from '../../systems/nodeDefs';
+import type { BiomeResult } from '../../systems/biomeGen';
+import type { EdgeSet } from '../../systems/edgeSets';
 import type { AssetCatalog, CatalogAssetRole } from '../catalog';
 import type { TerrainCatalog } from '../terrainCatalog';
 import type { UnderlaySettings } from '../underlayStore';
@@ -734,6 +736,23 @@ export interface EditorState {
    *  canonicalization pass, not a semantic edit); bumps `docRevision` only if something actually
    *  changed. Returns whether anything changed. */
   rebakeTerrainsForSave(): boolean;
+
+  // ---- biome painter (plan 052 step 10) ----
+  /** Bakes a Step 9 `generateBiome` result into the live map as ONE undoable command: region-local
+   *  `'base'`-role cells (bands — mud/water/…) onto the CURRENT active layer, region-local
+   *  `'overlay'`-role cells (the biome's base terrain, e.g. grass) onto a freshly-added higher-index
+   *  layer (created only when `result` actually carries overlay cells), and every scatter placement as
+   *  a real node/decor object (dropped, not fatal, if its footprint lands on void/out-of-bounds).
+   *  `origin` is where the generated region sits in this map (tile coords); `edgeSets` is the same
+   *  loaded tile-edge-set catalog `generateBiome` was given, needed again to resolve each cell's real
+   *  `{pack, sheet}`. Returns `false` only if there's no open map; an apply that excludes everything
+   *  still returns `true` (nothing to undo, not an error). See `biomeSlice.ts`'s module doc for the
+   *  overlay-layer-per-apply scope limit. */
+  applyBiomeResult(
+    result: BiomeResult,
+    origin: { col: number; row: number },
+    edgeSets: Record<string, EdgeSet>,
+  ): boolean;
 
   // ---- objects: place, transform, stack, portals (step 7) ----
   /** Places a `decor` object at `(x,y)` px with the default cosmetic transform (scale 1, rotation 0,

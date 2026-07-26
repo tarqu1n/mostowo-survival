@@ -47,6 +47,7 @@ import { layersSlice } from './slices/layersSlice';
 import { favouritesSlice } from './slices/favouritesSlice';
 import { tilePalettesSlice } from './slices/tilePalettesSlice';
 import { objectsSlice } from './slices/objectsSlice';
+import { biomeSlice } from './slices/biomeSlice';
 
 /**
  * The editor document store, composed from per-domain Zustand slices (plan 043 step 7). Each slice is
@@ -71,6 +72,7 @@ export const useEditorStore = create<EditorState>()(
     ...favouritesSlice(...a),
     ...tilePalettesSlice(...a),
     ...objectsSlice(...a),
+    ...biomeSlice(...a),
   })),
 );
 
